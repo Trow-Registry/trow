@@ -6,12 +6,13 @@ extern crate rocket_contrib;
 #[macro_use]
 extern crate serde_derive;
 
-use std::path::Path;
 use rocket_contrib::Json;
 use rocket::http::Status;
-use rocket::response::{NamedFile, Responder, Response};
+use rocket::response::{Responder, Response};
 use rocket::request::Request;
 use rocket::response::status::NotFound;
+
+mod errors;
 
 #[derive(Serialize, Debug)]
 struct V2AvailableRoutes {}
@@ -38,20 +39,21 @@ fn get_v2root() -> LycaonResponse<V2AvailableRoutes> {
     RegistryResponse::<Json<V2AvailableRoutes>>((Json(V2AvailableRoutes {})))
 }
 
-#[get("/v2/<name>/manifests/<reference>")]
+#[get("/v2/<_name>/manifests/<reference>")]
 fn get_manifest(
-    name: String,
+    _name: String,
     reference: String,
-) -> MaybeResponse<V2AvailableRoutes, V2AvailableRoutes> {
+) -> MaybeResponse<V2AvailableRoutes, errors::Errors> {
     println!("Getting Manifest");
+    let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match reference.as_str() {
         "good" => Ok(Json(V2AvailableRoutes {})),
-        _ => Err(NotFound(Json(V2AvailableRoutes {}))),
+        _ => Err(NotFound(Json(errors))),
     }
 }
 
-#[get("/v2/<name>/blobs/<digest>")]
-fn get_blob(name: String, digest: String) -> MaybeResponse<V2AvailableRoutes, V2AvailableRoutes> {
+#[get("/v2/<_name>/blobs/<digest>")]
+fn get_blob(_name: String, digest: String) -> MaybeResponse<V2AvailableRoutes, V2AvailableRoutes> {
     println!("Getting Blob");
     match digest.as_str() {
         "good" => Ok(Json(V2AvailableRoutes {})),
