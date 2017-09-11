@@ -23,18 +23,15 @@ pub enum ErrorType {
 }
 
 #[derive(Serialize, Debug)]
-#[serde(untagged)]
-pub enum Error {
-    Error {
-        code: ErrorType,
-        message: Message,
-        detail: Detail,
-    }
+pub struct FormatError {
+    code: ErrorType,
+    message: Message,
+    detail: Detail,
 }
 
 #[derive(Serialize, Debug)]
-pub struct Errors {
-    errors: Vec<Error>
+pub struct Error {
+    errors: Vec<FormatError>
 }
 
 fn get_message(error: &ErrorType) -> Message {
@@ -79,33 +76,23 @@ fn get_detail(error: &ErrorType) -> Detail {
     Detail::from(detail)
 }
 
-pub fn get_error(error: ErrorType) -> Error {
+pub fn get_error(error: ErrorType) -> FormatError {
     let message = get_message(&error);
     let detail = get_detail(&error);
-    Error::Error{
+    FormatError {
         code: error,
         message: message,
         detail: detail
     }
 }
 
-pub fn generate_errors(errors: &[ErrorType]) -> Errors {
-    let mut my_errors: Vec<Error> = Vec::new();
+pub fn generate_errors(errors: &[ErrorType]) -> Error {
+    let mut format_errors: Vec<FormatError> = Vec::new();
     for error in errors {
         let error = error.clone();
-        let error = get_error(error);
-        println!("{:?}", error);
-        my_errors.push(error);
+        format_errors.push(get_error(error));
     }
-    Errors {
-        errors: my_errors
+    Error {
+        errors: format_errors
     }
 }
-
-// pub fn generate_errors(errors: &[ErrorType]) -> &Errors {
-//     let errors = errors.into_iter().map(|&x| { get_error(x); });
-//     let errors: Vec<Error> = Vec::from_iter(errors);
-//     &Errors {
-//         errors: errors
-//     }
-// }

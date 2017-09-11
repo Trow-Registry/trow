@@ -43,7 +43,7 @@ fn get_v2root() -> LycaonResponse<V2AvailableRoutes> {
 fn get_manifest(
     _name: String,
     reference: String,
-) -> MaybeResponse<V2AvailableRoutes, errors::Errors> {
+) -> MaybeResponse<V2AvailableRoutes, errors::Error> {
     println!("Getting Manifest");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match reference.as_str() {
@@ -53,11 +53,12 @@ fn get_manifest(
 }
 
 #[get("/v2/<_name>/blobs/<digest>")]
-fn get_blob(_name: String, digest: String) -> MaybeResponse<V2AvailableRoutes, V2AvailableRoutes> {
+fn get_blob(_name: String, digest: String) -> MaybeResponse<V2AvailableRoutes, errors::Error> {
     println!("Getting Blob");
+    let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match digest.as_str() {
         "good" => Ok(Json(V2AvailableRoutes {})),
-        _ => Err(NotFound(Json(V2AvailableRoutes {}))),
+        _ => Err(NotFound(Json(errors))),
     }
 }
 
