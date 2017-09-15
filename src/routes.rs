@@ -1,4 +1,32 @@
-/*
+use rocket;
+use rocket_contrib::Json;
+use uuid::Uuid;
+
+use errors;
+use response;
+use response::*; // HACK: bad practice
+
+pub fn routes() -> Vec<rocket::Route> {
+    routes![
+        get_v2root,
+        get_manifest,
+        check_image_manifest,
+        get_blob,
+        post_blob_uuid,
+        check_existing_layer,
+        get_upload_progress,
+        put_blob,
+        delete_upload,
+        post_blob_upload,
+        delete_blob,
+        put_image_manifest,
+        get_catalog,
+        get_image_tags,
+        delete_image_manifest,
+    ]
+}
+
+/**
 Routes of a 2.0 Registry
 
 Version Check of the registry
@@ -10,7 +38,15 @@ GET /v2/
 
 # Headers
 Docker-Distribution-API-Version: registry/2.0
+*/
 
+/// Some docs for this function
+#[get("/v2")]
+fn get_v2root() -> LycaonResponse<EmptyResponse> {
+    RegistryResponse::<Json<EmptyResponse>>((Json(EmptyResponse {})))
+}
+
+/*
 ---
 Pulling an image
 GET /v2/<name>/manifests/<reference>
@@ -29,6 +65,21 @@ Accept: manifest-version
 # Returns
 200 - return the manifest
 404 - manifest not known to the registry
+*/
+#[get("/v2/<name>/<repo>/manifests/<reference>")]
+fn get_manifest(
+    name: String,
+    repo: String,
+    reference: String,
+) -> MaybeResponse<EmptyResponse> {
+    info!("Getting Manifest");
+    let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+    match reference.as_str() {
+        "good" => RegistryResponse(Ok(Json(EmptyResponse {}))),
+        _ => MaybeResponse::err(errors),
+    }
+}
+/*
 
 ---
 Check for existance
@@ -45,7 +96,15 @@ Content-Length: size of manifest
 # Returns
 200 - manifest exists
 404 - manifest does not exist
+ */
+#[head("/v2/<name>/<repo>/manifests/<reference>")]
+fn check_image_manifest(name: String, repo: String, reference: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
 
+/*
 ---
 Pulling a Layer
 GET /v2/<name>/blobs/<digest>
@@ -55,6 +114,18 @@ digest - unique identifier for the blob to be downoaded
 # Responses
 200 - blob is downloaded
 307 - redirect to another service for downloading[1]
+ */
+#[get("/v2/<name>/<repo>/blobs/<digest>")]
+fn get_blob(name: String, repo: String, digest: String) -> MaybeResponse<EmptyResponse> {
+    info!("Getting Blob");
+    let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+    match digest.as_str() {
+        "good" => RegistryResponse(Ok(Json(EmptyResponse {}))),
+        _ => MaybeResponse::err(errors),
+    }
+}
+
+/**
 
 ---
 Pushing a Layer
@@ -69,7 +140,15 @@ Docker-Upload-UUID: <uuid>
 
 # Returns
 202 - accepted
+*/
+#[post("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
+fn post_blob_uuid(name: String, repo: String, uuid: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
 
+/*
 ---
 Check for existing layer
 HEAD /v2/<name>/blobs/<digest>
@@ -83,7 +162,15 @@ Docker-Content-Digest: <digest>
 # Returns
 200 - exists
 404 - does not exist
+ */
+#[head("/v2/<name>/<repo>/blobs/<digest>")]
+fn check_existing_layer(name: String, repo: String, digest: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
 
+/*
 ---
 Upload Progress
 GET /v2/<name>/blobs/uploads/<uuid>
@@ -100,6 +187,14 @@ Docker-Upload-UUID: <uuid>
 
 # Returns
 204
+ */
+#[get("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
+fn get_upload_progress(name: String, repo: String, uuid: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+/*
 
 ---
 Monolithic Upload
@@ -108,8 +203,6 @@ Content-Length: <size of layer>
 Content-Type: application/octet-stream
 
 <Layer Binary Data>
-
-
 ---
 Chunked Upload (Don't implement until Monolithic works)
 PATCH /v2/<name>/blobs/uploads/<uuid>
@@ -118,37 +211,112 @@ Content-Range: <start of range>-<end of range>
 Content-Type: application/octet-stream
 
 <Layer Chunk Binary Data>
+ */
+
+#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>")] // capture digest query string
+fn put_blob(name: String, repo: String, uuid: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+
+/*
+
 
 ---
 Cancelling an upload
 DELETE /v2/<name>/blobs/uploads/<uuid>
 
+ */
 
+#[delete("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
+fn delete_upload(name: String, repo: String, uuid: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+/*
 ---
 Cross repo blob mounting (validate how regularly this is used)
 POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
 
+ */
+
+#[post("/v2/<name>/<repo>/blobs/uploads")]
+fn post_blob_upload(name: String, repo: String) ->
+    RegistryResponse<response::UuidResponse> {
+    // MaybeResponse<response::UuidResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        let my_uuid = Uuid::new_v4();
+        let uuid = String::from("test");
+        info!("Using Uuid: {}", my_uuid);
+        response::RegistryResponse(response::UuidResponse{uuid})
+}
+/*
+
 ---
 Delete a layer
 DELETE /v2/<name>/blobs/<digest>
+
+*/
+#[delete("/v2/<name>/<repo>/blobs/<digest>")]
+fn delete_blob(name: String, repo: String, digest: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+/*
 
 ---
 Pushing an image manifest
 PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
+*/
+#[put("/v2/<name>/<repo>/manifests/<reference>")]
+fn put_image_manifest(name: String, repo: String, reference: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+/*
 ---
 Listing Repositories
 GET /v2/_catalog
 
+*/
+#[get("/v2/_catalog")]
+fn get_catalog() ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+/*
 ---
 Listing Image Tags
 GET /v2/<name>/tags/list
 
+*/
+#[delete("/v2/<name>/<repo>/tags/list")]
+fn get_image_tags(name: String, repo: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+/*
 ---
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
 
+*/
+#[delete("/v2/<name>/<repo>/manifests/<reference>")]
+fn delete_image_manifest(name: String, repo: String, reference: String) ->
+    MaybeResponse<EmptyResponse> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        MaybeResponse::err(errors)
+}
+
+/*
 ---
 [1]: Could possibly be used to redirect a client to a local cache
 */
