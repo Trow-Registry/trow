@@ -1,6 +1,6 @@
 use rocket;
 use rocket_contrib::Json;
-use rocket::http::Status;
+use rocket::http::{Header, Status};
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
 use rocket::response::status::NotFound;
@@ -8,7 +8,32 @@ use rocket::response::status::NotFound;
 use errors;
 
 #[derive(Serialize, Debug)]
-pub struct EmptyResponse {}
+pub enum Responses {
+    Empty {},
+    Uuid {
+        uuid: String,
+        name: String,
+        repo: String
+    },
+
+}
+
+impl<'r> Responder<'r> for Responses {
+    fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
+        match self {
+            Responses::Empty {} => Response::build().ok(),
+            Responses::Uuid {uuid, name, repo} => {
+                let location_url = format!("/v2/{}/{}/blobs/uploads/{}", name, repo, uuid);
+                let header = Header::new("Docker-Upload-UUID", uuid);
+                let location = Header::new("Location", location_url);
+                Response::build()
+                    .header(header)
+                    .header(location)
+                    .ok()
+            },
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct RegistryResponse<R>(pub R);
@@ -24,33 +49,14 @@ impl<'r, R: Responder<'r>> Responder<'r> for RegistryResponse<R> {
     }
 }
 
-/**
-This is the response for a valid Uuid Generation.
-*/
-#[derive(Debug, Serialize)]
-pub struct UuidResponse {
-    pub uuid: String
-}
-
-impl<'r> Responder<'r> for UuidResponse {
-    fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
-        let header = rocket::http::Header::new("Docker-Upload-UUID", self.uuid);
-        Response::build()
-            .header(header)
-            .ok()
-    }
-}
-
-pub type LycaonResponse<A> = RegistryResponse<Json<A>>;
-pub type MaybeResponse<A> = RegistryResponse<Result<Json<A>, NotFound<Json<errors::Error>>>>;
-
+pub type MaybeResponse<A> = RegistryResponse<Result<A, NotFound<errors::Error>>>;
 
 impl<A> MaybeResponse<A>  {
     pub fn ok(val: A) -> Self {
-        RegistryResponse(Ok((Json(val))))
+        RegistryResponse(Ok(val))
     }
 
     pub fn err(error: errors::Error) -> Self {
-        RegistryResponse(Err(NotFound(Json(error))))
+        RegistryResponse(Err(NotFound(error)))
     }
 }

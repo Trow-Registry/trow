@@ -1,3 +1,4 @@
+use std::string::ToString;
 use rocket;
 use rocket_contrib::Json;
 use uuid::Uuid;
@@ -42,8 +43,8 @@ Docker-Distribution-API-Version: registry/2.0
 
 /// Some docs for this function
 #[get("/v2")]
-fn get_v2root() -> LycaonResponse<EmptyResponse> {
-    RegistryResponse::<Json<EmptyResponse>>((Json(EmptyResponse {})))
+fn get_v2root() -> MaybeResponse<Responses> {
+    MaybeResponse::ok(Responses::Empty {})
 }
 
 /*
@@ -71,11 +72,11 @@ fn get_manifest(
     name: String,
     repo: String,
     reference: String,
-) -> MaybeResponse<EmptyResponse> {
+) -> MaybeResponse<Responses> {
     info!("Getting Manifest");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match reference.as_str() {
-        "good" => RegistryResponse(Ok(Json(EmptyResponse {}))),
+        "good" => MaybeResponse::ok(Responses::Empty {}),
         _ => MaybeResponse::err(errors),
     }
 }
@@ -99,7 +100,7 @@ Content-Length: size of manifest
  */
 #[head("/v2/<name>/<repo>/manifests/<reference>")]
 fn check_image_manifest(name: String, repo: String, reference: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -116,11 +117,11 @@ digest - unique identifier for the blob to be downoaded
 307 - redirect to another service for downloading[1]
  */
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
-fn get_blob(name: String, repo: String, digest: String) -> MaybeResponse<EmptyResponse> {
+fn get_blob(name: String, repo: String, digest: String) -> MaybeResponse<Responses> {
     info!("Getting Blob");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match digest.as_str() {
-        "good" => RegistryResponse(Ok(Json(EmptyResponse {}))),
+        "good" => MaybeResponse::ok(Responses::Empty {}),
         _ => MaybeResponse::err(errors),
     }
 }
@@ -143,7 +144,7 @@ Docker-Upload-UUID: <uuid>
 */
 #[post("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
 fn post_blob_uuid(name: String, repo: String, uuid: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -165,7 +166,7 @@ Docker-Content-Digest: <digest>
  */
 #[head("/v2/<name>/<repo>/blobs/<digest>")]
 fn check_existing_layer(name: String, repo: String, digest: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -190,7 +191,7 @@ Docker-Upload-UUID: <uuid>
  */
 #[get("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
 fn get_upload_progress(name: String, repo: String, uuid: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -215,7 +216,7 @@ Content-Type: application/octet-stream
 
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>")] // capture digest query string
 fn put_blob(name: String, repo: String, uuid: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -231,7 +232,7 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
 #[delete("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
 fn delete_upload(name: String, repo: String, uuid: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -244,13 +245,13 @@ POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
 fn post_blob_upload(name: String, repo: String) ->
-    RegistryResponse<response::UuidResponse> {
-    // MaybeResponse<response::UuidResponse> {
-        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        let my_uuid = Uuid::new_v4();
-        let uuid = String::from("test");
-        info!("Using Uuid: {}", my_uuid);
-        response::RegistryResponse(response::UuidResponse{uuid})
+    MaybeResponse<Responses> {
+        let uuid = Uuid::new_v4();
+        info!("Using Uuid: {:?}", uuid);
+        MaybeResponse::ok(Responses::Uuid {
+            uuid: uuid.to_string(),
+            name,
+            repo})
 }
 /*
 
@@ -261,7 +262,7 @@ DELETE /v2/<name>/blobs/<digest>
 */
 #[delete("/v2/<name>/<repo>/blobs/<digest>")]
 fn delete_blob(name: String, repo: String, digest: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -275,7 +276,7 @@ Content-Type: <manifest media type>
 */
 #[put("/v2/<name>/<repo>/manifests/<reference>")]
 fn put_image_manifest(name: String, repo: String, reference: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -287,7 +288,7 @@ GET /v2/_catalog
 */
 #[get("/v2/_catalog")]
 fn get_catalog() ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -299,7 +300,7 @@ GET /v2/<name>/tags/list
 */
 #[delete("/v2/<name>/<repo>/tags/list")]
 fn get_image_tags(name: String, repo: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -311,7 +312,7 @@ DELETE /v2/<name>/manifests/<reference>
 */
 #[delete("/v2/<name>/<repo>/manifests/<reference>")]
 fn delete_image_manifest(name: String, repo: String, reference: String) ->
-    MaybeResponse<EmptyResponse> {
+    MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
