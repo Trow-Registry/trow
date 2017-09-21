@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Hamish Hutchings <moredhel@aoeu.me>"]
 
 [dependencies]
+# pinned
+ring = "0.11.0" # cookie depends on this version
+
 rocket = "0.3.2"
 rocket_codegen = "0.3.2"
 rocket_contrib = "0.3.2"

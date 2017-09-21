@@ -1,11 +1,14 @@
+use std::hash::{Hash, Hasher};
+use std::str;
+use std::io::Read;
+use std::fs::File;
 use std::string::ToString;
 use rocket;
-use rocket_contrib::Json;
 use uuid::Uuid;
+use ring::{digest, test};
 
 use errors;
-use response;
-use response::*; // HACK: bad practice
+use response::{Responses, MaybeResponse};
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -17,6 +20,7 @@ pub fn routes() -> Vec<rocket::Route> {
         check_existing_layer,
         get_upload_progress,
         put_blob,
+        patch_blob,
         delete_upload,
         post_blob_upload,
         delete_blob,
@@ -25,6 +29,26 @@ pub fn routes() -> Vec<rocket::Route> {
         get_image_tags,
         delete_image_manifest,
     ]
+}
+
+pub fn errors() -> Vec<rocket::Catcher> {
+    errors![
+        err_400,
+        err_404,
+        ]
+        
+}
+
+#[error(400)]
+fn err_400() -> MaybeResponse<Responses> {
+    let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+    MaybeResponse::err(errors)
+}
+
+#[error(404)]
+fn err_404() -> MaybeResponse<Responses> {
+    let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+    MaybeResponse::err(errors)
 }
 
 /**
@@ -118,6 +142,7 @@ digest - unique identifier for the blob to be downoaded
  */
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
 fn get_blob(name: String, repo: String, digest: String) -> MaybeResponse<Responses> {
+    info!("---------------------");
     info!("Getting Blob");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match digest.as_str() {
@@ -167,6 +192,7 @@ Docker-Content-Digest: <digest>
 #[head("/v2/<name>/<repo>/blobs/<digest>")]
 fn check_existing_layer(name: String, repo: String, digest: String) ->
     MaybeResponse<Responses> {
+        debug!("Checking if {}/{} exists...", name, repo);
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
 }
@@ -206,6 +232,7 @@ Content-Type: application/octet-stream
 <Layer Binary Data>
 ---
 Chunked Upload (Don't implement until Monolithic works)
+Must be implemented as docker only supports this
 PATCH /v2/<name>/blobs/uploads/<uuid>
 Content-Length: <size of chunk>
 Content-Range: <start of range>-<end of range>
@@ -214,11 +241,71 @@ Content-Type: application/octet-stream
 <Layer Chunk Binary Data>
  */
 
-#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>")] // capture digest query string
-fn put_blob(name: String, repo: String, uuid: String) ->
+#[derive_FromForm]
+struct DigestStruct {
+    query: bool,
+    digest: String,
+}
+
+// TODO change this to return a type-safe thing rather than just 'String'
+fn scratch_path(uuid: &String) -> String {
+    format!("data/scratch/{}", uuid)
+}
+
+// TODO change this to return a type-safe thing rather than just 'String'
+fn hash_file(absolute_directory: String) -> Result<String, String> {
+    debug!("Hashing file: {}", absolute_directory);
+    match File::open(&absolute_directory) {
+        Ok(mut file) => {
+            let mut vec_file: &mut Vec<u8> = &mut Vec::new();
+            file.read_to_end(&mut vec_file);
+            // HACK: needs a fix of some description
+            let sha = format!("{:?}", digest::digest(&digest::SHA256, &vec_file));
+            Ok(sha)
+        }
+        Err(_) => Err(format!("could not open file: {}", absolute_directory))
+    }
+}
+
+#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
+fn put_blob(name: String, repo: String, uuid: String, digest: DigestStruct) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        debug!("Completing layer upload with digest: {}", digest.digest);
+        let hash = match hash_file(scratch_path(&uuid)) {
+            Ok(v) => v,
+            Err(_) => "".to_string(),
+        };
+        debug!("File Hash: {}", hash);
+
         MaybeResponse::err(errors)
+
+        // hash uuid from scratch, if success, copy over to layers
+        // UuidAccept
+        // match digest.digest.eq(hash) {
+        //     True => MaybeResponse::err(errors),
+        //     False => True => MaybeResponse::err(errors).
+        // }
+}
+
+#[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data="<chunk>")]
+fn patch_blob(name: String, repo: String, uuid: String, chunk: rocket::data::Data) ->
+    MaybeResponse<Responses> {
+        let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+        let absolute_file = scratch_path(&uuid);
+        debug!("Streaming out to {}", absolute_file);
+        let file = chunk.stream_to_file(absolute_file);
+
+        match file {
+            Ok(_) => {
+                let right = match file.map(|x| x.to_string()) {
+                    Ok(x) => x.parse::<u32>().unwrap(),
+                    Err(_) => 0,
+                };
+                MaybeResponse::ok(Responses::Uuid {uuid, name, repo, left: 0, right })
+            },
+            Err(_) => MaybeResponse::err(errors)
+        }
 }
 
 /*
@@ -251,7 +338,10 @@ fn post_blob_upload(name: String, repo: String) ->
         MaybeResponse::ok(Responses::Uuid {
             uuid: uuid.to_string(),
             name,
-            repo})
+            repo,
+            left: 0,
+            right: 0,
+        })
 }
 /*
 
