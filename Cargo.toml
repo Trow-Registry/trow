@@ -15,5 +15,9 @@ serde_json = "1.0"
 serde_derive = "1.0"
 uuid = { version = "0.5.1", features = ["v4", "rustc-serialize"] }
 log = "0.3"
+slog = "2.0.12"
+slog-term = "2.2.0"
+slog-async = "2.1.0"
 fern = "0.4"
 chrono = "0.4.0"
+ctrlc = { version = "3.0", features = ["termination"] }

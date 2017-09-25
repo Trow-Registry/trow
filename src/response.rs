@@ -7,10 +7,12 @@ use errors;
 
 const BASE_URL: &str = "http://localhost:8000";
 
+// pub type Response<T: MyResponder>(T);
+/// An enum of possible responses
 #[derive(Serialize, Debug)]
 pub enum Responses {
     Accept,
-    Empty {},
+    Empty,
     Uuid {
         uuid: String,
         name: String,
@@ -19,14 +21,13 @@ pub enum Responses {
         right: u32,
     },
     UuidAccept,
-
 }
 
 impl<'r> Responder<'r> for Responses {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
         match self {
             Responses::Accept => Response::build().status(Status::Accepted).ok(),
-            Responses::Empty {} => Response::build().ok(),
+            Responses::Empty => Response::build().ok(),
             Responses::Uuid {uuid, name, repo, left, right} => {
                 let location_url = format!("{}/v2/{}/{}/blobs/uploads/{}?query=true", BASE_URL, name, repo, uuid);
                 let upload_uuid = Header::new("Docker-Upload-UUID", uuid);
@@ -87,5 +88,18 @@ impl<A> MaybeResponse<A>  {
 
     pub fn err(error: errors::Error) -> Self {
         RegistryResponse(Err(error))
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn it_works() {
+    }
+
+    #[test]
+    fn panicify() {
+        panic!("something happened");
     }
 }

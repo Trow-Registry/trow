@@ -68,7 +68,7 @@ Docker-Distribution-API-Version: registry/2.0
 /// Some docs for this function
 #[get("/v2")]
 fn get_v2root() -> MaybeResponse<Responses> {
-    MaybeResponse::ok(Responses::Empty {})
+    MaybeResponse::ok(Responses::Empty)
 }
 
 /*
@@ -100,7 +100,7 @@ fn get_manifest(
     info!("Getting Manifest");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match reference.as_str() {
-        "good" => MaybeResponse::ok(Responses::Empty {}),
+        "good" => MaybeResponse::ok(Responses::Empty),
         _ => MaybeResponse::err(errors),
     }
 }
@@ -142,11 +142,10 @@ digest - unique identifier for the blob to be downoaded
  */
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
 fn get_blob(name: String, repo: String, digest: String) -> MaybeResponse<Responses> {
-    info!("---------------------");
     info!("Getting Blob");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match digest.as_str() {
-        "good" => MaybeResponse::ok(Responses::Empty {}),
+        "good" => MaybeResponse::ok(Responses::Empty),
         _ => MaybeResponse::err(errors),
     }
 }
@@ -242,6 +241,7 @@ Content-Type: application/octet-stream
  */
 
 #[derive_FromForm]
+#[derive(Debug)]
 struct DigestStruct {
     query: bool,
     digest: String,
@@ -257,11 +257,12 @@ fn hash_file(absolute_directory: String) -> Result<String, String> {
     debug!("Hashing file: {}", absolute_directory);
     match File::open(&absolute_directory) {
         Ok(mut file) => {
-            let mut vec_file: &mut Vec<u8> = &mut Vec::new();
-            file.read_to_end(&mut vec_file);
+            let mut vec_file = &mut Vec::new();
+            let _ = file.read_to_end(&mut vec_file);
+            let sha = digest::digest(&digest::SHA256, &vec_file);
+
             // HACK: needs a fix of some description
-            let sha = format!("{:?}", digest::digest(&digest::SHA256, &vec_file));
-            Ok(sha)
+            Ok(format!("{:?}", sha).to_lowercase())
         }
         Err(_) => Err(format!("could not open file: {}", absolute_directory))
     }
@@ -278,7 +279,10 @@ fn put_blob(name: String, repo: String, uuid: String, digest: DigestStruct) ->
         };
         debug!("File Hash: {}", hash);
 
-        MaybeResponse::err(errors)
+        match assert_eq!(hash, digest.digest) {
+            () => MaybeResponse::err(errors)
+        }
+
 
         // hash uuid from scratch, if success, copy over to layers
         // UuidAccept
