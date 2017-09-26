@@ -6,7 +6,7 @@ use uuid::Uuid;
 use ring::digest;
 
 use errors;
-use response::{Responses, MaybeResponse};
+use response::{Responses, MaybeResponse, MaybeResponse2, Empty, UuidResponse};
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -38,15 +38,15 @@ pub fn errors() -> Vec<rocket::Catcher> {
 }
 
 #[error(400)]
-fn err_400() -> MaybeResponse<Responses> {
+fn err_400() -> MaybeResponse2<Empty> {
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-    MaybeResponse::err(errors)
+    MaybeResponse2::err2(Empty)
 }
 
 #[error(404)]
-fn err_404() -> MaybeResponse<Responses> {
+fn err_404() -> MaybeResponse2<Empty> {
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-    MaybeResponse::err(errors)
+    MaybeResponse2::err2(Empty)
 }
 
 /**
@@ -65,8 +65,9 @@ Docker-Distribution-API-Version: registry/2.0
 
 /// Some docs for this function
 #[get("/v2")]
-fn get_v2root() -> MaybeResponse<Responses> {
-    MaybeResponse::ok(Responses::Empty)
+fn get_v2root() -> MaybeResponse2<Empty> {
+    // MaybeResponse2::ok2(Empty)
+    MaybeResponse2::err2(Empty)
 }
 
 /*
@@ -94,12 +95,12 @@ fn get_manifest(
     _name: String,
     _repo: String,
     reference: String,
-) -> MaybeResponse<Responses> {
+) -> MaybeResponse2<Empty> {
     info!("Getting Manifest");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match reference.as_str() {
-        "good" => MaybeResponse::ok(Responses::Empty),
-        _ => MaybeResponse::err(errors),
+        "good" => MaybeResponse2::ok2(Empty),
+        _ => MaybeResponse2::err2(Empty),
     }
 }
 /*
@@ -122,9 +123,9 @@ Content-Length: size of manifest
  */
 #[head("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn check_image_manifest(_name: String, _repo: String, _reference: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 
 /*
@@ -139,12 +140,12 @@ digest - unique identifier for the blob to be downoaded
 307 - redirect to another service for downloading[1]
  */
 #[get("/v2/<_name>/<_repo>/blobs/<digest>")]
-fn get_blob(_name: String, _repo: String, digest: String) -> MaybeResponse<Responses> {
+fn get_blob(_name: String, _repo: String, digest: String) -> MaybeResponse2<Empty> {
     info!("Getting Blob");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match digest.as_str() {
-        "good" => MaybeResponse::ok(Responses::Empty),
-        _ => MaybeResponse::err(errors),
+        "good" => MaybeResponse2::ok2(Empty),
+        _ => MaybeResponse2::err2(Empty),
     }
 }
 
@@ -166,9 +167,9 @@ Docker-Upload-UUID: <uuid>
 */
 #[post("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
 fn post_blob_uuid(_name: String, _repo: String, _uuid: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 
 /*
@@ -188,10 +189,10 @@ Docker-Content-Digest: <digest>
  */
 #[head("/v2/<name>/<repo>/blobs/<_digest>")]
 fn check_existing_layer(name: String, repo: String, _digest: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         debug!("Checking if {}/{} exists...", name, repo);
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 
 /*
@@ -214,9 +215,9 @@ Docker-Upload-UUID: <uuid>
  */
 #[get("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
 fn get_upload_progress(_name: String, _repo: String, _uuid: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 /*
 
@@ -270,7 +271,7 @@ fn hash_file(absolute_directory: String) -> Result<String, String> {
 
 #[put("/v2/<_name>/<_repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
 fn put_blob(_name: String, _repo: String, uuid: String, digest: DigestStruct) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         debug!("Completing layer upload with digest: {}", digest.digest);
         let hash = match hash_file(scratch_path(&uuid)) {
@@ -280,21 +281,21 @@ fn put_blob(_name: String, _repo: String, uuid: String, digest: DigestStruct) ->
         debug!("File Hash: {}", hash);
 
         match assert_eq!(hash, digest.digest) {
-            () => MaybeResponse::err(errors)
+            () => MaybeResponse2::err2(Empty)
         }
 
 
         // hash uuid from scratch, if success, copy over to layers
         // UuidAccept
         // match digest.digest.eq(hash) {
-        //     True => MaybeResponse::err(errors),
-        //     False => True => MaybeResponse::err(errors).
+        //     True => MaybeResponse2::err2(Empty),
+        //     False => True => MaybeResponse2::err2(Empty).
         // }
 }
 
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data="<chunk>")]
 fn patch_blob(name: String, repo: String, uuid: String, chunk: rocket::data::Data) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<UuidResponse> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         let absolute_file = scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
@@ -306,9 +307,9 @@ fn patch_blob(name: String, repo: String, uuid: String, chunk: rocket::data::Dat
                     Ok(x) => x.parse::<u32>().unwrap(),
                     Err(_) => 0,
                 };
-                MaybeResponse::ok(Responses::Uuid {uuid, name, repo, left: 0, right })
+                MaybeResponse2::ok2(UuidResponse::Uuid {uuid, name, repo, left: 0, right })
             },
-            Err(_) => MaybeResponse::err(errors)
+            Err(_) => MaybeResponse2::err2(UuidResponse::Empty)
         }
 }
 
@@ -323,9 +324,9 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
 #[delete("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
 fn delete_upload(_name: String, _repo: String, _uuid: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 /*
 ---
@@ -336,10 +337,10 @@ POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
 fn post_blob_upload(name: String, repo: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<UuidResponse> {
         let uuid = Uuid::new_v4();
         info!("Using Uuid: {:?}", uuid);
-        MaybeResponse::ok(Responses::Uuid {
+        MaybeResponse2::ok2(UuidResponse::Uuid {
             uuid: uuid.to_string(),
             name,
             repo,
@@ -356,9 +357,9 @@ DELETE /v2/<name>/blobs/<digest>
 */
 #[delete("/v2/<_name>/<_repo>/blobs/<_digest>")]
 fn delete_blob(_name: String, _repo: String, _digest: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 /*
 
@@ -370,9 +371,9 @@ Content-Type: <manifest media type>
 */
 #[put("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn put_image_manifest(_name: String, _repo: String, _reference: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 /*
 ---
@@ -382,9 +383,9 @@ GET /v2/_catalog
 */
 #[get("/v2/_catalog")]
 fn get_catalog() ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 /*
 ---
@@ -394,9 +395,9 @@ GET /v2/<name>/tags/list
 */
 #[delete("/v2/<_name>/<_repo>/tags/list")]
 fn get_image_tags(_name: String, _repo: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 /*
 ---
@@ -406,9 +407,9 @@ DELETE /v2/<name>/manifests/<reference>
 */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn delete_image_manifest(_name: String, _repo: String, _reference: String) ->
-    MaybeResponse<Responses> {
+    MaybeResponse2<Empty> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(errors)
+        MaybeResponse2::err2(Empty)
 }
 
 /*

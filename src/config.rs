@@ -46,13 +46,28 @@ fn attach_sigterm() {
     }).expect("Error setting Ctrl-C handler");
 }
 
-fn check_path_exists(path: &Path) {
-    match path.exists() {
-        true => info!("Using data directory: {}", path.display()),
-        false => {
-            panic!("Path {} does not exist", path.display());
-        },
-    };
+/// given a directory, check all subdirectories exist
+///
+/// If needed subdirectories don't exist, create them. (possible extension)...
+fn check_paths_exists(path: &Path) {
+    let subdirectories = [
+        "scratch",
+        "layers",
+    ];
+
+    for dir in subdirectories.iter() {
+        let path = path.join(dir);
+        debug!("Checking {} subdirectory", path.display());
+        match path.exists() {
+            true => info!("subdirectory {} exists", path.display()),
+            false => {
+                panic!("{} does not exist try create it with: `mkdir {}`",
+                       path.display(),
+                       path.display());
+            },
+        };
+    }
+
 }
 
 /// extract configuration values
@@ -79,7 +94,7 @@ fn extract_config(rocket: rocket::Rocket) -> rocket::Rocket {
 pub fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket>{
     attach_sigterm();
 
-    check_path_exists(Path::new("data/scratch"));
+    check_paths_exists(Path::new("data"));
 
     Ok(extract_config(rocket))
 }
