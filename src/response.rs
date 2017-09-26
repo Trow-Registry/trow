@@ -7,7 +7,7 @@ use errors;
 
 const BASE_URL: &str = "http://localhost:8000";
 
-// pub type Response<T: MyResponder>(T);
+// pub struct Response2<T: MyResponder>(pub T);
 /// An enum of possible responses
 #[derive(Serialize, Debug)]
 pub enum Responses {

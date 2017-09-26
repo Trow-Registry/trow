@@ -1,11 +1,9 @@
-use std::hash::{Hash, Hasher};
-use std::str;
 use std::io::Read;
 use std::fs::File;
 use std::string::ToString;
 use rocket;
 use uuid::Uuid;
-use ring::{digest, test};
+use ring::digest;
 
 use errors;
 use response::{Responses, MaybeResponse};
@@ -91,10 +89,10 @@ Accept: manifest-version
 200 - return the manifest
 404 - manifest not known to the registry
 */
-#[get("/v2/<name>/<repo>/manifests/<reference>")]
+#[get("/v2/<_name>/<_repo>/manifests/<reference>")]
 fn get_manifest(
-    name: String,
-    repo: String,
+    _name: String,
+    _repo: String,
     reference: String,
 ) -> MaybeResponse<Responses> {
     info!("Getting Manifest");
@@ -122,8 +120,8 @@ Content-Length: size of manifest
 200 - manifest exists
 404 - manifest does not exist
  */
-#[head("/v2/<name>/<repo>/manifests/<reference>")]
-fn check_image_manifest(name: String, repo: String, reference: String) ->
+#[head("/v2/<_name>/<_repo>/manifests/<_reference>")]
+fn check_image_manifest(_name: String, _repo: String, _reference: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
@@ -140,8 +138,8 @@ digest - unique identifier for the blob to be downoaded
 200 - blob is downloaded
 307 - redirect to another service for downloading[1]
  */
-#[get("/v2/<name>/<repo>/blobs/<digest>")]
-fn get_blob(name: String, repo: String, digest: String) -> MaybeResponse<Responses> {
+#[get("/v2/<_name>/<_repo>/blobs/<digest>")]
+fn get_blob(_name: String, _repo: String, digest: String) -> MaybeResponse<Responses> {
     info!("Getting Blob");
     let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     match digest.as_str() {
@@ -166,8 +164,8 @@ Docker-Upload-UUID: <uuid>
 # Returns
 202 - accepted
 */
-#[post("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
-fn post_blob_uuid(name: String, repo: String, uuid: String) ->
+#[post("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
+fn post_blob_uuid(_name: String, _repo: String, _uuid: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
@@ -188,8 +186,8 @@ Docker-Content-Digest: <digest>
 200 - exists
 404 - does not exist
  */
-#[head("/v2/<name>/<repo>/blobs/<digest>")]
-fn check_existing_layer(name: String, repo: String, digest: String) ->
+#[head("/v2/<name>/<repo>/blobs/<_digest>")]
+fn check_existing_layer(name: String, repo: String, _digest: String) ->
     MaybeResponse<Responses> {
         debug!("Checking if {}/{} exists...", name, repo);
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
@@ -214,8 +212,8 @@ Docker-Upload-UUID: <uuid>
 # Returns
 204
  */
-#[get("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
-fn get_upload_progress(name: String, repo: String, uuid: String) ->
+#[get("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
+fn get_upload_progress(_name: String, _repo: String, _uuid: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
@@ -240,6 +238,7 @@ Content-Type: application/octet-stream
 <Layer Chunk Binary Data>
  */
 
+// TODO move this somewhere else
 #[derive_FromForm]
 #[derive(Debug)]
 struct DigestStruct {
@@ -253,6 +252,7 @@ fn scratch_path(uuid: &String) -> String {
 }
 
 // TODO change this to return a type-safe thing rather than just 'String'
+// TODO move this somewhere not in the routes directory...
 fn hash_file(absolute_directory: String) -> Result<String, String> {
     debug!("Hashing file: {}", absolute_directory);
     match File::open(&absolute_directory) {
@@ -268,8 +268,8 @@ fn hash_file(absolute_directory: String) -> Result<String, String> {
     }
 }
 
-#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
-fn put_blob(name: String, repo: String, uuid: String, digest: DigestStruct) ->
+#[put("/v2/<_name>/<_repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
+fn put_blob(_name: String, _repo: String, uuid: String, digest: DigestStruct) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         debug!("Completing layer upload with digest: {}", digest.digest);
@@ -321,8 +321,8 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
  */
 
-#[delete("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
-fn delete_upload(name: String, repo: String, uuid: String) ->
+#[delete("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
+fn delete_upload(_name: String, _repo: String, _uuid: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
@@ -354,8 +354,8 @@ Delete a layer
 DELETE /v2/<name>/blobs/<digest>
 
 */
-#[delete("/v2/<name>/<repo>/blobs/<digest>")]
-fn delete_blob(name: String, repo: String, digest: String) ->
+#[delete("/v2/<_name>/<_repo>/blobs/<_digest>")]
+fn delete_blob(_name: String, _repo: String, _digest: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
@@ -368,8 +368,8 @@ PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
 */
-#[put("/v2/<name>/<repo>/manifests/<reference>")]
-fn put_image_manifest(name: String, repo: String, reference: String) ->
+#[put("/v2/<_name>/<_repo>/manifests/<_reference>")]
+fn put_image_manifest(_name: String, _repo: String, _reference: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
@@ -392,8 +392,8 @@ Listing Image Tags
 GET /v2/<name>/tags/list
 
 */
-#[delete("/v2/<name>/<repo>/tags/list")]
-fn get_image_tags(name: String, repo: String) ->
+#[delete("/v2/<_name>/<_repo>/tags/list")]
+fn get_image_tags(_name: String, _repo: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
@@ -404,8 +404,8 @@ Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
 
 */
-#[delete("/v2/<name>/<repo>/manifests/<reference>")]
-fn delete_image_manifest(name: String, repo: String, reference: String) ->
+#[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
+fn delete_image_manifest(_name: String, _repo: String, _reference: String) ->
     MaybeResponse<Responses> {
         let errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
         MaybeResponse::err(errors)
