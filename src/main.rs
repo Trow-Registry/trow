@@ -18,14 +18,14 @@
 // extern crate slog_async;
 
 extern crate ctrlc;
-#[macro_use(log,info,debug)]
-extern crate log;
 extern crate fern;
+#[macro_use(log, info, debug)]
+extern crate log;
+extern crate ring;
 extern crate rocket;
 #[macro_use]
 extern crate serde_derive;
 extern crate uuid;
-extern crate ring;
 
 mod errors;
 mod routes;
@@ -34,7 +34,6 @@ pub mod config;
 
 // use slog::Drain;
 use rocket::fairing;
-
 
 fn main() {
     let _log = config::main_logger().apply();
