@@ -66,8 +66,7 @@ Docker-Distribution-API-Version: registry/2.0
 /// Some docs for this function
 #[get("/v2")]
 fn get_v2root() -> MaybeResponse<Empty> {
-    // MaybeResponse::ok(Empty)
-    MaybeResponse::err(Empty)
+    MaybeResponse::ok(Empty)
 }
 
 /*
@@ -299,7 +298,7 @@ fn patch_blob(name: String, repo: String, uuid: String, chunk: rocket::data::Dat
                     Ok(x) => x.parse::<u32>().unwrap(),
                     Err(_) => 0,
                 };
-                MaybeResponse::ok(UuidResponse::Uuid {uuid, name, repo, left: 0, right })
+                MaybeResponse::ok(UuidResponse::Uuid {uuid, name, repo, left: 0, right})
             },
             Err(_) => MaybeResponse::err(UuidResponse::Empty)
         }

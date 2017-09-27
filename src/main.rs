@@ -12,15 +12,12 @@
 #![feature(plugin)]
 #![plugin(rocket_codegen)]
 
-// #[macro_use]
-// extern crate slog;
-// extern crate slog_term;
-// extern crate slog_async;
-
 extern crate ctrlc;
 extern crate fern;
 #[macro_use(log, info, debug)]
 extern crate log;
+// use of slog is currently not supported
+// https://github.com/SergioBenitez/Rocket/issues/21
 extern crate ring;
 extern crate rocket;
 #[macro_use]
