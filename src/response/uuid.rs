@@ -61,15 +61,31 @@ mod test {
     use response::uuid::UuidResponse;
 
     use test::test_helpers::test_route;
+    fn build_response() -> UuidResponse {
+        UuidResponse::Uuid {
+            // TODO: keep this as a real Uuid!
+            uuid: String::from("whatever"),
+            name: String::from("moredhel"),
+            repo: String::from("test"),
+            left: 0,
+            right: 0,
+        }
+    }
 
     #[test]
     fn uuid_ok_good() {
-        assert_eq!(true, false);
+        let response = test_route(Ok(build_response()));
+        let headers = response.headers();
+        assert_eq!(response.status(), Status::Accepted);
+        assert!(headers.contains("Docker-Upload-UUID"));
+        assert!(headers.contains("Location"));
+        assert!(headers.contains("Range"));
     }
 
     #[test]
     fn uuid_ok_bad() {
-        assert_eq!(true, false);
+        let response = test_route(Err(build_response()));
+        assert_eq!(response.status(), Status::NotFound);
     }
 
     #[test]

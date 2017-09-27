@@ -274,15 +274,15 @@ fn put_blob(_name: String, _repo: String, uuid: String, digest: DigestStruct) ->
 
         match assert_eq!(hash, digest.digest) {
             () => MaybeResponse::err(Empty)
-        }
+        };
 
 
         // hash uuid from scratch, if success, copy over to layers
         // UuidAccept
-        // match digest.digest.eq(hash) {
-        //     True => MaybeResponse::err(Empty),
-        //     False => True => MaybeResponse::err(Empty).
-        // }
+        match digest.digest.eq(&hash) {
+            true => MaybeResponse::err(Empty),
+            false  => MaybeResponse::err(Empty),
+        }
 }
 
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data="<chunk>")]
