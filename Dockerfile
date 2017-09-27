@@ -22,4 +22,5 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 
 FROM scratch
 COPY --from=builder /usr/src/lycaon/target/x86_64-unknown-linux-musl/release/lycaon /lycaon
+COPY Rocket.toml /
 CMD ["/lycaon"]
