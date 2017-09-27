@@ -84,14 +84,3 @@ impl<'r, R> Responder<'r> for RegistryResponse<R>
     }
 }
 
-#[cfg(test)]
-mod test {
-    #[test]
-    fn it_works() {
-    }
-
-    #[test]
-    fn panicify() {
-        panic!("something happened");
-    }
-}

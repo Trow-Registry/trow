@@ -21,7 +21,7 @@ pub enum UuidResponse {
 DummyResponder!(UuidResponse);
 
 impl RegistryTrait for UuidResponse {
-    fn ok<'r>(&self, _req: &Request) -> Result<Response<'r>, Status> {
+    fn ok<'r>(&self, req: &Request) -> Result<Response<'r>, Status> {
         debug!("Uuid Ok");
 
         if let &UuidResponse::Uuid {ref uuid, ref name, ref repo, ref left, ref right} = self {
@@ -44,7 +44,7 @@ impl RegistryTrait for UuidResponse {
                 // TODO: move into the type so it is better encoded?...
                 .status(Status::Accepted)
                 .ok()
-        } else { panic!("oh noes!") }
+        } else { self.err(req) }
     }
 
     fn err<'r>(&self, _req: &Request) -> Result<Response<'r>, Status> {
@@ -52,6 +52,36 @@ impl RegistryTrait for UuidResponse {
         Response::build()
             .status(Status::NotFound)
             .ok()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use rocket::http::Status;
+    use response::uuid::UuidResponse;
+
+    use test::test_helpers::test_route;
+
+    #[test]
+    fn uuid_ok_good() {
+        assert_eq!(true, false);
+    }
+
+    #[test]
+    fn uuid_ok_bad() {
+        assert_eq!(true, false);
+    }
+
+    #[test]
+    fn uuid_err_good() {
+        let response = test_route(Err(UuidResponse::Empty));
+        assert_eq!(response.status(), Status::NotFound);
+    }
+
+    #[test]
+    fn uuid_err_bad() {
+        let response = test_route(Ok(UuidResponse::Empty));
+        assert_eq!(response.status(), Status::NotFound);
     }
 }
 

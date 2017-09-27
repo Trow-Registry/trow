@@ -9,6 +9,9 @@ use log;
 use fern;
 use ctrlc;
 use rocket;
+use rocket::fairing;
+
+use routes;
 
 static DEFAULT_DATA_DIR: &'static str = "data";
 static SCRATCH_DIR: &'static str = "scratch";
@@ -105,4 +108,12 @@ pub fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket>
     create_data_dirs(Path::new(DEFAULT_DATA_DIR));
 
     Ok(extract_config(rocket))
+}
+
+/// Construct the rocket instance and prepare for launch
+pub(crate) fn rocket() -> rocket::Rocket {
+    rocket::ignite()
+        .attach(fairing::AdHoc::on_attach(startup))
+        .mount("/", routes::routes())
+        .catch(routes::errors())
 }

@@ -28,16 +28,11 @@ mod errors;
 mod routes;
 pub mod response;
 pub mod config;
+mod test;
 
-// use slog::Drain;
-use rocket::fairing;
 
 fn main() {
     let _log = config::main_logger().apply();
 
-    rocket::ignite()
-        .attach(fairing::AdHoc::on_attach(config::startup))
-        .mount("/", routes::routes())
-        .catch(routes::errors())
-        .launch();
+    config::rocket().launch();
 }
