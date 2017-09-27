@@ -64,7 +64,7 @@ fn create_data_dirs(data_path: &Path) {
             Ok(res) => res,
         };
     }
-    info!("Scratch directory set to {}", scratch_path.display());
+    info!("Scratch directory set to {}", scratch_path.canonicalize().unwrap().display());
 
     let layers_path = data_path.join(LAYERS_DIR);
     if !layers_path.exists() {
@@ -74,7 +74,7 @@ fn create_data_dirs(data_path: &Path) {
             Ok(res) => res,
         };
     }
-    info!("Layers directory set to {}", layers_path.display());
+    info!("Layers directory set to {}", layers_path.canonicalize().unwrap().display());
     
 }
 

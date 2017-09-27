@@ -23,4 +23,9 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 FROM scratch
 COPY --from=builder /usr/src/lycaon/target/x86_64-unknown-linux-musl/release/lycaon /lycaon
 COPY Rocket.toml /
+#Yeah, it's another hack. Sue me. Note that you need 17.09 to build this
+COPY --chown=65534:65534 README.md /data/layers/README.md
+COPY --chown=65534:65534 README.md /data/scratch/README.md
+USER 65534
+EXPOSE 8000
 CMD ["/lycaon"]
