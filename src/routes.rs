@@ -9,6 +9,7 @@ use errors;
 use response::MaybeResponse;
 use response::empty::Empty;
 use response::uuid::UuidResponse;
+use response::uuidaccept::UuidAcceptResponse;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -262,9 +263,9 @@ fn hash_file(absolute_directory: String) -> Result<String, String> {
     }
 }
 
-#[put("/v2/<_name>/<_repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
-fn put_blob(_name: String, _repo: String, uuid: String, digest: DigestStruct) ->
-    MaybeResponse<Empty> {
+#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
+fn put_blob(name: String, repo: String, uuid: String, digest: DigestStruct) ->
+    MaybeResponse<UuidAcceptResponse> {
         debug!("Completing layer upload with digest: {}", digest.digest);
         let hash = match hash_file(scratch_path(&uuid)) {
             Ok(v) => v,
@@ -273,15 +274,27 @@ fn put_blob(_name: String, _repo: String, uuid: String, digest: DigestStruct) ->
         debug!("File Hash: {}", hash);
 
         match assert_eq!(hash, digest.digest) {
-            () => MaybeResponse::err(Empty)
+            () => MaybeResponse::err(UuidAcceptResponse::DigestMismatch)
         };
 
 
         // hash uuid from scratch, if success, copy over to layers
         // UuidAccept
         match digest.digest.eq(&hash) {
-            true => MaybeResponse::err(Empty),
-            false  => MaybeResponse::err(Empty),
+            true => {
+                warn!("all good here");
+                let digest = digest.digest;
+                MaybeResponse::err(UuidAcceptResponse::UuidAccept {
+                    uuid,
+                    digest,
+                    name,
+                    repo,
+                })
+            },
+            false  => {
+                warn!("expected {}, got {}", digest.digest, hash);
+                MaybeResponse::err(UuidAcceptResponse::DigestMismatch)
+            },
         }
 }
 

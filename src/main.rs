@@ -14,7 +14,7 @@
 
 extern crate ctrlc;
 extern crate fern;
-#[macro_use(log, info, debug)]
+#[macro_use(log, warn, info, debug)]
 extern crate log;
 // use of slog is currently not supported
 // https://github.com/SergioBenitez/Rocket/issues/21

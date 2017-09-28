@@ -1,51 +1,50 @@
+use std::fs;
+
 use rocket::http::{Header, Status};
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
 
-// TODO refactor this out in place of dynamic updates
 const BASE_URL: &str = "http://localhost:8000";
 
 #[derive(Debug, Serialize)]
-pub enum UuidResponse {
-    Uuid {
+pub enum UuidAcceptResponse {
+    DigestMismatch,
+    UuidAccept {
         uuid: String,
+        digest: String,
         name: String,
         repo: String,
-        left: u32,
-        right: u32,
     },
-    Empty,
 }
 
-impl<'r> Responder<'r> for UuidResponse {
+impl<'r> Responder<'r> for UuidAcceptResponse {
     fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
-        debug!("Uuid Ok");
+        use self::UuidAcceptResponse::*;
 
-        if let UuidResponse::Uuid {ref uuid, ref name, ref repo, ref left, ref right} = self {
-            let location_url = format!("{}/v2/{}/{}/blobs/uploads/{}?query=true",
+        match self {
+            UuidAccept { name, repo, digest, uuid } => {
+                // 1. copy file to layers (with new name)
+                // 2. delete old layer
+                // 3. return success
+                let location = format!("{}/v2/{}/{}/blobs/{}",
                                        BASE_URL,
                                        name,
                                        repo,
-                                       uuid);
-            let upload_uuid = Header::new("Docker-Upload-UUID", uuid.clone());
-            let range = Header::new("Range", format!("{}-{}", left, right));
-            let length = Header::new("Content-Length", format!("{}", right - left));
-            let location = Header::new("Location", location_url);
-
-            debug!("Range: {}-{}, Length: {}", left, right, right-left);
-            Response::build()
-                .header(upload_uuid)
-                .header(location)
-                .header(range)
-                .header(length)
-                // TODO: move into the type so it is better encoded?...
-                .status(Status::Accepted)
-                .ok()
-        } else {
-            debug!("Uuid Error");
-            Response::build()
-                .status(Status::NotFound)
-                .ok()
+                                       digest);
+                let location = Header::new("Location", location);
+                let digest = Header::new("Docker-Content-Digest", digest);
+                Response::build()
+                    .status(Status::Created)
+                    .header(location)
+                    .header(digest)
+                    .ok()
+            },
+            DigestMismatch => {
+                debug!("Digest mismatched");
+                Response::build()
+                    .status(Status::NotFound)
+                    .ok()
+            },
         }
     }
 }
