@@ -1,0 +1,65 @@
+use std::io;
+use std::fs;
+use std::fs::File;
+use std::io::Read;
+
+use ring::digest;
+use uuid::Uuid;
+
+#[derive_FromForm]
+#[derive(Debug)]
+pub struct DigestStruct {
+    pub query: bool,
+    pub digest: String,
+}
+
+// TODO change this to return a type-safe thing rather than just 'String'
+pub fn scratch_path(uuid: &String) -> String {
+    format!("data/scratch/{}", uuid)
+}
+
+pub fn layer_path(fname: &String) -> String {
+    format!("data/layers/{}", fname)
+}
+
+// TODO change this to return a type-safe thing rather than just 'String'
+pub fn hash_file(absolute_directory: String) -> Result<String, String> {
+    debug!("Hashing file: {}", absolute_directory);
+    match File::open(&absolute_directory) {
+        Ok(mut file) => {
+            let mut vec_file = &mut Vec::new();
+            let _ = file.read_to_end(&mut vec_file);
+            let sha = digest::digest(&digest::SHA256, &vec_file);
+
+            // HACK: needs a fix of some description
+            Ok(format!("{:?}", sha).to_lowercase())
+        }
+        Err(_) => Err(format!("could not open file: {}", absolute_directory))
+    }
+}
+
+
+pub fn gen_uuid() -> Uuid {
+    Uuid::new_v4()
+}
+
+
+/// given a _uuid_ and a _hash_, will copy the layer to the _layers_
+/// directory from the _scratch_ directory.
+pub fn save_layer(uuid: &String, digest: &String) -> io::Result<u64> {
+    let from = scratch_path(uuid);
+    let to   = layer_path(digest);
+
+    // TODO: check if layer already exists.
+    debug!("Copying {} -> {}", from, to);
+    fs::copy(from, to)
+}
+
+/// Marks the given uuid for deletion.
+/// The current implementation simply deletes the file, future
+/// implementations may want to propogate the message to neighbouring
+/// registry instances.
+pub fn mark_delete(uuid: &String) -> io::Result<()> {
+    let file = scratch_path(uuid);
+    fs::remove_file(file)
+}

@@ -1,15 +1,12 @@
-use std::io::Read;
-use std::fs::File;
 use std::string::ToString;
 use rocket;
-use uuid::Uuid;
-use ring::digest;
 
 use errors;
-use response::MaybeResponse;
+use response::{MaybeResponse, RegistryResponse};
 use response::empty::Empty;
 use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
+use controller::uuid as cuuid;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -233,41 +230,11 @@ Content-Type: application/octet-stream
 <Layer Chunk Binary Data>
  */
 
-// TODO move this somewhere else
-#[derive_FromForm]
-#[derive(Debug)]
-struct DigestStruct {
-    query: bool,
-    digest: String,
-}
-
-// TODO change this to return a type-safe thing rather than just 'String'
-fn scratch_path(uuid: &String) -> String {
-    format!("data/scratch/{}", uuid)
-}
-
-// TODO change this to return a type-safe thing rather than just 'String'
-// TODO move this somewhere not in the routes directory...
-fn hash_file(absolute_directory: String) -> Result<String, String> {
-    debug!("Hashing file: {}", absolute_directory);
-    match File::open(&absolute_directory) {
-        Ok(mut file) => {
-            let mut vec_file = &mut Vec::new();
-            let _ = file.read_to_end(&mut vec_file);
-            let sha = digest::digest(&digest::SHA256, &vec_file);
-
-            // HACK: needs a fix of some description
-            Ok(format!("{:?}", sha).to_lowercase())
-        }
-        Err(_) => Err(format!("could not open file: {}", absolute_directory))
-    }
-}
-
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
-fn put_blob(name: String, repo: String, uuid: String, digest: DigestStruct) ->
+fn put_blob(name: String, repo: String, uuid: String, digest: cuuid::DigestStruct) ->
     MaybeResponse<UuidAcceptResponse> {
         debug!("Completing layer upload with digest: {}", digest.digest);
-        let hash = match hash_file(scratch_path(&uuid)) {
+        let hash = match cuuid::hash_file(cuuid::scratch_path(&uuid)) {
             Ok(v) => v,
             Err(_) => "".to_string(),
         };
@@ -282,14 +249,22 @@ fn put_blob(name: String, repo: String, uuid: String, digest: DigestStruct) ->
         // UuidAccept
         match digest.digest.eq(&hash) {
             true => {
-                warn!("all good here");
                 let digest = digest.digest;
-                MaybeResponse::err(UuidAcceptResponse::UuidAccept {
-                    uuid,
-                    digest,
-                    name,
-                    repo,
-                })
+                // 1. copy file to layers (with new name)
+                if let Ok(_) = cuuid::save_layer(&uuid, &digest) {
+                    // 2. delete old layer
+                    warn!("Deleting scratch file: {}", &uuid);
+                    if let Ok(_) = cuuid::mark_delete(&uuid) {
+                        // 3. return success
+                        MaybeResponse::err(UuidAcceptResponse::UuidAccept {
+                            uuid,
+                            digest,
+                            name,
+                            repo,
+                        })
+                    } else { panic!("file could not be deleted"); }
+
+                } else { panic!("file could not be copied"); }
             },
             false  => {
                 warn!("expected {}, got {}", digest.digest, hash);
@@ -301,7 +276,7 @@ fn put_blob(name: String, repo: String, uuid: String, digest: DigestStruct) ->
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data="<chunk>")]
 fn patch_blob(name: String, repo: String, uuid: String, chunk: rocket::data::Data) ->
     MaybeResponse<UuidResponse> {
-        let absolute_file = scratch_path(&uuid);
+        let absolute_file = cuuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
         let file = chunk.stream_to_file(absolute_file);
 
@@ -326,10 +301,14 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
  */
 
-#[delete("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn delete_upload(_name: String, _repo: String, _uuid: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+/// This route assumes that no more data will be uploaded to the specified uuid.
+#[delete("/v2/<_name>/<_repo>/blobs/uploads/<uuid>")]
+fn delete_upload(_name: String, _repo: String, uuid: String) ->
+    MaybeResponse<UuidAcceptResponse> {
+        match cuuid::mark_delete(&uuid) {
+            Ok(_) => RegistryResponse(UuidAcceptResponse::UuidDelete),
+            Err(_) => panic!("Figure out what to put here too..."),
+        }
 }
 /*
 ---
@@ -341,7 +320,7 @@ POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
 #[post("/v2/<name>/<repo>/blobs/uploads")]
 fn post_blob_upload(name: String, repo: String) ->
     MaybeResponse<UuidResponse> {
-        let uuid = Uuid::new_v4();
+        let uuid = cuuid::gen_uuid();
         info!("Using Uuid: {:?}", uuid);
         MaybeResponse::ok(UuidResponse::Uuid {
             uuid: uuid.to_string(),

@@ -28,6 +28,7 @@ extern crate hostname;
 mod errors;
 mod routes;
 pub mod response;
+pub mod controller;
 pub mod config;
 mod test;
 
