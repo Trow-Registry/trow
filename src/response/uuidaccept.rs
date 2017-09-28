@@ -13,6 +13,7 @@ pub enum UuidAcceptResponse {
         name: String,
         repo: String,
     },
+    UuidDelete,
 }
 
 impl<'r> Responder<'r> for UuidAcceptResponse {
@@ -40,6 +41,11 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
                     .status(Status::NotFound)
                     .ok()
             },
+            UuidDelete => {
+                Response::build()
+                    .status(Status::NoContent)
+                    .ok()
+            }
         }
     }
 }

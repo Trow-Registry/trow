@@ -2,7 +2,7 @@ use std::string::ToString;
 use rocket;
 
 use errors;
-use response::MaybeResponse;
+use response::{MaybeResponse, RegistryResponse};
 use response::empty::Empty;
 use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
@@ -301,10 +301,14 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
  */
 
-#[delete("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn delete_upload(_name: String, _repo: String, _uuid: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+/// This route assumes that no more data will be uploaded to the specified uuid.
+#[delete("/v2/<_name>/<_repo>/blobs/uploads/<uuid>")]
+fn delete_upload(_name: String, _repo: String, uuid: String) ->
+    MaybeResponse<UuidAcceptResponse> {
+        match cuuid::mark_delete(&uuid) {
+            Ok(_) => RegistryResponse(UuidAcceptResponse::UuidDelete),
+            Err(_) => panic!("Figure out what to put here too..."),
+        }
 }
 /*
 ---
