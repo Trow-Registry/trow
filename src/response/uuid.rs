@@ -1,9 +1,7 @@
 use rocket::http::{Header, Status};
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
-
-// TODO refactor this out in place of dynamic updates
-const BASE_URL: &str = "http://localhost:8000";
+use hostname;
 
 #[derive(Debug, Serialize)]
 pub enum UuidResponse {
@@ -17,13 +15,27 @@ pub enum UuidResponse {
     Empty,
 }
 
+/*
+ * Gets the base URL e.g. http://registry:8000 using the HOST value from the request header.
+ * Falls back to hostname if it doesn't exist.
+ */
+fn get_base_url(req: &Request) -> String {
+    
+    let host = match req.headers().get("HOST").next() {
+        None => hostname::get_hostname().expect("I have no name").to_string(),
+        Some(host) => host.to_string(),
+    };
+
+    format!("http://{}", host)
+}
+
 impl<'r> Responder<'r> for UuidResponse {
-    fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
+    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
         debug!("Uuid Ok");
 
         if let UuidResponse::Uuid {ref uuid, ref name, ref repo, ref left, ref right} = self {
             let location_url = format!("{}/v2/{}/{}/blobs/uploads/{}?query=true",
-                                       BASE_URL,
+                                       get_base_url(req),
                                        name,
                                        repo,
                                        uuid);

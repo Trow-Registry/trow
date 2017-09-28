@@ -21,3 +21,4 @@ slog-async = "2.1.0"
 fern = "0.4"
 chrono = "0.4.0"
 ctrlc = { version = "3.0", features = ["termination"] }
+hostname = "^0.1"
