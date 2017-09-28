@@ -1,5 +1,3 @@
-use std::fs;
-
 use rocket::http::{Header, Status};
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
@@ -23,9 +21,6 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
 
         match self {
             UuidAccept { name, repo, digest, uuid } => {
-                // 1. copy file to layers (with new name)
-                // 2. delete old layer
-                // 3. return success
                 let location = format!("{}/v2/{}/{}/blobs/{}",
                                        BASE_URL,
                                        name,

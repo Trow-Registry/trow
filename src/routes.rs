@@ -249,14 +249,22 @@ fn put_blob(name: String, repo: String, uuid: String, digest: cuuid::DigestStruc
         // UuidAccept
         match digest.digest.eq(&hash) {
             true => {
-                warn!("all good here");
                 let digest = digest.digest;
-                MaybeResponse::err(UuidAcceptResponse::UuidAccept {
-                    uuid,
-                    digest,
-                    name,
-                    repo,
-                })
+                // 1. copy file to layers (with new name)
+                if let Ok(_) = cuuid::save_layer(&uuid, &digest) {
+                    // 2. delete old layer
+                    warn!("Deleting scratch file: {}", &uuid);
+                    if let Ok(_) = cuuid::mark_delete(&uuid) {
+                        // 3. return success
+                        MaybeResponse::err(UuidAcceptResponse::UuidAccept {
+                            uuid,
+                            digest,
+                            name,
+                            repo,
+                        })
+                    } else { panic!("file could not be deleted"); }
+
+                } else { panic!("file could not be copied"); }
             },
             false  => {
                 warn!("expected {}, got {}", digest.digest, hash);
