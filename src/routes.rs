@@ -34,11 +34,7 @@ pub fn routes() -> Vec<rocket::Route> {
 }
 
 pub fn errors() -> Vec<rocket::Catcher> {
-    errors![
-        err_400,
-        err_404,
-        ]
-        
+    errors![err_400, err_404,]
 }
 
 #[error(400)]
@@ -101,11 +97,7 @@ Accept: manifest-version
 404 - manifest not known to the registry
 */
 #[get("/v2/<_name>/<_repo>/manifests/<reference>")]
-fn get_manifest(
-    _name: String,
-    _repo: String,
-    reference: String,
-) -> MaybeResponse<Empty> {
+fn get_manifest(_name: String, _repo: String, reference: String) -> MaybeResponse<Empty> {
     info!("Getting Manifest");
     match reference.as_str() {
         "good" => MaybeResponse::ok(Empty),
@@ -131,9 +123,8 @@ Content-Length: size of manifest
 404 - manifest does not exist
  */
 #[head("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn check_image_manifest(_name: String, _repo: String, _reference: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+fn check_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
+    MaybeResponse::err(Empty)
 }
 
 /*
@@ -173,9 +164,8 @@ Docker-Upload-UUID: <uuid>
 202 - accepted
 */
 #[post("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn post_blob_uuid(_name: String, _repo: String, _uuid: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+fn post_blob_uuid(_name: String, _repo: String, _uuid: String) -> MaybeResponse<Empty> {
+    MaybeResponse::err(Empty)
 }
 
 /*
@@ -194,10 +184,9 @@ Docker-Content-Digest: <digest>
 404 - does not exist
  */
 #[head("/v2/<name>/<repo>/blobs/<_digest>")]
-fn check_existing_layer(name: String, repo: String, _digest: String) ->
-    MaybeResponse<Empty> {
-        debug!("Checking if {}/{} exists...", name, repo);
-        MaybeResponse::err(Empty)
+fn check_existing_layer(name: String, repo: String, _digest: String) -> MaybeResponse<Empty> {
+    debug!("Checking if {}/{} exists...", name, repo);
+    MaybeResponse::err(Empty)
 }
 
 /*
@@ -219,9 +208,8 @@ Docker-Upload-UUID: <uuid>
 204
  */
 #[get("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn get_upload_progress(_name: String, _repo: String, _uuid: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+fn get_upload_progress(_name: String, _repo: String, _uuid: String) -> MaybeResponse<Empty> {
+    MaybeResponse::err(Empty)
 }
 /*
 
@@ -244,65 +232,82 @@ Content-Type: application/octet-stream
  */
 
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
-fn put_blob(name: String, repo: String, uuid: String, digest: cuuid::DigestStruct) ->
-    MaybeResponse<UuidAcceptResponse> {
-        debug!("Completing layer upload with digest: {}", digest.digest);
-        let hash = match cuuid::hash_file(cuuid::scratch_path(&uuid)) {
-            Ok(v) => v,
-            Err(_) => "".to_string(),
-        };
-        debug!("File Hash: {}", hash);
+fn put_blob(
+    name: String,
+    repo: String,
+    uuid: String,
+    digest: cuuid::DigestStruct,
+) -> MaybeResponse<UuidAcceptResponse> {
+    debug!("Completing layer upload with digest: {}", digest.digest);
+    let hash = match cuuid::hash_file(cuuid::scratch_path(&uuid)) {
+        Ok(v) => v,
+        Err(_) => "".to_string(),
+    };
+    debug!("File Hash: {}", hash);
 
-        match assert_eq!(hash, digest.digest) {
-            () => MaybeResponse::err(UuidAcceptResponse::DigestMismatch)
-        };
+    match assert_eq!(hash, digest.digest) {
+        () => MaybeResponse::err(UuidAcceptResponse::DigestMismatch),
+    };
 
 
-        // hash uuid from scratch, if success, copy over to layers
-        // UuidAccept
-        match digest.digest.eq(&hash) {
-            true => {
-                let digest = digest.digest;
-                // 1. copy file to layers (with new name)
-                if let Ok(_) = cuuid::save_layer(&uuid, &digest) {
-                    // 2. delete old layer
-                    warn!("Deleting scratch file: {}", &uuid);
-                    if let Ok(_) = cuuid::mark_delete(&uuid) {
-                        // 3. return success
-                        MaybeResponse::err(UuidAcceptResponse::UuidAccept {
-                            uuid,
-                            digest,
-                            name,
-                            repo,
-                        })
-                    } else { panic!("file could not be deleted"); }
-
-                } else { panic!("file could not be copied"); }
-            },
-            false  => {
-                warn!("expected {}, got {}", digest.digest, hash);
-                MaybeResponse::err(UuidAcceptResponse::DigestMismatch)
-            },
+    // hash uuid from scratch, if success, copy over to layers
+    // UuidAccept
+    match digest.digest.eq(&hash) {
+        true => {
+            let digest = digest.digest;
+            // 1. copy file to layers (with new name)
+            if let Ok(_) = cuuid::save_layer(&uuid, &digest) {
+                // 2. delete old layer
+                warn!("Deleting scratch file: {}", &uuid);
+                if let Ok(_) = cuuid::mark_delete(&uuid) {
+                    // 3. return success
+                    MaybeResponse::err(UuidAcceptResponse::UuidAccept {
+                        uuid,
+                        digest,
+                        name,
+                        repo,
+                    })
+                } else {
+                    panic!("file could not be deleted");
+                }
+            } else {
+                panic!("file could not be copied");
+            }
         }
+        false => {
+            warn!("expected {}, got {}", digest.digest, hash);
+            MaybeResponse::err(UuidAcceptResponse::DigestMismatch)
+        }
+    }
 }
 
-#[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data="<chunk>")]
-fn patch_blob(name: String, repo: String, uuid: String, chunk: rocket::data::Data) ->
-    MaybeResponse<UuidResponse> {
-        let absolute_file = cuuid::scratch_path(&uuid);
-        debug!("Streaming out to {}", absolute_file);
-        let file = chunk.stream_to_file(absolute_file);
+#[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data = "<chunk>")]
+fn patch_blob(
+    name: String,
+    repo: String,
+    uuid: String,
+    chunk: rocket::data::Data,
+) -> MaybeResponse<UuidResponse> {
+    let absolute_file = cuuid::scratch_path(&uuid);
+    debug!("Streaming out to {}", absolute_file);
+    let file = chunk.stream_to_file(absolute_file);
 
-        match file {
-            Ok(_) => {
-                let right = match file.map(|x| x.to_string()) {
-                    Ok(x) => x.parse::<u32>().unwrap(),
-                    Err(_) => 0,
-                };
-                MaybeResponse::ok(UuidResponse::Uuid {uuid, name, repo, left: 0, right})
-            },
-            Err(_) => MaybeResponse::err(UuidResponse::Empty)
+    match file {
+        Ok(_) => {
+            let right = match file.map(|x| x.to_string()) {
+                Ok(x) => x.parse::<u32>().unwrap(),
+                Err(_) => 0,
+            };
+            MaybeResponse::ok(UuidResponse::Uuid {
+                uuid,
+                name,
+                repo,
+                left: 0,
+                right,
+            })
         }
+        Err(_) => MaybeResponse::err(UuidResponse::Empty),
+    }
 }
 
 /*
@@ -316,12 +321,11 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
 /// This route assumes that no more data will be uploaded to the specified uuid.
 #[delete("/v2/<_name>/<_repo>/blobs/uploads/<uuid>")]
-fn delete_upload(_name: String, _repo: String, uuid: String) ->
-    MaybeResponse<UuidAcceptResponse> {
-        match cuuid::mark_delete(&uuid) {
-            Ok(_) => RegistryResponse(UuidAcceptResponse::UuidDelete),
-            Err(_) => panic!("Figure out what to put here too..."),
-        }
+fn delete_upload(_name: String, _repo: String, uuid: String) -> MaybeResponse<UuidAcceptResponse> {
+    match cuuid::mark_delete(&uuid) {
+        Ok(_) => RegistryResponse(UuidAcceptResponse::UuidDelete),
+        Err(_) => panic!("Figure out what to put here too..."),
+    }
 }
 /*
 ---
@@ -331,17 +335,16 @@ POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
  */
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
-fn post_blob_upload(name: String, repo: String) ->
-    MaybeResponse<UuidResponse> {
-        let uuid = cuuid::gen_uuid();
-        info!("Using Uuid: {:?}", uuid);
-        MaybeResponse::ok(UuidResponse::Uuid {
-            uuid: uuid.to_string(),
-            name,
-            repo,
-            left: 0,
-            right: 0,
-        })
+fn post_blob_upload(name: String, repo: String) -> MaybeResponse<UuidResponse> {
+    let uuid = cuuid::gen_uuid();
+    info!("Using Uuid: {:?}", uuid);
+    MaybeResponse::ok(UuidResponse::Uuid {
+        uuid: uuid.to_string(),
+        name,
+        repo,
+        left: 0,
+        right: 0,
+    })
 }
 /*
 
@@ -351,9 +354,8 @@ DELETE /v2/<name>/blobs/<digest>
 
 */
 #[delete("/v2/<_name>/<_repo>/blobs/<_digest>")]
-fn delete_blob(_name: String, _repo: String, _digest: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+fn delete_blob(_name: String, _repo: String, _digest: String) -> MaybeResponse<Empty> {
+    MaybeResponse::err(Empty)
 }
 /*
 
@@ -364,9 +366,8 @@ Content-Type: <manifest media type>
 
 */
 #[put("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn put_image_manifest(_name: String, _repo: String, _reference: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+fn put_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
+    MaybeResponse::err(Empty)
 }
 /*
 ---
@@ -375,9 +376,8 @@ GET /v2/_catalog
 
 */
 #[get("/v2/_catalog")]
-fn get_catalog() ->
-    MaybeResponse<Catalog> {
-        MaybeResponse::err(Catalog)
+fn get_catalog() -> MaybeResponse<Catalog> {
+    MaybeResponse::err(Catalog)
 }
 /*
 ---
@@ -386,9 +386,8 @@ GET /v2/<name>/tags/list
 
 */
 #[delete("/v2/<_name>/<_repo>/tags/list")]
-fn get_image_tags(_name: String, _repo: String) ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+fn get_image_tags(_name: String, _repo: String) -> MaybeResponse<Empty> {
+    MaybeResponse::err(Empty)
 }
 /*
 ---
@@ -397,10 +396,9 @@ DELETE /v2/<name>/manifests/<reference>
 
 */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn delete_image_manifest(_name: String, _repo: String, _reference: String) ->
-    MaybeResponse<Empty> {
-        let _errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
-        MaybeResponse::err(Empty)
+fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
+    let _errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
+    MaybeResponse::err(Empty)
 }
 
 /*
