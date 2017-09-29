@@ -7,12 +7,14 @@ use response::empty::Empty;
 use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
+use response::html::HTML;
 
 use controller::uuid as cuuid;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
+        get_homepage,
         get_manifest,
         check_image_manifest,
         get_blob,
@@ -67,6 +69,15 @@ Docker-Distribution-API-Version: registry/2.0
 #[get("/v2")]
 fn get_v2root() -> MaybeResponse<Empty> {
     MaybeResponse::ok(Empty)
+}
+
+#[get("/")]
+fn get_homepage<'a>() -> RegistryResponse<HTML<'a>> {
+    RegistryResponse(HTML(
+        "<!DOCTYPE html><html><body>
+    <h1>Welcome to Lycaon, the King of Registries</h1>
+    </body></html>",
+    ))
 }
 
 /*

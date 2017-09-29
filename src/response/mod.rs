@@ -9,6 +9,7 @@ pub mod catalog;
 pub mod empty;
 pub mod uuid;
 pub mod uuidaccept;
+pub mod html;
 
 /// Encapsulate a response from the registry
 /// Currently the full type definition is not possible (26 Sept 2017),
