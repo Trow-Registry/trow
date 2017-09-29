@@ -21,12 +21,13 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
         use self::UuidAcceptResponse::*;
 
         match self {
-            UuidAccept { name, repo, digest, uuid: _ } => {
-                let location = format!("{}/v2/{}/{}/blobs/{}",
-                                       BASE_URL,
-                                       name,
-                                       repo,
-                                       digest);
+            UuidAccept {
+                name,
+                repo,
+                digest,
+                uuid: _,
+            } => {
+                let location = format!("{}/v2/{}/{}/blobs/{}", BASE_URL, name, repo, digest);
                 let location = Header::new("Location", location);
                 let digest = Header::new("Docker-Content-Digest", digest);
                 Response::build()
@@ -34,18 +35,12 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
                     .header(location)
                     .header(digest)
                     .ok()
-            },
+            }
             DigestMismatch => {
                 debug!("Digest mismatched");
-                Response::build()
-                    .status(Status::NotFound)
-                    .ok()
-            },
-            UuidDelete => {
-                Response::build()
-                    .status(Status::NoContent)
-                    .ok()
+                Response::build().status(Status::NotFound).ok()
             }
+            UuidDelete => Response::build().status(Status::NoContent).ok(),
         }
     }
 }
@@ -83,4 +78,3 @@ mod test {
         assert_eq!(response.status(), Status::NotFound);
     }
 }
-

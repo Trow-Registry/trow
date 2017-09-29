@@ -20,9 +20,10 @@ pub enum UuidResponse {
  * Falls back to hostname if it doesn't exist.
  */
 fn get_base_url(req: &Request) -> String {
-    
     let host = match req.headers().get("HOST").next() {
-        None => hostname::get_hostname().expect("I have no name").to_string(),
+        None => hostname::get_hostname()
+            .expect("I have no name")
+            .to_string(),
         Some(shost) => shost.to_string(),
     };
 
@@ -33,18 +34,27 @@ impl<'r> Responder<'r> for UuidResponse {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
         debug!("Uuid Ok");
 
-        if let UuidResponse::Uuid {ref uuid, ref name, ref repo, ref left, ref right} = self {
-            let location_url = format!("{}/v2/{}/{}/blobs/uploads/{}?query=true",
-                                       get_base_url(req),
-                                       name,
-                                       repo,
-                                       uuid);
+        if let UuidResponse::Uuid {
+            ref uuid,
+            ref name,
+            ref repo,
+            ref left,
+            ref right,
+        } = self
+        {
+            let location_url = format!(
+                "{}/v2/{}/{}/blobs/uploads/{}?query=true",
+                get_base_url(req),
+                name,
+                repo,
+                uuid
+            );
             let upload_uuid = Header::new("Docker-Upload-UUID", uuid.clone());
             let range = Header::new("Range", format!("{}-{}", left, right));
             let length = Header::new("Content-Length", format!("{}", right - left));
             let location = Header::new("Location", location_url);
 
-            debug!("Range: {}-{}, Length: {}", left, right, right-left);
+            debug!("Range: {}-{}, Length: {}", left, right, right - left);
             Response::build()
                 .header(upload_uuid)
                 .header(location)
@@ -55,9 +65,7 @@ impl<'r> Responder<'r> for UuidResponse {
                 .ok()
         } else {
             debug!("Uuid Error");
-            Response::build()
-                .status(Status::NotFound)
-                .ok()
+            Response::build().status(Status::NotFound).ok()
         }
     }
 }
@@ -95,4 +103,3 @@ mod test {
         assert_eq!(response.status(), Status::NotFound);
     }
 }
-

@@ -6,11 +6,10 @@ use rocket::request::Request;
 pub struct Empty;
 
 impl<'r> Responder<'r> for Empty {
-            fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
-                Response::build()
-                    .ok()
-            }
-        }
+    fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
+        Response::build().ok()
+    }
+}
 
 #[cfg(test)]
 mod test {

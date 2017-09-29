@@ -34,7 +34,7 @@ pub fn hash_file(absolute_directory: String) -> Result<String, String> {
             // HACK: needs a fix of some description
             Ok(format!("{:?}", sha).to_lowercase())
         }
-        Err(_) => Err(format!("could not open file: {}", absolute_directory))
+        Err(_) => Err(format!("could not open file: {}", absolute_directory)),
     }
 }
 
@@ -48,7 +48,7 @@ pub fn gen_uuid() -> Uuid {
 /// directory from the _scratch_ directory.
 pub fn save_layer(uuid: &String, digest: &String) -> io::Result<u64> {
     let from = scratch_path(uuid);
-    let to   = layer_path(digest);
+    let to = layer_path(digest);
 
     // TODO: check if layer already exists.
     debug!("Copying {} -> {}", from, to);

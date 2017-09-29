@@ -5,6 +5,6 @@ stdenv.mkDerivation rec {
   buildInputs = [
     pkgconfig
     latest.rustChannels.nightly.rust
-    libsodium
+    capnproto
   ];
 }

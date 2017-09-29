@@ -19,15 +19,15 @@ extern crate fern;
 extern crate log;
 // use of slog is currently not supported
 // https://github.com/SergioBenitez/Rocket/issues/21
+extern crate hostname;
 extern crate ring;
 extern crate rocket;
 extern crate rocket_contrib;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate serde;
 extern crate uuid;
-extern crate hostname;
 
 mod errors;
 mod routes;

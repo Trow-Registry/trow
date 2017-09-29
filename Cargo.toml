@@ -22,3 +22,13 @@ fern = "0.4"
 chrono = "0.4.0"
 ctrlc = { version = "3.0", features = ["termination"] }
 hostname = "^0.1"
+
+# grpc
+# grpc            = "0.*"
+# protobuf        = "1.*"
+# futures         = "0.1"
+# futures-cpupool = "0.1"
+
+[build-dependencies]
+# protoc-rust-grpc= "0.*"
+rustfmt-nightly = "0.2.8"
