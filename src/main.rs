@@ -5,6 +5,7 @@
 //!
 //! There are many features available:
 //!
+
 //! - Ability to delete images
 //! - replication and masterless
 //! - other stuff...
@@ -20,8 +21,11 @@ extern crate log;
 // https://github.com/SergioBenitez/Rocket/issues/21
 extern crate ring;
 extern crate rocket;
+extern crate rocket_contrib;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
+extern crate serde;
 extern crate uuid;
 extern crate hostname;
 
