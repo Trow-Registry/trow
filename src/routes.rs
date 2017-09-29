@@ -6,6 +6,8 @@ use response::{MaybeResponse, RegistryResponse};
 use response::empty::Empty;
 use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
+use response::catalog::Catalog;
+
 use controller::uuid as cuuid;
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -363,8 +365,8 @@ GET /v2/_catalog
 */
 #[get("/v2/_catalog")]
 fn get_catalog() ->
-    MaybeResponse<Empty> {
-        MaybeResponse::err(Empty)
+    MaybeResponse<Catalog> {
+        MaybeResponse::err(Catalog)
 }
 /*
 ---

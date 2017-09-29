@@ -21,7 +21,7 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
         use self::UuidAcceptResponse::*;
 
         match self {
-            UuidAccept { name, repo, digest, uuid } => {
+            UuidAccept { name, repo, digest, uuid: _ } => {
                 let location = format!("{}/v2/{}/{}/blobs/{}",
                                        BASE_URL,
                                        name,
