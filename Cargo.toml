@@ -30,5 +30,4 @@ hostname = "^0.1"
 # futures-cpupool = "0.1"
 
 [build-dependencies]
-# protoc-rust-grpc= "0.*"
-rustfmt-nightly = "0.2.8"
+capnpc = "0.8.7"

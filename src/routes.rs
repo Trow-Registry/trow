@@ -47,21 +47,17 @@ fn err_404() -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
 }
 
-#[doc = /**
-Routes of a 2.0 Registry
-
-Version Check of the registry
-GET /v2/
-
-# Responses
-200 - We Exist (and you are authenticated)
-401 - Please Authorize (WWW-Authenticate header with instuctions).
-
-# Headers
-Docker-Distribution-API-Version: registry/2.0
-*/]
-
-/// Some docs for this function
+/// Routes of a 2.0 Registry
+/// 
+/// Version Check of the registry
+/// GET /v2/
+/// 
+/// # Responses
+/// 200 - We Exist (and you are authenticated)
+/// 401 - Please Authorize (WWW-Authenticate header with instuctions).
+/// 
+/// # Headers
+/// Docker-Distribution-API-Version: registry/2.0
 #[get("/v2")]
 fn get_v2root() -> MaybeResponse<Empty> {
     MaybeResponse::ok(Empty)
@@ -147,22 +143,18 @@ fn get_blob(_name: String, _repo: String, digest: String) -> MaybeResponse<Empty
     }
 }
 
-#[doc = /**
-
----
-Pushing a Layer
-POST /v2/<name>/blobs/uploads/
-name - name of repository
-
-# Headers
-Location: /v2/<name>/blobs/uploads/<uuid>
-Range: bytes=0-<offset>
-Content-Length: 0
-Docker-Upload-UUID: <uuid>
-
-# Returns
-202 - accepted
-*/]
+/// Pushing a Layer
+/// POST /v2/<name>/blobs/uploads/
+/// name - name of repository
+/// 
+/// # Headers
+/// Location: /v2/<name>/blobs/uploads/<uuid>
+/// Range: bytes=0-<offset>
+/// Content-Length: 0
+/// Docker-Upload-UUID: <uuid>
+/// 
+/// # Returns
+/// 202 - accepted
 #[post("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
 fn post_blob_uuid(_name: String, _repo: String, _uuid: String) -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
