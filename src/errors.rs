@@ -125,7 +125,5 @@ pub fn generate_errors(errors: &[ErrorType]) -> Error {
         let error = error.clone();
         format_errors.push(get_error(error));
     }
-    Error {
-        errors: format_errors,
-    }
+    Error { errors: format_errors }
 }

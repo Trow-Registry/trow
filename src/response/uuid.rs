@@ -21,9 +21,11 @@ pub enum UuidResponse {
  */
 fn get_base_url(req: &Request) -> String {
     let host = match req.headers().get("HOST").next() {
-        None => hostname::get_hostname()
-            .expect("I have no name")
-            .to_string(),
+        None => {
+            hostname::get_hostname()
+                .expect("I have no name")
+                .to_string()
+        }
         Some(shost) => shost.to_string(),
     };
 
