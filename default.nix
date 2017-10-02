@@ -6,5 +6,8 @@ stdenv.mkDerivation rec {
     pkgconfig
     latest.rustChannels.nightly.rust
     capnproto
+
+    # dev
+    rustfmt
   ];
 }
