@@ -103,7 +103,7 @@ fn get_manifest(_name: String, _repo: String, reference: String) -> MaybeRespons
 /*
 
 ---
-Check for existance
+Check for existence
 HEAD /v2/<name>/manifests/<reference>
 
 # Parameters

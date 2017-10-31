@@ -6,7 +6,8 @@ network="lyc-reg-test-net"
 
 docker network create ${network}
 docker run -d --name ${container} --net ${network} lycaon
-docker run --rm --net ${network} -e BASE_URL="http://${container}:8000/" amouat/registry-test-suite
+docker run --rm --net ${network} -e BASE_URL="http://${container}:8000/" \
+  containersol/registry-test-suite
 code=$?
 docker stop ${container}
 docker rm ${container}
