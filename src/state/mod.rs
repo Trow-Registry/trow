@@ -1,6 +1,7 @@
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use http_capnp::{message_interface, message};
 
+use rocket;
 use capnp::capability::Promise;
 use capnp::Error;
 
@@ -34,10 +35,30 @@ impl message_interface::Server for MessageImpl {
 
 }
 
+// TODO: merge this into the Config struct in config.rs
+struct ConsoleConfig {
+    console_port: i64,
+}
+
+fn get_config() -> ConsoleConfig {
+    let rkt = rocket::Rocket::ignite();
+    let cfg = rkt.config();
+
+    // config::
+    ConsoleConfig {
+        console_port: match cfg.get_int("console_port") {
+            Ok(x) => x,
+            Err(_) => 29999,
+        }
+    }
+}
+
 pub fn main() {
+
+    let cfg = get_config();
     use std::net::ToSocketAddrs;
 
-    let address = "localhost:29999";
+    let address = format!("localhost:{}", cfg.console_port);
     let mut core = reactor::Core::new().unwrap();
     let handle = core.handle();
 
@@ -63,5 +84,6 @@ pub fn main() {
         Ok(())
     });
 
+    info!("Starting Console on address: {}", address);
     core.run(done).unwrap();
 }

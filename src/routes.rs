@@ -1,6 +1,7 @@
 use std::string::ToString;
 use rocket;
 
+use config;
 use errors;
 use response::{MaybeResponse, RegistryResponse};
 use response::empty::Empty;
@@ -51,26 +52,25 @@ fn err_404() -> MaybeResponse<Empty> {
 
 
 #[get("/testing")]
-fn get_test_route() -> MaybeResponse<Empty> {
+fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty> {
     use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-    use http_capnp::{message_interface};
+    use http_capnp::message_interface;
 
     use tokio_core::reactor;
     use tokio_io::AsyncRead;
     use futures::Future;
 
-    pub fn main() {
-        use std::net::ToSocketAddrs;
+    use std::net::ToSocketAddrs;
 
-        let address = "localhost:29999";
-        let mut core = reactor::Core::new().unwrap();
-        let handle = core.handle();
+    let address = format!("localhost:{}", config.console_port);
+    let mut core = reactor::Core::new().unwrap();
+    let handle = core.handle();
 
-        let addr = address.to_socket_addrs().unwrap().next().expect(
-            "could not parse address",
-        );
-        let stream = core.run(::tokio_core::net::TcpStream::connect(&addr, &handle))
-            .unwrap();
+    let addr = address.to_socket_addrs().unwrap().next().expect(
+        "could not parse address",
+    );
+    info!("Connecting to address: {}", address);
+    if let Ok(stream) = core.run(::tokio_core::net::TcpStream::connect(&addr, &handle)) {
         stream.set_nodelay(true).unwrap();
         let (reader, writer) = stream.split();
 
@@ -82,7 +82,8 @@ fn get_test_route() -> MaybeResponse<Empty> {
         ));
 
         let mut rpc_system = RpcSystem::new(rpc_network, None);
-        let proxy: message_interface::Client = rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
+        let proxy: message_interface::Client =
+            rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
 
         handle.spawn(rpc_system.map_err(|_e| ()));
 
@@ -95,11 +96,15 @@ fn get_test_route() -> MaybeResponse<Empty> {
             let response = response.get().unwrap();
             let msg = response.get_msg().unwrap();
             info!("Success!!");
-            info!("Response: (text = {:?}, number = {:?})", msg.get_text(), msg.get_number());
+            info!(
+                "Response: (text = {:?}, number = {:?})",
+                msg.get_text(),
+                msg.get_number()
+            );
         }
+    } else {
+        warn!("Issue connecting to Console, please try again later");
     }
-    main();
-
     MaybeResponse::err(Empty)
 }
 

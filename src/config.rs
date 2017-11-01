@@ -20,9 +20,10 @@ static LAYERS_DIR: &'static str = "layers";
 /// This encapsulates any stateful data that needs to be preserved and
 /// passed around during execution.
 #[derive(Debug)]
-pub struct State {
+pub struct Config {
     pub address: String,
     pub port: u16,
+    pub console_port: i64,
 }
 
 /// Bulid the logging agent with formatting and the correct log-level.
@@ -86,17 +87,24 @@ fn create_data_dirs(data_path: &Path) {
     );
 }
 
+
 /// extract configuration values
-fn extract_config(rocket: rocket::Rocket) -> rocket::Rocket {
-    let state: State;
+pub(crate) fn extract_config(rocket: rocket::Rocket) -> rocket::Rocket {
+    let state: Config;
     {
         let conf = &rocket.config();
         let address = &conf.address;
         let port = conf.port;
-        state = State {
+        let console_port = match conf.get_int("console_port") {
+            Ok(x) => x,
+            Err(_) => 30000
+        };
+        state = Config {
             address: address.clone(),
             port,
+            console_port,
         };
+    info!("console_port: {}", console_port);
     }
     debug!("{:?}", state);
     rocket.manage(state)
@@ -107,7 +115,7 @@ fn extract_config(rocket: rocket::Rocket) -> rocket::Rocket {
 /// - attach SIGTERM handler
 /// - Check necessary paths exist
 /// - Extract configuration values needed for runtime
-pub fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
+fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
     attach_sigterm();
 
     create_data_dirs(Path::new(DEFAULT_DATA_DIR));
