@@ -13,6 +13,8 @@ use controller::uuid as cuuid;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
+        get_test_route,
+
         get_v2root,
         get_homepage,
         get_manifest,
@@ -47,15 +49,69 @@ fn err_404() -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
 }
 
+
+#[get("/testing")]
+fn get_test_route() -> MaybeResponse<Empty> {
+    use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
+    use http_capnp::{message_interface};
+
+    use tokio_core::reactor;
+    use tokio_io::AsyncRead;
+    use futures::Future;
+
+    pub fn main() {
+        use std::net::ToSocketAddrs;
+
+        let address = "localhost:29999";
+        let mut core = reactor::Core::new().unwrap();
+        let handle = core.handle();
+
+        let addr = address.to_socket_addrs().unwrap().next().expect(
+            "could not parse address",
+        );
+        let stream = core.run(::tokio_core::net::TcpStream::connect(&addr, &handle))
+            .unwrap();
+        stream.set_nodelay(true).unwrap();
+        let (reader, writer) = stream.split();
+
+        let rpc_network = Box::new(twoparty::VatNetwork::new(
+            reader,
+            writer,
+            rpc_twoparty_capnp::Side::Client,
+            Default::default(),
+        ));
+
+        let mut rpc_system = RpcSystem::new(rpc_network, None);
+        let proxy: message_interface::Client = rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
+
+        handle.spawn(rpc_system.map_err(|_e| ()));
+
+        let mut req = proxy.get_request();
+        req.get().set_num(12);
+        let session = req.send();
+        let response = core.run(session.promise).unwrap();
+
+        {
+            let response = response.get().unwrap();
+            let msg = response.get_msg().unwrap();
+            info!("Success!!");
+            info!("Response: (text = {:?}, number = {:?})", msg.get_text(), msg.get_number());
+        }
+    }
+    main();
+
+    MaybeResponse::err(Empty)
+}
+
 /// Routes of a 2.0 Registry
-/// 
+///
 /// Version Check of the registry
 /// GET /v2/
-/// 
+///
 /// # Responses
 /// 200 - We Exist (and you are authenticated)
 /// 401 - Please Authorize (WWW-Authenticate header with instuctions).
-/// 
+///
 /// # Headers
 /// Docker-Distribution-API-Version: registry/2.0
 #[get("/v2")]
@@ -146,13 +202,13 @@ fn get_blob(_name: String, _repo: String, digest: String) -> MaybeResponse<Empty
 /// Pushing a Layer
 /// POST /v2/<name>/blobs/uploads/
 /// name - name of repository
-/// 
+///
 /// # Headers
 /// Location: /v2/<name>/blobs/uploads/<uuid>
 /// Range: bytes=0-<offset>
 /// Content-Length: 0
 /// Docker-Upload-UUID: <uuid>
-/// 
+///
 /// # Returns
 /// 202 - accepted
 #[post("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
