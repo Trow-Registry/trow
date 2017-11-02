@@ -1,5 +1,6 @@
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use http_capnp::{message_interface, message};
+use http_capnp::lycaon::{message_interface, message, layer_interface, layer};
+use http_capnp::lycaon;
 
 use rocket;
 use capnp::capability::Promise;
@@ -24,8 +25,8 @@ impl message_interface::Server for MessageImpl {
         -> Promise<(), Error>
     {
         let num = pry!(params.get()).get_num();
-        let mut message = ::capnp::message::Builder::new(::capnp::message::HeapAllocator::new());
-        let mut msg = message.init_root::<message::Builder>();
+        let mut message2 = ::capnp::message::Builder::new(::capnp::message::HeapAllocator::new());
+        let mut msg = message2.init_root::<message::Builder>();
         msg.set_text("Hello There");
         msg.set_number(num);
         results.get().set_msg(msg.as_reader()).unwrap();
@@ -33,6 +34,20 @@ impl message_interface::Server for MessageImpl {
         Promise::ok(())
     }
 
+}
+
+struct LycaonRPC;
+impl lycaon::Server for LycaonRPC {
+    fn get_message_interface(&mut self,
+                         params: lycaon::GetMessageInterfaceParams,
+                         mut results: lycaon::GetMessageInterfaceResults)
+                         -> Promise<(), Error>
+        {
+            debug!("returning the message interface");
+            let msg_interface = lycaon::message_interface::ToClient::new(MessageImpl::new()).from_server::<::capnp_rpc::Server>();
+            results.get().set_if(msg_interface);
+            Promise::ok(())
+        }
 }
 
 // TODO: merge this into the Config struct in config.rs
@@ -44,7 +59,6 @@ fn get_config() -> ConsoleConfig {
     let rkt = rocket::Rocket::ignite();
     let cfg = rkt.config();
 
-    // config::
     ConsoleConfig {
         // TODO: This is currently duplicated in the config.rs file (where it should be).
         console_port: match cfg.get_int("console_port") {
@@ -67,8 +81,7 @@ pub fn main() {
     let addr = address.to_socket_addrs().unwrap().next().expect("could not parse address");
     let socket = ::tokio_core::net::TcpListener::bind(&addr, &handle).unwrap();
 
-    let proxy = message_interface::ToClient::new(
-        MessageImpl::new()).from_server::<::capnp_rpc::Server>();
+    let proxy = lycaon::ToClient::new(LycaonRPC).from_server::<::capnp_rpc::Server>();
 
     let handle1 = handle.clone();
     let done = socket.incoming().for_each(move |(socket, _addr)| {

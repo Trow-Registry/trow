@@ -90,6 +90,8 @@ fn create_data_dirs(data_path: &Path) {
 
 /// extract configuration values
 pub(crate) fn extract_config(rocket: rocket::Rocket) -> rocket::Rocket {
+    // TODO: use the builder in the rocket instance.
+    // let conf = rocket::Config::default().unwrap();
     let state: Config;
     {
         let conf = &rocket.config();

@@ -1,29 +1,40 @@
 @0x8e59099839a48161;
 
-interface OutgoingHttp {
-    newSession @0 (baseUrl :Text) -> (session :HttpSession);
+interface Lycaon {
+
+  # TODO This feels like a huge hack
+  getMessageInterface @0 () -> (if: MessageInterface);
+  getLayerInterface @1 () -> (if: LayerInterface);
+
+  # -- Begin Sample --
+  struct Message  {
+    text @0 :Text;
+    number @1 :UInt8;
+  }
+
+
+  interface MessageInterface {
+    list @0 () -> (list: List(Message));
+    send @1 (msg :Message) -> ();
+    get @2 (num :UInt8) -> (msg :Message);
+  }
+# -- End Sample --
+
+# -- Layer --
+  struct Layer {
+    digest @0 :Text;
+    name   @1 :Text;
+    repo   @2 :Text;
+  }
+
+  interface LayerInterface {
+    # query an layer existence.
+    # This maps directly with the external API.
+    layerExists @0 (layer :Layer) -> (result :Bool);
+
+    # Commit a layer to the image.
+    layerCommit @1 (layer :Layer) -> (result :Bool);
+  }
+
 }
-
-interface HttpSession {
-    get @0 (path :Text) -> (responseCode :UInt32, body :Data);
-    post @1 (path :Text, body :Data) -> (responseCode: UInt32);
-}
-
-
-const pizza :Text = "Hamish was here...";
-
-struct Message  {
-  text @0 :Text;
-  number @1 :UInt8;
-}
-
-
-interface MessageInterface {
-  list @0 () -> (list: List(Message));
-  send @1 (msg :Message) -> ();
-  get @2 (num :UInt8) -> (msg :Message);
-}
-
-const test :Text = "hello";
-
-const mymessage :Text = "Hello there";
+# -- End Layer --

@@ -54,7 +54,8 @@ fn err_404() -> MaybeResponse<Empty> {
 #[get("/testing")]
 fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty> {
     use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-    use http_capnp::message_interface;
+    use http_capnp::lycaon::message_interface;
+    use http_capnp::lycaon;
 
     use tokio_core::reactor;
     use tokio_io::AsyncRead;
@@ -82,17 +83,20 @@ fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty>
         ));
 
         let mut rpc_system = RpcSystem::new(rpc_network, None);
-        let proxy: message_interface::Client =
+        let lycaon_proxy: lycaon::Client =
             rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
+        let interface = lycaon_proxy.get_message_interface_request().send();
+        let proxy = interface.pipeline.get_if();
+
 
         handle.spawn(rpc_system.map_err(|_e| ()));
 
         let mut req = proxy.get_request();
         req.get().set_num(12);
         let session = req.send();
+        // NOTE: this route is currently broken, I'm not sure how to fix it...
         let response = core.run(session.promise).unwrap();
 
-        {
             let response = response.get().unwrap();
             let msg = response.get_msg().unwrap();
             info!("Success!!");
@@ -101,7 +105,6 @@ fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty>
                 msg.get_text(),
                 msg.get_number()
             );
-        }
     } else {
         warn!("Issue connecting to Console, please try again later");
     }
