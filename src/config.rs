@@ -97,7 +97,7 @@ pub(crate) fn extract_config(rocket: rocket::Rocket) -> rocket::Rocket {
         let port = conf.port;
         let console_port = match conf.get_int("console_port") {
             Ok(x) => x,
-            Err(_) => 30000
+            Err(_) => 29999
         };
         state = Config {
             address: address.clone(),

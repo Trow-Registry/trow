@@ -46,7 +46,9 @@ fn get_config() -> ConsoleConfig {
 
     // config::
     ConsoleConfig {
+        // TODO: This is currently duplicated in the config.rs file (where it should be).
         console_port: match cfg.get_int("console_port") {
+
             Ok(x) => x,
             Err(_) => 29999,
         }
