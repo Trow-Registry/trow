@@ -36,6 +36,18 @@ impl message_interface::Server for MessageImpl {
 
 }
 
+pub struct LayerImpl;
+impl lycaon::layer_interface::Server for LayerImpl {
+    fn layer_exists(&mut self,
+                    params: lycaon::layer_interface::LayerExistsParams,
+                    mut results: lycaon::layer_interface::LayerExistsResults)
+                    -> Promise<(), Error>
+    {
+        warn!("My error here");
+        Promise::ok(())
+    }
+}
+
 struct LycaonRPC;
 impl lycaon::Server for LycaonRPC {
     fn get_message_interface(&mut self,
@@ -46,6 +58,16 @@ impl lycaon::Server for LycaonRPC {
             debug!("returning the message interface");
             let msg_interface = lycaon::message_interface::ToClient::new(MessageImpl::new()).from_server::<::capnp_rpc::Server>();
             results.get().set_if(msg_interface);
+            Promise::ok(())
+        }
+    fn get_layer_interface(&mut self,
+                         params: lycaon::GetLayerInterfaceParams,
+                         mut results: lycaon::GetLayerInterfaceResults)
+                         -> Promise<(), Error>
+        {
+            debug!("returning the message interface");
+            let interface = lycaon::layer_interface::ToClient::new(LayerImpl).from_server::<::capnp_rpc::Server>();
+            results.get().set_if(interface);
             Promise::ok(())
         }
 }
