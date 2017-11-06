@@ -1,7 +1,7 @@
 #Not a big fan of using nightly, but such is our lot currently
 FROM rustlang/rust:nightly as builder
 
-RUN apt-get update && apt-get install -y musl musl-dev musl-tools
+RUN apt-get update && apt-get install -y musl musl-dev musl-tools capnproto
 RUN rustup target add x86_64-unknown-linux-musl
 
 WORKDIR /usr/src/lycaon
@@ -14,6 +14,7 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release --target x86_64-unknown-linux-musl
 
 #Now the real src
+COPY build.rs .
 COPY src ./src
 COPY Rocket.toml .
 # Need to touch to alert cargo that things have changed...
