@@ -54,7 +54,6 @@ fn err_404() -> MaybeResponse<Empty> {
 #[get("/testing")]
 fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty> {
     use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-    use http_capnp::lycaon::message_interface;
     use http_capnp::lycaon;
 
     use tokio_core::reactor;
@@ -83,8 +82,7 @@ fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty>
         ));
 
         let mut rpc_system = RpcSystem::new(rpc_network, None);
-        let lycaon_proxy: lycaon::Client =
-            rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
+        let lycaon_proxy: lycaon::Client = rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
         let interface = lycaon_proxy.get_message_interface_request().send();
         let proxy = interface.pipeline.get_if();
 
@@ -96,14 +94,14 @@ fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty>
         let session = req.send();
         let response = core.run(session.promise).unwrap();
 
-            let response = response.get().unwrap();
-            let msg = response.get_msg().unwrap();
-            info!("Success!!");
-            info!(
-                "Response: (text = {:?}, number = {:?})",
-                msg.get_text(),
-                msg.get_number()
-            );
+        let response = response.get().unwrap();
+        let msg = response.get_msg().unwrap();
+        info!("Success!!");
+        info!(
+            "Response: (text = {:?}, number = {:?})",
+            msg.get_text(),
+            msg.get_number()
+        );
     } else {
         warn!("Issue connecting to Console, please try again later");
     }
@@ -239,7 +237,12 @@ Docker-Content-Digest: <digest>
 404 - does not exist
  */
 #[head("/v2/<name>/<repo>/blobs/<digest>")]
-fn check_existing_layer(config: rocket::State<config::Config>, name: String, repo: String, digest: String) -> MaybeResponse<Empty> {
+fn check_existing_layer(
+    config: rocket::State<config::Config>,
+    name: String,
+    repo: String,
+    digest: String,
+) -> MaybeResponse<Empty> {
     debug!("Checking if {}/{} exists...", name, repo);
     use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
     use http_capnp::lycaon;
@@ -247,20 +250,29 @@ fn check_existing_layer(config: rocket::State<config::Config>, name: String, rep
     use tokio_core::reactor;
     use tokio_io::AsyncRead;
     use futures::Future;
-    use state;
+    // use state;
 
     use std::net::ToSocketAddrs;
 
+    // TODO: this can /all/ be cleaned up considerably...
     let address = format!("localhost:{}", config.console_port);
     let mut core = reactor::Core::new().unwrap();
     let handle = core.handle();
 
-    let addr = address.to_socket_addrs().unwrap().next().expect(
-        "could not parse address",
-    );
+    let addr = address.to_socket_addrs().and_then(|mut addr| {
+        addr.next().ok_or(
+            Err("could not parse address".to_string())
+                .unwrap(),
+        )
+    });
+
     info!("Connecting to address: {}", address);
-    if let Ok(stream) = core.run(::tokio_core::net::TcpStream::connect(&addr, &handle)) {
-        stream.set_nodelay(true).unwrap();
+    let stream = addr.and_then(|addr| {
+        core.run(::tokio_core::net::TcpStream::connect(&addr, &handle))
+    });
+
+    if let Ok(stream) = stream {
+        stream.set_nodelay(true).expect("could not set nodelay");
         let (reader, writer) = stream.split();
 
         let rpc_network = Box::new(twoparty::VatNetwork::new(
@@ -271,8 +283,7 @@ fn check_existing_layer(config: rocket::State<config::Config>, name: String, rep
         ));
 
         let mut rpc_system = RpcSystem::new(rpc_network, None);
-        let lycaon_proxy: lycaon::Client =
-            rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
+        let lycaon_proxy: lycaon::Client = rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
         let interface = lycaon_proxy.get_layer_interface_request().send();
         let proxy = interface.pipeline.get_if();
 
@@ -285,16 +296,17 @@ fn check_existing_layer(config: rocket::State<config::Config>, name: String, rep
         msg.set_digest(&digest);
         msg.set_name(&name);
         msg.set_repo(&repo);
-        req.get().set_layer(msg.as_reader());
+        req.get().set_layer(msg.as_reader()).expect(
+            "could not set layer",
+        );
         let session = req.send();
-        let response = core.run(session.promise).unwrap();
+        if let Ok(response) = core.run(session.promise) {
+            let response = response.get();
+            let msg = response.and_then(|response| Ok(response.get_result()));
 
-            let response = response.get().unwrap();
-            let msg = response.get_result();
             info!("Success!!");
-            info!(
-                "Exists?: {}", msg
-            );
+            info!("Exists?: {:?}", msg);
+        }
     } else {
         warn!("Issue connecting to Console, please try again later");
     }

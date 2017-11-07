@@ -44,8 +44,8 @@ pub struct LayerImpl;
 impl lycaon::layer_interface::Server for LayerImpl {
     fn layer_exists(
         &mut self,
-        params: lycaon::layer_interface::LayerExistsParams,
-        mut results: lycaon::layer_interface::LayerExistsResults,
+        _params: lycaon::layer_interface::LayerExistsParams,
+        _results: lycaon::layer_interface::LayerExistsResults,
     ) -> Promise<(), Error> {
         warn!("My error here");
         Promise::ok(())
@@ -56,7 +56,7 @@ struct LycaonRPC;
 impl lycaon::Server for LycaonRPC {
     fn get_message_interface(
         &mut self,
-        params: lycaon::GetMessageInterfaceParams,
+        _params: lycaon::GetMessageInterfaceParams,
         mut results: lycaon::GetMessageInterfaceResults,
     ) -> Promise<(), Error> {
         debug!("returning the message interface");
@@ -67,7 +67,7 @@ impl lycaon::Server for LycaonRPC {
     }
     fn get_layer_interface(
         &mut self,
-        params: lycaon::GetLayerInterfaceParams,
+        _params: lycaon::GetLayerInterfaceParams,
         mut results: lycaon::GetLayerInterfaceResults,
     ) -> Promise<(), Error> {
         debug!("returning the message interface");
