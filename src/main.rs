@@ -57,7 +57,7 @@ fn main() {
     // TODO: this name needs a change
     let handle = thread::spawn(|| {
         debug!("Starting state thread...");
-        state::main();
+        state::main().expect("Backend Service has exited unexpectedly");
     });
     config::rocket().launch();
     handle.join().unwrap();
