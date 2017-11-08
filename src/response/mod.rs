@@ -7,9 +7,10 @@ use serde;
 /// Exporting all routes for the project
 pub mod catalog;
 pub mod empty;
+pub mod html;
+pub mod layers;
 pub mod uuid;
 pub mod uuidaccept;
-pub mod html;
 
 /// Encapsulate a response from the registry
 /// Currently the full type definition is not possible (26 Sept 2017),
@@ -76,5 +77,4 @@ pub fn json_response<T: serde::Serialize>(
     use rocket_contrib;
     let response = rocket_contrib::Json(var).respond_to(req);
     response
-    // Ok(response.unwrap_or_default())
 }

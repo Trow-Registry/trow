@@ -27,10 +27,15 @@ interface Lycaon {
     repo   @2 :Text;
   }
 
+  struct LayerResult {
+    exists @0 :Bool;
+    length   @1 :UInt16;
+  }
+
   interface LayerInterface {
     # query an layer existence.
     # This maps directly with the external API.
-    layerExists @0 (layer :Layer) -> (result :Bool);
+    layerExists @0 (layer :Layer) -> (result :LayerResult);
 
     # Commit a layer to the image.
     layerCommit @1 (layer :Layer) -> (result :Bool);

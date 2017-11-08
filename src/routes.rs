@@ -5,6 +5,7 @@ use config;
 use errors;
 use response::{MaybeResponse, RegistryResponse};
 use response::empty::Empty;
+use response::layers::LayerExists;
 use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
@@ -242,15 +243,15 @@ fn check_existing_layer(
     name: String,
     repo: String,
     digest: String,
-) -> MaybeResponse<Empty> {
+) -> MaybeResponse<LayerExists> {
     debug!("Checking if {}/{} exists...", name, repo);
+
     use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
     use http_capnp::lycaon;
 
     use tokio_core::reactor;
     use tokio_io::AsyncRead;
     use futures::Future;
-    // use state;
 
     use std::net::ToSocketAddrs;
 
@@ -260,10 +261,17 @@ fn check_existing_layer(
     let handle = core.handle();
 
     let addr = address.to_socket_addrs().and_then(|mut addr| {
-        addr.next().ok_or(
-            Err("could not parse address".to_string())
-                .unwrap(),
-        )
+        let err = Err("could not parse address".to_string());
+        // The below piece of code is actually handled by using
+        // `.or_ok()`, but it is not a solution until I can find a
+        // proper error handler.
+        match addr.next() {
+            Some(x) => Ok(x),
+            // TODO: This is a hack and will actually cause the code to panic when trying to unwrap.
+            // A proper fix needs to be done for this, but it does make the type-checker happy...
+            // This is a duplicate of some code in the state/mod.rs file.
+            None => Err(err.unwrap()),
+        }
     });
 
     info!("Connecting to address: {}", address);
@@ -300,17 +308,36 @@ fn check_existing_layer(
             "could not set layer",
         );
         let session = req.send();
-        if let Ok(response) = core.run(session.promise) {
-            let response = response.get();
-            let msg = response.and_then(|response| Ok(response.get_result()));
+        match core.run(session.promise) {
+            Ok(response) => {
+                let response = response.get();
+                let msg = response
+                    .and_then(|response| {
+                        response.get_result().and_then(|response| {
+                            let exists = response.get_exists();
+                            let length = response.get_length();
+                            match exists {
+                                true => Ok(Ok(LayerExists::True { digest, length })),
+                                false => Ok(Err(LayerExists::False)),
+                            }
+                        })
+                    })
+                    .unwrap();
 
-            info!("Success!!");
-            info!("Exists?: {:?}", msg);
+                match msg {
+                    Ok(v) => {
+                        info!("Path found!");
+                        MaybeResponse::ok(v)
+                    }
+                    Err(e) => MaybeResponse::err(e),
+                }
+            }
+            Err(_) => MaybeResponse::err(LayerExists::False),
         }
     } else {
         warn!("Issue connecting to Console, please try again later");
+        MaybeResponse::err(LayerExists::False)
     }
-    MaybeResponse::err(Empty)
 }
 
 /*

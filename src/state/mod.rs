@@ -1,6 +1,6 @@
 use std;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use http_capnp::lycaon::{message_interface, message, layer_interface, layer};
+use http_capnp::lycaon::{message_interface, message};
 use http_capnp::lycaon;
 
 use rocket;
@@ -40,14 +40,63 @@ impl message_interface::Server for MessageImpl {
     }
 }
 
+
+enum Algorithm {
+    Sha256,
+}
+
+struct Layer {
+    algorithm: Algorithm,
+    digest: String,
+    name: String,
+    repo: String,
+}
+
+fn construct_filename(layer: Layer) -> String {
+    let prefix = match layer.algorithm {
+        Algorithm::Sha256 => "sha256",
+    };
+    format!("{}:{}", prefix, layer.digest)
+}
+
+fn construct_absolute_path(layer: Layer) -> String {
+    format!("data/layers/{}", construct_filename(layer))
+}
+
+/// Backend functions for layer-based operations.
 pub struct LayerImpl;
 impl lycaon::layer_interface::Server for LayerImpl {
+    /// Check if a layer exists on the file-system
+    ///
+    /// Returns a boolean as the result.
     fn layer_exists(
         &mut self,
-        _params: lycaon::layer_interface::LayerExistsParams,
-        _results: lycaon::layer_interface::LayerExistsResults,
+        params: lycaon::layer_interface::LayerExistsParams,
+        mut results: lycaon::layer_interface::LayerExistsResults,
     ) -> Promise<(), Error> {
-        warn!("My error here");
+        let args = params.get().and_then(|args| {
+            args.get_layer().and_then(|layer| {
+                let layer = Layer {
+                    algorithm: Algorithm::Sha256,
+                    digest: layer.get_digest().unwrap().to_string(),
+                    name: layer.get_name().unwrap().to_string(),
+                    repo: layer.get_repo().unwrap().to_string(),
+                };
+                let path = construct_absolute_path(layer);
+                info!("Path constructed: {}", path);
+                let path = std::path::Path::new(&path).exists();
+
+
+
+                let mut builder =
+                    ::capnp::message::Builder::new(::capnp::message::HeapAllocator::new());
+                let mut ret = builder.init_root::<lycaon::layer_result::Builder>();
+                ret.set_exists(path);
+                ret.set_length(1337);
+                results.get().set_result(ret.as_reader());
+                Ok(())
+            })
+        });
         Promise::ok(())
     }
 }
@@ -79,8 +128,13 @@ impl lycaon::Server for LycaonRPC {
 }
 
 // TODO: merge this into the Config struct in config.rs
-struct ConsoleConfig {
-    console_port: i64,
+pub struct ConsoleConfig {
+    pub console_port: i64,
+}
+impl ConsoleConfig {
+    fn default() -> ConsoleConfig {
+        ConsoleConfig { console_port: 29999 }
+    }
 }
 
 fn get_config() -> ConsoleConfig {
@@ -92,7 +146,7 @@ fn get_config() -> ConsoleConfig {
         console_port: match cfg.get_int("console_port") {
 
             Ok(x) => x,
-            Err(_) => 29999,
+            Err(_) => ConsoleConfig::default().console_port,
         },
     }
 }
@@ -107,10 +161,14 @@ pub fn main() -> Result<(), std::io::Error> {
         let handle = core.handle();
 
         let addr = address.to_socket_addrs().and_then(|mut addr| {
-            addr.next().ok_or(
-                Err("could not parse address".to_string())
-                    .unwrap(),
-            )
+            let err = Err("could not parse address".to_string());
+
+            match addr.next() {
+                Some(x) => Ok(x),
+                // TODO: This is a hack and will actually cause the code to panic when trying to unwrap.
+                // A proper fix needs to be done for this, but it does make the type-checker happy...
+                None => Err(err.unwrap()),
+            }
         });
 
         let socket = addr.and_then(|addr| ::tokio_core::net::TcpListener::bind(&addr, &handle))
