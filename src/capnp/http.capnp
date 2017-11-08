@@ -3,22 +3,7 @@
 interface Lycaon {
 
   # TODO This feels like a huge hack
-  getMessageInterface @0 () -> (if: MessageInterface);
-  getLayerInterface @1 () -> (if: LayerInterface);
-
-  # -- Begin Sample --
-  struct Message  {
-    text @0 :Text;
-    number @1 :UInt8;
-  }
-
-
-  interface MessageInterface {
-    list @0 () -> (list: List(Message));
-    send @1 (msg :Message) -> ();
-    get @2 (num :UInt8) -> (msg :Message);
-  }
-# -- End Sample --
+  getLayerInterface @0 () -> (if: LayerInterface);
 
 # -- Layer --
   struct Layer {
@@ -29,7 +14,7 @@ interface Lycaon {
 
   struct LayerResult {
     exists @0 :Bool;
-    length   @1 :UInt16;
+    length   @1 :UInt64;
   }
 
   interface LayerInterface {

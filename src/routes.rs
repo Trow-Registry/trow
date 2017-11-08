@@ -15,8 +15,6 @@ use controller::uuid as cuuid;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
-        get_test_route,
-
         get_v2root,
         get_homepage,
         get_manifest,
@@ -48,64 +46,6 @@ fn err_400() -> MaybeResponse<Empty> {
 
 #[error(404)]
 fn err_404() -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
-}
-
-
-#[get("/testing")]
-fn get_test_route(config: rocket::State<config::Config>) -> MaybeResponse<Empty> {
-    use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-    use http_capnp::lycaon;
-
-    use tokio_core::reactor;
-    use tokio_io::AsyncRead;
-    use futures::Future;
-
-    use std::net::ToSocketAddrs;
-
-    let address = format!("localhost:{}", config.console_port);
-    let mut core = reactor::Core::new().unwrap();
-    let handle = core.handle();
-
-    let addr = address.to_socket_addrs().unwrap().next().expect(
-        "could not parse address",
-    );
-    info!("Connecting to address: {}", address);
-    if let Ok(stream) = core.run(::tokio_core::net::TcpStream::connect(&addr, &handle)) {
-        stream.set_nodelay(true).unwrap();
-        let (reader, writer) = stream.split();
-
-        let rpc_network = Box::new(twoparty::VatNetwork::new(
-            reader,
-            writer,
-            rpc_twoparty_capnp::Side::Client,
-            Default::default(),
-        ));
-
-        let mut rpc_system = RpcSystem::new(rpc_network, None);
-        let lycaon_proxy: lycaon::Client = rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
-        let interface = lycaon_proxy.get_message_interface_request().send();
-        let proxy = interface.pipeline.get_if();
-
-
-        handle.spawn(rpc_system.map_err(|_e| ()));
-
-        let mut req = proxy.get_request();
-        req.get().set_num(12);
-        let session = req.send();
-        let response = core.run(session.promise).unwrap();
-
-        let response = response.get().unwrap();
-        let msg = response.get_msg().unwrap();
-        info!("Success!!");
-        info!(
-            "Response: (text = {:?}, number = {:?})",
-            msg.get_text(),
-            msg.get_number()
-        );
-    } else {
-        warn!("Issue connecting to Console, please try again later");
-    }
     MaybeResponse::err(Empty)
 }
 
