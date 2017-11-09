@@ -266,7 +266,7 @@ fn check_existing_layer(
 
                 match msg {
                     Ok(v) => {
-                        info!("Path found!");
+                        debug!("Path found!");
                         MaybeResponse::ok(v)
                     }
                     Err(e) => MaybeResponse::err(e),

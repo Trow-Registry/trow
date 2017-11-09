@@ -35,6 +35,9 @@ extern crate tokio_core;
 extern crate tokio_io;
 extern crate futures;
 
+#[cfg(test)]
+extern crate quickcheck;
+
 /// Loading capn'p
 mod http_capnp {
     include!(concat!(env!("OUT_DIR"), "/http_capnp.rs"));

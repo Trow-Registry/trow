@@ -22,7 +22,7 @@ impl<'r> Responder<'r> for Catalog {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
         warn!("Turn this into a dynamic call!");
         let repositories = CatalogList {
-            repositories: vec![String::from("moredhel/test"), String::from("place/two")],
+            repositories: vec![String::from("moredhel/test"), String::from("FIX/ME")],
         };
 
         json_response(req, &repositories)

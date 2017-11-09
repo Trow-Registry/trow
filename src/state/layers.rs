@@ -1,10 +1,13 @@
 use std;
+use std::path::Path;
 
 use http_capnp::lycaon;
 
 use capnp::capability::Promise;
 use capnp::Error;
+use capnp::message;
 
+#[derive(Debug, Clone)]
 struct Layer {
     digest: String,
     name: String,
@@ -20,34 +23,42 @@ impl Layer {
     }
 }
 
-fn construct_absolute_path(layer: Layer) -> String {
-    format!("data/layers/{}", layer.digest)
+/// Takes the digest, and constructs an absolute pathstring to the digest.
+fn construct_absolute_path(layer: Layer) -> Box<Path> {
+    let cwd = std::env::current_dir().unwrap();
+    let absolute_dir = cwd.join(format!("data/layers/{}", layer.digest));
+    debug!("Absolute Path: {:?}", absolute_dir);
+    absolute_dir.into_boxed_path()
 }
 
 fn file_length(file: std::fs::File) -> Result<u64, std::io::Error> {
     file.metadata().and_then(|metadata| Ok(metadata.len()))
 }
 
-fn do_thing(layer: Layer, ret: &mut lycaon::layer_result::Builder) {
+/// Process the Incoming Request
+///
+/// Given a Layer and Builder, check for file existence and get length
+fn process(
+    layer: Layer,
+    builder: &mut lycaon::layer_result::Builder,
+) -> Result<(), std::io::Error> {
     let path = construct_absolute_path(layer);
-    match std::path::Path::new(&path).exists() {
+    match path.exists() {
         true => {
-            ret.set_exists(true);
-            let res = std::fs::File::open(path).and_then(|file| {
+            builder.set_exists(true);
+            std::fs::File::open(path).and_then(|file| {
                 file_length(file).and_then(|length| {
-                    ret.set_length(length);
+                    builder.set_length(length);
                     Ok(())
                 })
-            });
-            if let Err(res) = res {
-                warn!("could not open file");
-            }
+            })
         }
         false => {
-            ret.set_exists(false);
-            ret.set_length(0);
+            builder.set_exists(false);
+            builder.set_length(0);
+            Ok(())
         }
-    };
+    }
 }
 
 /// Backend functions for layer-based operations.
@@ -69,11 +80,13 @@ impl lycaon::layer_interface::Server for LayerImpl {
         });
         let _ = layer
             .and_then(|layer| {
-                let mut builder =
-                    ::capnp::message::Builder::new(::capnp::message::HeapAllocator::new());
-                let mut ret = builder.init_root::<lycaon::layer_result::Builder>();
-                do_thing(layer, &mut ret);
-                results.get().set_result(ret.as_reader())
+                let mut builder = message::Builder::new(message::HeapAllocator::new());
+                let mut builder = builder.init_root::<lycaon::layer_result::Builder>();
+                let _ = process(layer, &mut builder).or_else(|e| {
+                    warn!("{}", e);
+                    Err(e)
+                });
+                results.get().set_result(builder.as_reader())
             })
             .or_else(|e| {
                 warn!("Error building LayerExists");
@@ -81,5 +94,69 @@ impl lycaon::layer_interface::Server for LayerImpl {
                 Err(e)
             });
         Promise::ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+    // use metric::{AggregationMethod, Telemetry};
+    // use std::sync;
+
+    impl Arbitrary for Layer {
+        fn arbitrary<G>(g: &mut G) -> Self
+        where
+            G: Gen,
+        {
+            let digest_len = g.gen_range(1, 256);
+            let name_len = g.gen_range(1, 256);
+            let repo_len = g.gen_range(1, 256);
+
+            let digest: String = g.gen_ascii_chars().take(digest_len).collect();
+            let digest: String = format!("sha256:{}", digest);
+            let name: String = g.gen_ascii_chars().take(name_len).collect();
+            let repo: String = g.gen_ascii_chars().take(repo_len).collect();
+
+            Layer { digest, name, repo }
+        }
+    }
+
+
+    #[test]
+    fn test_process_layer() {
+        fn inner(layer: Layer) -> TestResult {
+            let mut builder = message::Builder::new(message::HeapAllocator::new());
+            let mut builder = builder.init_root::<lycaon::layer_result::Builder>();
+            process(layer.clone(), &mut builder)
+                .map(|_| {
+                    let reader = builder.as_reader();
+                    let length = reader.get_length();
+                    let exists = reader.get_exists();
+
+                    if length == 0 {
+                        assert!(!exists);
+                    }
+                    TestResult::passed()
+                })
+                .map_err(|_| TestResult::failed())
+                .unwrap()
+
+        }
+        QuickCheck::new().tests(100).max_tests(1000).quickcheck(
+            inner as fn(Layer) -> TestResult,
+        );
+    }
+
+    #[test]
+    fn test_construct_absolute_path() {
+        fn inner(layer: Layer) -> TestResult {
+            let path = construct_absolute_path(layer);
+            assert!(path.has_root());
+            TestResult::passed()
+        }
+        QuickCheck::new().tests(100).max_tests(1000).quickcheck(
+            inner as fn(Layer) -> TestResult,
+        );
     }
 }
