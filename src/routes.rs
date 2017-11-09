@@ -214,7 +214,7 @@ fn check_existing_layer(
         }
     });
 
-    info!("Connecting to address: {}", address);
+    debug!("Connecting to address: {}", address);
     let stream = addr.and_then(|addr| {
         core.run(::tokio_core::net::TcpStream::connect(&addr, &handle))
     });

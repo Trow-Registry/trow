@@ -14,7 +14,7 @@
 #![plugin(rocket_codegen)]
 
 extern crate capnp;
-#[macro_use] extern crate capnp_rpc;
+extern crate capnp_rpc;
 extern crate ctrlc;
 extern crate fern;
 #[macro_use(log, warn, info, debug)]
