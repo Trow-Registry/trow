@@ -1,21 +1,28 @@
 use std;
 
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use http_capnp::lycaon;
-
-use rocket;
 use capnp::capability::Promise;
 use capnp::Error;
-
 use futures::{Future, Stream};
-
+use http_capnp::lycaon;
+use orset::ORSet;
+use rocket;
 use tokio_core::reactor;
 use tokio_io::AsyncRead;
 
 /// Export Module layers
 mod layers;
 
-struct LycaonRPC;
+type LayerImplType = lycaon::layer_interface::Client;
+struct LycaonRPC {
+    layerimpl: LayerImplType,
+}
+impl LycaonRPC {
+    fn new(layerimpl: LayerImplType) -> LycaonRPC {
+        LycaonRPC { layerimpl }
+    }
+}
+
 impl lycaon::Server for LycaonRPC {
     fn get_layer_interface(
         &mut self,
@@ -23,9 +30,7 @@ impl lycaon::Server for LycaonRPC {
         mut results: lycaon::GetLayerInterfaceResults,
     ) -> Promise<(), Error> {
         debug!("returning the layer interface");
-        let interface = lycaon::layer_interface::ToClient::new(layers::LayerImpl)
-            .from_server::<::capnp_rpc::Server>();
-        results.get().set_if(interface);
+        results.get().set_if(self.layerimpl.clone());
         Promise::ok(())
     }
 }
@@ -77,7 +82,11 @@ pub fn main() -> Result<(), std::io::Error> {
         let socket = addr.and_then(|addr| ::tokio_core::net::TcpListener::bind(&addr, &handle))
             .expect("could not bind socket to address");
 
-        let proxy = lycaon::ToClient::new(LycaonRPC).from_server::<::capnp_rpc::Server>();
+        let layers = ORSet::new("layers".to_string());
+        let layerimpl = layers::LayerImpl::new(layers);
+        let interface = lycaon::layer_interface::ToClient::new(layerimpl)
+            .from_server::<::capnp_rpc::Server>();
+        let proxy = lycaon::ToClient::new(LycaonRPC::new(interface)).from_server::<::capnp_rpc::Server>();
 
         let handle1 = handle.clone();
         let done = socket.incoming().for_each(move |(socket, _addr)| {

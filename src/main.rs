@@ -35,6 +35,8 @@ extern crate tokio_core;
 extern crate tokio_io;
 extern crate futures;
 
+extern crate orset;
+
 #[cfg(test)]
 extern crate quickcheck;
 
@@ -44,13 +46,14 @@ mod http_capnp {
 }
 
 
-mod errors;
-mod routes;
-pub mod response;
 pub mod controller;
 pub mod config;
-mod test;
+mod errors;
+pub mod response;
+mod routes;
 mod state;
+mod test;
+mod types;
 
 use std::thread;
 

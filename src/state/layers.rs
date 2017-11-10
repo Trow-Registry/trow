@@ -1,32 +1,28 @@
 use std;
 use std::path::Path;
 
-use http_capnp::lycaon;
 
 use capnp::capability::Promise;
 use capnp::Error;
 use capnp::message;
+use http_capnp::lycaon;
+use orset::ORSet;
 
-#[derive(Debug, Clone)]
-struct Layer {
-    digest: String,
-    name: String,
-    repo: String,
-}
+use types::{Digest, Layer};
+
 impl Layer {
     fn from_params(layer: lycaon::layer::Reader) -> Layer {
-        Layer {
-            digest: layer.get_digest().unwrap().to_string(),
-            name: layer.get_name().unwrap().to_string(),
-            repo: layer.get_repo().unwrap().to_string(),
-        }
+        let digest = layer.get_digest().unwrap().to_string();
+        let name = layer.get_name().unwrap().to_string();
+        let repo = layer.get_repo().unwrap().to_string();
+        Layer::new(digest, name, repo)
     }
 }
 
 /// Takes the digest, and constructs an absolute pathstring to the digest.
 fn construct_absolute_path(layer: Layer) -> Box<Path> {
     let cwd = std::env::current_dir().unwrap();
-    let absolute_dir = cwd.join(format!("data/layers/{}", layer.digest));
+    let absolute_dir = cwd.join(format!("data/layers/{}", layer.digest()));
     debug!("Absolute Path: {:?}", absolute_dir);
     absolute_dir.into_boxed_path()
 }
@@ -61,8 +57,17 @@ fn process(
     }
 }
 
+type LayerSet = ORSet<Digest>;
 /// Backend functions for layer-based operations.
-pub struct LayerImpl;
+pub struct LayerImpl {
+    layers: LayerSet,
+}
+impl LayerImpl {
+    pub fn new(layers: LayerSet) -> LayerImpl {
+        LayerImpl { layers }
+    }
+}
+
 impl lycaon::layer_interface::Server for LayerImpl {
     /// Check if a layer exists on the file-system
     ///
@@ -80,6 +85,8 @@ impl lycaon::layer_interface::Server for LayerImpl {
         });
         let _ = layer
             .and_then(|layer| {
+                self.layers.add(layer.digest());
+                println!("{:?}", self.layers);
                 let mut builder = message::Builder::new(message::HeapAllocator::new());
                 let mut builder = builder.init_root::<lycaon::layer_result::Builder>();
                 let _ = process(layer, &mut builder).or_else(|e| {
