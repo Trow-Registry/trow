@@ -181,6 +181,7 @@ Docker-Content-Digest: <digest>
 200 - exists
 404 - does not exist
  */
+
 #[head("/v2/<name>/<repo>/blobs/<digest>")]
 fn check_existing_layer(
     config: rocket::State<config::Config>,
@@ -189,39 +190,13 @@ fn check_existing_layer(
     digest: String,
 ) -> MaybeResponse<LayerExists> {
     debug!("Checking if {}/{} exists...", name, repo);
-    util::connect_backend(&config)
-        .and_then(|mut handler: util::CapnpConnection| {
-            let mut msg = handler.builder.init_root::<lycaon::layer::Builder>();
-            let mut req = handler.proxy.layer_exists_request();
-            msg.set_digest(&digest);
-            msg.set_name(&name);
-            msg.set_repo(&repo);
-            req.get()
-                .set_layer(msg.as_reader())
-                .and(handler.core.run(req.send().promise))
-                .and_then(|response| {
-                    response.get().and_then(|response| {
-                        response
-                            .get_result()
-                            .map(|response| {
-                                let exists = response.get_exists();
-                                let length = response.get_length();
-                                match exists {
-                                    true => LayerExists::True { digest, length },
-                                    false => LayerExists::False,
-                                }
-                            })
-                            .map_err(|e| e.into())
-                    })
-                })
-                .map_err(|e| Error::new(ErrorKind::Other, e))
-        })
+    LayerExists::handle(config, name, repo, digest)
         .or_else(|e| {
             warn!("We have a serious issue! {}", e);
             Err(e)
         })
         .map(|response| MaybeResponse::ok(response))
-        .unwrap_or(MaybeResponse::ok(LayerExists::False))
+        .unwrap_or(MaybeResponse::err(LayerExists::False))
 }
 
 /*

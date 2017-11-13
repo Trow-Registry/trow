@@ -26,10 +26,18 @@ pub type MaybeResponse<A> = RegistryResponse<A>;
 
 /// Two constructors to ease sending a success/fail response.
 impl<'r, A: Responder<'r>> MaybeResponse<A> {
+    pub fn build(val: A) -> Self
+    where
+        A: Responder<'r>,
+    {
+        RegistryResponse(val)
+    }
+
     pub fn ok(val: A) -> Self
     where
         A: Responder<'r>,
     {
+        warn!("Deprecated, please use build");
         RegistryResponse(val)
     }
 
@@ -37,6 +45,7 @@ impl<'r, A: Responder<'r>> MaybeResponse<A> {
     where
         A: Responder<'r>,
     {
+        warn!("Deprecated, please use build");
         RegistryResponse(val)
     }
 }
