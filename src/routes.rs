@@ -189,12 +189,7 @@ fn check_existing_layer(
     repo: String,
     digest: String,
 ) -> MaybeResponse<LayerExists> {
-    debug!("Checking if {}/{} exists...", name, repo);
     LayerExists::handle(config, name, repo, digest)
-        .or_else(|e| {
-            warn!("We have a serious issue! {}", e);
-            Err(e)
-        })
         .map(|response| MaybeResponse::ok(response))
         .unwrap_or(MaybeResponse::err(LayerExists::False))
 }

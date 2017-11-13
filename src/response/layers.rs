@@ -47,6 +47,10 @@ impl LayerExists {
                     })
                 })
                 .map_err(|e| Error::new(ErrorKind::Other, e))
+                .or_else(|e| {
+                    warn!("We have a serious issue! {}", e);
+                    Err(e)
+                })
         })
 
     }
