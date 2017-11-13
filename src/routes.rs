@@ -1,3 +1,4 @@
+use std::io::{Error, ErrorKind};
 use std::string::ToString;
 use rocket;
 
@@ -12,7 +13,9 @@ use response::html::HTML;
 use config;
 use controller::uuid as cuuid;
 use errors;
+use http_capnp::lycaon;
 use util;
+
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -186,46 +189,39 @@ fn check_existing_layer(
     digest: String,
 ) -> MaybeResponse<LayerExists> {
     debug!("Checking if {}/{} exists...", name, repo);
-    use http_capnp::lycaon;
-
-    util::connect_backend(&config).and_then(|mut handler: util::CapnpConnection| {
-        let mut msg = handler.builder.init_root::<lycaon::layer::Builder>();
-        let mut req = handler.proxy.layer_exists_request();
-        msg.set_digest(&digest);
-        msg.set_name(&name);
-        msg.set_repo(&repo);
-        req.get().set_layer(msg.as_reader()).expect(
-            "could not set layer",
-        );
-
-        let tmp = match handler.core.run(req.send().promise) {
-            Ok(response) => {
-                let response = response.get();
-                let msg = response
-                    .and_then(|response| {
-                        response.get_result().and_then(|response| {
-                            let exists = response.get_exists();
-                            let length = response.get_length();
-                            match exists {
-                                true => Ok(Ok(LayerExists::True { digest, length })),
-                                false => Ok(Err(LayerExists::False)),
-                            }
-                        })
+    util::connect_backend(&config)
+        .and_then(|mut handler: util::CapnpConnection| {
+            let mut msg = handler.builder.init_root::<lycaon::layer::Builder>();
+            let mut req = handler.proxy.layer_exists_request();
+            msg.set_digest(&digest);
+            msg.set_name(&name);
+            msg.set_repo(&repo);
+            req.get()
+                .set_layer(msg.as_reader())
+                .and(handler.core.run(req.send().promise))
+                .and_then(|response| {
+                    response.get().and_then(|response| {
+                        response
+                            .get_result()
+                            .map(|response| {
+                                let exists = response.get_exists();
+                                let length = response.get_length();
+                                match exists {
+                                    true => LayerExists::True { digest, length },
+                                    false => LayerExists::False,
+                                }
+                            })
+                            .map_err(|e| e.into())
                     })
-                    .unwrap();
-
-                match msg {
-                    Ok(v) => {
-                        debug!("Path found!");
-                        MaybeResponse::ok(v)
-                    }
-                    Err(e) => MaybeResponse::err(e),
-                }
-            }
-            Err(_) => MaybeResponse::err(LayerExists::False),
-        };
-        Ok(tmp)
-    }).unwrap()
+                })
+                .map_err(|e| Error::new(ErrorKind::Other, e))
+        })
+        .or_else(|e| {
+            warn!("We have a serious issue! {}", e);
+            Err(e)
+        })
+        .map(|response| MaybeResponse::ok(response))
+        .unwrap_or(MaybeResponse::ok(LayerExists::False))
 }
 
 /*

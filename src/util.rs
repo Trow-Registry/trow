@@ -2,8 +2,8 @@
 //! The use of this file is unclear, but it does at the very least
 //! clean out other sections of code.
 use std::net::ToSocketAddrs;
+use std::io::{Error, ErrorKind};
 
-use capnp;
 use capnp::message::{Builder, HeapAllocator};
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use http_capnp::lycaon;
@@ -22,7 +22,7 @@ pub struct CapnpConnection {
 
 pub fn connect_backend(
     config: &rocket::State<config::Config>,
-) -> Result<CapnpConnection, capnp::Error> {
+) -> Result<CapnpConnection, Error> {
 
     let address = format!("localhost:{}", config.console_port);
     let mut core = reactor::Core::new().unwrap();
@@ -72,9 +72,7 @@ pub fn connect_backend(
             builder,
         })
     } else {
-        Err(capnp::Error::disconnected(
-            "could not connect to Backend".to_string(),
-        ))
+        Err(Error::new(ErrorKind::Other, "could not connect to Backend"))
     }
 
 }
