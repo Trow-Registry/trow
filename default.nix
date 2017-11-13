@@ -9,5 +9,6 @@ stdenv.mkDerivation rec {
 
     # dev
     rustfmt
+    valgrind
   ];
 }

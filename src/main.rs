@@ -54,6 +54,7 @@ mod routes;
 mod state;
 mod test;
 mod types;
+mod util;
 
 use std::thread;
 
