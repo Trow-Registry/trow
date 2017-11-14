@@ -1,3 +1,4 @@
+use failure::Error;
 type Message = String;
 type Detail = String;
 
@@ -44,6 +45,8 @@ pub enum Server {
     Invalid(&'static str),
     #[fail(display = "File Not Found: {}", _0)]
     FileNotFound(String),
+    #[fail(display = "ConfigError: {}", _0)]
+    ConfigError(Error),
 }
 
 #[derive(Debug, Fail)]
@@ -134,10 +137,10 @@ pub struct FormatError {
     detail: Detail,
 }
 
-#[derive(Serialize, Debug)]
-pub struct Error {
-    errors: Vec<FormatError>,
-}
+// #[derive(Serialize, Debug)]
+// pub struct Error{
+//     errors: Vec<FormatError>,
+// }
 
 
 
@@ -151,11 +154,11 @@ pub fn get_error(error: Client) -> FormatError {
     }
 }
 
-pub fn generate_errors(errors: &[Client]) -> Error {
+pub fn generate_errors(errors: &[Client]) -> () {
     let mut format_errors: Vec<FormatError> = Vec::new();
     for error in errors {
         let error = error.clone();
         format_errors.push(get_error(error));
     }
-    Error { errors: format_errors }
+    // Error { errors: format_errors }
 }

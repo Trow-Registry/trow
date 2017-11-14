@@ -6,11 +6,13 @@ use std;
 use std::path::Path;
 use std::fs;
 use log;
+use failure::Error;
 use fern;
 use ctrlc;
 use rocket;
 use rocket::fairing;
 
+use errors;
 use routes;
 
 static DEFAULT_DATA_DIR: &'static str = "data";
@@ -26,7 +28,7 @@ pub struct Config {
     pub console_port: i64,
 }
 
-/// Bulid the logging agent with formatting and the correct log-level.
+/// Build the logging agent with formatting and the correct log-level.
 ///
 /// The log-level is set using the `DEBUG` environment variable.
 pub fn main_logger() -> fern::Dispatch {
@@ -48,59 +50,45 @@ pub fn main_logger() -> fern::Dispatch {
 }
 
 /// Attaches SIGTERM handler
-fn attach_sigterm() {
+fn attach_sigterm() -> Result<(), Error> {
     ctrlc::set_handler(|| {
         info!("SIGTERM caught, shutting down...");
         std::process::exit(127);
-    }).expect("Error setting Ctrl-C handler");
+    }).map_err(|e| e.into())
 }
 
-/*
-Creates needed directories under given path if they don't already exist.
-*/
-fn create_data_dirs(data_path: &Path) {
+/// Creates needed directories under given path if they don't already exist.
+///
+fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
+    fn setup_path(path: std::path::PathBuf) -> Result<(), Error> {
+        if !path.exists() {
+            fs::create_dir_all(&path)?;
+        }
+        Ok(())
+    }
+
     let scratch_path = data_path.join(SCRATCH_DIR);
-
-    if !scratch_path.exists() {
-        debug!("Creating scratch dir {}", scratch_path.display());
-        match fs::create_dir_all(&scratch_path) {
-            Ok(res) => res,
-            Err(err) => panic!("Failed to create {}: {}", scratch_path.display(), err),
-        };
-    }
-    info!(
-        "Scratch directory set to {}",
-        scratch_path.canonicalize().unwrap().display()
-    );
-
     let layers_path = data_path.join(LAYERS_DIR);
-    if !layers_path.exists() {
-        debug!("Creating layers dir {}", layers_path.display());
-        match fs::create_dir_all(&layers_path) {
-            Err(err) => panic!("Failed to create {}: {}", layers_path.display(), err),
-            Ok(res) => res,
-        };
-    }
-    info!(
-        "Layers directory set to {}",
-        layers_path.canonicalize().unwrap().display()
-    );
+    setup_path(scratch_path)
+        .and(setup_path(layers_path))
+        .map_err(|e| errors::Server::ConfigError(e).into())
 }
 
 
 /// extract configuration values
-pub(crate) fn extract_config(conf: &rocket::Config) -> Config {
+///
+pub(crate) fn extract_config(conf: &rocket::Config) -> Result<Config, Error> {
     let address = &conf.address;
     let port = conf.port;
     let console_port = match conf.get_int("console_port") {
         Ok(x) => x,
         Err(_) => 29999,
     };
-    Config {
+    Ok(Config {
         address: address.clone(),
         port,
         console_port,
-    }
+    })
 }
 
 /// Handle all code relating to bootstrapping the project
@@ -109,13 +97,11 @@ pub(crate) fn extract_config(conf: &rocket::Config) -> Config {
 /// - Check necessary paths exist
 /// - Extract configuration values needed for runtime
 fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
-    attach_sigterm();
-
-    create_data_dirs(Path::new(DEFAULT_DATA_DIR));
-
-    let config = extract_config(rocket.config());
-
-    Ok(rocket.manage(config))
+    attach_sigterm()
+        .and(create_data_dirs(Path::new(DEFAULT_DATA_DIR)))
+        .and(extract_config(rocket.config()))
+        .and_then(|config| Ok(rocket.manage(config)))
+        .map_err(|e| panic!("{}", e))
 }
 
 /// Construct the rocket instance and prepare for launch
