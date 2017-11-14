@@ -41,7 +41,7 @@ pub enum Client {
 #[derive(Debug, Fail)]
 pub enum Server {
     #[fail(display = "Invalid {} input", _0)]
-    Invalid(&static str),
+    Invalid(&'static str),
     #[fail(display = "File Not Found: {}", _0)]
     FileNotFound(String),
 }

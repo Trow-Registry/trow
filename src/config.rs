@@ -64,8 +64,8 @@ fn create_data_dirs(data_path: &Path) {
     if !scratch_path.exists() {
         debug!("Creating scratch dir {}", scratch_path.display());
         match fs::create_dir_all(&scratch_path) {
-            Err(err) => panic!("Failed to create {}: {}", scratch_path.display(), err),
             Ok(res) => res,
+            Err(err) => panic!("Failed to create {}: {}", scratch_path.display(), err),
         };
     }
     info!(
@@ -89,27 +89,18 @@ fn create_data_dirs(data_path: &Path) {
 
 
 /// extract configuration values
-pub(crate) fn extract_config(rocket: rocket::Rocket) -> rocket::Rocket {
-    // TODO: use the builder in the rocket instance.
-    // let conf = rocket::Config::default().unwrap();
-    let state: Config;
-    {
-        let conf = &rocket.config();
-        let address = &conf.address;
-        let port = conf.port;
-        let console_port = match conf.get_int("console_port") {
-            Ok(x) => x,
-            Err(_) => 29999
-        };
-        state = Config {
-            address: address.clone(),
-            port,
-            console_port,
-        };
-    info!("console_port: {}", console_port);
+pub(crate) fn extract_config(conf: &rocket::Config) -> Config {
+    let address = &conf.address;
+    let port = conf.port;
+    let console_port = match conf.get_int("console_port") {
+        Ok(x) => x,
+        Err(_) => 29999,
+    };
+    Config {
+        address: address.clone(),
+        port,
+        console_port,
     }
-    debug!("{:?}", state);
-    rocket.manage(state)
 }
 
 /// Handle all code relating to bootstrapping the project
@@ -122,7 +113,9 @@ fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
 
     create_data_dirs(Path::new(DEFAULT_DATA_DIR));
 
-    Ok(extract_config(rocket))
+    let config = extract_config(rocket.config());
+
+    Ok(rocket.manage(config))
 }
 
 /// Construct the rocket instance and prepare for launch

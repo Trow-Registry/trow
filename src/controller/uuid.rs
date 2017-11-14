@@ -13,7 +13,6 @@ pub struct DigestStruct {
     pub digest: String,
 }
 
-// TODO change this to return a type-safe thing rather than just 'String'
 pub fn scratch_path(uuid: &String) -> String {
     format!("data/scratch/{}", uuid)
 }
