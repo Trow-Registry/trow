@@ -31,14 +31,18 @@ extern crate tokio_io;
 extern crate uuid;
 
 
-#[macro_use] extern crate failure_derive;
-#[macro_use] extern crate serde_derive;
-#[macro_use(log, warn, info, debug)] extern crate log;
+#[macro_use]
+extern crate failure_derive;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use(log, warn, info, debug)]
+extern crate log;
 
 #[cfg(test)]
 extern crate quickcheck;
 
 /// Loading capn'p
+#[allow(dead_code)]
 mod http_capnp {
     include!(concat!(env!("OUT_DIR"), "/http_capnp.rs"));
 }

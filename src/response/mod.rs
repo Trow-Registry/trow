@@ -79,11 +79,11 @@ where
 ///   .header(header)
 ///   .ok()
 /// ```
+
 pub fn json_response<T: serde::Serialize>(
     req: &Request,
     var: &T,
 ) -> Result<Response<'static>, Status> {
     use rocket_contrib;
-    let response = rocket_contrib::Json(var).respond_to(req);
-    response
+    rocket_contrib::Json(var).respond_to(req)
 }

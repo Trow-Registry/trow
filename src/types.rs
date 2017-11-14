@@ -1,4 +1,5 @@
 pub type Digest = String;
+
 #[derive(Debug, Clone)]
 pub struct Layer {
     digest: Digest,

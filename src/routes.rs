@@ -11,7 +11,6 @@ use response::html::HTML;
 
 use config;
 use controller::uuid as cuuid;
-use errors;
 
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -187,8 +186,8 @@ fn check_existing_layer(
     digest: String,
 ) -> MaybeResponse<LayerExists> {
     LayerExists::handle(config, name, repo, digest)
-        .map(|response| MaybeResponse::ok(response))
-        .unwrap_or(MaybeResponse::err(LayerExists::False))
+        .map(|response| MaybeResponse::build(response))
+        .unwrap_or(MaybeResponse::build(LayerExists::False))
 }
 
 /*
@@ -404,7 +403,6 @@ DELETE /v2/<name>/manifests/<reference>
 */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
-    let _errors = errors::generate_errors(&[errors::ErrorType::UNSUPPORTED]);
     MaybeResponse::err(Empty)
 }
 

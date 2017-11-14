@@ -1,6 +1,5 @@
 // use std::io::{Error, ErrorKind};
 use failure::Error;
-use std::io;
 
 use rocket::State;
 use rocket::http::{Header, Status};
@@ -8,6 +7,7 @@ use rocket::response::{Responder, Response};
 use rocket::request::Request;
 
 use config;
+use errors;
 use util;
 use http_capnp::lycaon;
 
@@ -33,22 +33,36 @@ impl LayerExists {
                 msg.set_repo(&repo);
                 req.get()
                     .set_layer(msg.as_reader())
-                    .and(handler.core.run(req.send().promise))
+                    .map_err(|e| Error::from(e))
+                    .and(handler.core.and_then(|mut core| {
+                        core.run(req.send().promise).map_err(|e| Error::from(e))
+                    }))
                     .and_then(|response| {
-                        response.get().and_then(|response| {
-                            response.get_result().map(|response| {
-                                let exists = response.get_exists();
-                                let length = response.get_length();
-                                match exists {
-                                    true => LayerExists::True { digest, length },
-                                    false => LayerExists::False,
-                                }
-                            })
-                        })
+                        response.get().map_err(|e| Error::from(e)).and_then(
+                            |response| {
+                                response.get_result().map_err(|e| Error::from(e)).and_then(
+                                    |response| {
+                                        let exists = response.get_exists();
+                                        let length = response.get_length();
+                                        match exists {
+                                            true => Ok(LayerExists::True { digest, length }),
+                                            false => Err(
+                                                errors::Server::FileNotFound(
+                                                    format!("{}", digest.clone()),
+                                                ).into(),
+                                            ),
+                                        }
+                                    },
+                                )
+                            },
+                        )
                     })
                     .map_err(|e| e.into())
             })
-            .map_err(|e| e.into())
+            .map_err(|e| {
+                warn!("{}", e.cause());
+                errors::Client::BLOB_UNKNOWN.into()
+            })
 
     }
 }
