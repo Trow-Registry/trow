@@ -1,4 +1,6 @@
-use std::io::{Error, ErrorKind};
+// use std::io::{Error, ErrorKind};
+use failure::Error;
+use std::io;
 
 use rocket::State;
 use rocket::http::{Header, Status};
@@ -22,20 +24,19 @@ impl LayerExists {
         repo: String,
         digest: String,
     ) -> Result<LayerExists, Error> {
-        util::connect_backend(&config).and_then(|mut handler: util::CapnpConnection| {
-            let mut msg = handler.builder.init_root::<lycaon::layer::Builder>();
-            let mut req = handler.proxy.layer_exists_request();
-            msg.set_digest(&digest);
-            msg.set_name(&name);
-            msg.set_repo(&repo);
-            req.get()
-                .set_layer(msg.as_reader())
-                .and(handler.core.run(req.send().promise))
-                .and_then(|response| {
-                    response.get().and_then(|response| {
-                        response
-                            .get_result()
-                            .map(|response| {
+        util::connect_backend(&config)
+            .and_then(|mut handler: util::CapnpConnection| {
+                let mut msg = handler.builder.init_root::<lycaon::layer::Builder>();
+                let mut req = handler.proxy.layer_exists_request();
+                msg.set_digest(&digest);
+                msg.set_name(&name);
+                msg.set_repo(&repo);
+                req.get()
+                    .set_layer(msg.as_reader())
+                    .and(handler.core.run(req.send().promise))
+                    .and_then(|response| {
+                        response.get().and_then(|response| {
+                            response.get_result().map(|response| {
                                 let exists = response.get_exists();
                                 let length = response.get_length();
                                 match exists {
@@ -43,15 +44,11 @@ impl LayerExists {
                                     false => LayerExists::False,
                                 }
                             })
-                            .map_err(|e| e.into())
+                        })
                     })
-                })
-                .map_err(|e| Error::new(ErrorKind::Other, e))
-                .or_else(|e| {
-                    warn!("We have a serious issue! {}", e);
-                    Err(e)
-                })
-        })
+                    .map_err(|e| e.into())
+            })
+            .map_err(|e| e.into())
 
     }
 }

@@ -2,10 +2,11 @@
 //! The use of this file is unclear, but it does at the very least
 //! clean out other sections of code.
 use std::net::ToSocketAddrs;
-use std::io::{Error, ErrorKind};
+use std::io::ErrorKind;
 
 use capnp::message::{Builder, HeapAllocator};
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
+use failure::Error;
 use http_capnp::lycaon;
 use rocket;
 use tokio_core::reactor;
@@ -20,9 +21,7 @@ pub struct CapnpConnection {
     pub builder: Builder<HeapAllocator>,
 }
 
-pub fn connect_backend(
-    config: &rocket::State<config::Config>,
-) -> Result<CapnpConnection, Error> {
+pub fn connect_backend(config: &rocket::State<config::Config>) -> Result<CapnpConnection, Error> {
 
     let address = format!("localhost:{}", config.console_port);
     let mut core = reactor::Core::new().unwrap();
@@ -41,21 +40,25 @@ pub fn connect_backend(
             None => Err(err.unwrap()),
         }
     });
-    debug!("Connecting to address: {}", address);
     let stream = addr.and_then(|addr| {
+        debug!("Connecting to address: {}", address);
         core.run(::tokio_core::net::TcpStream::connect(&addr, &handle))
     });
 
     if let Ok(stream) = stream {
-        stream.set_nodelay(true).expect("could not set nodelay");
-        let (reader, writer) = stream.split();
+        let rpc_network = stream
+            .set_nodelay(true)
+            .map(|_| {
+                let (reader, writer) = stream.split();
+                Box::new(twoparty::VatNetwork::new(
+                    reader,
+                    writer,
+                    rpc_twoparty_capnp::Side::Client,
+                    Default::default(),
+                ))
+            })
+            .unwrap();
 
-        let rpc_network = Box::new(twoparty::VatNetwork::new(
-            reader,
-            writer,
-            rpc_twoparty_capnp::Side::Client,
-            Default::default(),
-        ));
 
         let mut rpc_system = RpcSystem::new(rpc_network, None);
         let lycaon_proxy: lycaon::Client = rpc_system.bootstrap(rpc_twoparty_capnp::Side::Server);
@@ -72,7 +75,8 @@ pub fn connect_backend(
             builder,
         })
     } else {
-        Err(Error::new(ErrorKind::Other, "could not connect to Backend"))
+        use std::io;
+        Err(Error::from(io::Error::new(ErrorKind::Other, "could not connect to Backend")))
     }
 
 }

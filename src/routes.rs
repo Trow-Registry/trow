@@ -1,4 +1,3 @@
-use std::io::{Error, ErrorKind};
 use std::string::ToString;
 use rocket;
 
@@ -13,8 +12,6 @@ use response::html::HTML;
 use config;
 use controller::uuid as cuuid;
 use errors;
-use http_capnp::lycaon;
-use util;
 
 
 pub fn routes() -> Vec<rocket::Route> {

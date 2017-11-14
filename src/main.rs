@@ -16,26 +16,24 @@
 extern crate capnp;
 extern crate capnp_rpc;
 extern crate ctrlc;
+extern crate failure;
 extern crate fern;
-#[macro_use(log, warn, info, debug)]
-extern crate log;
-// use of slog is currently not supported
-// https://github.com/SergioBenitez/Rocket/issues/21
+extern crate futures;
 extern crate hostname;
+extern crate orset;
 extern crate ring;
 extern crate rocket;
 extern crate rocket_contrib;
 extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 extern crate serde_json;
-extern crate uuid;
-
 extern crate tokio_core;
 extern crate tokio_io;
-extern crate futures;
+extern crate uuid;
 
-extern crate orset;
+
+#[macro_use] extern crate failure_derive;
+#[macro_use] extern crate serde_derive;
+#[macro_use(log, warn, info, debug)] extern crate log;
 
 #[cfg(test)]
 extern crate quickcheck;
