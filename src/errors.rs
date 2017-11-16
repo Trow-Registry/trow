@@ -1,6 +1,20 @@
 use failure::Error;
-type Message = String;
-type Detail = String;
+
+type Message = &'static str;
+type Detail = &'static str;
+
+/// Internal errors that occur throughout the system
+#[derive(Debug, Fail)]
+pub enum Server {
+    #[fail(display = "Invalid {} input", _0)]
+    Invalid(&'static str),
+    #[fail(display = "File Not Found: {}", _0)]
+    FileNotFound(String),
+    #[fail(display = "ConfigError: {}", _0)]
+    ConfigError(Error),
+    #[fail(display = "The Capnp Interface was wrong expected: {}", _0)]
+    CapnpInterfaceError(&'static str),
+}
 
 /// Client errors that are returned to consumers of the Registry API
 #[derive(Serialize, Clone, Debug, Fail)]
@@ -38,28 +52,9 @@ pub enum Client {
     UNSUPPORTED,
 }
 
-/// Internal errors that occur throughout the system
-#[derive(Debug, Fail)]
-pub enum Server {
-    #[fail(display = "Invalid {} input", _0)]
-    Invalid(&'static str),
-    #[fail(display = "File Not Found: {}", _0)]
-    FileNotFound(String),
-    #[fail(display = "ConfigError: {}", _0)]
-    ConfigError(Error),
-}
-
-#[derive(Debug, Fail)]
-pub enum TestError {
-    #[fail(display = "{:?}", _0)]
-    Client(Client),
-    #[fail(display = "{:?}", _0)]
-    Server(Server),
-}
-
 impl Client {
     fn message(self) -> Message {
-        let message = match self {
+        match self {
             Client::BLOB_UNKNOWN => "blob unknown to registry",
             Client::BLOB_UPLOAD_INVALID => "blob upload invalid",
             Client::BLOB_UPLOAD_UNKNOWN => "blob upload unknown to registry",
@@ -75,11 +70,11 @@ impl Client {
             Client::UNAUTHORIZED => "authentication required",
             Client::DENIED => "requested access to the resource is denied",
             Client::UNSUPPORTED => "The operation is unsupported",
-        };
-        Message::from(message)
+        }
     }
+
     fn detail(self) -> Detail {
-        let detail = match self {
+        match self {
             Client::BLOB_UNKNOWN => {
                 "This error may be returned when a blob is unknown to the registry in a specified repository. This can be returned with a standard get or if a manifest references an unknown layer during upload"
             }
@@ -125,40 +120,6 @@ impl Client {
             Client::UNSUPPORTED => {
                 "The operation was unsupported due to a missing implementation or invalid set of parameters."
             }
-        };
-        Detail::from(detail)
+        }
     }
-}
-
-#[derive(Serialize, Debug)]
-pub struct FormatError {
-    code: Client,
-    message: Message,
-    detail: Detail,
-}
-
-// #[derive(Serialize, Debug)]
-// pub struct Error{
-//     errors: Vec<FormatError>,
-// }
-
-
-
-pub fn get_error(error: Client) -> FormatError {
-    let message = error.clone().message();
-    let detail = error.clone().detail();
-    FormatError {
-        code: error,
-        message: message,
-        detail: detail,
-    }
-}
-
-pub fn generate_errors(errors: &[Client]) -> () {
-    let mut format_errors: Vec<FormatError> = Vec::new();
-    for error in errors {
-        let error = error.clone();
-        format_errors.push(get_error(error));
-    }
-    // Error { errors: format_errors }
 }

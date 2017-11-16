@@ -63,11 +63,10 @@ use std::thread;
 fn main() {
     let _log = config::main_logger().apply();
 
-    // TODO: this name needs a change
-    let handle = thread::spawn(|| {
+    let backend = thread::spawn(|| {
         debug!("Starting state thread...");
         state::main().expect("Backend Service has exited unexpectedly");
     });
     config::rocket().launch();
-    handle.join().unwrap();
+    backend.join().unwrap();
 }

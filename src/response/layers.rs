@@ -1,4 +1,3 @@
-// use std::io::{Error, ErrorKind};
 use failure::Error;
 
 use rocket::State;
@@ -24,46 +23,37 @@ impl LayerExists {
         repo: String,
         digest: String,
     ) -> Result<LayerExists, Error> {
-        util::connect_backend(&config)
-            .and_then(|mut handler: util::CapnpConnection| {
-                let mut msg = handler.builder.init_root::<lycaon::layer::Builder>();
-                let mut req = handler.proxy.layer_exists_request();
-                msg.set_digest(&digest);
-                msg.set_name(&name);
-                msg.set_repo(&repo);
-                req.get()
-                    .set_layer(msg.as_reader())
-                    .map_err(|e| Error::from(e))
-                    .and(handler.core.and_then(|mut core| {
-                        core.run(req.send().promise).map_err(|e| Error::from(e))
-                    }))
-                    .and_then(|response| {
-                        response.get().map_err(|e| Error::from(e)).and_then(
-                            |response| {
-                                response.get_result().map_err(|e| Error::from(e)).and_then(
-                                    |response| {
-                                        let exists = response.get_exists();
-                                        let length = response.get_length();
-                                        match exists {
-                                            true => Ok(LayerExists::True { digest, length }),
-                                            false => Err(
-                                                errors::Server::FileNotFound(
-                                                    format!("{}", digest.clone()),
-                                                ).into(),
-                                            ),
-                                        }
-                                    },
-                                )
-                            },
-                        )
-                    })
-                    .map_err(|e| e.into())
-            })
-            .map_err(|e| {
-                warn!("{}", e.cause());
-                errors::Client::BLOB_UNKNOWN.into()
-            })
-
+        let mut handler = util::CapnpInterface::layer_interface(&config)?;
+        let mut msg = handler.builder.init_root::<lycaon::layer::Builder>();
+        let proxy = handler.proxy.and_then(|proxy| {
+            // TODO: this is a current hack to get around dynamic dispatch issues
+            // with the proxy handler
+            if let util::CapnpInterface::Layer(client) = proxy {
+                Ok(client)
+            } else {
+                Err(errors::Server::CapnpInterfaceError("Layer").into())
+            }
+        })?;
+        let mut req = proxy.layer_exists_request();
+        msg.set_digest(&digest);
+        msg.set_name(&name);
+        msg.set_repo(&repo);
+        let response = req.get()
+            .set_layer(msg.as_reader())
+            .map_err(|e| Error::from(e))
+            .and(handler.core.and_then(|mut core| {
+                core.run(req.send().promise).map_err(|e| Error::from(e))
+            }))?;
+        let response = response.get()?;
+        let response = response.get_result()?;
+        let exists = response.get_exists();
+        let length = response.get_length();
+        match exists {
+            true => Ok(LayerExists::True { digest, length }),
+            false => Err(
+                errors::Server::FileNotFound(format!("{}", digest.clone())).into(),
+            ),
+        }
     }
 }
 

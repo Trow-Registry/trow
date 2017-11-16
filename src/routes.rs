@@ -1,6 +1,10 @@
 use std::string::ToString;
+
 use rocket;
 
+use errors;
+use config;
+use controller::uuid as cuuid;
 use response::{MaybeResponse, RegistryResponse};
 use response::empty::Empty;
 use response::layers::LayerExists;
@@ -8,9 +12,7 @@ use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
 use response::html::HTML;
-
-use config;
-use controller::uuid as cuuid;
+use state;
 
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -187,6 +189,10 @@ fn check_existing_layer(
 ) -> MaybeResponse<LayerExists> {
     LayerExists::handle(config, name, repo, digest)
         .map(|response| MaybeResponse::build(response))
+        .map_err(|e| {
+            warn!("{}", e);
+            errors::Client::BLOB_UNKNOWN
+        })
         .unwrap_or(MaybeResponse::build(LayerExists::False))
 }
 
@@ -234,52 +240,16 @@ Content-Type: application/octet-stream
 
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
 fn put_blob(
+    config: rocket::State<config::Config>,
     name: String,
     repo: String,
     uuid: String,
     digest: cuuid::DigestStruct,
 ) -> MaybeResponse<UuidAcceptResponse> {
-    debug!("Completing layer upload with digest: {}", digest.digest);
-    let hash = match cuuid::hash_file(cuuid::scratch_path(&uuid)) {
-        Ok(v) => v,
-        Err(_) => "".to_string(),
-    };
-    debug!("File Hash: {}", hash);
-
-    match assert_eq!(hash, digest.digest) {
-        () => MaybeResponse::err(UuidAcceptResponse::DigestMismatch),
-    };
-
-
-    // hash uuid from scratch, if success, copy over to layers
-    // UuidAccept
-    match digest.digest.eq(&hash) {
-        true => {
-            let digest = digest.digest;
-            // 1. copy file to layers (with new name)
-            if let Ok(_) = cuuid::save_layer(&uuid, &digest) {
-                // 2. delete old layer
-                warn!("Deleting scratch file: {}", &uuid);
-                if let Ok(_) = cuuid::mark_delete(&uuid) {
-                    // 3. return success
-                    MaybeResponse::err(UuidAcceptResponse::UuidAccept {
-                        uuid,
-                        digest,
-                        name,
-                        repo,
-                    })
-                } else {
-                    panic!("file could not be deleted");
-                }
-            } else {
-                panic!("file could not be copied");
-            }
-        }
-        false => {
-            warn!("expected {}, got {}", digest.digest, hash);
-            MaybeResponse::err(UuidAcceptResponse::DigestMismatch)
-        }
-    }
+    UuidAcceptResponse::handle(config, name, repo, uuid, digest)
+        .map(|response| MaybeResponse::build(response))
+        .or_else(|e| Err(e))
+        .unwrap_or(MaybeResponse::build(UuidAcceptResponse::UnknownError))
 }
 
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data = "<chunk>")]
@@ -289,7 +259,7 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> MaybeResponse<UuidResponse> {
-    let absolute_file = cuuid::scratch_path(&uuid);
+    let absolute_file = state::uuid::scratch_path(&uuid);
     debug!("Streaming out to {}", absolute_file);
     let file = chunk.stream_to_file(absolute_file);
 
@@ -323,7 +293,7 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 /// This route assumes that no more data will be uploaded to the specified uuid.
 #[delete("/v2/<_name>/<_repo>/blobs/uploads/<uuid>")]
 fn delete_upload(_name: String, _repo: String, uuid: String) -> MaybeResponse<UuidAcceptResponse> {
-    match cuuid::mark_delete(&uuid) {
+    match state::uuid::mark_delete(&uuid) {
         Ok(_) => RegistryResponse(UuidAcceptResponse::UuidDelete),
         Err(_) => panic!("Figure out what to put here too..."),
     }
@@ -337,20 +307,16 @@ POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
 fn post_blob_upload(
-    _config: rocket::State<config::Config>,
+    config: rocket::State<config::Config>,
     name: String,
     repo: String,
 ) -> MaybeResponse<UuidResponse> {
-    // let mut msg = message2.init_root::<lycaon::layer::Builder>();
-    let uuid = cuuid::gen_uuid();
-    info!("Using Uuid: {:?}", uuid);
-    MaybeResponse::ok(UuidResponse::Uuid {
-        uuid: uuid.to_string(),
-        name,
-        repo,
-        left: 0,
-        right: 0,
-    })
+    UuidResponse::handle(config, name, repo)
+        .map_err(|e| {
+            warn!("Uuid Generate: {}", e);
+        })
+        .map(|response| MaybeResponse::build(response))
+        .unwrap_or(MaybeResponse::build(UuidResponse::Empty))
 }
 /*
 

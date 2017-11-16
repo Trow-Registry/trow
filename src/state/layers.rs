@@ -21,10 +21,12 @@ impl Layer {
 
 /// Takes the digest, and constructs an absolute pathstring to the digest.
 fn construct_absolute_path(layer: Layer) -> Box<Path> {
-    let cwd = std::env::current_dir().unwrap();
-    let absolute_dir = cwd.join(format!("data/layers/{}", layer.digest()));
-    debug!("Absolute Path: {:?}", absolute_dir);
-    absolute_dir.into_boxed_path()
+    let cwd = std::env::current_dir().map(|cwd| {
+        let absolute_dir = cwd.join(format!("data/layers/{}", layer.digest()));
+        debug!("Absolute Path: {:?}", absolute_dir);
+        absolute_dir.into_boxed_path()
+    });
+    cwd.unwrap()
 }
 
 fn file_length(file: std::fs::File) -> Result<u64, std::io::Error> {
@@ -108,8 +110,6 @@ impl lycaon::layer_interface::Server for LayerImpl {
 mod tests {
     use super::*;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
-    // use metric::{AggregationMethod, Telemetry};
-    // use std::sync;
 
     impl Arbitrary for Layer {
         fn arbitrary<G>(g: &mut G) -> Self
@@ -125,7 +125,7 @@ mod tests {
             let name: String = g.gen_ascii_chars().take(name_len).collect();
             let repo: String = g.gen_ascii_chars().take(repo_len).collect();
 
-            Layer { digest, name, repo }
+            Layer::new( digest, name, repo )
         }
     }
 

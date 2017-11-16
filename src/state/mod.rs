@@ -12,14 +12,20 @@ use tokio_io::AsyncRead;
 
 /// Export Module layers
 mod layers;
+pub(crate) mod uuid;
 
 type LayerImplType = lycaon::layer_interface::Client;
+type UuidImplType = lycaon::uuid_interface::Client;
 struct LycaonRPC {
     layerimpl: LayerImplType,
+    uuidimpl: UuidImplType,
 }
 impl LycaonRPC {
-    fn new(layerimpl: LayerImplType) -> LycaonRPC {
-        LycaonRPC { layerimpl }
+    fn new(layerimpl: LayerImplType, uuidimpl: UuidImplType) -> LycaonRPC {
+        LycaonRPC {
+            layerimpl,
+            uuidimpl,
+        }
     }
 }
 
@@ -31,6 +37,15 @@ impl lycaon::Server for LycaonRPC {
     ) -> Promise<(), Error> {
         debug!("returning the layer interface");
         results.get().set_if(self.layerimpl.clone());
+        Promise::ok(())
+    }
+    fn get_uuid_interface(
+        &mut self,
+        _params: lycaon::GetUuidInterfaceParams,
+        mut results: lycaon::GetUuidInterfaceResults,
+    ) -> Promise<(), Error> {
+        debug!("returning the layer interface");
+        results.get().set_if(self.uuidimpl.clone());
         Promise::ok(())
     }
 }
@@ -84,9 +99,14 @@ pub fn main() -> Result<(), std::io::Error> {
 
         let layers = ORSet::new("layers".to_string());
         let layerimpl = layers::LayerImpl::new(layers);
-        let interface = lycaon::layer_interface::ToClient::new(layerimpl)
+        let layerimpl = lycaon::layer_interface::ToClient::new(layerimpl)
             .from_server::<::capnp_rpc::Server>();
-        let proxy = lycaon::ToClient::new(LycaonRPC::new(interface)).from_server::<::capnp_rpc::Server>();
+
+        let uuidimpl = uuid::UuidImpl::new();
+        let uuidimpl = lycaon::uuid_interface::ToClient::new(uuidimpl)
+            .from_server::<::capnp_rpc::Server>();
+
+        let proxy = lycaon::ToClient::new(LycaonRPC::new(layerimpl, uuidimpl)).from_server::<::capnp_rpc::Server>();
 
         let handle1 = handle.clone();
         let done = socket.incoming().for_each(move |(socket, _addr)| {

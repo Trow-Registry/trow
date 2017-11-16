@@ -1,7 +1,15 @@
+use failure::Error;
+use rocket::State;
 use rocket::http::{Header, Status};
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
 use hostname;
+use uuid::Uuid;
+
+use config;
+use errors;
+use util;
+use http_capnp::lycaon;
 
 #[derive(Debug, Serialize)]
 pub enum UuidResponse {
@@ -15,10 +23,58 @@ pub enum UuidResponse {
     Empty,
 }
 
-/*
- * Gets the base URL e.g. http://registry:8000 using the HOST value from the request header.
- * Falls back to hostname if it doesn't exist.
- */
+impl UuidResponse {
+    pub fn handle(
+        config: State<config::Config>,
+        name: String,
+        repo: String,
+    ) -> Result<UuidResponse, Error> {
+        let uuid = gen_uuid().to_string();
+
+        let mut handler = util::CapnpInterface::uuid_interface(&config)?;
+        let mut msg = handler
+            .builder
+            .init_root::<lycaon::uuid_interface::uuid::Builder>();
+        let proxy = handler.proxy.and_then(|proxy| {
+            // TODO: this is a current hack to get around dynamic dispatch issues
+            // with the proxy handler. This is _super_ fragile!
+            if let util::CapnpInterface::Uuid(client) = proxy {
+                Ok(client)
+            } else {
+                Err(errors::Server::CapnpInterfaceError("Uuid").into())
+            }
+        })?;
+        let mut req = proxy.add_uuid_request();
+        msg.set_uuid(&uuid);
+        let response = req.get()
+            .set_uuid(msg.as_reader())
+            .map_err(|e| Error::from(e))
+            .and(handler.core.and_then(|mut core| {
+                core.run(req.send().promise).map_err(|e| Error::from(e))
+            }))?;
+        let result = response.get().map(|response| response.get_result())?;
+        if result {
+            Ok(UuidResponse::Uuid {
+                uuid,
+                name,
+                repo,
+                left: 0,
+                right: 0,
+            })
+        } else {
+            Err(errors::Server::CapnpInterfaceError("Uuid Response").into())
+        }
+    }
+}
+
+fn gen_uuid() -> Uuid {
+    Uuid::new_v4()
+}
+
+
+/// Gets the base URL e.g. http://registry:8000 using the HOST value from the request header.
+/// Falls back to hostname if it doesn't exist.
+///
 fn get_base_url(req: &Request) -> String {
     let host = match req.headers().get("HOST").next() {
         None => {
@@ -53,7 +109,7 @@ impl<'r> Responder<'r> for UuidResponse {
             );
             let upload_uuid = Header::new("Docker-Upload-UUID", uuid.clone());
             let range = Header::new("Range", format!("{}-{}", left, right));
-            let length = Header::new("Content-Length", format!("{}", right - left));
+            let length = Header::new("X-Content-Length", format!("{}", right - left));
             let location = Header::new("Location", location_url);
 
             debug!("Range: {}-{}, Length: {}", left, right, right - left);
