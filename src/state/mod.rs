@@ -1,5 +1,4 @@
-use std;
-
+use failure;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use capnp::capability::Promise;
 use capnp::Error;
@@ -9,6 +8,8 @@ use orset::ORSet;
 use rocket;
 use tokio_core::reactor;
 use tokio_io::AsyncRead;
+
+use config;
 
 /// Export Module layers
 mod layers;
@@ -74,7 +75,27 @@ fn get_config() -> ConsoleConfig {
     }
 }
 
-pub fn main() -> Result<(), std::io::Error> {
+pub fn main(handler: config::SocketHandler) -> Result<(), failure::Error> {
+
+    // TODO: Strip out the rest of this functionality
+    use std::thread;
+    thread::spawn(move || loop {
+        debug!("Listening...");
+
+        let _ = handler
+            .rx()
+            .recv()
+            .map_err(|e| failure::Error::from(e))
+            .and_then(|val| {
+                let req = config::BackendMessage::Frontend(config::Frontend::TestResponse);
+                debug!("{:?}", val);
+                handler.tx().send(req).map_err(|e| failure::Error::from(e))
+            })
+            .map_err(|e| {
+                warn!("{}", e);
+                e
+            });
+    });
 
     let cfg = get_config();
     use std::net::ToSocketAddrs;
@@ -130,5 +151,5 @@ pub fn main() -> Result<(), std::io::Error> {
 
         info!("Starting Console on address: {}", address);
         core.run(done)
-    })
+    }).map_err(|e| e.into())
 }

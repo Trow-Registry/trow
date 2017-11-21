@@ -30,7 +30,6 @@ extern crate tokio_core;
 extern crate tokio_io;
 extern crate uuid;
 
-
 #[macro_use]
 extern crate failure_derive;
 #[macro_use]
@@ -47,6 +46,8 @@ mod http_capnp {
     include!(concat!(env!("OUT_DIR"), "/http_capnp.rs"));
 }
 
+use std::thread;
+use std::sync::mpsc;
 
 pub mod controller;
 pub mod config;
@@ -58,15 +59,17 @@ mod test;
 mod types;
 mod util;
 
-use std::thread;
-
 fn main() {
     let _log = config::main_logger().apply();
 
-    let backend = thread::spawn(|| {
+    let (tx_a, rx_a) = mpsc::channel::<config::BackendMessage>();
+    let (tx_b, rx_b) = mpsc::channel::<config::BackendMessage>();
+
+    let backend_handler = config::SocketHandler::new(tx_a, rx_b);
+    let _ = thread::spawn(|| {
         debug!("Starting state thread...");
-        state::main().expect("Backend Service has exited unexpectedly");
+        let frontend_handler = config::SocketHandler::new(tx_b, rx_a);
+        state::main(frontend_handler).expect("Backend Service has exited unexpectedly");
     });
-    config::rocket().launch();
-    backend.join().unwrap();
+    config::rocket(backend_handler).launch();
 }

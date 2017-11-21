@@ -4,6 +4,7 @@
 
 use std;
 use std::path::Path;
+use std::sync::mpsc;
 use std::fs;
 use log;
 use failure::Error;
@@ -26,6 +27,45 @@ pub struct Config {
     pub address: String,
     pub port: u16,
     pub console_port: i64,
+}
+
+#[derive(Debug)]
+pub enum Backend {
+    Test,
+}
+#[derive(Debug)]
+pub enum Frontend {
+    TestResponse,
+}
+
+#[derive(Debug)]
+pub enum BackendMessage {
+    Backend(Backend),
+    Frontend(Frontend),
+}
+
+pub type SendSock = mpsc::Sender<BackendMessage>;
+pub type RecvSock = mpsc::Receiver<BackendMessage>;
+
+#[derive(Debug)]
+pub struct SocketHandler {
+    tx: SendSock,
+    rx: RecvSock,
+}
+unsafe impl Sync for SocketHandler {}
+
+impl SocketHandler {
+    pub fn new(tx: SendSock, rx: RecvSock) -> SocketHandler {
+        SocketHandler { tx, rx }
+    }
+
+    pub fn tx(&self) -> SendSock {
+        self.tx.clone()
+    }
+
+    pub fn rx(&self) -> &RecvSock {
+        &self.rx
+    }
 }
 
 /// Build the logging agent with formatting and the correct log-level.
@@ -105,8 +145,9 @@ fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
 }
 
 /// Construct the rocket instance and prepare for launch
-pub(crate) fn rocket() -> rocket::Rocket {
+pub(crate) fn rocket(handler: SocketHandler) -> rocket::Rocket {
     rocket::ignite()
+        .manage(handler)
         .attach(fairing::AdHoc::on_attach(startup))
         .mount("/", routes::routes())
         .catch(routes::errors())

@@ -13,6 +13,7 @@ use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
 use response::html::HTML;
 use state;
+use util;
 
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -67,13 +68,23 @@ fn get_v2root() -> MaybeResponse<Empty> {
     MaybeResponse::ok(Empty)
 }
 
+const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
+<h1>Welcome to Lycaon, the King of Registries</h1>
+</body></html>";
+
 #[get("/")]
-fn get_homepage<'a>() -> RegistryResponse<HTML<'a>> {
-    RegistryResponse(HTML(
-        "<!DOCTYPE html><html><body>
-    <h1>Welcome to Lycaon, the King of Registries</h1>
-    </body></html>",
-    ))
+fn get_homepage<'a>(handler: rocket::State<config::SocketHandler>) -> RegistryResponse<HTML<'a>> {
+    let req = config::BackendMessage::Backend(config::Backend::Test);
+    util::send(handler.tx(), req)
+        .and(
+            util::recv(handler.rx())
+                .and_then(|val| {
+                    debug!("Received: {:?}", val);
+                    Ok(val)
+                })
+                .and_then(|_| Ok(RegistryResponse(HTML(ROOT_RESPONSE)))),
+        )
+        .unwrap_or(RegistryResponse(HTML(ROOT_RESPONSE)))
 }
 
 /*
@@ -95,7 +106,7 @@ Accept: manifest-version
 # Returns
 200 - return the manifest
 404 - manifest not known to the registry
-*/
+ */
 #[get("/v2/<_name>/<_repo>/manifests/<reference>")]
 fn get_manifest(_name: String, _repo: String, reference: String) -> MaybeResponse<Empty> {
     info!("Getting Manifest");
@@ -324,7 +335,7 @@ fn post_blob_upload(
 Delete a layer
 DELETE /v2/<name>/blobs/<digest>
 
-*/
+ */
 #[delete("/v2/<_name>/<_repo>/blobs/<_digest>")]
 fn delete_blob(_name: String, _repo: String, _digest: String) -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
@@ -336,7 +347,7 @@ Pushing an image manifest
 PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
-*/
+ */
 #[put("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn put_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
@@ -346,7 +357,7 @@ fn put_image_manifest(_name: String, _repo: String, _reference: String) -> Maybe
 Listing Repositories
 GET /v2/_catalog
 
-*/
+ */
 #[get("/v2/_catalog")]
 fn get_catalog() -> MaybeResponse<Catalog> {
     MaybeResponse::err(Catalog)
@@ -356,7 +367,7 @@ fn get_catalog() -> MaybeResponse<Catalog> {
 Listing Image Tags
 GET /v2/<name>/tags/list
 
-*/
+ */
 #[delete("/v2/<_name>/<_repo>/tags/list")]
 fn get_image_tags(_name: String, _repo: String) -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
@@ -366,7 +377,7 @@ fn get_image_tags(_name: String, _repo: String) -> MaybeResponse<Empty> {
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
 
-*/
+ */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
@@ -375,4 +386,4 @@ fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Ma
 /*
 ---
 [1]: Could possibly be used to redirect a client to a local cache
-*/
+ */

@@ -51,12 +51,12 @@ impl UuidAcceptResponse {
 
         let mut req = proxy.save_layer_request();
         msg.set_uuid(&uuid);
-        let response = req.get().set_uuid(msg.as_reader())
+        let _response = req.get().set_uuid(msg.as_reader())
             .map_err(|e| Error::from(e))
             .and(handler.core.and_then(|mut core| {
                 core.run(req.send().promise).map_err(|e| Error::from(e))
             }))?;
-        let hash = state::uuid::hash_file(state::uuid::scratch_path(&uuid))
+        let _hash = state::uuid::hash_file(state::uuid::scratch_path(&uuid))
             .and_then(|hash| {
                 if hash != digest.digest {
                     return Err(errors::Client::DIGEST_INVALID.into());

@@ -25,6 +25,7 @@ capnp = "0.8.11"
 futures = "0.1"
 tokio-core = "0.1"
 tokio-io = "0.1"
+
 orset = "0.2.0"
 
 failure = { git = 'https://github.com/withoutboats/failure', rev = "ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"}
