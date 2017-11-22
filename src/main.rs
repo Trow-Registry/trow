@@ -36,6 +36,7 @@ extern crate failure_derive;
 extern crate serde_derive;
 #[macro_use(log, warn, info, debug)]
 extern crate log;
+extern crate env_logger;
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -60,6 +61,7 @@ mod types;
 mod util;
 
 fn main() {
+    env_logger::init();
     let _log = config::main_logger().apply();
 
     let (tx_a, rx_a) = mpsc::channel::<config::BackendMessage>();

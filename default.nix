@@ -11,7 +11,10 @@ stdenv.mkDerivation rec {
     pkgconfig
     rust-nightly.rust
     capnproto
+    protobuf
 
+    cmake
+    go
     # dev
     rustfmt
     valgrind

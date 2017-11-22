@@ -6,7 +6,6 @@ use std;
 use std::path::Path;
 use std::sync::mpsc;
 use std::fs;
-use log;
 use failure::Error;
 use fern;
 use ctrlc;
@@ -68,14 +67,8 @@ impl SocketHandler {
     }
 }
 
-/// Build the logging agent with formatting and the correct log-level.
-///
-/// The log-level is set using the `DEBUG` environment variable.
+/// Build the logging agent with formatting.
 pub fn main_logger() -> fern::Dispatch {
-    let level = match std::env::var("DEBUG") {
-        Ok(_) => log::LogLevelFilter::Debug,
-        Err(_) => log::LogLevelFilter::Info,
-    };
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -85,7 +78,6 @@ pub fn main_logger() -> fern::Dispatch {
                 message
             ))
         })
-        .level(level)
         .chain(std::io::stdout())
 }
 
