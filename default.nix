@@ -21,6 +21,8 @@ stdenv.mkDerivation rec {
   ];
 
   shellHook = ''
+    cargo install protobuf
+    cargo install grpcio-compiler
     echo Rust Nightly: ${date}
   '';
 }

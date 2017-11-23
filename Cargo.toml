@@ -21,6 +21,10 @@ chrono = "0.4.0"
 ctrlc = { version = "3.0", features = ["termination"] }
 hostname = "^0.1"
 
+protobuf = "1.4.2"
+grpcio = "0.1.2"
+config = "0.7.0"
+
 capnp-rpc = "0.8.2"
 capnp = "0.8.11"
 futures = "0.1"

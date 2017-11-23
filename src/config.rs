@@ -28,6 +28,35 @@ pub struct Config {
     pub console_port: i64,
 }
 
+#[derive(Debug, Deserialize)]
+struct GrpcConfig {
+    listen: Service,
+    bootstrap: Service,
+}
+
+#[derive(Debug, Deserialize)]
+struct Service {
+    host: String,
+    port: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct LycaonConfig {
+    grpc: GrpcConfig,
+}
+
+impl LycaonConfig {
+    pub fn new() -> Result<Self, Error> {
+        use cfg::{Config, Environment, File};
+        let mut s = Config::new();
+
+        s.merge(File::with_name("Lycaon.toml"))?;
+        s.merge(Environment::with_prefix("lycaon"))?;
+
+        s.try_into().map_err(|e| e.into())
+    }
+}
+
 #[derive(Debug)]
 pub enum Backend {
     Test,
@@ -138,6 +167,7 @@ fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
 
 /// Construct the rocket instance and prepare for launch
 pub(crate) fn rocket(handler: SocketHandler) -> rocket::Rocket {
+    debug!("Config: {:?}", LycaonConfig::new());
     rocket::ignite()
         .manage(handler)
         .attach(fairing::AdHoc::on_attach(startup))
