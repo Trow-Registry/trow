@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package lycaon;
+
+// Looking at the ORSet library which we are using for our CRDT
+// We have two kinds of messages that relate to the propogation of
+// data.
+//
+// 1. When a new Instance comes online and requests a sync.
+//   - This could be implemented using no. 2 and just applying all
+//     deltas from an empty ORSet.
+// 2. When an existing instance needs to send a delta to listening instances.
+//
+// The second set of messages relates to locating and downloading
+// information from other services. This includes (non-exhaustive):
+//
+// - Querying a layers existence on a remote instance
+// - Querying permissions regarding a layer
+// - Propogating any state changes (such as deletion requests)
+
+// Generic Types
+//
+// These are types that are reused throughout the specification and
+// are defined at the top for ease of discovery.
+message Dot {
+  string actor = 1;
+  uint64 counter = 2;
+}
+
+enum DeltaType {
+  ADD = 0;
+  REMOVE = 1;
+}
+
+// ORSet messages
+//
+// This message is a sync of the entire current state of the ORSet.
+message ORSetFullSync {}
+
+// This message represents a single Delta of the ORSet.
+message ORSetDelta {
+  DeltaType deltatype = 1; // If this is set t
+  string element = 2;
+  repeated Dot dots = 3;
+}
+
+// This message represents a reply to a sent delta.
+// Currently this message simply returns the DeltaType and the element
+// so the client can verify a successful message sent.
+message ORSetDeltaReply {
+  DeltaType deltatype = 1;
+  string element = 1;
+}
+
+service Peer {
+  rpc deltaSync (ORSetDelta) returns (ORSetDeltaReply) {}
+}
