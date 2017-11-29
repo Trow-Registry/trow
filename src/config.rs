@@ -2,10 +2,13 @@
 //! as well as data-structures for setting and maintaining the
 //! system configuration.
 
+use getopts::Occur;
 use std;
 use std::path::Path;
 use std::sync::mpsc;
 use std::fs;
+
+use args::Args;
 use failure::Error;
 use fern;
 use ctrlc;
@@ -13,6 +16,7 @@ use rocket;
 use rocket::fairing;
 
 use errors;
+use grpc::backend_grpc::PeerClient;
 use routes;
 
 static DEFAULT_DATA_DIR: &'static str = "data";
@@ -28,32 +32,81 @@ pub struct Config {
     pub console_port: i64,
 }
 
-#[derive(Debug, Deserialize)]
-struct GrpcConfig {
+#[derive(Clone, Debug, Deserialize)]
+pub struct GrpcConfig {
     listen: Service,
     bootstrap: Service,
 }
 
-#[derive(Debug, Deserialize)]
-struct Service {
-    host: String,
-    port: u64,
+impl GrpcConfig {
+    pub fn listen(&self) -> Service {
+        self.listen.clone()
+    }
+
+    pub fn bootstrap(&self) -> Service {
+        self.listen.clone()
+    }
 }
 
-#[derive(Debug, Deserialize)]
-struct LycaonConfig {
+#[derive(Clone, Debug, Deserialize)]
+pub struct Service {
+    host: String,
+    port: u16,
+}
+
+impl Service {
+    pub fn host(&self) -> String {
+        self.host.clone()
+    }
+
+    pub fn port(&self) -> u16 {
+        self.port.clone()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct HttpConfig {
+    listen: Service,
+}
+
+impl HttpConfig {
+    fn listen(&self) -> Service {
+        self.listen.clone()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct LycaonConfig {
     grpc: GrpcConfig,
+    web: HttpConfig,
 }
 
 impl LycaonConfig {
-    pub fn new() -> Result<Self, Error> {
+    pub fn new(file: String) -> Result<Self, Error> {
         use cfg::{Config, Environment, File};
         let mut s = Config::new();
 
-        s.merge(File::with_name("Lycaon.toml"))?;
+        s.merge(File::with_name(&file))?;
         s.merge(Environment::with_prefix("lycaon"))?;
 
         s.try_into().map_err(|e| e.into())
+    }
+
+    pub fn default() -> Result<Self, Error> {
+        LycaonConfig::new("Lycaon.toml".to_owned())
+    }
+
+    pub fn from_file(file: Result<String, Error>) -> Result<Self, Error> {
+        file.map_err(|e| e.into())
+            .and_then(|file: String| LycaonConfig::new(file))
+            .or_else(|err| {
+                debug!("No config file specified, using default");
+                LycaonConfig::default()
+            })
+    }
+
+    pub fn grpc(&self) -> GrpcConfig {
+        self.grpc.clone()
     }
 }
 
@@ -165,12 +218,88 @@ fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
         .map_err(|e| panic!("{}", e))
 }
 
+pub struct PeerHandler {
+    peers: Vec<PeerClient>,
+}
+
+impl PeerHandler {
+    fn new(peers: Vec<PeerClient>) -> Self {
+        PeerHandler { peers }
+    }
+
+    pub fn peers(&self) -> &Vec<PeerClient> {
+        &self.peers
+    }
+}
+
+fn build_handlers(config: &LycaonConfig) -> PeerHandler {
+    use grpc;
+    use protobuf;
+    use std::sync::Arc;
+
+    use grpcio::{ChannelBuilder, EnvBuilder};
+    use grpc::backend;
+
+    let env = Arc::new(EnvBuilder::new().build());
+    let ch = ChannelBuilder::new(env).connect("127.0.0.1:50055");
+    let client = PeerClient::new(ch);
+    PeerHandler::new(vec![client])
+}
+
+fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
+    debug!("Config: {:?}", config.web);
+    let bind = config.web.listen();
+    rocket::config::Config::build(rocket::config::Environment::Production)
+        .address(bind.host())
+        .port(bind.port())
+        .finalize()
+        .expect("Error building Rocket Config")
+}
+
 /// Construct the rocket instance and prepare for launch
-pub(crate) fn rocket(handler: SocketHandler) -> rocket::Rocket {
-    debug!("Config: {:?}", LycaonConfig::new());
-    rocket::ignite()
-        .manage(handler)
-        .attach(fairing::AdHoc::on_attach(startup))
-        .mount("/", routes::routes())
-        .catch(routes::errors())
+pub(crate) fn rocket(handler: SocketHandler, args: Args) -> Result<rocket::Rocket, Error> {
+    let config = args.value_of("config")
+        .map_err(|e| e.into())
+        .and_then(|file| LycaonConfig::new(file))
+        .or_else(|e| LycaonConfig::default())?;
+
+    let rocket_config = build_rocket_config(&config);
+    debug!("Config: {:?}", config);
+    Ok(
+        rocket::custom(rocket_config, true)
+            .manage(handler)
+            .manage(build_handlers(&config))
+            .manage(config)
+            .attach(fairing::AdHoc::on_attach(startup))
+            .mount("/", routes::routes())
+            .catch(routes::errors()),
+    )
+}
+
+const PROGRAM_NAME: &'static str = "Lycaon";
+const PROGRAM_DESC: &'static str = "The King of Registries";
+
+pub fn parse_args() -> Result<Args, Error> {
+    let mut args = Args::new(PROGRAM_NAME, PROGRAM_DESC);
+
+    args.flag("h", "help", "print usage information");
+    args.option(
+        "c",
+        "config",
+        "config file",
+        "FILE",
+        Occur::Optional,
+        Some(String::from("Lycaon.toml")),
+    );
+
+    debug!("Parsing Arguments from CLI");
+    args.parse_from_cli()?;
+    if args.value_of("help")? {
+        println!("{}", args.full_usage());
+        use std;
+        return Err(Error::from(std::fmt::Error));
+    }
+
+    debug!("Args, all good");
+    Ok(args)
 }

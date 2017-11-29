@@ -63,39 +63,34 @@ fn err_404() -> MaybeResponse<Empty> {
 ///
 /// # Headers
 /// Docker-Distribution-API-Version: registry/2.0
-fn client() {
-    use grpc;
+fn client(handler: &config::PeerHandler) {
     use protobuf;
-    use std::sync::Arc;
 
-    use grpcio::{ChannelBuilder, EnvBuilder};
     use grpc::backend;
-    use grpc::backend_grpc::PeerClient;
 
-    let env = Arc::new(EnvBuilder::new().build());
-
-    let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect("127.0.0.1:50055");
-    let client = PeerClient::new(ch);
-
-    let mut dot = backend::Dot::new();
-    dot.set_actor("dot".to_owned());
-    dot.set_counter(1337);
-    let mut dot2 = backend::Dot::new();
-    dot2.set_actor("dot".to_owned());
-    dot2.set_counter(1337);
-    let mut delta = backend::ORSetDelta::new();
-    delta.set_deltatype(backend::DeltaType::ADD);
-    delta.set_element("Striiing!".to_owned());
-    delta.set_dots(protobuf::RepeatedField::from_vec(vec![dot, dot2]));
-    debug!("Client sending: {:?}", delta);
-    // --
-    let reply = client.delta_sync(delta).expect("rpc");
-    debug!("Client received: {:?}", reply);
+    for peer in handler.peers() {
+        debug!("Sending to peer!");
+        let mut dot = backend::Dot::new();
+        dot.set_actor("dot".to_owned());
+        dot.set_counter(1337);
+        let mut dot2 = backend::Dot::new();
+        dot2.set_actor("dot".to_owned());
+        dot2.set_counter(1337);
+        let mut delta = backend::ORSetDelta::new();
+        delta.set_deltatype(backend::DeltaType::ADD);
+        delta.set_element("Striiing!".to_owned());
+        delta.set_dots(protobuf::RepeatedField::from_vec(vec![dot, dot2]));
+        debug!("Client sending: {:?}", delta);
+        // --
+        let reply = peer.delta_sync(delta).expect("rpc");
+        debug!("Client received: {:?}", reply);
+    }
 }
+
 #[get("/v2")]
-fn get_v2root() -> MaybeResponse<Empty> {
-    client();
+fn get_v2root(handler: rocket::State<config::PeerHandler>) -> MaybeResponse<Empty> {
+    use std::ops::Deref;
+    client(handler.deref());
     MaybeResponse::ok(Empty)
 }
 

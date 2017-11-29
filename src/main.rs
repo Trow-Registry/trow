@@ -13,6 +13,7 @@
 #![feature(plugin)]
 #![plugin(rocket_codegen)]
 
+extern crate args;
 extern crate capnp;
 extern crate capnp_rpc;
 extern crate config as cfg;
@@ -20,6 +21,7 @@ extern crate ctrlc;
 extern crate failure;
 extern crate fern;
 extern crate futures;
+extern crate getopts;
 extern crate hostname;
 extern crate orset;
 extern crate ring;
@@ -78,9 +80,7 @@ struct PeerService {
 }
 impl PeerService {
     fn new() -> PeerService {
-        PeerService {
-            counter: Cell::new(0)
-        }
+        PeerService { counter: Cell::new(0) }
     }
 }
 
@@ -104,18 +104,20 @@ impl Peer for PeerService {
     }
 }
 
-fn server() {
+fn server(config: config::LycaonConfig) {
     use futures::sync::oneshot;
     use std::sync::Arc;
     use grpcio::{Environment, RpcContext, ServerBuilder, UnarySink};
     use std::io::Read;
+
+    let listen = config.grpc().listen();
 
     debug!("starting GRPC server");
     let env = Arc::new(Environment::new(1));
     let service = grpc::backend_grpc::create_peer(PeerService::new());
     let mut server = ServerBuilder::new(env)
         .register_service(service)
-        .bind("127.0.0.1", 50055)
+        .bind(listen.host(), listen.port())
         .build()
         .unwrap();
     server.start();
@@ -129,20 +131,41 @@ fn server() {
 
 // --- END GRPC SERVER ---
 
-fn grpc() {
+fn grpc() -> std::thread::JoinHandle<()> {
     debug!("Setting up RPC Server");
-    thread::spawn(|| server());
-    debug!("RPC Server setup!");
+    thread::spawn(|| {
+        let _ = config::parse_args()
+            .and_then(|args| {
+                args.value_of("config")
+                    .map_err(|e| e.into())
+                    .and_then(|file| config::LycaonConfig::new(file))
+                    .or_else(|e| config::LycaonConfig::default())
+            })
+            .map(|config| server(config));
+
+    })
 }
 
 fn main() {
+    // Init Logger
     let _ = env_logger::init()
         .and(config::main_logger().apply())
         .map_err(|e| {
-            println!("Error setting up logging: {:?}", e);
+            warn!("Error setting up logging: {:?}", e);
         });
 
-    grpc();
+    // Parse Args
+    let args = match config::parse_args() {
+        Ok(args) => args,
+        Err(_) => {
+            std::process::exit(0);
+        }
+
+    };
+
+    // GRPC Backend thread
+    let _grpc_thread = grpc();
+
     let (tx_a, rx_a) = mpsc::channel::<config::BackendMessage>();
     let (tx_b, rx_b) = mpsc::channel::<config::BackendMessage>();
 
@@ -152,5 +175,5 @@ fn main() {
         let frontend_handler = config::SocketHandler::new(tx_b, rx_a);
         state::main(frontend_handler).expect("Backend Service has exited unexpectedly");
     });
-    config::rocket(backend_handler).launch();
+    config::rocket(backend_handler, args).map(|rocket| rocket.launch());
 }
