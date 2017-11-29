@@ -1,0 +1,11 @@
+[grpc]
+[grpc.listen]
+host = "localhost"
+port = 51002
+[grpc.bootstrap]
+host = 'localhost'
+port = 51001
+
+[web.listen]
+host = "localhost"
+port = 8003
