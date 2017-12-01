@@ -36,6 +36,8 @@ orset = "0.2.0"
 failure = { git = 'https://github.com/withoutboats/failure', rev = "ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"}
 failure_derive = "0.0.1"
 
+lycaon-protobuf = { git = "ssh://git@github.com/ContainerSolutions/lycaon-protobuf", rev = "4473ba7dfe7fcc8f98c4dae2cae40bc4ea731e59"}
+
 [build-dependencies]
 
 [dev-dependencies]

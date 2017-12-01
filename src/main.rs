@@ -33,6 +33,8 @@ extern crate uuid;
 extern crate protobuf;
 extern crate grpcio;
 
+extern crate lycaon_protobuf as grpc;
+
 #[macro_use]
 extern crate failure_derive;
 #[macro_use]
@@ -56,10 +58,6 @@ mod state;
 mod test;
 mod types;
 mod util;
-
-// grpc imports
-mod grpc;
-
 
 // --- GRPC SERVER ---
 use grpc::backend_grpc::Peer;
