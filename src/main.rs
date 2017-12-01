@@ -69,7 +69,7 @@ fn grpc() -> std::thread::JoinHandle<()> {
                 args.value_of("config")
                     .map_err(|e| e.into())
                     .and_then(|file| config::LycaonConfig::new(file))
-                    .or_else(|e| config::LycaonConfig::default())
+                    .or_else(|_e| config::LycaonConfig::default())
             })
             .map(|config| backend::server(config.grpc()));
     })
@@ -95,8 +95,8 @@ fn main() {
     // GRPC Backend thread
     let _grpc_thread = grpc();
 
-    let (tx_a, rx_a) = mpsc::channel::<config::BackendMessage>();
-    let (tx_b, rx_b) = mpsc::channel::<config::BackendMessage>();
+    let (tx_a, _rx_a) = mpsc::channel::<config::BackendMessage>();
+    let (_tx_b, rx_b) = mpsc::channel::<config::BackendMessage>();
 
     let backend_handler = config::SocketHandler::new(tx_a, rx_b);
     config::rocket(backend_handler, args).map(|rocket| rocket.launch());

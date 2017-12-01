@@ -6,8 +6,6 @@ use rocket::response::{Responder, Response};
 use rocket::request::Request;
 
 use config;
-use errors;
-use util;
 
 #[derive(Debug)]
 pub enum LayerExists {

@@ -1,11 +1,4 @@
-use failure;
-use futures::{Future, Stream};
-use orset::ORSet;
 use rocket;
-use tokio_core::reactor;
-use tokio_io::AsyncRead;
-
-use config;
 
 /// Export Module layers
 mod layers;

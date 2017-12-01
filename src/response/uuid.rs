@@ -7,8 +7,6 @@ use hostname;
 use uuid::Uuid;
 
 use config;
-use errors;
-use util;
 
 #[derive(Debug, Serialize)]
 pub enum UuidResponse {

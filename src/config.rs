@@ -84,7 +84,7 @@ impl LycaonConfig {
     pub fn from_file(file: Result<String, Error>) -> Result<Self, Error> {
         file.map_err(|e| e.into())
             .and_then(|file: String| LycaonConfig::new(file))
-            .or_else(|err| {
+            .or_else(|_| {
                 debug!("No config file specified, using default");
                 LycaonConfig::default()
             })
@@ -217,13 +217,10 @@ impl PeerHandler {
     }
 }
 
-fn build_handlers(config: &LycaonConfig) -> PeerHandler {
-    use grpc;
-    use protobuf;
+fn build_handlers(_config: &LycaonConfig) -> PeerHandler {
     use std::sync::Arc;
 
     use grpcio::{ChannelBuilder, EnvBuilder};
-    use grpc::backend;
 
     let env = Arc::new(EnvBuilder::new().build());
     let ch = ChannelBuilder::new(env).connect("127.0.0.1:50055");
@@ -246,7 +243,7 @@ pub(crate) fn rocket(handler: SocketHandler, args: Args) -> Result<rocket::Rocke
     let config = args.value_of("config")
         .map_err(|e| e.into())
         .and_then(|file| LycaonConfig::new(file))
-        .or_else(|e| LycaonConfig::default())?;
+        .or_else(|_| LycaonConfig::default())?;
 
     let rocket_config = build_rocket_config(&config);
     debug!("Config: {:?}", config);

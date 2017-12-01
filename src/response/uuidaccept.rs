@@ -7,9 +7,6 @@ use rocket::request::Request;
 
 use config;
 use controller::uuid as cuuid;
-use errors;
-use state;
-use util;
 
 const BASE_URL: &str = "http://localhost:8000";
 
