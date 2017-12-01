@@ -12,8 +12,6 @@ pub enum Server {
     FileNotFound(String),
     #[fail(display = "ConfigError: {}", _0)]
     ConfigError(Error),
-    #[fail(display = "The Capnp Interface was wrong expected: {}", _0)]
-    CapnpInterfaceError(&'static str),
 }
 
 /// Client errors that are returned to consumers of the Registry API

@@ -9,7 +9,6 @@ use uuid::Uuid;
 use config;
 use errors;
 use util;
-use http_capnp::lycaon;
 
 #[derive(Debug, Serialize)]
 pub enum UuidResponse {
@@ -30,40 +29,9 @@ impl UuidResponse {
         repo: String,
     ) -> Result<UuidResponse, Error> {
         let uuid = gen_uuid().to_string();
+        use std;
+        Err(Error::from(std::fmt::Error))
 
-        let mut handler = util::CapnpInterface::uuid_interface(&config)?;
-        let mut msg = handler
-            .builder
-            .init_root::<lycaon::uuid_interface::uuid::Builder>();
-        let proxy = handler.proxy.and_then(|proxy| {
-            // TODO: this is a current hack to get around dynamic dispatch issues
-            // with the proxy handler. This is _super_ fragile!
-            if let util::CapnpInterface::Uuid(client) = proxy {
-                Ok(client)
-            } else {
-                Err(errors::Server::CapnpInterfaceError("Uuid").into())
-            }
-        })?;
-        let mut req = proxy.add_uuid_request();
-        msg.set_uuid(&uuid);
-        let response = req.get()
-            .set_uuid(msg.as_reader())
-            .map_err(|e| Error::from(e))
-            .and(handler.core.and_then(|mut core| {
-                core.run(req.send().promise).map_err(|e| Error::from(e))
-            }))?;
-        let result = response.get().map(|response| response.get_result())?;
-        if result {
-            Ok(UuidResponse::Uuid {
-                uuid,
-                name,
-                repo,
-                left: 0,
-                right: 0,
-            })
-        } else {
-            Err(errors::Server::CapnpInterfaceError("Uuid Response").into())
-        }
     }
 }
 

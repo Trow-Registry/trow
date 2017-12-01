@@ -4,12 +4,8 @@ use std::fs::File;
 use std::io;
 use std::io::Read;
 
-use capnp;
-use capnp::capability::Promise;
 use failure::Error;
 use ring::digest;
-
-use http_capnp::lycaon;
 
 pub struct UuidImpl {
     digests: HashSet<String>,
@@ -17,38 +13,6 @@ pub struct UuidImpl {
 impl UuidImpl {
     pub fn new() -> UuidImpl {
         UuidImpl { digests: HashSet::<String>::new() }
-    }
-}
-
-impl lycaon::uuid_interface::Server for UuidImpl {
-    fn add_uuid(
-        &mut self,
-        params: lycaon::uuid_interface::AddUuidParams,
-        mut results: lycaon::uuid_interface::AddUuidResults,
-    ) -> Promise<(), capnp::Error> {
-        let uuid = params.get().and_then(|args| {
-            let uuid = args.get_uuid()?;
-            uuid.get_uuid()
-        });
-
-        let _ = uuid.map(|uuid| {
-            let result = self.digests.insert(uuid.to_string());
-            results.get().set_result(result);
-        });
-        Promise::ok(())
-    }
-    fn save_layer(
-        &mut self,
-        params: lycaon::uuid_interface::SaveLayerParams,
-        _results: lycaon::uuid_interface::SaveLayerResults,
-    ) -> Promise<(), capnp::Error> {
-        let _uuid = params.get().and_then(|args| {
-            let uuid = args.get_uuid()?;
-            uuid.get_uuid()
-        });
-
-        warn!("Hash Table: {:?}", self.digests);
-        Promise::ok(())
     }
 }
 

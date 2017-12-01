@@ -10,7 +10,6 @@ stdenv.mkDerivation rec {
   buildInputs = [
     pkgconfig
     rust-nightly.rust
-    capnproto
     protobuf
 
     cmake

@@ -14,8 +14,6 @@
 #![plugin(rocket_codegen)]
 
 extern crate args;
-extern crate capnp;
-extern crate capnp_rpc;
 extern crate config as cfg;
 extern crate ctrlc;
 extern crate failure;
@@ -45,12 +43,6 @@ extern crate env_logger;
 
 #[cfg(test)]
 extern crate quickcheck;
-
-/// Loading capn'p
-#[allow(dead_code)]
-mod http_capnp {
-    include!(concat!(env!("OUT_DIR"), "/http_capnp.rs"));
-}
 
 use std::thread;
 use std::sync::mpsc;
@@ -142,7 +134,6 @@ fn grpc() -> std::thread::JoinHandle<()> {
                     .or_else(|e| config::LycaonConfig::default())
             })
             .map(|config| server(config));
-
     })
 }
 
@@ -170,10 +161,5 @@ fn main() {
     let (tx_b, rx_b) = mpsc::channel::<config::BackendMessage>();
 
     let backend_handler = config::SocketHandler::new(tx_a, rx_b);
-    let _ = thread::spawn(|| {
-        debug!("Starting state thread...");
-        let frontend_handler = config::SocketHandler::new(tx_b, rx_a);
-        state::main(frontend_handler).expect("Backend Service has exited unexpectedly");
-    });
     config::rocket(backend_handler, args).map(|rocket| rocket.launch());
 }
