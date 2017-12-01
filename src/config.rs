@@ -15,6 +15,7 @@ use ctrlc;
 use rocket;
 use rocket::fairing;
 
+use backend;
 use errors;
 use grpc::backend_grpc::PeerClient;
 use routes;
@@ -30,22 +31,6 @@ pub struct Config {
     pub address: String,
     pub port: u16,
     pub console_port: i64,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct GrpcConfig {
-    listen: Service,
-    bootstrap: Service,
-}
-
-impl GrpcConfig {
-    pub fn listen(&self) -> Service {
-        self.listen.clone()
-    }
-
-    pub fn bootstrap(&self) -> Service {
-        self.listen.clone()
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -77,7 +62,7 @@ impl HttpConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct LycaonConfig {
-    grpc: GrpcConfig,
+    grpc: backend::config::LycaonBackendConfig,
     web: HttpConfig,
 }
 
@@ -105,7 +90,7 @@ impl LycaonConfig {
             })
     }
 
-    pub fn grpc(&self) -> GrpcConfig {
+    pub fn grpc(&self) -> backend::config::LycaonBackendConfig {
         self.grpc.clone()
     }
 }

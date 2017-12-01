@@ -34,6 +34,7 @@ extern crate protobuf;
 extern crate grpcio;
 
 extern crate lycaon_protobuf as grpc;
+extern crate lycaon_backend as backend;
 
 #[macro_use]
 extern crate failure_derive;
@@ -49,6 +50,7 @@ extern crate quickcheck;
 use std::thread;
 use std::sync::mpsc;
 
+// mod backend;
 pub mod controller;
 pub mod config;
 mod errors;
@@ -58,68 +60,6 @@ mod state;
 mod test;
 mod types;
 mod util;
-
-// --- GRPC SERVER ---
-use grpc::backend_grpc::Peer;
-use futures::Future;
-
-use std::cell::Cell;
-#[derive(Clone)]
-struct PeerService {
-    counter: Cell<u64>,
-}
-impl PeerService {
-    fn new() -> PeerService {
-        PeerService { counter: Cell::new(0) }
-    }
-}
-
-impl Peer for PeerService {
-    fn delta_sync(
-        &self,
-        ctx: grpcio::RpcContext,
-        req: grpc::backend::ORSetDelta,
-        sink: grpcio::UnarySink<grpc::backend::ORSetDeltaReply>,
-    ) {
-        self.counter.set(self.counter.get() + 1);
-        debug!("Counter: {:?}", self.counter);
-        let mut resp = grpc::backend::ORSetDeltaReply::new();
-        let deltatype = req.get_deltatype();
-        resp.set_deltatype(deltatype);
-        resp.set_element("server".to_owned());
-        let f = sink.success(resp).map_err(move |e| {
-            warn!("failed to reply! {:?}, {:?}", req, e)
-        });
-        ctx.spawn(f);
-    }
-}
-
-fn server(config: config::LycaonConfig) {
-    use futures::sync::oneshot;
-    use std::sync::Arc;
-    use grpcio::{Environment, RpcContext, ServerBuilder, UnarySink};
-    use std::io::Read;
-
-    let listen = config.grpc().listen();
-
-    debug!("starting GRPC server");
-    let env = Arc::new(Environment::new(1));
-    let service = grpc::backend_grpc::create_peer(PeerService::new());
-    let mut server = ServerBuilder::new(env)
-        .register_service(service)
-        .bind(listen.host(), listen.port())
-        .build()
-        .unwrap();
-    server.start();
-    for &(ref host, port) in server.bind_addrs() {
-        info!("listening on {}:{}", host, port);
-    }
-    thread::park();
-    let _ = server.shutdown().wait();
-    warn!("GRPC Server shutdown!");
-}
-
-// --- END GRPC SERVER ---
 
 fn grpc() -> std::thread::JoinHandle<()> {
     debug!("Setting up RPC Server");
@@ -131,7 +71,7 @@ fn grpc() -> std::thread::JoinHandle<()> {
                     .and_then(|file| config::LycaonConfig::new(file))
                     .or_else(|e| config::LycaonConfig::default())
             })
-            .map(|config| server(config));
+            .map(|config| backend::server(config.grpc()));
     })
 }
 
