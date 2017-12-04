@@ -12,7 +12,7 @@ use protobuf;
 use grpc::backend;
 use util;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LayerExists {
     True { digest: String, length: u64 },
     False,
@@ -41,10 +41,8 @@ impl LayerExists {
                     digest: layer.digest,
                     length: reply.get_length(),
                 })
-            },
-            false => {
-                Err(util::std_err("blob doesn't exist"))
             }
+            false => Err(util::std_err("blob doesn't exist")),
         }
     }
 }
@@ -63,5 +61,38 @@ impl<'r> Responder<'r> for LayerExists {
             }
             LayerExists::False => Response::build().status(Status::NotFound).ok(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+
+    impl Arbitrary for LayerExists {
+        fn arbitrary<G>(g: &mut G) -> Self
+        where
+            G: Gen,
+        {
+            let digest_len = g.gen_range(1, 256);
+            let length = g.gen_range(1, 256000000);
+
+            let digest: String = g.gen_ascii_chars().take(digest_len).collect();
+            let digest: String = format!("sha256:{}", digest);
+
+            LayerExists::True { digest, length }
+        }
+    }
+
+
+    #[test]
+    fn test_process_layer() {
+        fn inner(layer: LayerExists) -> TestResult {
+            TestResult::failed()
+
+        }
+        QuickCheck::new().tests(100).max_tests(1000).quickcheck(
+            inner as fn(LayerExists) -> TestResult,
+        );
     }
 }
