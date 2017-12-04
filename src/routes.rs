@@ -12,8 +12,9 @@ use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
 use response::html::HTML;
+
 use state;
-use util;
+use types::Layer;
 
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -63,34 +64,9 @@ fn err_404() -> MaybeResponse<Empty> {
 ///
 /// # Headers
 /// Docker-Distribution-API-Version: registry/2.0
-fn client(handler: &config::PeerHandler) {
-    use protobuf;
-
-    use grpc::backend;
-
-    for peer in handler.peers() {
-        debug!("Sending to peer!");
-        let mut dot = backend::Dot::new();
-        dot.set_actor("dot".to_owned());
-        dot.set_counter(1337);
-        let mut dot2 = backend::Dot::new();
-        dot2.set_actor("dot".to_owned());
-        dot2.set_counter(1337);
-        let mut delta = backend::ORSetDelta::new();
-        delta.set_deltatype(backend::DeltaType::ADD);
-        delta.set_element("Striiing!".to_owned());
-        delta.set_dots(protobuf::RepeatedField::from_vec(vec![dot, dot2]));
-        debug!("Client sending: {:?}", delta);
-        // --
-        let reply = peer.delta_sync(delta).expect("rpc");
-        debug!("Client received: {:?}", reply);
-    }
-}
 
 #[get("/v2")]
-fn get_v2root(handler: rocket::State<config::PeerHandler>) -> MaybeResponse<Empty> {
-    use std::ops::Deref;
-    client(handler.deref());
+fn get_v2root() -> MaybeResponse<Empty> {
     MaybeResponse::ok(Empty)
 }
 
@@ -99,18 +75,8 @@ const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
 </body></html>";
 
 #[get("/")]
-fn get_homepage<'a>(handler: rocket::State<config::SocketHandler>) -> RegistryResponse<HTML<'a>> {
-    let req = config::BackendMessage::Backend(config::Backend::Test);
-    util::send(handler.tx(), req)
-        .and(
-            util::recv(handler.rx())
-                .and_then(|val| {
-                    debug!("Received: {:?}", val);
-                    Ok(val)
-                })
-                .and_then(|_| Ok(RegistryResponse(HTML(ROOT_RESPONSE)))),
-        )
-        .unwrap_or(RegistryResponse(HTML(ROOT_RESPONSE)))
+fn get_homepage<'a>() -> RegistryResponse<HTML<'a>> {
+    RegistryResponse(HTML(ROOT_RESPONSE))
 }
 
 /*
@@ -219,12 +185,13 @@ Docker-Content-Digest: <digest>
 
 #[head("/v2/<name>/<repo>/blobs/<digest>")]
 fn check_existing_layer(
-    config: rocket::State<config::Config>,
+    backend: rocket::State<config::BackendHandler>,
     name: String,
     repo: String,
     digest: String,
 ) -> MaybeResponse<LayerExists> {
-    LayerExists::handle(config, name, repo, digest)
+    debug!("Handling LayerExists route");
+    LayerExists::handle(backend, Layer { name, repo, digest })
         .map(|response| MaybeResponse::build(response))
         .map_err(|e| {
             warn!("{}", e);

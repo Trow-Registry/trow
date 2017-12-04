@@ -9,20 +9,6 @@ use types::{Digest, Layer};
 impl Layer {
 }
 
-/// Takes the digest, and constructs an absolute pathstring to the digest.
-fn construct_absolute_path(layer: Layer) -> Box<Path> {
-    let cwd = std::env::current_dir().map(|cwd| {
-        let absolute_dir = cwd.join(format!("data/layers/{}", layer.digest()));
-        debug!("Absolute Path: {:?}", absolute_dir);
-        absolute_dir.into_boxed_path()
-    });
-    cwd.unwrap()
-}
-
-fn file_length(file: std::fs::File) -> Result<u64, std::io::Error> {
-    file.metadata().and_then(|metadata| Ok(metadata.len()))
-}
-
 type LayerSet = ORSet<Digest>;
 /// Backend functions for layer-based operations.
 pub struct LayerImpl {

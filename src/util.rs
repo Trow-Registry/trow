@@ -5,6 +5,7 @@
 use failure::Error;
 
 use config;
+use errors;
 
 // --- Channel Helpers ---
 pub fn send(tx: config::SendSock, msg: config::BackendMessage) -> Result<(), Error> {
@@ -21,4 +22,8 @@ pub fn recv(rx: &config::RecvSock) -> Result<config::BackendMessage, Error> {
         warn!("{}", e);
         Err(e.into())
     })
+}
+
+pub fn std_err(msg: &str) -> Error {
+    Error::from(errors::Server::GenericError(msg.to_owned()))
 }

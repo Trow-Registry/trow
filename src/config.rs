@@ -17,7 +17,7 @@ use rocket::fairing;
 
 use backend;
 use errors;
-use grpc::backend_grpc::PeerClient;
+use grpc::backend_grpc::BackendClient;
 use routes;
 
 static DEFAULT_DATA_DIR: &'static str = "data";
@@ -203,29 +203,30 @@ fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
         .map_err(|e| panic!("{}", e))
 }
 
-pub struct PeerHandler {
-    peers: Vec<PeerClient>,
+pub struct BackendHandler {
+    backend: BackendClient,
 }
 
-impl PeerHandler {
-    fn new(peers: Vec<PeerClient>) -> Self {
-        PeerHandler { peers }
+impl BackendHandler {
+    fn new(backend: BackendClient) -> Self {
+        BackendHandler { backend }
     }
 
-    pub fn peers(&self) -> &Vec<PeerClient> {
-        &self.peers
+    pub fn backend(&self) -> &BackendClient {
+        &self.backend
     }
 }
 
-fn build_handlers(_config: &LycaonConfig) -> PeerHandler {
+fn build_handlers(config: &LycaonConfig) -> BackendHandler {
     use std::sync::Arc;
-
     use grpcio::{ChannelBuilder, EnvBuilder};
 
+    let backend = config.grpc().listen();
+    debug!("Connecting to backend: {}:{}", backend.host(), backend.port());
     let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect("127.0.0.1:50055");
-    let client = PeerClient::new(ch);
-    PeerHandler::new(vec![client])
+    let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", backend.host(), backend.port()));
+    let client = BackendClient::new(ch);
+    BackendHandler::new(client)
 }
 
 fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
@@ -239,7 +240,7 @@ fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
 }
 
 /// Construct the rocket instance and prepare for launch
-pub(crate) fn rocket(handler: SocketHandler, args: Args) -> Result<rocket::Rocket, Error> {
+pub(crate) fn rocket(args: Args) -> Result<rocket::Rocket, Error> {
     let config = args.value_of("config")
         .map_err(|e| e.into())
         .and_then(|file| LycaonConfig::new(file))
@@ -249,7 +250,6 @@ pub(crate) fn rocket(handler: SocketHandler, args: Args) -> Result<rocket::Rocke
     debug!("Config: {:?}", config);
     Ok(
         rocket::custom(rocket_config, true)
-            .manage(handler)
             .manage(build_handlers(&config))
             .manage(config)
             .attach(fairing::AdHoc::on_attach(startup))

@@ -6,6 +6,11 @@ use rocket::response::{Responder, Response};
 use rocket::request::Request;
 
 use config;
+use types::Layer;
+
+use protobuf;
+use grpc::backend;
+use util;
 
 #[derive(Debug)]
 pub enum LayerExists {
@@ -15,13 +20,32 @@ pub enum LayerExists {
 
 impl LayerExists {
     pub fn handle(
-        config: State<config::Config>,
-        name: String,
-        repo: String,
-        digest: String,
+        handler: State<config::BackendHandler>,
+        layer: Layer,
     ) -> Result<LayerExists, Error> {
-        use std;
-        Err(Error::from(std::fmt::Error))
+        let backend = handler.backend();
+
+        let mut proto_layer = backend::Layer::new();
+        proto_layer.set_name(layer.name);
+        proto_layer.set_repo(layer.repo);
+        proto_layer.set_digest(layer.digest.clone());
+
+        let reply = backend.layer_exists(proto_layer).expect(
+            "layerexists RPC failed",
+        );
+        debug!("Client received: {:?}", reply);
+
+        match reply.get_success() {
+            true => {
+                Ok(LayerExists::True {
+                    digest: layer.digest,
+                    length: reply.get_length(),
+                })
+            },
+            false => {
+                Err(util::std_err("blob doesn't exist"))
+            }
+        }
     }
 }
 

@@ -12,6 +12,8 @@ pub enum Server {
     FileNotFound(String),
     #[fail(display = "ConfigError: {}", _0)]
     ConfigError(Error),
+    #[fail(display = "GenericError: {}", _0)]
+    GenericError(String),
 }
 
 /// Client errors that are returned to consumers of the Registry API
