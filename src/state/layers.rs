@@ -54,16 +54,4 @@ mod tests {
             inner as fn(Layer) -> TestResult,
         );
     }
-
-    #[test]
-    fn test_construct_absolute_path() {
-        fn inner(layer: Layer) -> TestResult {
-            let path = construct_absolute_path(layer);
-            assert!(path.has_root());
-            TestResult::passed()
-        }
-        QuickCheck::new().tests(100).max_tests(1000).quickcheck(
-            inner as fn(Layer) -> TestResult,
-        );
-    }
 }

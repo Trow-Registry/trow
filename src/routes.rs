@@ -67,7 +67,7 @@ fn err_404() -> MaybeResponse<Empty> {
 
 #[get("/v2")]
 fn get_v2root() -> MaybeResponse<Empty> {
-    MaybeResponse::ok(Empty)
+    MaybeResponse::build(Empty)
 }
 
 const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
@@ -273,7 +273,7 @@ fn patch_blob(
                 Ok(x) => x.parse::<u32>().unwrap(),
                 Err(_) => 0,
             };
-            MaybeResponse::ok(UuidResponse::Uuid {
+            MaybeResponse::build(UuidResponse::Uuid {
                 uuid,
                 name,
                 repo,
@@ -281,7 +281,7 @@ fn patch_blob(
                 right,
             })
         }
-        Err(_) => MaybeResponse::err(UuidResponse::Empty),
+        Err(_) => MaybeResponse::build(UuidResponse::Empty),
     }
 }
 
@@ -311,11 +311,11 @@ POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
 fn post_blob_upload(
-    config: rocket::State<config::Config>,
+    handler: rocket::State<config::BackendHandler>,
     name: String,
     repo: String,
 ) -> MaybeResponse<UuidResponse> {
-    UuidResponse::handle(config, name, repo)
+    UuidResponse::handle(handler, name, repo)
         .map_err(|e| {
             warn!("Uuid Generate: {}", e);
         })
@@ -331,7 +331,7 @@ DELETE /v2/<name>/blobs/<digest>
  */
 #[delete("/v2/<_name>/<_repo>/blobs/<_digest>")]
 fn delete_blob(_name: String, _repo: String, _digest: String) -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
+    MaybeResponse::build(Empty)
 }
 /*
 
@@ -353,7 +353,7 @@ GET /v2/_catalog
  */
 #[get("/v2/_catalog")]
 fn get_catalog() -> MaybeResponse<Catalog> {
-    MaybeResponse::err(Catalog)
+    MaybeResponse::build(Catalog)
 }
 /*
 ---

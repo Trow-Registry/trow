@@ -6,6 +6,7 @@ use rocket::request::Request;
 use hostname;
 use uuid::Uuid;
 
+use grpc::backend;
 use config;
 
 #[derive(Debug, Serialize)]
@@ -22,14 +23,27 @@ pub enum UuidResponse {
 
 impl UuidResponse {
     pub fn handle(
-        config: State<config::Config>,
+        handler: State<config::BackendHandler>,
         name: String,
         repo: String,
     ) -> Result<UuidResponse, Error> {
-        let uuid = gen_uuid().to_string();
-        use std;
-        Err(Error::from(std::fmt::Error))
+        let backend = handler.backend();
+        let mut req = backend::Layer::new();
+        req.set_name(name.clone());
+        req.set_repo(repo.clone());
 
+        let response = backend.gen_uuid(req)?;
+        debug!("Client received: {:?}", response);
+
+
+        Ok(UuidResponse::Uuid {
+            uuid: response.get_uuid().to_owned(),
+            name: name,
+            repo: repo,
+            left: 0,
+            right: 0,
+        })
+        // let uuid = gen_uuid().to_string();
     }
 }
 
