@@ -13,6 +13,8 @@ COPY lib/protobuf/Cargo.toml lib/protobuf/
 COPY Cargo.lock .
 COPY Cargo.toml .
 RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir -p lib/backend/src && touch lib/backend/src/lib.rs
+RUN mkdir -p lib/protobuf/src && touch lib/protobuf/src/lib.rs
 #Use musl to get a static binary 
 RUN cargo build --release -vv # --target x86_64-unknown-linux-musl
 
