@@ -14,15 +14,16 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 #Use musl to get a static binary 
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release -vv # --target x86_64-unknown-linux-musl
 
 #Now the real src
 COPY build.rs .
 COPY src ./src
+COPY lib ./lib
 COPY Rocket.toml .
 # Need to touch to alert cargo that things have changed...
 RUN touch src/main.rs 
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release -vv # --target x86_64-unknown-linux-musl
 
 FROM scratch
 COPY --from=builder /usr/src/lycaon/target/x86_64-unknown-linux-musl/release/lycaon /lycaon
