@@ -7,6 +7,9 @@ RUN rustup target add x86_64-unknown-linux-musl
 WORKDIR /usr/src/lycaon
 
 #Let's grab and install the dependencies first with a bit of a hack...
+RUN mkdir -p lib/{backend,protobuf}/src
+COPY lib/backend/Cargo.toml lib/backend
+COPY lib/protobuf/Cargo.toml lib/protobuf
 COPY Cargo.lock .
 COPY Cargo.toml .
 RUN mkdir src && echo "fn main() {}" > src/main.rs

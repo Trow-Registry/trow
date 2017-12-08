@@ -1,0 +1,20 @@
+[package]
+name = "lycaon-backend"
+version = "0.1.0"
+authors = ["Hamish Hutchings <moredhel@aoeu.me>"]
+
+[dependencies]
+futures = "0.1"
+failure = { git = 'https://github.com/withoutboats/failure', rev = "ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"}
+grpcio = "0.1.2"
+
+log = "0.3"
+env_logger = "0.4.3"
+
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+uuid = { version = "0.5.1", features = ["v4", "rustc-serialize"] }
+
+# Private
+lycaon-protobuf = { path = "../protobuf" }

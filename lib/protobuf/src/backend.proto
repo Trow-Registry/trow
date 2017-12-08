@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package lycaon;
+
+// The backend Protobuf protocol is used between the Client-facing
+// frontend and the Business-logic backend.
+//
+// A single service defines the legal rpc calls that can be made to
+// the backend from the Frontend.
+//
+
+message Layer {
+  string name = 1;
+  string repo = 2;
+  string digest = 3;
+}
+
+// A generic success/fail response message
+message Result {
+  bool success = 1;
+  string text = 2;
+}
+
+// The result message for a request of image existence.
+//
+// success := whether or not the image exists
+// length  := the length of the queried image (if exists)
+message LayerExistsResult {
+  bool success = 1;
+  uint64 length = 2;
+}
+
+// The result message of a uuid Generation.
+// uuid := the generated uuid
+message GenUuidResult {
+  string uuid = 1;
+}
+               
+service Backend {
+  // ----- Image Upload Flow ----------
+  // Check if a layer exists in the Registry
+  rpc layerExists (Layer) returns (LayerExistsResult) {}
+
+  // Generate a uuid for a new layer being uploaded
+  rpc GenUuid (Layer) returns (GenUuidResult) {}
+
+  // Cancel a pending upload
+  // The digest field is used for the uuid in this rpc call
+  rpc cancelUpload (Layer) returns (Result) {}
+}
