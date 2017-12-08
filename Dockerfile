@@ -1,7 +1,7 @@
 #Not a big fan of using nightly, but such is our lot currently
 FROM rustlang/rust:nightly as builder
 
-RUN apt-get update && apt-get install -y musl musl-dev musl-tools cmake pkgconfig golang
+RUN apt-get update && apt-get install -y musl musl-dev musl-tools cmake pkg-config golang
 RUN rustup target add x86_64-unknown-linux-musl
 
 WORKDIR /usr/src/lycaon
