@@ -11,12 +11,12 @@ let
   mozilla = (import mozilla-overlay) pkgs pkgs;
   rust-nightly = mozilla.rustChannelOf { date = date; channel = "nightly"; };
 in
-rustPlatform.buildRustPackage rec {
-# stdenv.mkDerivation rec {
+# rustPlatform.buildRustPackage rec {
+stdenv.mkDerivation rec {
   name = "lycaon";
   env = buildEnv { name = name; paths = buildInputs; };
-  src = lib.sourceFilesBySuffices ./. [".lock" ".toml" ".rs"];
-  cargoSha256 = "0q68qyl2h6i0qsz82z840myxlnjay8p1w5z7hfyr8fqp7wgwa9cx";
+  # src = lib.sourceFilesBySuffices ./. [".lock" ".toml" ".rs"];
+  # cargoSha256 = "0q68qyl2h6i0qsz82z840myxlnjay8p1w5z7hfyr8fqp7wgwa9cx";
   buildInputs = [
     pkgconfig
     rust-nightly.rust
