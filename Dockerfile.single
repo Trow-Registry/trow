@@ -1,0 +1,15 @@
+#Not a big fan of using nightly, but such is our lot currently
+# FROM rustlang/rust:nightly as builder
+FROM rustlang/rust:nightly
+
+RUN apt-get update && apt-get install -y musl musl-dev musl-tools cmake pkg-config golang
+
+WORKDIR /usr/src/lycaon
+
+#Now the real src
+COPY . .
+RUN cargo build --release -vv # --target x86_64-unknown-linux-musl
+
+USER 65534
+EXPOSE 8000
+CMD ["/lycaon"]
