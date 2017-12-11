@@ -26,7 +26,7 @@ stdenv.mkDerivation rec {
     go
 
     # for .proto generation
-    # protobuf
+    protobuf
 
     # dev
     rustfmt

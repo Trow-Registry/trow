@@ -10,6 +10,9 @@ use std::error::Error as ErrorTrait;
 use futures::Future;
 use uuid::Uuid;
 
+/// Struct implementing callbacks for the Frontend
+///
+/// _uploads_: a HashSet of all uuids that are currently being tracked
 #[derive(Clone)]
 pub struct BackendService {
     uploads: Arc<Mutex<std::collections::HashSet<String>>>,

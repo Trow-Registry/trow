@@ -27,7 +27,7 @@ pub fn server(config: config::LycaonBackendConfig) {
 
     let env = Arc::new(Environment::new(1));
     let backend_service = grpc::backend_grpc::create_backend(BackendService::new());
-    let peer_service = grpc::peer_grpc::create_peer(PeerService::new());
+    let peer_service = grpc::peer_grpc::create_peer(PeerService::new(config.bootstrap));
     let mut server = ServerBuilder::new(env)
         .register_service(peer_service)
         .register_service(backend_service)

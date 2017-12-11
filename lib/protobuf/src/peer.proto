@@ -59,12 +59,17 @@ message ORSetDeltaReply {
   string element = 2;
 }
 
+// An empty message representing the heartbeat
+message Heartbeat {}
+
 // RPC's that directly deal with Propogation of core business data
 //
 // - Delta Changes
 // - A full Sync Request.
 // - Requests for Layer data/location
 service Peer {
+  // Sends a heartbeat to verify that the connection exists and is up
+  rpc heartbeat (Heartbeat) returns (Heartbeat) {}
   rpc deltaSync (ORSetDelta) returns (ORSetDeltaReply) {}
 }
 

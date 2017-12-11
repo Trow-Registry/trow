@@ -1,7 +1,7 @@
 #[derive(Clone, Debug, Deserialize)]
 pub struct LycaonBackendConfig {
-    listen: Service,
-    bootstrap: Service,
+    pub listen: Service,
+    pub bootstrap: Service,
 }
 
 impl LycaonBackendConfig {
@@ -28,5 +28,8 @@ impl Service {
 
     pub fn port(&self) -> u16 {
         self.port.clone()
+    }
+    pub fn address(&self) -> String {
+        format!("{}:{}", self.host.clone(), self.port.clone())
     }
 }
