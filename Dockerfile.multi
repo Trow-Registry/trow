@@ -1,0 +1,33 @@
+#Not a big fan of using nightly, but such is our lot currently
+# FROM rustlang/rust:nightly as builder
+FROM rustlang/rust:nightly
+
+RUN apt-get update && apt-get install -y musl musl-dev musl-tools cmake pkg-config golang
+
+WORKDIR /usr/src/lycaon
+
+#Now the real src
+COPY Cargo.toml .
+COPY Cargo.lock .
+
+# lycaon
+RUN mkdir src/
+RUN echo "fn main() {}" > src/main.rs
+
+# lycaon-backend
+COPY lib/backend/Cargo.toml lib/backend/
+RUN mkdir -p lib/backend/src
+RUN touch lib/backend/src/lib.rs
+
+# lycaon-protobuf
+COPY lib/protobuf/Cargo.toml lib/protobuf/
+RUN mkdir -p lib/protobuf/src
+RUN touch lib/protobuf/src/lib.rs
+
+RUN cargo fetch
+# COPY . .
+RUN cargo build --release -vv # --target x86_64-unknown-linux-musl
+
+USER 65534
+EXPOSE 8000
+CMD ["/lycaon"]
