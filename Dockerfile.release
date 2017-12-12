@@ -28,11 +28,6 @@ COPY src src
 COPY lib lib
 RUN touch src/main.rs
 RUN cargo build --release
-COPY Rocket.toml .
-
-USER 65534
-EXPOSE 8000
-CMD ["/usr/src/lycaon/target/release/lycaon", "-h"]
 
 FROM scratch
 

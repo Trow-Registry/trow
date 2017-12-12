@@ -1,0 +1,40 @@
+#Not a big fan of using nightly, but such is our lot currently
+FROM rustlang/rust:nightly as builder
+
+RUN apt-get update && apt-get install -y cmake golang
+
+WORKDIR /usr/src/lycaon
+
+#First get just the deps
+COPY Cargo.toml .
+COPY Cargo.lock .
+
+# lycaon
+RUN mkdir src/
+RUN echo "fn main() {}" > src/main.rs
+
+# lycaon-backend
+COPY lib/backend/Cargo.toml lib/backend/
+RUN mkdir -p lib/backend/src
+RUN touch lib/backend/src/lib.rs
+
+# lycaon-protobuf
+COPY lib/protobuf/Cargo.toml lib/protobuf/
+RUN mkdir -p lib/protobuf/src
+RUN touch lib/protobuf/src/lib.rs
+
+RUN cargo fetch
+COPY src src
+COPY lib lib
+RUN touch src/main.rs
+#Do a normal build for debug
+RUN cargo build 
+
+FROM debian:stable-slim
+
+COPY --from=builder /usr/src/lycaon/target/debug/lycaon /lycaon
+
+COPY Rocket.toml /
+RUN mkdir --parents /data/layers
+RUN mkdir /data/scratch
+ENTRYPOINT ["/lycaon", "-h"]
