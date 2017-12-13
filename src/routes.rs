@@ -388,9 +388,15 @@ fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Ma
 }
 
 #[get("/admin/uuids")]
-fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> MaybeResponse<Empty> {
-    let _ =  Admin::get_uuids(handler);
-    MaybeResponse::err(Empty)
+fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> MaybeResponse<Admin> {
+    MaybeResponse::build(
+        Admin::get_uuids(handler)
+            .map(|uuids| {
+                // oMaybeResponse::build(uuids)
+                uuids
+            })
+            .unwrap_or(Admin::Uuids(vec![]))
+    )
 }
 
 /*
