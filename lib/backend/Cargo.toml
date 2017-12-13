@@ -7,6 +7,7 @@ authors = ["Hamish Hutchings <moredhel@aoeu.me>"]
 futures = "0.1"
 failure = { git = 'https://github.com/withoutboats/failure', rev = "ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"}
 grpcio = "0.1.2"
+protobuf = "1.4.2"
 
 log = "0.3"
 env_logger = "0.4.3"

@@ -2,6 +2,7 @@ extern crate grpcio;
 extern crate futures;
 extern crate failure;
 extern crate uuid;
+extern crate protobuf;
 
 extern crate lycaon_protobuf as grpc;
 #[macro_use]
@@ -25,6 +26,7 @@ pub fn server(config: config::LycaonBackendConfig) {
 
     let listen = config.listen();
 
+    debug!("Setting up backend server");
     let env = Arc::new(Environment::new(1));
     let backend_service = grpc::backend_grpc::create_backend(BackendService::new());
     let peer_service = grpc::peer_grpc::create_peer(PeerService::new(config.bootstrap));

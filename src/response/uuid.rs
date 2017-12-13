@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use grpc::backend;
 use config;
+use errors;
 
 #[derive(Debug, Serialize)]
 pub enum UuidResponse {
@@ -45,6 +46,22 @@ impl UuidResponse {
         })
         // let uuid = gen_uuid().to_string();
     }
+
+    pub fn uuid_exists(
+        handler: State<config::BackendHandler>,
+        uuid: &String,
+    ) -> Result<bool, Error> {
+        let backend = handler.backend();
+        let mut req = backend::GenUuidResult::new();
+        req.set_uuid(uuid.to_owned());
+
+        let response = backend.uuid_exists(req)?;
+        debug!("UuidExists: {:?}", response.get_success());
+        match response.get_success() {
+            true => Ok(true),
+            false => Err(errors::Client::DIGEST_INVALID.into()),
+        }
+    }
 }
 
 fn gen_uuid() -> Uuid {
@@ -70,30 +87,29 @@ fn get_base_url(req: &Request) -> String {
 
 impl<'r> Responder<'r> for UuidResponse {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
-        debug!("Uuid Ok");
+        match self {
+            UuidResponse::Uuid {
+                ref uuid,
+                ref name,
+                ref repo,
+                ref left,
+                ref right,
+            } => {
+                debug!("Uuid Ok");
+                let location_url = format!(
+                    "{}/v2/{}/{}/blobs/uploads/{}?query=true",
+                    get_base_url(req),
+                    name,
+                    repo,
+                    uuid
+                );
+                let upload_uuid = Header::new("Docker-Upload-UUID", uuid.clone());
+                let range = Header::new("Range", format!("{}-{}", left, right));
+                let length = Header::new("X-Content-Length", format!("{}", right - left));
+                let location = Header::new("Location", location_url);
 
-        if let UuidResponse::Uuid {
-            ref uuid,
-            ref name,
-            ref repo,
-            ref left,
-            ref right,
-        } = self
-        {
-            let location_url = format!(
-                "{}/v2/{}/{}/blobs/uploads/{}?query=true",
-                get_base_url(req),
-                name,
-                repo,
-                uuid
-            );
-            let upload_uuid = Header::new("Docker-Upload-UUID", uuid.clone());
-            let range = Header::new("Range", format!("{}-{}", left, right));
-            let length = Header::new("X-Content-Length", format!("{}", right - left));
-            let location = Header::new("Location", location_url);
-
-            debug!("Range: {}-{}, Length: {}", left, right, right - left);
-            Response::build()
+                debug!("Range: {}-{}, Length: {}", left, right, right - left);
+                Response::build()
                 .header(upload_uuid)
                 .header(location)
                 .header(range)
@@ -101,9 +117,11 @@ impl<'r> Responder<'r> for UuidResponse {
                 // TODO: move into the type so it is better encoded?...
                 .status(Status::Accepted)
                 .ok()
-        } else {
-            debug!("Uuid Error");
-            Response::build().status(Status::NotFound).ok()
+            },
+            UuidResponse::Empty => {
+                debug!("Uuid Error");
+                Response::build().status(Status::NotFound).ok()
+            }
         }
     }
 }

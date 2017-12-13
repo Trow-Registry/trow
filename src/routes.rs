@@ -5,6 +5,7 @@ use rocket;
 use errors;
 use config;
 use controller::uuid as cuuid;
+use response::admin::Admin;
 use response::{MaybeResponse, RegistryResponse};
 use response::empty::Empty;
 use response::layers::LayerExists;
@@ -36,6 +37,9 @@ pub fn routes() -> Vec<rocket::Route> {
         get_catalog,
         get_image_tags,
         delete_image_manifest,
+
+        // admin routes
+        admin_get_uuids,
     ]
 }
 
@@ -64,7 +68,6 @@ fn err_404() -> MaybeResponse<Empty> {
 ///
 /// # Headers
 /// Docker-Distribution-API-Version: registry/2.0
-
 #[get("/v2")]
 fn get_v2root() -> MaybeResponse<Empty> {
     MaybeResponse::build(Empty)
@@ -258,30 +261,38 @@ fn put_blob(
 
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
+    handler: rocket::State<config::BackendHandler>,
     name: String,
     repo: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> MaybeResponse<UuidResponse> {
-    let absolute_file = state::uuid::scratch_path(&uuid);
-    debug!("Streaming out to {}", absolute_file);
-    let file = chunk.stream_to_file(absolute_file);
+    debug!("Checking if uuid is valid!");
+    let exists = UuidResponse::uuid_exists(handler, &uuid);
+    if let Ok(_) = exists {
 
-    match file {
-        Ok(_) => {
-            let right = match file.map(|x| x.to_string()) {
-                Ok(x) => x.parse::<u32>().unwrap(),
-                Err(_) => 0,
-            };
-            MaybeResponse::build(UuidResponse::Uuid {
-                uuid,
-                name,
-                repo,
-                left: 0,
-                right,
-            })
+        let absolute_file = state::uuid::scratch_path(&uuid);
+        debug!("Streaming out to {}", absolute_file);
+        let file = chunk.stream_to_file(absolute_file);
+
+        match file {
+            Ok(_) => {
+                let right = match file.map(|x| x.to_string()) {
+                    Ok(x) => x.parse::<u32>().unwrap(),
+                    Err(_) => 0,
+                };
+                MaybeResponse::build(UuidResponse::Uuid {
+                    uuid,
+                    name,
+                    repo,
+                    left: 0,
+                    right,
+                })
+            }
+            Err(_) => MaybeResponse::build(UuidResponse::Empty),
         }
-        Err(_) => MaybeResponse::build(UuidResponse::Empty),
+    } else {
+        MaybeResponse::build(UuidResponse::Empty)
     }
 }
 
@@ -373,6 +384,12 @@ DELETE /v2/<name>/manifests/<reference>
  */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
+    MaybeResponse::err(Empty)
+}
+
+#[get("/admin/uuids")]
+fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> MaybeResponse<Empty> {
+    let _ =  Admin::get_uuids(handler);
     MaybeResponse::err(Empty)
 }
 

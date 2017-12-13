@@ -5,6 +5,7 @@ use rocket::request::Request;
 use serde;
 
 /// Exporting all routes for the project
+pub mod admin;
 pub mod catalog;
 pub mod empty;
 pub mod html;

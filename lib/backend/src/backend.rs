@@ -107,6 +107,22 @@ impl grpc::backend_grpc::Backend for BackendService {
         ctx.spawn(f);
     }
 
+    fn uuid_exists(
+        &self,
+        ctx: grpcio::RpcContext,
+        req: grpc::backend::GenUuidResult,
+        sink: grpcio::UnarySink<grpc::backend::Result>,
+    ) {
+        let mut resp = grpc::backend::Result::new();
+        let set = self.uploads.lock().unwrap();
+        resp.set_success(set.contains(req.get_uuid()));
+
+        let f = sink.success(resp).map_err(
+            move |e| warn!("failed to reply! {:?}", e),
+        );
+        ctx.spawn(f);
+    }
+
     fn cancel_upload(
         &self,
         ctx: grpcio::RpcContext,
@@ -114,6 +130,30 @@ impl grpc::backend_grpc::Backend for BackendService {
         sink: grpcio::UnarySink<grpc::backend::Result>,
     ) {
         panic!("Not implemented!");
+    }
+
+    fn get_uuids(
+        &self,
+        ctx: grpcio::RpcContext,
+        req: grpc::backend::Empty,
+        sink: grpcio::UnarySink<grpc::backend::UuidList>,
+    ) {
+        let mut resp = grpc::backend::UuidList::new();
+        {
+            use protobuf;
+            use std::iter::FromIterator;
+            let set = self.uploads.lock().unwrap();
+            let set = set.clone().into_iter().map(|x| {
+                let mut val = grpc::backend::GenUuidResult::new();
+                val.set_uuid(x);
+                val
+            });
+            resp.set_uuids(protobuf::RepeatedField::from_iter(set));
+        }
+        let f = sink.success(resp).map_err(
+            move |e| warn!("failed to reply! {:?}", e),
+        );
+        ctx.spawn(f);
     }
 }
 

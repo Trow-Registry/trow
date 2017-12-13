@@ -15,6 +15,9 @@ message Layer {
   string digest = 3;
 }
 
+// An Empty message used where no inputs are needed
+message Empty {}
+
 // A generic success/fail response message
 message Result {
   bool success = 1;
@@ -35,6 +38,12 @@ message LayerExistsResult {
 message GenUuidResult {
   string uuid = 1;
 }
+
+// A list of Uuids
+// :Admin:
+message UuidList {
+  repeated GenUuidResult uuids = 1;
+}
                
 service Backend {
   // ----- Image Upload Flow ----------
@@ -44,7 +53,16 @@ service Backend {
   // Generate a uuid for a new layer being uploaded
   rpc GenUuid (Layer) returns (GenUuidResult) {}
 
+  // Given a Uuid, check whether it exists in the cluster
+  rpc UuidExists (GenUuidResult) returns (Result) {}
+
   // Cancel a pending upload
   // The digest field is used for the uuid in this rpc call
   rpc cancelUpload (Layer) returns (Result) {}
+
+
+  // ------------ Admin calls --------------------
+
+  // returns a list of all Uuids currently in the  backend
+  rpc getUuids (Empty) returns (UuidList) {}
 }

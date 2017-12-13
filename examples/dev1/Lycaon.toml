@@ -7,5 +7,5 @@ host = 'localhost'
 port = 51001
 
 [web.listen]
-host = "localhost"
+host = "::"
 port = 8002
