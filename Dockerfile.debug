@@ -35,6 +35,8 @@ FROM debian:stable-slim
 COPY --from=builder /usr/src/lycaon/target/debug/lycaon /lycaon
 
 COPY Rocket.toml /
+COPY lycaon-default.toml /
 RUN mkdir --parents /data/layers
 RUN mkdir /data/scratch
-ENTRYPOINT ["/lycaon", "-h"]
+ENTRYPOINT ["/lycaon"]
+CMD ["-c", "lycaon-default.toml"]
