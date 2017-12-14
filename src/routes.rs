@@ -307,7 +307,12 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
 /// This route assumes that no more data will be uploaded to the specified uuid.
 #[delete("/v2/<_name>/<_repo>/blobs/uploads/<uuid>")]
-fn delete_upload(handler: rocket::State<config::BackendHandler>, _name: String, _repo: String, uuid: String) -> MaybeResponse2<UuidAcceptResponse> {
+fn delete_upload(
+    handler: rocket::State<config::BackendHandler>,
+    _name: String,
+    _repo: String,
+    uuid: String,
+) -> MaybeResponse2<UuidAcceptResponse> {
     MaybeResponse::build(UuidAcceptResponse::delete_upload(handler, &uuid))
 }
 /*
@@ -392,7 +397,7 @@ fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> MaybeRespo
                 // oMaybeResponse::build(uuids)
                 uuids
             })
-            .unwrap_or(Admin::Uuids(vec![]))
+            .unwrap_or(Admin::Uuids(vec![])),
     )
 }
 
