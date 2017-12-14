@@ -6,7 +6,9 @@ use rocket::request::Request;
 
 
 use config;
+use errors;
 use controller::uuid as cuuid;
+use grpc::backend;
 
 const BASE_URL: &str = "http://localhost:8000";
 
@@ -25,14 +27,30 @@ pub enum UuidAcceptResponse {
 
 impl UuidAcceptResponse {
     pub fn handle(
-        config: State<config::Config>,
+        handler: State<config::BackendHandler>,
         name: String,
         repo: String,
         uuid: String,
         digest: cuuid::DigestStruct,
     ) -> Result<UuidAcceptResponse, Error> {
-        use std;
-        Err(Error::from(std::fmt::Error))
+        use util;
+        Err(util::std_err("Not implemented"))
+    }
+
+    pub fn delete_upload(
+        handler: State<config::BackendHandler>,
+        uuid: &str,
+    ) -> Result <UuidAcceptResponse, Error> {
+        let backend = handler.backend();
+        let mut req = backend::Layer::new();
+        req.set_digest(uuid.to_owned());
+
+        let response = backend.cancel_upload(req)?;
+
+        match response.get_success() {
+            true => Ok(UuidAcceptResponse::UuidDelete),
+            false => Err(errors::Client::BLOB_UPLOAD_UNKNOWN.into()),
+        }
     }
 }
 

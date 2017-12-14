@@ -6,7 +6,7 @@ use errors;
 use config;
 use controller::uuid as cuuid;
 use response::admin::Admin;
-use response::{MaybeResponse, RegistryResponse};
+use response::{MaybeResponse2, MaybeResponse, RegistryResponse};
 use response::empty::Empty;
 use response::layers::LayerExists;
 use response::uuid::UuidResponse;
@@ -247,7 +247,7 @@ Content-Type: application/octet-stream
 
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
 fn put_blob(
-    config: rocket::State<config::Config>,
+    config: rocket::State<config::BackendHandler>,
     name: String,
     repo: String,
     uuid: String,
@@ -307,11 +307,8 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 
 /// This route assumes that no more data will be uploaded to the specified uuid.
 #[delete("/v2/<_name>/<_repo>/blobs/uploads/<uuid>")]
-fn delete_upload(_name: String, _repo: String, uuid: String) -> MaybeResponse<UuidAcceptResponse> {
-    match state::uuid::mark_delete(&uuid) {
-        Ok(_) => RegistryResponse(UuidAcceptResponse::UuidDelete),
-        Err(_) => panic!("Figure out what to put here too..."),
-    }
+fn delete_upload(handler: rocket::State<config::BackendHandler>, _name: String, _repo: String, uuid: String) -> MaybeResponse2<UuidAcceptResponse> {
+    MaybeResponse::build(UuidAcceptResponse::delete_upload(handler, &uuid))
 }
 /*
 ---

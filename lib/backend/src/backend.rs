@@ -10,6 +10,8 @@ use std::error::Error as ErrorTrait;
 use futures::Future;
 use uuid::Uuid;
 
+use util;
+
 /// Struct implementing callbacks for the Frontend
 ///
 /// _uploads_: a HashSet of all uuids that are currently being tracked
@@ -37,6 +39,14 @@ fn process(layer: Layer) -> Result<u64, Error> {
     let file = std::fs::File::open(path)?;
     file_length(file)
 
+}
+
+/// Delete a file if we want
+pub fn delete_blob_by_uuid(uuid: &str) -> bool {
+    use std::fs;
+    let path = format!("data/scratch/{}", uuid);
+
+    fs::remove_file(path).map(|_| true).unwrap_or(false)
 }
 
 /// Takes the digest, and constructs an absolute pathstring to the digest.
@@ -129,7 +139,16 @@ impl grpc::backend_grpc::Backend for BackendService {
         req: grpc::backend::Layer,
         sink: grpcio::UnarySink<grpc::backend::Result>,
     ) {
-        panic!("Not implemented!");
+        let mut resp = grpc::backend::Result::new();
+        let mut set = self.uploads.lock().unwrap();
+        let uuid = req.get_digest();
+        let _ = delete_blob_by_uuid(uuid);
+        resp.set_success(set.remove(uuid));
+
+        let f = sink.success(resp).map_err(
+            move |e| warn!("failed to reply! {:?}", e),
+        );
+        ctx.spawn(f);
     }
 
     fn get_uuids(

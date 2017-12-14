@@ -1,3 +1,4 @@
+use failure;
 use rocket;
 use rocket::http::Status;
 use rocket::response::{Responder, Response};
@@ -24,6 +25,17 @@ pub mod uuidaccept;
 ///
 /// @Deprecated, move everything directly onto the RegistryResponse
 pub type MaybeResponse<A> = RegistryResponse<A>;
+
+/// Testing new MaybeResponse
+pub type MaybeResponse2<A> = RegistryResponse<Result<A, failure::Error>>;
+impl<'r, A: Responder<'r>> MaybeResponse2<A> {
+    pub fn ok2(val: A) -> Self {
+        RegistryResponse(Ok(val))
+    }
+    pub fn err2(val: failure::Error) -> Self {
+        RegistryResponse(Err(val))
+    }
+}
 
 /// Two constructors to ease sending a success/fail response.
 impl<'r, A: Responder<'r>> MaybeResponse<A> {
