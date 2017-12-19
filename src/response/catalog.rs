@@ -36,6 +36,7 @@ mod test {
     // use test::test_helpers::test_route;
 
     #[test]
+    #[ignore]
     fn catalog_ok() {
         assert_eq!(true, false);
     }
