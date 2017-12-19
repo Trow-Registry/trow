@@ -1,6 +1,16 @@
+sudo: required
+
 language: rust
 rust:
-- nightly
+  - nightly
+
+services:
+  - docker
+
+before_install:
+  - docker build -t lycaon -f Dockerfile.release .
+  - docker build -t lycaon -f Dockerfile.debug .
+
 notifications:
   slack:
     secure: KvF9bNMG6zInmZc/YH7OzLWOI/65p+fJ7DXkeS3oFA5/4fWrtAnDC7vkppsJDrZWdolPS11NL22WiG1mubjpMEw9BL6USQUeXhBvSxXV9kOs2y1lnU1G/OX72/hy3MzElnl7IIKSSSRPjWWGKS0NcrIycvpyqKig7XanHPNZhgJyoiH3r8YjfNYo12c15XUaZP5Apcods2AomOzSQdPS2ztZDeH7p/NFdlm/rWaxMDDVtXLKkQgYT+jjszxH9MfrnedSdyR+SroEaYUwAraTZZp10s62uRGE23HsFNl/8XG4/kqsWxl631lbpAjAjEVBykgc2jtpwYBMl4i5+0MbvvvmpLfS+/A4KFYX409fICXP2/UqPnIbkmoiPiF1gBdh+0QaceUbx9lEk1jA1/tcXzTDtxpdq8ct4i5lA6PhSa58DEuRTbJFozL244ac6aMLkRr5qF3Pwe8OvQ8T0ktY2XJ7UvEnSZMqY39F0Mp8MxENaOepfgmzt15UhilcKVEHhMg/2P+Yme9Z+dMFNgJ1PPmZivYX9ZHy+baJlP7owWaHV9CrfkcAhJRvxVhlQEPZ/53/xy8G68JBzfss+OUbbwaTcW85PTFFryGHFhlZTyOL/Zg+lDYhGDxv/uG6CUAVYxn/19puzl/cGhEwCehAuqZix2rwHsJSXvCGiAkO7z8=
