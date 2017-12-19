@@ -1,15 +1,9 @@
-sudo: required
-
 language: rust
 rust:
-  - nightly
+- nightly
 
-services:
-  - docker
-
-before_install:
-  - docker build -t lycaon -f Dockerfile.release .
-  - docker build -t lycaon -f Dockerfile.debug .
+before_script:
+  - cargo update
 
 notifications:
   slack:
