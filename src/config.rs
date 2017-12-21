@@ -246,7 +246,7 @@ pub(crate) fn rocket(args: &Args) -> Result<rocket::Rocket, Error> {
 
     let config = match f {
         Ok(f) => LycaonConfig::new(&f)?,
-        Err(e) => LycaonConfig::default()?
+        Err(_) => LycaonConfig::default()?
     };
     
     let rocket_config = build_rocket_config(&config);
