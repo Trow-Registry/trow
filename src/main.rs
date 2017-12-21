@@ -11,6 +11,7 @@
 //! - other stuff...
 
 #![feature(plugin)]
+#![feature(use_extern_macros)]
 #![plugin(rocket_codegen)]
 
 extern crate args;
@@ -74,24 +75,31 @@ fn grpc() -> std::thread::JoinHandle<()> {
 }
 
 fn main() {
-    // Init Logger
-    let _ = env_logger::init()
-        .and(config::main_logger().apply())
-        .map_err(|e| {
-            warn!("Error setting up logging: {:?}", e);
-        });
+    // Init Logger (these should never fail so use expect)
+    //env_logger::init().expect("Failed to init logging");
+    config::main_logger().apply().expect("Failed to init logging");
 
     // Parse Args
     let args = match config::parse_args() {
         Ok(args) => args,
-        Err(_) => {
-            std::process::exit(0);
+        Err(e) => {
+            log::error!("Failed to process configuration {}", e);
+            std::process::exit(1);
         }
 
     };
 
-    // GRPC Backend thread
+    // GRPC Backend thread. 
     let _grpc_thread = grpc();
 
-    config::rocket(args).map(|rocket| rocket.launch());
+    //Rocket web stuff
+    let rocket = match config::rocket(args) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("Rocket failed to process arguments {}", e);
+            std::process::exit(1);
+        }
+
+    };
+    rocket.launch();
 }

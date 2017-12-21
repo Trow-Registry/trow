@@ -5,3 +5,6 @@ port = 51000
 [grpc.bootstrap]
 host = 'localhost'
 port = 3117
+[web.listen]
+host = "::"
+port = 8002
