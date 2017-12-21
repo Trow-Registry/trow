@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::fs;
 
-use args::Args;
+use args::{Args,ArgsError};
 use failure::Error;
 use fern;
 use ctrlc;
@@ -67,7 +67,7 @@ pub struct LycaonConfig {
 }
 
 impl LycaonConfig {
-    pub fn new(file: String) -> Result<Self, Error> {
+    pub fn new(file: &str) -> Result<Self, Error> {
         use cfg::{Config, Environment, File};
         let mut s = Config::new();
 
@@ -78,12 +78,12 @@ impl LycaonConfig {
     }
 
     pub fn default() -> Result<Self, Error> {
-        LycaonConfig::new("Lycaon.toml".to_owned())
+        LycaonConfig::new("Lycaon.toml")
     }
 
     pub fn from_file(file: Result<String, Error>) -> Result<Self, Error> {
         file.map_err(|e| e.into())
-            .and_then(|file: String| LycaonConfig::new(file))
+            .and_then(|file: String| LycaonConfig::new(&file))
             .or_else(|_| {
                 debug!("No config file specified, using default");
                 LycaonConfig::default()
@@ -240,12 +240,15 @@ fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
 }
 
 /// Construct the rocket instance and prepare for launch
-pub(crate) fn rocket(args: Args) -> Result<rocket::Rocket, Error> {
-    let config = args.value_of("config")
-        .map_err(|e| e.into())
-        .and_then(|file| LycaonConfig::new(file))
-        .or_else(|_| LycaonConfig::default())?;
+pub(crate) fn rocket(args: &Args) -> Result<rocket::Rocket, Error> {
+    
+    let f: Result<String, ArgsError> = args.value_of("config");
 
+    let config = match f {
+        Ok(f) => LycaonConfig::new(&f)?,
+        Err(e) => LycaonConfig::default()?
+    };
+    
     let rocket_config = build_rocket_config(&config);
     debug!("Config: {:?}", config);
     Ok(
