@@ -12,7 +12,6 @@ use std::fs;
 use args::{Args, ArgsError};
 use env_logger;
 use failure::Error;
-use fern;
 use ctrlc;
 use log::{LogLevelFilter, LogRecord, SetLoggerError};
 use rocket;

@@ -8,7 +8,6 @@ use rocket::request::Request;
 use config;
 use types::Layer;
 
-use protobuf;
 use grpc::backend;
 use util;
 

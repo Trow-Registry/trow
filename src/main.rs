@@ -39,7 +39,6 @@ extern crate lycaon_protobuf as grpc;
 extern crate lycaon_errors as errors;
 
 extern crate env_logger;
-#[macro_use]
 extern crate failure_derive;
 #[macro_use(log, warn, info, debug)]
 extern crate log;

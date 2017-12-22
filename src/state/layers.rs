@@ -1,7 +1,3 @@
-use std;
-use std::path::Path;
-
-
 use orset::ORSet;
 
 use types::{Digest, Layer};

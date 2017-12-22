@@ -63,7 +63,7 @@ impl UuidResponse {
     }
 }
 
-fn gen_uuid() -> Uuid {
+fn _gen_uuid() -> Uuid {
     Uuid::new_v4()
 }
 

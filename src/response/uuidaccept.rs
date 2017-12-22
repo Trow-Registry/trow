@@ -27,11 +27,11 @@ pub enum UuidAcceptResponse {
 
 impl UuidAcceptResponse {
     pub fn handle(
-        handler: State<config::BackendHandler>,
-        name: String,
-        repo: String,
-        uuid: String,
-        digest: cuuid::DigestStruct,
+        _handler: State<config::BackendHandler>,
+        _name: String,
+        _repo: String,
+        _uuid: String,
+        _digest: cuuid::DigestStruct,
     ) -> Result<UuidAcceptResponse, Error> {
         use util;
         Err(util::std_err("Not implemented"))
