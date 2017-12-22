@@ -1,7 +1,7 @@
 with import <nixpkgs> {};
 let
   pkgs = import <nixpkgs> {};
-  date = "2017-11-15";
+  date = "2017-12-21";
   mozilla-overlay = fetchFromGitHub {
     owner = "mozilla";
     repo = "nixpkgs-mozilla";
@@ -24,12 +24,13 @@ stdenv.mkDerivation rec {
     cmake
     perl
     go
+    sqlite
 
     # for .proto generation
     protobuf
 
     # dev
-    rustfmt
+    # rustfmt
     valgrind
   ];
 
