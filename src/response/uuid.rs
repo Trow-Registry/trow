@@ -44,7 +44,6 @@ impl UuidResponse {
             left: 0,
             right: 0,
         })
-        // let uuid = gen_uuid().to_string();
     }
 
     pub fn uuid_exists(

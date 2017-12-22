@@ -4,14 +4,17 @@
 
 use getopts::Occur;
 use std;
+use std::env;
 use std::path::Path;
 use std::sync::mpsc;
 use std::fs;
 
-use args::{Args,ArgsError};
+use args::{Args, ArgsError};
+use env_logger;
 use failure::Error;
 use fern;
 use ctrlc;
+use log::{LogLevelFilter, LogRecord, SetLoggerError};
 use rocket;
 use rocket::fairing;
 
@@ -135,17 +138,19 @@ impl SocketHandler {
 }
 
 /// Build the logging agent with formatting.
-pub fn main_logger() -> fern::Dispatch {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}] {}",
-                record.target(),
-                record.level(),
-                message
-            ))
+pub fn main_logger() -> Result<(), SetLoggerError> {
+    let mut builder = env_logger::LogBuilder::new();
+    builder
+        .format(|record: &LogRecord| {
+            format!("{}[{}] {}", record.target(), record.level(), record.args(),)
         })
-        .chain(std::io::stdout())
+        .filter(None, LogLevelFilter::Info);
+
+    if env::var("RUST_LOG").is_ok() {
+        builder.parse(&env::var("RUST_LOG").unwrap());
+    }
+
+    builder.init()
 }
 
 /// Attaches SIGTERM handler
@@ -172,7 +177,6 @@ fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
         .and(setup_path(layers_path))
         .map_err(|e| errors::Server::ConfigError(e).into())
 }
-
 
 /// extract configuration values
 ///
@@ -222,7 +226,11 @@ fn build_handlers(config: &LycaonConfig) -> BackendHandler {
     use grpcio::{ChannelBuilder, EnvBuilder};
 
     let backend = config.grpc().listen();
-    debug!("Connecting to backend: {}:{}", backend.host(), backend.port());
+    debug!(
+        "Connecting to backend: {}:{}",
+        backend.host(),
+        backend.port()
+    );
     let env = Arc::new(EnvBuilder::new().build());
     let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", backend.host(), backend.port()));
     let client = BackendClient::new(ch);
@@ -241,24 +249,21 @@ fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
 
 /// Construct the rocket instance and prepare for launch
 pub(crate) fn rocket(args: &Args) -> Result<rocket::Rocket, Error> {
-    
     let f: Result<String, ArgsError> = args.value_of("config");
 
     let config = match f {
         Ok(f) => LycaonConfig::new(&f)?,
-        Err(_) => LycaonConfig::default()?
+        Err(_) => LycaonConfig::default()?,
     };
-    
+
     let rocket_config = build_rocket_config(&config);
     debug!("Config: {:?}", config);
-    Ok(
-        rocket::custom(rocket_config, true)
-            .manage(build_handlers(&config))
-            .manage(config)
-            .attach(fairing::AdHoc::on_attach(startup))
-            .mount("/", routes::routes())
-            .catch(routes::errors()),
-    )
+    Ok(rocket::custom(rocket_config, true)
+        .manage(build_handlers(&config))
+        .manage(config)
+        .attach(fairing::AdHoc::on_attach(startup))
+        .mount("/", routes::routes())
+        .catch(routes::errors()))
 }
 
 const PROGRAM_NAME: &'static str = "Lycaon";

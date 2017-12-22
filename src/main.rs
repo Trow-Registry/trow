@@ -77,10 +77,7 @@ fn grpc(args: &args::Args) -> Result<std::thread::JoinHandle<()>, Error> {
 }
 
 fn main() {
-    // Init Logger (these should never fail so use expect)
-    config::main_logger()
-        .apply()
-        .expect("Failed to init logging");
+    config::main_logger().expect("Failed to init logging");
 
     // Parse Args
     let args = config::parse_args().unwrap_or_else(|e| {
