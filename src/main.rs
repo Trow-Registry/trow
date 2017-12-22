@@ -36,6 +36,7 @@ extern crate uuid;
 
 extern crate lycaon_backend as backend;
 extern crate lycaon_protobuf as grpc;
+extern crate lycaon_errors as errors;
 
 extern crate env_logger;
 #[macro_use]
@@ -53,7 +54,6 @@ use failure::Error;
 
 pub mod controller;
 pub mod config;
-mod errors;
 pub mod response;
 mod routes;
 mod state;
