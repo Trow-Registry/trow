@@ -1,3 +1,10 @@
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+
 use failure::Error;
 
 type Message = &'static str;
@@ -6,50 +13,34 @@ type Detail = &'static str;
 /// Internal errors that occur throughout the system
 #[derive(Debug, Fail)]
 pub enum Server {
-    #[fail(display = "Invalid {} input", _0)]
-    Invalid(&'static str),
-    #[fail(display = "File Not Found: {}", _0)]
-    FileNotFound(String),
-    #[fail(display = "ConfigError: {}", _0)]
-    ConfigError(Error),
-    #[fail(display = "GenericError: {}", _0)]
-    GenericError(String),
+    #[fail(display = "Invalid {} input", _0)] Invalid(&'static str),
+    #[fail(display = "File Not Found: {}", _0)] FileNotFound(String),
+    #[fail(display = "ConfigError: {}", _0)] ConfigError(Error),
+    #[fail(display = "GenericError: {}", _0)] GenericError(String),
+    #[fail(display = "Mismatched Digests" )] DigestMismatch,
+
+    #[fail(display = "Mismatched Digests" )] TestError(()),
 }
 
 /// Client errors that are returned to consumers of the Registry API
 #[derive(Serialize, Clone, Debug, Fail)]
 #[allow(dead_code, non_camel_case_types)]
 pub enum Client {
-    #[fail(display = "blob unknown to registry")]
-    BLOB_UNKNOWN,
-    #[fail(display = "blob upload invalid")]
-    BLOB_UPLOAD_INVALID,
-    #[fail(display = "IMPLEMENT ME")]
-    BLOB_UPLOAD_UNKNOWN,
-    #[fail(display = "IMPLEMENT ME")]
-    DIGEST_INVALID,
-    #[fail(display = "IMPLEMENT ME")]
-    MANIFEST_BLOB_UNKNOWN,
-    #[fail(display = "IMPLEMENT ME")]
-    MANIFEST_INVALID,
-    #[fail(display = "IMPLEMENT ME")]
-    MANIFEST_UNKNOWN,
-    #[fail(display = "IMPLEMENT ME")]
-    MANIFEST_UNVERIFIED,
-    #[fail(display = "IMPLEMENT ME")]
-    NAME_INVALID,
-    #[fail(display = "IMPLEMENT ME")]
-    NAME_UNKNOWN,
-    #[fail(display = "IMPLEMENT ME")]
-    SIZE_INVALID,
-    #[fail(display = "IMPLEMENT ME")]
-    TAG_INVALID,
-    #[fail(display = "IMPLEMENT ME")]
-    UNAUTHORIZED,
-    #[fail(display = "IMPLEMENT ME")]
-    DENIED,
-    #[fail(display = "IMPLEMENT ME")]
-    UNSUPPORTED,
+    #[fail(display = "blob unknown to registry")] BLOB_UNKNOWN,
+    #[fail(display = "blob upload invalid")] BLOB_UPLOAD_INVALID,
+    #[fail(display = "IMPLEMENT ME")] BLOB_UPLOAD_UNKNOWN,
+    #[fail(display = "IMPLEMENT ME")] DIGEST_INVALID,
+    #[fail(display = "IMPLEMENT ME")] MANIFEST_BLOB_UNKNOWN,
+    #[fail(display = "IMPLEMENT ME")] MANIFEST_INVALID,
+    #[fail(display = "IMPLEMENT ME")] MANIFEST_UNKNOWN,
+    #[fail(display = "IMPLEMENT ME")] MANIFEST_UNVERIFIED,
+    #[fail(display = "IMPLEMENT ME")] NAME_INVALID,
+    #[fail(display = "IMPLEMENT ME")] NAME_UNKNOWN,
+    #[fail(display = "IMPLEMENT ME")] SIZE_INVALID,
+    #[fail(display = "IMPLEMENT ME")] TAG_INVALID,
+    #[fail(display = "IMPLEMENT ME")] UNAUTHORIZED,
+    #[fail(display = "IMPLEMENT ME")] DENIED,
+    #[fail(display = "IMPLEMENT ME")] UNSUPPORTED,
 }
 
 impl Client {

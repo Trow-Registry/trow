@@ -1,0 +1,11 @@
+[package]
+name = "lycaon-errors"
+version = "0.1.0"
+authors = ["Hamish Hutchings <moredhel@aoeu.me>"]
+
+[dependencies]
+failure = "0.1"
+failure_derive = "0.1"
+
+serde = "1.0"
+serde_derive = "1.0"
