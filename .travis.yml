@@ -1,6 +1,10 @@
 language: rust
 rust:
-- nightly
+  - nightly-2017-12-20
+  - nightly
+matrix:
+  allow_failures:
+    - rust: nightly
 
 before_script:
   - cargo update
