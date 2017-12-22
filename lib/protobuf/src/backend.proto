@@ -44,7 +44,7 @@ message GenUuidResult {
 message UuidList {
   repeated GenUuidResult uuids = 1;
 }
-               
+
 service Backend {
   // ----- Image Upload Flow ----------
   // Check if a layer exists in the Registry

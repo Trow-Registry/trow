@@ -47,7 +47,7 @@ COPY lib lib
 RUN touch src/main.rs
 RUN cargo build
 
-#Might need to force 
+#Might need to force
 FROM arm64v8/debian:stable-slim
 
 COPY --from=builder /usr/src/lycaon/target/debug/lycaon /lycaon

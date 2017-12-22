@@ -28,7 +28,7 @@ COPY src src
 COPY lib lib
 RUN touch src/main.rs
 #Do a normal build for debug
-RUN cargo build 
+RUN cargo build
 
 FROM debian:stable-slim
 
