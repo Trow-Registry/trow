@@ -143,7 +143,7 @@ pub fn main_logger() -> Result<(), SetLoggerError> {
         .format(|record: &LogRecord| {
             format!("{}[{}] {}", record.target(), record.level(), record.args(),)
         })
-        .filter(None, LogLevelFilter::Info);
+        .filter(None, LogLevelFilter::Error);
 
     if env::var("RUST_LOG").is_ok() {
         builder.parse(&env::var("RUST_LOG").unwrap());
