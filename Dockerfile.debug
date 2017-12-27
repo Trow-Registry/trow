@@ -23,9 +23,14 @@ COPY lib/protobuf/Cargo.toml lib/protobuf/
 RUN mkdir -p lib/protobuf/src
 RUN touch lib/protobuf/src/lib.rs
 
-RUN cargo build
-COPY src src
+# lycaon-errors
+COPY lib/errors/Cargo.toml lib/errors/
+RUN mkdir -p lib/errors/src
+RUN touch lib/errors/src/lib.rs
+
+RUN cargo fetch #This should be cargo build, but it fails for some reason
 COPY lib lib
+COPY src src
 RUN touch src/main.rs
 #Do a normal build for debug
 RUN cargo build

@@ -29,8 +29,8 @@ RUN mkdir -p lib/errors/src
 RUN touch lib/errors/src/lib.rs
 
 RUN cargo fetch
-COPY src src
 COPY lib lib
+COPY src src
 RUN touch src/main.rs
 RUN cargo build --release
 
