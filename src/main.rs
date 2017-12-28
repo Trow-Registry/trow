@@ -61,6 +61,7 @@ mod test;
 mod types;
 mod util;
 
+FORCE FAIL
 fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Setting up RPC Server");
 
