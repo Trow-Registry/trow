@@ -14,7 +14,7 @@
 #![feature(use_extern_macros)]
 #![plugin(rocket_codegen)]
 
-extern crate args;
+extern crate clap;
 extern crate config as cfg;
 extern crate ctrlc;
 extern crate failure;
@@ -50,6 +50,7 @@ extern crate quickcheck;
 
 use std::thread;
 use failure::Error;
+use clap::ArgMatches;
 
 pub mod controller;
 pub mod config;
@@ -60,14 +61,14 @@ mod test;
 mod types;
 mod util;
 
-fn grpc(args: &args::Args) -> Result<std::thread::JoinHandle<()>, Error> {
+fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Setting up RPC Server");
 
-    let f: Result<String, args::ArgsError> = args.value_of("config");
+    let f = args.value_of("config");
 
     let cnfg = match f {
-        Ok(f) => config::LycaonConfig::new(&f)?,
-        Err(_) => config::LycaonConfig::default()?,
+        Some(v) => config::LycaonConfig::new(&v)?,
+        None => config::LycaonConfig::default()?,
     };
 
     Ok(thread::spawn(move || {
@@ -79,10 +80,7 @@ fn main() {
     config::main_logger().expect("Failed to init logging");
 
     // Parse Args
-    let args = config::parse_args().unwrap_or_else(|e| {
-        log::error!("Failed to process configuration {}", e);
-        std::process::exit(1);
-    });
+    let args = config::parse_args();
 
     // GRPC Backend thread.
     let _grpc_thread = grpc(&args).expect("Failed to start GRPC");

@@ -25,7 +25,7 @@ hostname = "^0.1"
 protobuf = "1.4.2"
 grpcio = "0.1.2"
 config = "0.7.0"
-args = "2.0"
+clap = "~2.29"
 getopts = "0.2.15"
 
 futures = "0.1"

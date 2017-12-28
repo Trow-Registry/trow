@@ -2,14 +2,14 @@
 //! as well as data-structures for setting and maintaining the
 //! system configuration.
 
-use getopts::Occur;
 use std;
 use std::env;
 use std::path::Path;
 use std::sync::mpsc;
 use std::fs;
 
-use args::{Args, ArgsError};
+use clap;
+use clap::{Arg, ArgMatches};
 use env_logger;
 use failure::Error;
 use ctrlc;
@@ -247,12 +247,13 @@ fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
 }
 
 /// Construct the rocket instance and prepare for launch
-pub(crate) fn rocket(args: &Args) -> Result<rocket::Rocket, Error> {
-    let f: Result<String, ArgsError> = args.value_of("config");
+pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
+    
+    let f = args.value_of("config");
 
     let config = match f {
-        Ok(f) => LycaonConfig::new(&f)?,
-        Err(_) => LycaonConfig::default()?,
+        Some(v) => LycaonConfig::new(&v)?,
+        None => LycaonConfig::default()?,
     };
 
     let rocket_config = build_rocket_config(&config);
@@ -266,29 +267,23 @@ pub(crate) fn rocket(args: &Args) -> Result<rocket::Rocket, Error> {
 }
 
 const PROGRAM_NAME: &'static str = "Lycaon";
-const PROGRAM_DESC: &'static str = "The King of Registries";
+const PROGRAM_DESC: &'static str = "\nThe King of Registries";
 
-pub fn parse_args() -> Result<Args, Error> {
-    let mut args = Args::new(PROGRAM_NAME, PROGRAM_DESC);
-
-    args.flag("h", "help", "print usage information");
-    args.option(
-        "c",
-        "config",
-        "config file",
-        "FILE",
-        Occur::Optional,
-        Some(String::from("Lycaon.toml")),
-    );
-
-    debug!("Parsing Arguments from CLI");
-    args.parse_from_cli()?;
-    if args.value_of("help")? {
-        println!("{}", args.full_usage());
-        use std;
-        return Err(Error::from(std::fmt::Error));
-    }
-
-    debug!("Args, all good");
-    Ok(args)
+/*
+  Parses command line arguments and returns ArgMatches object.
+*/
+pub fn parse_args<'a>() -> ArgMatches<'a> {
+    clap::App::new(PROGRAM_NAME)
+        .version("0.1")
+        .author("From Container Solutions")
+        .about(PROGRAM_DESC)
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .takes_value(true),
+        )
+        .get_matches()
 }
