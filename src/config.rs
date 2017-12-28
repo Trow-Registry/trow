@@ -159,7 +159,7 @@ pub fn main_logger() -> Result<(), SetLoggerError> {
 fn attach_sigterm() -> Result<(), Error> {
     ctrlc::set_handler(|| {
         info!("SIGTERM caught, shutting down...");
-        std::process::exit(127);
+        std::process::exit(0);
     }).map_err(|e| e.into())
 }
 
