@@ -61,7 +61,6 @@ mod test;
 mod types;
 mod util;
 
-FORCE FAIL
 fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Setting up RPC Server");
 
@@ -80,7 +79,7 @@ fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
 fn main() {
     config::main_logger().expect("Failed to init logging");
 
-    // Parse Args
+    // Parse command line
     let args = config::parse_args();
 
     // GRPC Backend thread.

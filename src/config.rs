@@ -26,6 +26,9 @@ static DEFAULT_DATA_DIR: &'static str = "data";
 static SCRATCH_DIR: &'static str = "scratch";
 static LAYERS_DIR: &'static str = "layers";
 
+const PROGRAM_NAME: &'static str = "Lycaon";
+const PROGRAM_DESC: &'static str = "\nThe King of Registries";
+
 /// This encapsulates any stateful data that needs to be preserved and
 /// passed around during execution.
 #[derive(Debug)]
@@ -265,9 +268,6 @@ pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
         .mount("/", routes::routes())
         .catch(routes::errors()))
 }
-
-const PROGRAM_NAME: &'static str = "Lycaon";
-const PROGRAM_DESC: &'static str = "\nThe King of Registries";
 
 /*
   Parses command line arguments and returns ArgMatches object.
