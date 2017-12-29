@@ -13,6 +13,7 @@ pub mod html;
 pub mod layers;
 pub mod uuid;
 pub mod uuidaccept;
+mod test_helper;
 
 /// Encapsulate a response from the registry
 /// Currently the full type definition is not possible (26 Sept 2017),

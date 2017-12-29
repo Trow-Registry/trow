@@ -16,7 +16,7 @@ mod test {
     use rocket::http::Status;
     use response::empty::Empty;
 
-    use test::test_helpers::test_route;
+    use response::test_helper::test_route;
 
     #[test]
     fn empty_ok() {

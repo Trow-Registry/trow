@@ -89,7 +89,7 @@ mod test {
     use rocket::http::Status;
     use response::uuid::UuidResponse;
 
-    use test::test_helpers::test_route;
+    use response::test_helper::test_route;
     fn build_response() -> UuidResponse {
         UuidResponse::Uuid {
             // TODO: keep this as a real Uuid!

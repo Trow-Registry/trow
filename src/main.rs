@@ -57,7 +57,6 @@ pub mod config;
 pub mod response;
 mod routes;
 mod state;
-mod test;
 mod types;
 mod util;
 
