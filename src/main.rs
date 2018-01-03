@@ -52,6 +52,8 @@ use std::thread;
 use failure::Error;
 use clap::ArgMatches;
 
+#[macro_use]
+mod macros;
 pub mod controller;
 pub mod config;
 pub mod response;

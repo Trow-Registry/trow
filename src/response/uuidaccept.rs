@@ -33,8 +33,7 @@ impl UuidAcceptResponse {
         _uuid: String,
         _digest: cuuid::DigestStruct,
     ) -> Result<UuidAcceptResponse, Error> {
-        use util;
-        Err(util::std_err("Not implemented"))
+        not_implemented!()
     }
 
     pub fn delete_upload(
