@@ -17,9 +17,9 @@ pub enum Server {
     #[fail(display = "File Not Found: {}", _0)] FileNotFound(String),
     #[fail(display = "ConfigError: {}", _0)] ConfigError(Error),
     #[fail(display = "GenericError: {}", _0)] GenericError(String),
-    #[fail(display = "Mismatched Digests" )] DigestMismatch,
+    #[fail(display = "Mismatched Digests")] DigestMismatch,
 
-    #[fail(display = "Mismatched Digests" )] TestError(()),
+    #[fail(display = "Mismatched Digests")] TestError(()),
 }
 
 /// Client errors that are returned to consumers of the Registry API
@@ -112,5 +112,13 @@ impl Client {
                 "The operation was unsupported due to a missing implementation or invalid set of parameters."
             }
         }
+    }
+}
+
+impl<'r> Responder<'r> for Client {
+    fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
+        // use response::json_response;
+        // json_response(self)
+        Response::build().status(Status::raw(418)).ok()
     }
 }
