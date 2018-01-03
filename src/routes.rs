@@ -6,7 +6,7 @@ use errors;
 use config;
 use controller::uuid as cuuid;
 use response::admin::Admin;
-use response::{MaybeResponse2, MaybeResponse, RegistryResponse};
+use response::{MaybeResponse, MaybeResponse2, RegistryResponse};
 use response::empty::Empty;
 use response::layers::LayerExists;
 use response::uuid::UuidResponse;
@@ -16,7 +16,6 @@ use response::html::HTML;
 
 use state;
 use types::Layer;
-
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -37,7 +36,6 @@ pub fn routes() -> Vec<rocket::Route> {
         get_catalog,
         get_image_tags,
         delete_image_manifest,
-
         // admin routes
         admin_get_uuids,
     ]
@@ -270,7 +268,6 @@ fn patch_blob(
     debug!("Checking if uuid is valid!");
     let exists = UuidResponse::uuid_exists(handler, &uuid);
     if let Ok(_) = exists {
-
         let absolute_file = state::uuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
         let file = chunk.stream_to_file(absolute_file);
@@ -313,14 +310,14 @@ fn delete_upload(
     repo: String,
     uuid: String,
 ) -> MaybeResponse2<UuidAcceptResponse> {
-    let response = UuidAcceptResponse::delete_upload(handler, &Layer::new(name, repo, uuid));
-    // .map_err(|e| {
-        // match e.downcast::<errors::Client>() {
-            // Ok(e) => e,
-            // Err(_) => errors::Client::UNSUPPORTED,
-        // }
-    // }
-    // );
+    let response = UuidAcceptResponse::delete_upload(handler, &Layer::new(name, repo, uuid))
+    .map_err(|e| {
+        match e.downcast::<errors::Client>() {
+            Ok(e) => e,
+            Err(_) => errors::Client::UNSUPPORTED,
+        }
+    }
+    );
     MaybeResponse::build(response)
 }
 /*

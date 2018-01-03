@@ -5,6 +5,8 @@ use rocket::response::{Responder, Response};
 use rocket::request::Request;
 use serde;
 
+use errors;
+
 /// Exporting all routes for the project
 pub mod admin;
 pub mod catalog;
@@ -20,7 +22,7 @@ mod test_helper;
 /// The hope is that we can restrict the following to Responder<'r> in
 /// the future.
 ///
-/// We simply pass in a Struct/Enum into the type-constructor, and as
+/// We pass in a Struct/Enum into the type-constructor, and as
 /// long as we have implemented the Responder<'r> trait, then
 /// everything just works.
 ///
@@ -28,15 +30,7 @@ mod test_helper;
 pub type MaybeResponse<A> = RegistryResponse<A>;
 
 /// Testing new MaybeResponse
-pub type MaybeResponse2<A> = RegistryResponse<Result<A, failure::Error>>;
-impl<'r, A: Responder<'r>> MaybeResponse2<A> {
-    pub fn ok2(val: A) -> Self {
-        RegistryResponse(Ok(val))
-    }
-    pub fn err2(val: failure::Error) -> Self {
-        RegistryResponse(Err(val))
-    }
-}
+pub type MaybeResponse2<A> = RegistryResponse<Result<A, errors::Client>>;
 
 /// Two constructors to ease sending a success/fail response.
 impl<'r, A: Responder<'r>> MaybeResponse<A> {
