@@ -17,7 +17,7 @@ use util;
 /// _uploads_: a HashSet of all uuids that are currently being tracked
 #[derive(Clone)]
 pub struct BackendService {
-    uploads: Arc<Mutex<std::collections::HashSet<String>>>,
+    uploads: Arc<Mutex<std::collections::HashSet<Layer>>>,
 }
 
 impl BackendService {
@@ -26,10 +26,11 @@ impl BackendService {
     }
 }
 
-struct Layer<'a> {
-    name: &'a str,
-    repo: &'a str,
-    digest: &'a str,
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
+pub struct Layer {
+    pub name: String,
+    pub repo: String,
+    pub digest: String,
 }
 
 fn process(layer: Layer) -> Result<u64, Error> {
@@ -42,9 +43,14 @@ fn process(layer: Layer) -> Result<u64, Error> {
 }
 
 /// Delete a file if we want
-pub fn delete_blob_by_uuid(uuid: &str) -> bool {
+pub fn delete_blob_by_uuid(layer: &Layer) -> bool {
     use std::fs;
-    let path = format!("data/scratch/{}", uuid);
+    let path = format!(
+        "data/scratch/{}/{}/{}",
+        layer.name,
+        layer.repo,
+        layer.digest
+    );
 
     fs::remove_file(path).map(|_| true).unwrap_or(false)
 }
@@ -74,9 +80,9 @@ impl grpc::backend_grpc::Backend for BackendService {
         sink: grpcio::UnarySink<grpc::backend::LayerExistsResult>,
     ) {
         let layer = Layer {
-            name: req.get_name(),
-            repo: req.get_repo(),
-            digest: req.get_digest(),
+            name: req.get_name().to_owned(),
+            repo: req.get_repo().to_owned(),
+            digest: req.get_digest().to_owned(),
         };
 
         let mut resp = grpc::backend::LayerExistsResult::new();
@@ -105,12 +111,16 @@ impl grpc::backend_grpc::Backend for BackendService {
         sink: grpcio::UnarySink<grpc::backend::GenUuidResult>,
     ) {
         let mut resp = grpc::backend::GenUuidResult::new();
-        let uuid = gen_uuid().to_string();
+        let layer = Layer {
+            name: req.get_name().to_owned(),
+            repo: req.get_repo().to_owned(),
+            digest: gen_uuid().to_string(),
+        };
         {
-            self.uploads.lock().unwrap().insert(uuid.clone());
+            self.uploads.lock().unwrap().insert(layer.clone());
             debug!("Hash Table: {:?}", self.uploads);
         }
-        resp.set_uuid(uuid);
+        resp.set_uuid(layer.digest.to_owned());
         let f = sink.success(resp).map_err(
             move |e| warn!("failed to reply! {:?}", e),
         );
@@ -120,12 +130,17 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn uuid_exists(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::GenUuidResult,
+        req: grpc::backend::Layer,
         sink: grpcio::UnarySink<grpc::backend::Result>,
     ) {
         let mut resp = grpc::backend::Result::new();
         let set = self.uploads.lock().unwrap();
-        resp.set_success(set.contains(req.get_uuid()));
+        let layer = Layer {
+            name: req.get_name().to_owned(),
+            repo: req.get_repo().to_owned(),
+            digest: req.get_digest().to_owned(),
+        };
+        resp.set_success(set.contains(&layer));
 
         let f = sink.success(resp).map_err(
             move |e| warn!("failed to reply! {:?}", e),
@@ -141,9 +156,13 @@ impl grpc::backend_grpc::Backend for BackendService {
     ) {
         let mut resp = grpc::backend::Result::new();
         let mut set = self.uploads.lock().unwrap();
-        let uuid = req.get_digest();
-        let _ = delete_blob_by_uuid(uuid);
-        resp.set_success(set.remove(uuid));
+        let layer = Layer {
+            name: req.get_name().to_owned(),
+            repo: req.get_repo().to_owned(),
+            digest: req.get_digest().to_owned(),
+        };
+        let _ = delete_blob_by_uuid(&layer);
+        resp.set_success(set.remove(&layer));
 
         let f = sink.success(resp).map_err(
             move |e| warn!("failed to reply! {:?}", e),
@@ -164,7 +183,7 @@ impl grpc::backend_grpc::Backend for BackendService {
             let set = self.uploads.lock().unwrap();
             let set = set.clone().into_iter().map(|x| {
                 let mut val = grpc::backend::GenUuidResult::new();
-                val.set_uuid(x);
+                val.set_uuid(x.digest);
                 val
             });
             resp.set_uuids(protobuf::RepeatedField::from_iter(set));

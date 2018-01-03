@@ -32,7 +32,7 @@ const METHOD_BACKEND_GEN_UUID: ::grpcio::Method<super::backend::Layer, super::ba
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
-const METHOD_BACKEND_UUID_EXISTS: ::grpcio::Method<super::backend::GenUuidResult, super::backend::Result> = ::grpcio::Method {
+const METHOD_BACKEND_UUID_EXISTS: ::grpcio::Method<super::backend::Layer, super::backend::Result> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/lycaon.Backend/UuidExists",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
@@ -96,19 +96,19 @@ impl BackendClient {
         self.gen_uuid_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn uuid_exists_opt(&self, req: super::backend::GenUuidResult, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
+    pub fn uuid_exists_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
         self.client.unary_call(&METHOD_BACKEND_UUID_EXISTS, req, opt)
     }
 
-    pub fn uuid_exists(&self, req: super::backend::GenUuidResult) -> ::grpcio::Result<super::backend::Result> {
+    pub fn uuid_exists(&self, req: super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
         self.uuid_exists_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn uuid_exists_async_opt(&self, req: super::backend::GenUuidResult, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn uuid_exists_async_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
         self.client.unary_call_async(&METHOD_BACKEND_UUID_EXISTS, req, opt)
     }
 
-    pub fn uuid_exists_async(&self, req: super::backend::GenUuidResult) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn uuid_exists_async(&self, req: super::backend::Layer) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
         self.uuid_exists_async_opt(req, ::grpcio::CallOption::default())
     }
 
@@ -151,7 +151,7 @@ impl BackendClient {
 pub trait Backend {
     fn layer_exists(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::LayerExistsResult>);
     fn gen_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::GenUuidResult>);
-    fn uuid_exists(&self, ctx: ::grpcio::RpcContext, req: super::backend::GenUuidResult, sink: ::grpcio::UnarySink<super::backend::Result>);
+    fn uuid_exists(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
     fn cancel_upload(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
     fn get_uuids(&self, ctx: ::grpcio::RpcContext, req: super::backend::Empty, sink: ::grpcio::UnarySink<super::backend::UuidList>);
 }

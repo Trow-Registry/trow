@@ -9,6 +9,7 @@ use config;
 use errors;
 use controller::uuid as cuuid;
 use grpc::backend;
+use types;
 
 const BASE_URL: &str = "http://localhost:8000";
 
@@ -38,14 +39,18 @@ impl UuidAcceptResponse {
 
     pub fn delete_upload(
         handler: State<config::BackendHandler>,
-        uuid: &str,
+        layer: &types::Layer,
+        // uuid: &str,
     ) -> Result <UuidAcceptResponse, Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
-        req.set_digest(uuid.to_owned());
+        req.set_name(layer.name.to_owned());
+        req.set_repo(layer.repo.to_owned());
+        req.set_digest(layer.digest.to_owned());
 
         let response = backend.cancel_upload(req)?;
 
+        debug!("Return: {:?}", response);
         match response.get_success() {
             true => Ok(UuidAcceptResponse::UuidDelete),
             false => Err(errors::Client::BLOB_UPLOAD_UNKNOWN.into()),

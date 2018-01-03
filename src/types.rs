@@ -7,7 +7,7 @@ pub struct Layer {
     pub repo: String,
 }
 impl Layer {
-    pub fn new(name: String, repo: String, digest: String) -> Layer {
+    pub fn new(name: String, repo: String, digest: Digest) -> Layer {
         Layer { digest, name, repo }
     }
 

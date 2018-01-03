@@ -51,8 +51,8 @@ impl UuidResponse {
         uuid: &String,
     ) -> Result<bool, Error> {
         let backend = handler.backend();
-        let mut req = backend::GenUuidResult::new();
-        req.set_uuid(uuid.to_owned());
+        let mut req = backend::Layer::new();
+        req.set_digest(uuid.to_owned());
 
         let response = backend.uuid_exists(req)?;
         debug!("UuidExists: {:?}", response.get_success());
