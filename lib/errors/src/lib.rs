@@ -1,14 +1,25 @@
+#[macro_use]
+extern crate downcast_rs;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
+extern crate rocket;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde;
 
 use failure::Error;
+use rocket::http::{Header, Status};
+use rocket::response::{Responder, Response};
+use rocket::request::Request;
+
+use downcast_rs::Downcast;
 
 type Message = &'static str;
 type Detail = &'static str;
+
+trait Trait: Downcast {}
+impl_downcast!(Trait);
 
 /// Internal errors that occur throughout the system
 #[derive(Debug, Fail)]
@@ -42,6 +53,8 @@ pub enum Client {
     #[fail(display = "IMPLEMENT ME")] DENIED,
     #[fail(display = "IMPLEMENT ME")] UNSUPPORTED,
 }
+
+impl Trait for Client {}
 
 impl Client {
     fn message(self) -> Message {
