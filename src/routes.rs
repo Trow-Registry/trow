@@ -289,6 +289,7 @@ fn patch_blob(
             Err(_) => MaybeResponse::build(UuidResponse::Empty),
         }
     } else {
+        info!("Uuid {} does not exist, denying upload request", uuid);
         MaybeResponse::build(UuidResponse::Empty)
     }
 }
