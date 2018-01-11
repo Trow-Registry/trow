@@ -59,7 +59,7 @@ pub fn delete_blob_by_uuid(layer: &Layer) -> bool {
 fn construct_absolute_path(layer: Layer) -> Result<Box<Path>, Error> {
     std::env::current_dir()
         .map(|cwd| {
-            let absolute_dir = cwd.join(format!("data/layers/{}", layer.digest));
+            let absolute_dir = cwd.join(format!("data/layers/{}/{}/{}", layer.name, layer.repo, layer.digest));
             debug!("Absolute Path: {:?}", absolute_dir);
             absolute_dir.into_boxed_path()
         })
