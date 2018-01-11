@@ -251,9 +251,12 @@ fn put_blob(
     uuid: String,
     digest: cuuid::DigestStruct,
 ) -> MaybeResponse<UuidAcceptResponse> {
-    UuidAcceptResponse::handle(config, name, repo, uuid, digest)
+    UuidAcceptResponse::handle(config, name, repo, uuid, digest.digest)
         .map(|response| MaybeResponse::build(response))
-        .or_else(|e| Err(e))
+        .or_else(|e| {
+            warn!("put_blob: {}", e);
+            Err(e)
+        })
         .unwrap_or(MaybeResponse::build(UuidAcceptResponse::UnknownError))
 }
 
@@ -266,8 +269,12 @@ fn patch_blob(
     chunk: rocket::data::Data,
 ) -> MaybeResponse<UuidResponse> {
     debug!("Checking if uuid is valid!");
-    let exists = UuidResponse::uuid_exists(handler, &uuid);
-    if let Ok(_) = exists {
+    let layer = Layer {
+        name: name.clone(),
+        repo: repo.clone(),
+        digest: uuid.clone()
+    };
+    if let Ok(_) = UuidResponse::uuid_exists(handler, &layer) {
         let absolute_file = state::uuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
         let file = chunk.stream_to_file(absolute_file);

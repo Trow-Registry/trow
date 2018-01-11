@@ -25,15 +25,57 @@ pub enum UuidAcceptResponse {
     UnknownError,
 }
 
+fn construct_digest_path(layer: &types::Layer) -> String {
+    format!("data/layers/{}/{}/{}", layer.name, layer.repo, layer.digest)
+}
+
 impl UuidAcceptResponse {
     pub fn handle(
-        _handler: State<config::BackendHandler>,
-        _name: String,
-        _repo: String,
-        _uuid: String,
-        _digest: cuuid::DigestStruct,
+        handler: State<config::BackendHandler>,
+        name: String,
+        repo: String,
+        uuid: String,
+        digest: String,
     ) -> Result<UuidAcceptResponse, Error> {
-        not_implemented!()
+        use std::fs;
+        use std::path;
+        // 1. copy file to new location
+        let backend = handler.backend();
+        let layer = types::Layer {
+            name: name.clone(),
+            repo: repo.clone(),
+            digest: digest.clone()
+        };
+        let digest_path = construct_digest_path(&layer);
+        let path = format!("data/layers/{}/{}", layer.name, layer.repo);
+        let scratch_path = format!("data/scratch/{}", uuid);
+        debug!("Saving file");
+        // 1.1 check direcory exists
+        if !path::Path::new(&path).exists() {
+            fs::create_dir_all(path)?;
+        }
+        fs::copy(&scratch_path, digest_path)?;
+        // 2. delete uploaded temporary file
+        debug!("Deleting file: {}", uuid);
+        fs::remove_file(scratch_path)?;
+        // 3. delete uuid from the backend
+        let mut layer = backend::Layer::new();
+        layer.set_name(name.clone());
+        layer.set_repo(repo.clone());
+        layer.set_digest(uuid.clone());
+        let resp = backend.delete_uuid(layer)?;
+        // 4. Construct response
+        match resp.get_success() {
+            true => Ok(UuidAcceptResponse::UuidAccept {
+                uuid: uuid,
+                digest: digest,
+                name: name,
+                repo: repo,
+            }),
+            false => {
+                not_implemented!()
+            }
+        }
     }
 
     pub fn delete_upload(

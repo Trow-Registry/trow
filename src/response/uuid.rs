@@ -9,6 +9,7 @@ use uuid::Uuid;
 use grpc::backend;
 use config;
 use errors;
+use types::Layer;
 
 #[derive(Debug, Serialize)]
 pub enum UuidResponse {
@@ -47,11 +48,13 @@ impl UuidResponse {
 
     pub fn uuid_exists(
         handler: State<config::BackendHandler>,
-        uuid: &String,
+        layer: &Layer,
     ) -> Result<bool, Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
-        req.set_digest(uuid.to_owned());
+        req.set_name(layer.name.to_owned());
+        req.set_repo(layer.repo.to_owned());
+        req.set_digest(layer.digest.to_owned());
 
         let response = backend.uuid_exists(req)?;
         debug!("UuidExists: {:?}", response.get_success());

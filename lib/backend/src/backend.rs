@@ -170,6 +170,29 @@ impl grpc::backend_grpc::Backend for BackendService {
         ctx.spawn(f);
     }
 
+    fn delete_uuid(
+        &self,
+        ctx: grpcio::RpcContext,
+        req: grpc::backend::Layer,
+        sink: grpcio::UnarySink<grpc::backend::Result>) {
+        let layer = Layer {
+            name: req.get_name().to_owned(),
+            repo: req.get_repo().to_owned(),
+            digest: req.get_digest().to_owned(),
+        };
+        let mut set = self.uploads.lock().unwrap();
+
+        let mut resp = grpc::backend::Result::new();
+        debug!("Before Delete: {:?}", self.uploads);
+        resp.set_success(set.remove(&layer));
+        debug!("After Delete: {:?}", self.uploads);
+
+        let f = sink.success(resp).map_err(
+            move |e| warn!("failed to reply! {:?}", e),
+        );
+        ctx.spawn(f);
+    }
+
     fn get_uuids(
         &self,
         ctx: grpcio::RpcContext,
