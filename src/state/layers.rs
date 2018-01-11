@@ -2,8 +2,7 @@ use orset::ORSet;
 
 use types::{Digest, Layer};
 
-impl Layer {
-}
+impl Layer {}
 
 type LayerSet = ORSet<Digest>;
 /// Backend functions for layer-based operations.
@@ -35,20 +34,19 @@ mod tests {
             let name: String = g.gen_ascii_chars().take(name_len).collect();
             let repo: String = g.gen_ascii_chars().take(repo_len).collect();
 
-            Layer::new( digest, name, repo )
+            Layer::new(digest, name, repo)
         }
     }
-
 
     #[test]
     #[ignore]
     fn test_process_layer() {
         fn inner(layer: Layer) -> TestResult {
-                TestResult::failed()
-
+            TestResult::failed()
         }
-        QuickCheck::new().tests(100).max_tests(1000).quickcheck(
-            inner as fn(Layer) -> TestResult,
-        );
+        QuickCheck::new()
+            .tests(100)
+            .max_tests(1000)
+            .quickcheck(inner as fn(Layer) -> TestResult);
     }
 }

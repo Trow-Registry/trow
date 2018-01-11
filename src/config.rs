@@ -251,7 +251,6 @@ fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
 
 /// Construct the rocket instance and prepare for launch
 pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
-    
     let f = args.value_of("config");
 
     let config = match f {

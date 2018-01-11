@@ -36,7 +36,6 @@ impl UuidResponse {
         let response = backend.gen_uuid(req)?;
         debug!("Client received: {:?}", response);
 
-
         Ok(UuidResponse::Uuid {
             uuid: response.get_uuid().to_owned(),
             name: name,
@@ -67,17 +66,14 @@ fn _gen_uuid() -> Uuid {
     Uuid::new_v4()
 }
 
-
 /// Gets the base URL e.g. http://registry:8000 using the HOST value from the request header.
 /// Falls back to hostname if it doesn't exist.
 ///
 fn get_base_url(req: &Request) -> String {
     let host = match req.headers().get("HOST").next() {
-        None => {
-            hostname::get_hostname()
-                .expect("I have no name")
-                .to_string()
-        }
+        None => hostname::get_hostname()
+            .expect("I have no name")
+            .to_string(),
         Some(shost) => shost.to_string(),
     };
 
@@ -116,7 +112,7 @@ impl<'r> Responder<'r> for UuidResponse {
                 // TODO: move into the type so it is better encoded?...
                 .status(Status::Accepted)
                 .ok()
-            },
+            }
             UuidResponse::Empty => {
                 debug!("Uuid Error");
                 Response::build().status(Status::NotFound).ok()

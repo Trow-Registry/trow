@@ -29,18 +29,16 @@ impl LayerExists {
         proto_layer.set_repo(layer.repo);
         proto_layer.set_digest(layer.digest.clone());
 
-        let reply = backend.layer_exists(proto_layer).expect(
-            "layerexists RPC failed",
-        );
+        let reply = backend
+            .layer_exists(proto_layer)
+            .expect("layerexists RPC failed");
         debug!("Client received: {:?}", reply);
 
         match reply.get_success() {
-            true => {
-                Ok(LayerExists::True {
-                    digest: layer.digest,
-                    length: reply.get_length(),
-                })
-            }
+            true => Ok(LayerExists::True {
+                digest: layer.digest,
+                length: reply.get_length(),
+            }),
             false => Err(util::std_err("blob doesn't exist")),
         }
     }
@@ -83,16 +81,15 @@ mod tests {
         }
     }
 
-
     #[test]
     #[ignore]
     fn test_process_layer() {
         fn inner(layer: LayerExists) -> TestResult {
             TestResult::failed()
-
         }
-        QuickCheck::new().tests(100).max_tests(1000).quickcheck(
-            inner as fn(LayerExists) -> TestResult,
-        );
+        QuickCheck::new()
+            .tests(100)
+            .max_tests(1000)
+            .quickcheck(inner as fn(LayerExists) -> TestResult);
     }
 }

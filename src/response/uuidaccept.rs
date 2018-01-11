@@ -4,7 +4,6 @@ use rocket::http::{Header, Status};
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
 
-
 use config;
 use errors;
 use controller::uuid as cuuid;
@@ -41,7 +40,7 @@ impl UuidAcceptResponse {
         handler: State<config::BackendHandler>,
         layer: &types::Layer,
         // uuid: &str,
-    ) -> Result <UuidAcceptResponse, Error> {
+    ) -> Result<UuidAcceptResponse, Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
         req.set_name(layer.name.to_owned());

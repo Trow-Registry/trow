@@ -10,7 +10,9 @@ pub struct ConsoleConfig {
 }
 impl ConsoleConfig {
     fn default() -> ConsoleConfig {
-        ConsoleConfig { console_port: 29999 }
+        ConsoleConfig {
+            console_port: 29999,
+        }
     }
 }
 
@@ -21,7 +23,6 @@ fn get_config() -> ConsoleConfig {
     ConsoleConfig {
         // TODO: This is currently duplicated in the config.rs file (where it should be).
         console_port: match cfg.get_int("console_port") {
-
             Ok(x) => x,
             Err(_) => ConsoleConfig::default().console_port,
         },

@@ -12,7 +12,9 @@ pub struct UuidImpl {
 }
 impl UuidImpl {
     pub fn new() -> UuidImpl {
-        UuidImpl { digests: HashSet::<String>::new() }
+        UuidImpl {
+            digests: HashSet::<String>::new(),
+        }
     }
 }
 
@@ -45,7 +47,6 @@ pub fn mark_delete(uuid: &String) -> io::Result<()> {
     let file = scratch_path(uuid);
     fs::remove_file(file)
 }
-
 
 // TODO change this to return a type-safe thing rather than just 'String'
 pub fn hash_file(absolute_directory: String) -> Result<String, Error> {

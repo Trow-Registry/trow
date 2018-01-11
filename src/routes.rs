@@ -314,13 +314,10 @@ fn delete_upload(
     uuid: String,
 ) -> MaybeResponse2<UuidAcceptResponse> {
     let response = UuidAcceptResponse::delete_upload(handler, &Layer::new(name, repo, uuid))
-    .map_err(|e| {
-        match e.downcast::<errors::Client>() {
+        .map_err(|e| match e.downcast::<errors::Client>() {
             Ok(e) => e,
             Err(_) => errors::Client::UNSUPPORTED,
-        }
-    }
-    );
+        });
     MaybeResponse::build(response)
 }
 /*
