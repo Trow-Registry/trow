@@ -46,6 +46,13 @@ const METHOD_BACKEND_CANCEL_UPLOAD: ::grpcio::Method<super::backend::Layer, supe
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
+const METHOD_BACKEND_DELETE_UUID: ::grpcio::Method<super::backend::Layer, super::backend::Result> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::Unary,
+    name: "/lycaon.Backend/deleteUuid",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
 const METHOD_BACKEND_GET_UUIDS: ::grpcio::Method<super::backend::Empty, super::backend::UuidList> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/lycaon.Backend/getUuids",
@@ -128,6 +135,22 @@ impl BackendClient {
         self.cancel_upload_async_opt(req, ::grpcio::CallOption::default())
     }
 
+    pub fn delete_uuid_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
+        self.client.unary_call(&METHOD_BACKEND_DELETE_UUID, req, opt)
+    }
+
+    pub fn delete_uuid(&self, req: super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
+        self.delete_uuid_opt(req, ::grpcio::CallOption::default())
+    }
+
+    pub fn delete_uuid_async_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+        self.client.unary_call_async(&METHOD_BACKEND_DELETE_UUID, req, opt)
+    }
+
+    pub fn delete_uuid_async(&self, req: super::backend::Layer) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+        self.delete_uuid_async_opt(req, ::grpcio::CallOption::default())
+    }
+
     pub fn get_uuids_opt(&self, req: super::backend::Empty, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::UuidList> {
         self.client.unary_call(&METHOD_BACKEND_GET_UUIDS, req, opt)
     }
@@ -153,6 +176,7 @@ pub trait Backend {
     fn gen_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::GenUuidResult>);
     fn uuid_exists(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
     fn cancel_upload(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
+    fn delete_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
     fn get_uuids(&self, ctx: ::grpcio::RpcContext, req: super::backend::Empty, sink: ::grpcio::UnarySink<super::backend::UuidList>);
 }
 
@@ -173,6 +197,10 @@ pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Se
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_BACKEND_CANCEL_UPLOAD, move |ctx, req, resp| {
         instance.cancel_upload(ctx, req, resp)
+    });
+    let instance = s.clone();
+    builder = builder.add_unary_handler(&METHOD_BACKEND_DELETE_UUID, move |ctx, req, resp| {
+        instance.delete_uuid(ctx, req, resp)
     });
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_BACKEND_GET_UUIDS, move |ctx, req, resp| {

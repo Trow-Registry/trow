@@ -60,6 +60,9 @@ service Backend {
   // The digest field is used for the uuid in this rpc call
   rpc cancelUpload (Layer) returns (Result) {}
 
+  // Delete an uuid after a successful upload.
+  rpc deleteUuid (Layer) returns (Result) {}
+
 
   // ------------ Admin calls --------------------
 
