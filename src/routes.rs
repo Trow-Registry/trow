@@ -289,7 +289,9 @@ fn patch_blob(
             Err(_) => MaybeResponse::build(UuidResponse::Empty),
         }
     } else {
-        info!("Uuid {} does not exist, denying upload request", uuid);
+        warn!("Uuid {} does not exist, piping to /dev/null", uuid);
+        let len = chunk.stream_to_file("/dev/null");
+        debug!("Chunk Length = {:?}", len);
         MaybeResponse::build(UuidResponse::Empty)
     }
 }
