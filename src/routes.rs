@@ -281,16 +281,15 @@ fn patch_blob(
 
         match file {
             Ok(_) => {
-                let right = match file.map(|x| x.to_string()) {
+                let range = (0, match file.map(|x| x.to_string()) {
                     Ok(x) => x.parse::<u32>().unwrap(),
                     Err(_) => 0,
-                };
+                });
                 MaybeResponse::build(UuidResponse::Uuid {
                     uuid,
                     name,
                     repo,
-                    left: 0,
-                    right,
+                    range
                 })
             }
             Err(_) => MaybeResponse::build(UuidResponse::Empty),

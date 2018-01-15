@@ -17,8 +17,7 @@ pub enum UuidResponse {
         uuid: String,
         name: String,
         repo: String,
-        left: u32,
-        right: u32,
+        range: (u32, u32),
     },
     Empty,
 }
@@ -41,8 +40,7 @@ impl UuidResponse {
             uuid: response.get_uuid().to_owned(),
             name: name,
             repo: repo,
-            left: 0,
-            right: 0,
+            range: (0, 0)
         })
     }
 
@@ -90,8 +88,7 @@ impl<'r> Responder<'r> for UuidResponse {
                 ref uuid,
                 ref name,
                 ref repo,
-                ref left,
-                ref right,
+                ref range
             } => {
                 debug!("Uuid Ok");
                 let location_url = format!(
@@ -101,6 +98,7 @@ impl<'r> Responder<'r> for UuidResponse {
                     repo,
                     uuid
                 );
+                let &(left, right) = range;
                 let upload_uuid = Header::new("Docker-Upload-UUID", uuid.clone());
                 let range = Header::new("Range", format!("{}-{}", left, right));
                 let length = Header::new("X-Content-Length", format!("{}", right - left));
@@ -136,8 +134,7 @@ mod test {
             uuid: String::from("whatever"),
             name: String::from("moredhel"),
             repo: String::from("test"),
-            left: 0,
-            right: 0,
+            range: (0,0)
         }
     }
 

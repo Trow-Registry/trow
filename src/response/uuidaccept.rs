@@ -141,8 +141,7 @@ mod test {
             uuid: String::from("whatever"),
             name: String::from("moredhel"),
             repo: String::from("test"),
-            left: 0,
-            right: 0,
+            range: (0, 0)
         }
     }
 
