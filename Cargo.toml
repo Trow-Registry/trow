@@ -45,7 +45,7 @@ lycaon-errors = { path = "./lib/errors" }
 [build-dependencies]
 
 [dev-dependencies]
-quickcheck = "0.4"
-quickcheck_macros = "0.4"
+quickcheck = "0.6"
+quickcheck_macros = "0.6"
 assert_cli = "0.5"
 

@@ -1,6 +1,8 @@
 # lycaon
 Distributed Cluster Registry
 
+[![Build Status](https://travis-ci.org/ContainerSolutions/lycaon.svg?branch=master)](https://travis-ci.org/ContainerSolutions/lycaon)
+
 ## Notes
 
-- The project currently runs on Rust Nightly (build 2017-11-15 or newer)
+- The project currently runs on Rust Nightly
