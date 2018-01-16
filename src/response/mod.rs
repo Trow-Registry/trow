@@ -1,4 +1,3 @@
-use failure;
 use rocket;
 use rocket::http::Status;
 use rocket::response::{Responder, Response};

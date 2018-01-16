@@ -6,7 +6,6 @@ use rocket::request::Request;
 
 use config;
 use errors;
-use controller::uuid as cuuid;
 use grpc::backend;
 use types;
 
