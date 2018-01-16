@@ -190,6 +190,24 @@ impl grpc::backend_grpc::Backend for BackendService {
         ctx.spawn(f);
     }
 
+    fn upload_manifest(
+        &self,
+        ctx: grpcio::RpcContext,
+        _req: grpc::backend::Manifest,
+        sink: grpcio::UnarySink<grpc::backend::Result>) {
+        warn!("upload manifest not implemented");
+        let mut resp = grpc::backend::Result::new();
+        resp.set_success(false);
+
+        let f = sink.success(resp).map_err(
+            move |e| warn!("failed to reply! {:?}", e),
+        );
+        ctx.spawn(f);
+    }
+
+
+
+    // ---------- Admin calls ----------------
     fn get_uuids(
         &self,
         ctx: grpcio::RpcContext,
