@@ -20,12 +20,6 @@ pub struct PeerService {
     peers: Arc<Vec<PeerClient>>
 }
 impl PeerService {
-    pub fn empty() -> PeerService {
-        PeerService {
-            counter: Cell::new(0),
-            peers: Arc::new(vec![]),
-        }
-    }
 
     pub fn new(service: config::Service) -> PeerService {
 
@@ -44,11 +38,11 @@ impl Peer for PeerService {
     fn heartbeat (
         &self,
         ctx: grpcio::RpcContext,
-        req: peer::Heartbeat,
+        _req: peer::Heartbeat,
         sink: grpcio::UnarySink<peer::Heartbeat>,
     ) {
         {
-            for peer in self.peers.iter() {
+            for _ in self.peers.iter() {
                 print!("Hello there!");
             }
         }

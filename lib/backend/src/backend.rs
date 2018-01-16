@@ -6,11 +6,8 @@ use grpcio;
 use grpc;
 
 use failure::Error;
-use std::error::Error as ErrorTrait;
 use futures::Future;
 use uuid::Uuid;
-
-use util;
 
 /// Struct implementing callbacks for the Frontend
 ///
@@ -92,7 +89,7 @@ impl grpc::backend_grpc::Backend for BackendService {
                 resp.set_success(true);
                 resp.set_length(length);
             })
-            .map_err(|e| {
+            .map_err(|_| {
                 debug!("Failure, building return object");
                 resp.set_success(false);
             });
@@ -196,7 +193,7 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn get_uuids(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::Empty,
+        _req: grpc::backend::Empty,
         sink: grpcio::UnarySink<grpc::backend::UuidList>,
     ) {
         let mut resp = grpc::backend::UuidList::new();
