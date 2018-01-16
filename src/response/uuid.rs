@@ -73,8 +73,7 @@ fn _gen_uuid() -> Uuid {
 fn get_base_url(req: &Request) -> String {
     let host = match req.headers().get("HOST").next() {
         None => hostname::get_hostname()
-            .expect("I have no name")
-            .to_string(),
+            .expect("Server has no name; cannot give clients my address"),
         Some(shost) => shost.to_string(),
     };
 
