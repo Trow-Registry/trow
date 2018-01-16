@@ -1,7 +1,7 @@
 with import <nixpkgs> {};
 let
   pkgs = import <nixpkgs> {};
-  date = "2017-12-21";
+  date = "2018-01-15";
   mozilla-overlay = fetchFromGitHub {
     owner = "mozilla";
     repo = "nixpkgs-mozilla";
