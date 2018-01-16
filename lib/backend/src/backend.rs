@@ -205,9 +205,8 @@ impl grpc::backend_grpc::Backend for BackendService {
         ctx.spawn(f);
     }
 
-
-
     // ---------- Admin calls ----------------
+
     fn get_uuids(
         &self,
         ctx: grpcio::RpcContext,

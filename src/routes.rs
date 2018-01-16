@@ -365,9 +365,14 @@ PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
  */
-#[put("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn put_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
+#[put("/v2/<name>/<repo>/manifests/<reference>", data = "<_chunk>")]
+fn put_image_manifest(name: String,
+                      repo: String,
+                      reference: String,
+                      _chunk: rocket::data::Data,
+) -> MaybeResponse2<Empty> {
+    debug!("{}/{}/{}", name, repo, reference);
+    MaybeResponse::err(Err(errors::Client::UNSUPPORTED))
 }
 /*
 ---

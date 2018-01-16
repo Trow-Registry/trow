@@ -84,7 +84,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_process_layer() {
-        fn inner(layer: LayerExists) -> TestResult {
+        fn inner(_layer: LayerExists) -> TestResult {
             TestResult::failed()
         }
         QuickCheck::new()
