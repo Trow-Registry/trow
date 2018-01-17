@@ -1,13 +1,8 @@
-sudo: required
-
-services:
-  - docker
-
-script:
-  - docker build -f Dockerfile.release -t builder --target builder .
-  - docker run builder cargo test
-  - docker build -f Dockerfile.release -t containersol/lycaon .
-
+language: rust
+rust:
+- nightly
+before_script:
+- cargo update
 notifications:
   slack:
     rooms:
