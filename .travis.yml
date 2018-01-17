@@ -4,9 +4,9 @@ services:
   - docker
 
 script:
-  - docker build -t builder --target builder .
+  - docker build -f Dockerfile.release -t builder --target builder .
   - docker run builder cargo test
-  - docker build -t containersol/lycaon .
+  - docker build -f Dockerfile.release -t containersol/lycaon .
 
 notifications:
   slack:
