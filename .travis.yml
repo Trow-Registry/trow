@@ -1,8 +1,13 @@
-language: rust
-rust:
-- nightly
-before_script:
-- cargo update
+sudo: required
+
+services:
+  - docker
+
+script:
+  - docker build -t builder --target builder .
+  - docker run builder cargo test
+  - docker build -t containersol/lycaon .
+
 notifications:
   slack:
     rooms:

@@ -33,6 +33,8 @@ COPY lib lib
 COPY src src
 RUN touch src/main.rs
 RUN cargo build --release
+# So we can use the build target to run tests
+COPY tests tests
 
 FROM scratch
 
@@ -49,7 +51,7 @@ COPY --from=builder /lib/x86_64-linux-gnu/libm.so.6 /lib/libm.so.6
 
 COPY Rocket.toml /
 COPY lycaon-default.toml /
-##Yeah, it's another hack. Sue me. Note that you need 17.09 to build this
+##Yeah, it's another hack. Sue me. Note that you need 17.09+ to build this
 COPY --chown=65534:65534 README.md /data/layers/README.md
 COPY --chown=65534:65534 README.md /data/scratch/README.md
 USER 65534
