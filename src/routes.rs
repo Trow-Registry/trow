@@ -42,15 +42,15 @@ pub fn routes() -> Vec<rocket::Route> {
 }
 
 pub fn errors() -> Vec<rocket::Catcher> {
-    errors![err_400, err_404,]
+    catchers![err_400, err_404,]
 }
 
-#[error(400)]
+#[catch(400)]
 fn err_400() -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
 }
 
-#[error(404)]
+#[catch(404)]
 fn err_404() -> MaybeResponse<Empty> {
     MaybeResponse::err(Empty)
 }

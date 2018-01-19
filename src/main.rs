@@ -10,6 +10,8 @@
 //! - replication and masterless
 //! - other stuff...
 
+
+#![feature(decl_macro)]
 #![feature(plugin)]
 #![feature(use_extern_macros)]
 #![plugin(rocket_codegen)]
@@ -61,6 +63,7 @@ mod routes;
 mod state;
 mod types;
 mod util;
+
 
 fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Setting up RPC Server");
