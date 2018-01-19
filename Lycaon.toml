@@ -7,4 +7,4 @@ host = 'localhost'
 port = 3117
 [web.listen]
 host = "::"
-port = 8003
+port = 8000

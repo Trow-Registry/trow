@@ -47,4 +47,5 @@ lycaon-errors = { path = "./lib/errors" }
 quickcheck = "0.6"
 quickcheck_macros = "0.6"
 assert_cli = "0.5"
-
+environment = "0.1"
+hyper = "0.11"
