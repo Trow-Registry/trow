@@ -1,8 +1,7 @@
 /// Test API end-points
 extern crate environment;
 extern crate futures;
-extern crate hyper;
-extern crate tokio_core;
+extern crate curl;
 
 #[cfg(test)]
 mod interface_tests {
@@ -13,19 +12,16 @@ mod interface_tests {
     use std::process::Child;
     use std::time::Duration;
     use std::thread;
-    use futures::Future;
-    use hyper::{Client, StatusCode};
-    use tokio_core::reactor::Core;
+    use curl::easy::Easy;
 
     struct LycaonInstance {
-        pid: Child
+        pid: Child,
     }
     /// Call out to cargo to start lycaon.
     /// Seriously considering moving to docker run.
 
     fn start_lycaon() -> LycaonInstance {
         let child = Command::new("cargo")
-            //.current_dir("../../")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
@@ -34,7 +30,7 @@ mod interface_tests {
 
         //FIXME: change to poll for start-up
         thread::sleep(Duration::from_millis(500));
-        LycaonInstance{pid: child}
+        LycaonInstance { pid: child }
     }
 
     impl Drop for LycaonInstance {
@@ -47,18 +43,11 @@ mod interface_tests {
     #[test]
     fn get_main() {
         let _lyc = start_lycaon();
+        let mut easy = Easy::new();
+        easy.url("http://localhost:8000").unwrap();
+        easy.perform().unwrap();
 
-        let mut core = Core::new().expect("Failed to start hyper");
-        let client = Client::new(&core.handle());
-
-        let uri = "http://localhost:8000"
-            .parse()
-            .expect("Failure parsing URI");
-        let work = client.get(uri).map(|res| {
-            assert_eq!(StatusCode::Ok, res.status());
-        });
-        core.run(work).expect("Failed to run get");
-
+        assert_eq!(easy.response_code().unwrap(), 200);
     }
 
 }
