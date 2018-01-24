@@ -3,9 +3,6 @@ rust:
   - nightly
 before_script:
   - cargo update
-script:
-  - cargo build --verbose
-  - cargo test --verbose -- --nocapture
 notifications:
   slack:
     rooms:

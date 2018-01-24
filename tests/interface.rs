@@ -15,6 +15,8 @@ mod interface_tests {
     use hyper::{Client, StatusCode, Error, Response};
     use tokio_core::reactor::Core;
 
+    const LYCAON_ADDRESS: &'static str = "http://localhost:8000";
+
     struct LycaonInstance {
         pid: Child
     }
@@ -22,7 +24,7 @@ mod interface_tests {
     /// Seriously considering moving to docker run.
 
     fn start_lycaon() -> LycaonInstance {
-        let child = Command::new("cargo")
+        let mut child = Command::new("cargo")
             //.current_dir("../../")
             .arg("run")
             .env_clear()
@@ -30,8 +32,17 @@ mod interface_tests {
             .spawn()
             .expect("failed to start");
 
-        //FIXME: change to poll for start-up
-        thread::sleep(Duration::from_millis(500));
+        let mut timeout = 20;
+        let mut response = get_sync(LYCAON_ADDRESS);
+        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::Ok)) { 
+            thread::sleep(Duration::from_millis(100));
+            response = get_sync(LYCAON_ADDRESS);
+            timeout -= 1;
+        }
+        if timeout == 0 {
+            child.kill().unwrap();
+            panic!("Failed to start Lycaon");
+        }
         LycaonInstance{pid: child}
     }
 
@@ -56,7 +67,7 @@ mod interface_tests {
     fn get_main() {
         let _lyc = start_lycaon();
 
-        let i = get_sync("http://localhost:8000").unwrap();
+        let i = get_sync(LYCAON_ADDRESS).unwrap();
         assert_eq!(i.status(), StatusCode::Ok);
         assert_eq!(i.headers().get_raw("Docker-Distribution-API-Version").unwrap(), "registry/2.0");
 
