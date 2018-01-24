@@ -4,7 +4,6 @@ rust:
 before_script:
   - cargo update
 script:
-  -script:
   - cargo build --verbose
   - cargo test --verbose -- --no-capture
 notifications:
