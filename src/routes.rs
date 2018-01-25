@@ -67,16 +67,17 @@ fn err_404() -> MaybeResponse<Empty> {
 /// # Headers
 /// Docker-Distribution-API-Version: registry/2.0
 #[get("/v2")]
-fn get_v2root() -> MaybeResponse<Empty> {
-    MaybeResponse::build(Empty)
+fn get_v2root() -> RegistryResponse<Empty> {
+    RegistryResponse(Empty)
 }
-
-const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
-<h1>Welcome to Lycaon, the King of Registries</h1>
-</body></html>";
 
 #[get("/")]
 fn get_homepage<'a>() -> RegistryResponse<HTML<'a>> {
+    
+    const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
+<h1>Welcome to Lycaon, the King of Registries</h1>
+</body></html>";
+
     RegistryResponse(HTML(ROOT_RESPONSE))
 }
 
@@ -272,7 +273,7 @@ fn patch_blob(
     let layer = Layer {
         name: name.clone(),
         repo: repo.clone(),
-        digest: uuid.clone()
+        digest: uuid.clone(),
     };
     if let Ok(_) = UuidResponse::uuid_exists(handler, &layer) {
         let absolute_file = state::uuid::scratch_path(&uuid);
@@ -281,15 +282,18 @@ fn patch_blob(
 
         match file {
             Ok(_) => {
-                let range = (0, match file.map(|x| x.to_string()) {
-                    Ok(x) => x.parse::<u32>().unwrap(),
-                    Err(_) => 0,
-                });
+                let range = (
+                    0,
+                    match file.map(|x| x.to_string()) {
+                        Ok(x) => x.parse::<u32>().unwrap(),
+                        Err(_) => 0,
+                    },
+                );
                 MaybeResponse::build(UuidResponse::Uuid {
                     uuid,
                     name,
                     repo,
-                    range
+                    range,
                 })
             }
             Err(_) => MaybeResponse::build(UuidResponse::Empty),
@@ -366,10 +370,11 @@ Content-Type: <manifest media type>
 
  */
 #[put("/v2/<name>/<repo>/manifests/<reference>", data = "<_chunk>")]
-fn put_image_manifest(name: String,
-                      repo: String,
-                      reference: String,
-                      _chunk: rocket::data::Data,
+fn put_image_manifest(
+    name: String,
+    repo: String,
+    reference: String,
+    _chunk: rocket::data::Data,
 ) -> MaybeResponse2<Empty> {
     debug!("{}/{}/{}", name, repo, reference);
     MaybeResponse::err(Err(errors::Client::UNSUPPORTED))

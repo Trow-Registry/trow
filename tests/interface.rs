@@ -12,7 +12,7 @@ mod interface_tests {
     use std::process::Child;
     use std::time::Duration;
     use std::thread;
-    use hyper::{Client, StatusCode, Error, Response};
+    use hyper::{Client, StatusCode, Error, Response, Request, Method};
     use tokio_core::reactor::Core;
 
     const LYCAON_ADDRESS: &'static str = "http://localhost:8000";
@@ -63,13 +63,45 @@ mod interface_tests {
         core.run(work)
     }
 
+
+    fn post_sync(url: &str) -> Result<Response, Error> {
+
+        let mut core = Core::new().expect("Failed to start hyper");
+        let client = Client::new(&core.handle());
+
+        let uri = url.parse()?;
+        let req = Request::new(Method::Post, uri);
+        let work = client.request(req);
+        core.run(work)
+    }
+
     #[test]
     fn get_main() {
         let _lyc = start_lycaon();
 
-        let i = get_sync(LYCAON_ADDRESS).unwrap();
-        assert_eq!(i.status(), StatusCode::Ok);
-        assert_eq!(i.headers().get_raw("Docker-Distribution-API-Version").unwrap(), "registry/2.0");
+        let resp = get_sync(LYCAON_ADDRESS).unwrap();
+        assert_eq!(resp.status(), StatusCode::Ok);
+        assert_eq!(resp.headers().get_raw("Docker-Distribution-API-Version").unwrap(), "registry/2.0");
+
+        //All v2 registries should respond with a 200 to this
+        let resp = get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/")).unwrap();
+        assert_eq!(resp.status(), StatusCode::Ok);
+        assert_eq!(resp.headers().get_raw("Docker-Distribution-API-Version").unwrap(), "registry/2.0");
+    }
+
+    #[test]
+    #[ignore]
+    fn upload_layer() {
+        let _lyc = start_lycaon();
+        
+        let resp = post_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/imagetest/blobs/uploads/")).unwrap();
+
+        //should give 202 accepted
+
+        let _uuid = resp.headers().get_raw("Docker-Upload-Uuid").unwrap();
+        //assert uuid in request.headers.get("Location")
+
+        //return request.headers.get("Location")
 
     }
 
