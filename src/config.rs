@@ -265,6 +265,7 @@ pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
         .manage(config)
         .attach(fairing::AdHoc::on_attach(startup))
         .attach(fairing::AdHoc::on_response(|_, resp| {
+            //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
             resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");}))
         .mount("/", routes::routes())
         .catch(routes::errors()))

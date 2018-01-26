@@ -147,7 +147,7 @@ digest - unique identifier for the blob to be downoaded
 fn get_blob(_name: String, _repo: String, digest: String) -> MaybeResponse<Empty> {
     info!("Getting Blob");
     match digest.as_str() {
-        "good" => MaybeResponse::ok(Empty),
+        "test_digest" => MaybeResponse::ok(Empty),
         _ => MaybeResponse::err(Empty),
     }
 }
