@@ -264,6 +264,8 @@ pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
         .manage(build_handlers(&config))
         .manage(config)
         .attach(fairing::AdHoc::on_attach(startup))
+        .attach(fairing::AdHoc::on_response(|_, resp| {
+            resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");}))
         .mount("/", routes::routes())
         .catch(routes::errors()))
 }
