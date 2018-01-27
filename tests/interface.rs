@@ -98,29 +98,20 @@ mod interface_tests {
 
     //#[test]
     fn get_blob() {
-        //let _lyc = start_lycaon();
 
         //Currently have stub value in lycaon
         let resp =
             get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/test_digest")).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
-        assert_eq!(
-            resp.headers()
-                .get_raw("Docker-Distribution-API-Version")
-                .unwrap(),
-            "registry/2.0"
-        );
+        //Add test that we get file
+
+        //Try getting seomthing on another instance should redirect
 
         //Try getting something that doesn't exist
         let resp =
             get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry")).unwrap();
-        assert_eq!(resp.status(), StatusCode::Ok);
-        assert_eq!(
-            resp.headers()
-                .get_raw("Docker-Distribution-API-Version")
-                .unwrap(),
-            "registry/2.0"
-        );
+        assert_eq!(resp.status(), StatusCode::NotFound);
+
     }
 
     #[test]
@@ -142,7 +133,7 @@ mod interface_tests {
     #[test]
     fn test_runner() {
         //Had issues with stopping and starting lycaon causing test fails.
-        //It might be able to improve things with a thread_local variable.
+        //It might be able to improve things with a thread_local
         let _lyc = start_lycaon();
         get_main();
         get_blob();

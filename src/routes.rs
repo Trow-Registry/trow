@@ -13,6 +13,9 @@ use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
 use response::html::HTML;
+use rocket::request::{self, FromRequest, Request};
+use rocket::Outcome;
+use rocket::http::Status;
 
 use state;
 use types::Layer;
@@ -39,6 +42,33 @@ pub fn routes() -> Vec<rocket::Route> {
         // admin routes
         admin_get_uuids,
     ]
+}
+
+struct Blob {
+    _file: String,
+}
+impl<'a, 'r> FromRequest<'a, 'r> for Blob {
+    type Error = ();
+    fn from_request(req: &'a Request<'r>) -> request::Outcome<Blob, ()> {
+
+        //Look up catalogue to see if we have it
+        let digest = req.get_param::<String>(2).unwrap();
+
+        if digest == "test_digest" {
+            return Outcome::Success(Blob {
+                _file: "test_file".to_owned(),
+            });
+        }
+        Outcome::Failure((Status::NotFound, ()))
+    }
+}
+
+struct AuthorisedUser(String);
+impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
+    type Error = ();
+    fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
+        Outcome::Success(AuthorisedUser("test".to_owned()))
+    }
 }
 
 pub fn errors() -> Vec<rocket::Catcher> {
@@ -73,7 +103,6 @@ fn get_v2root() -> RegistryResponse<Empty> {
 
 #[get("/")]
 fn get_homepage<'a>() -> RegistryResponse<HTML<'a>> {
-    
     const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
 <h1>Welcome to Lycaon, the King of Registries</h1>
 </body></html>";
@@ -143,13 +172,16 @@ digest - unique identifier for the blob to be downoaded
 200 - blob is downloaded
 307 - redirect to another service for downloading[1]
  */
-#[get("/v2/<_name>/<_repo>/blobs/<digest>")]
-fn get_blob(_name: String, _repo: String, digest: String) -> MaybeResponse<Empty> {
+#[get("/v2/<_name>/<_repo>/blobs/<_digest>")]
+fn get_blob(
+    _name: String,
+    _repo: String,
+    _digest: String,
+    _auth_user: AuthorisedUser,
+    _blob: Blob,
+) -> MaybeResponse<Empty> {
     info!("Getting Blob");
-    match digest.as_str() {
-        "test_digest" => MaybeResponse::ok(Empty),
-        _ => MaybeResponse::err(Empty),
-    }
+    MaybeResponse::ok(Empty)
 }
 
 /// Pushing a Layer
