@@ -73,20 +73,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     }
 }
 
-pub fn errors() -> Vec<rocket::Catcher> {
-    catchers![err_400, err_404,]
-}
-
-#[catch(400)]
-fn err_400() -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
-}
-
-#[catch(404)]
-fn err_404() -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
-}
-
 /// Routes of a 2.0 Registry
 ///
 /// Version Check of the registry
