@@ -143,10 +143,12 @@ Content-Length: size of manifest
 # Returns
 200 - manifest exists
 404 - manifest does not exist
+
+NOTE: this may not be needed due to autogen of HEAD methods.
  */
 #[head("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn check_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
+fn check_image_manifest(_name: String, _repo: String, _reference: String) -> Empty {
+    Empty
 }
 
 /*
@@ -185,8 +187,8 @@ fn get_blob(
 /// # Returns
 /// 202 - accepted
 #[post("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn post_blob_uuid(_name: String, _repo: String, _uuid: String) -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
+fn post_blob_uuid(_name: String, _repo: String, _uuid: String) -> Empty {
+    Empty
 }
 
 /*
@@ -241,8 +243,8 @@ Docker-Upload-UUID: <uuid>
 204
  */
 #[get("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn get_upload_progress(_name: String, _repo: String, _uuid: String) -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
+fn get_upload_progress(_name: String, _repo: String, _uuid: String) -> Empty {
+    Empty
 }
 /*
 
@@ -378,8 +380,8 @@ DELETE /v2/<name>/blobs/<digest>
 
  */
 #[delete("/v2/<_name>/<_repo>/blobs/<_digest>")]
-fn delete_blob(_name: String, _repo: String, _digest: String) -> MaybeResponse<Empty> {
-    MaybeResponse::build(Empty)
+fn delete_blob(_name: String, _repo: String, _digest: String) -> Empty {
+    Empty
 }
 /*
 
@@ -416,8 +418,8 @@ GET /v2/<name>/tags/list
 
  */
 #[delete("/v2/<_name>/<_repo>/tags/list")]
-fn get_image_tags(_name: String, _repo: String) -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
+fn get_image_tags(_name: String, _repo: String) -> Empty {
+    Empty
 }
 /*
 ---
@@ -426,8 +428,8 @@ DELETE /v2/<name>/manifests/<reference>
 
  */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> MaybeResponse<Empty> {
-    MaybeResponse::err(Empty)
+fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Empty {
+    Empty
 }
 
 #[get("/admin/uuids")]
