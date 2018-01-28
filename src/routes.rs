@@ -1,4 +1,5 @@
 use std::string::ToString;
+use std::path::PathBuf;
 
 use rocket;
 
@@ -16,6 +17,7 @@ use response::html::HTML;
 use rocket::request::{self, FromRequest, Request};
 use rocket::Outcome;
 use rocket::http::Status;
+use rocket::response::NamedFile;
 
 use state;
 use types::Layer;
@@ -45,7 +47,7 @@ pub fn routes() -> Vec<rocket::Route> {
 }
 
 struct Blob {
-    _file: String,
+    file: PathBuf,
 }
 impl<'a, 'r> FromRequest<'a, 'r> for Blob {
     type Error = ();
@@ -56,7 +58,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Blob {
 
         if digest == "test_digest" {
             return Outcome::Success(Blob {
-                _file: "test_file".to_owned(),
+                file: PathBuf::from("./README.md"),
             });
         }
         Outcome::Failure((Status::NotFound, ()))
@@ -178,10 +180,10 @@ fn get_blob(
     _repo: String,
     _digest: String,
     _auth_user: AuthorisedUser,
-    _blob: Blob,
-) -> MaybeResponse<Empty> {
+    blob: Blob,
+) -> Option<NamedFile> {
     info!("Getting Blob");
-    MaybeResponse::ok(Empty)
+    NamedFile::open(blob.file).ok()
 }
 
 /// Pushing a Layer
