@@ -1,4 +1,3 @@
-use rocket;
 use rocket::http::Status;
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
@@ -68,9 +67,7 @@ where
 {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
         let response = self.0.respond_to(req)?;
-        let header = rocket::http::Header::new("Docker-Distribution-API-Version", "registry/2.0");
-
-        Response::build().header(header).merge(response).ok()
+        Ok(response)
     }
 }
 
