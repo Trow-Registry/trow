@@ -7,7 +7,7 @@ use errors;
 use config;
 use controller::uuid as cuuid;
 use response::admin::Admin;
-use response::{MaybeResponse, MaybeResponse2, RegistryResponse};
+use response::{MaybeResponse, MaybeResponse2};
 use response::empty::Empty;
 use response::layers::LayerExists;
 use response::uuid::UuidResponse;
@@ -85,17 +85,17 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
 /// # Headers
 /// Docker-Distribution-API-Version: registry/2.0
 #[get("/v2")]
-fn get_v2root() -> RegistryResponse<Empty> {
-    RegistryResponse(Empty)
+fn get_v2root() -> Empty {
+    Empty
 }
 
 #[get("/")]
-fn get_homepage<'a>() -> RegistryResponse<HTML<'a>> {
+fn get_homepage<'a>() -> HTML<'a> {
     const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
 <h1>Welcome to Lycaon, the King of Registries</h1>
 </body></html>";
 
-    RegistryResponse(HTML(ROOT_RESPONSE))
+    HTML(ROOT_RESPONSE)
 }
 
 /*
