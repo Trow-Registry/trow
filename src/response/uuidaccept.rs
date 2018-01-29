@@ -5,9 +5,9 @@ use rocket::response::{Responder, Response};
 use rocket::request::Request;
 
 use config;
-use errors;
 use grpc::backend;
 use types;
+use response::errors;
 
 const BASE_URL: &str = "http://localhost:8000";
 
@@ -81,19 +81,28 @@ impl UuidAcceptResponse {
         handler: State<config::BackendHandler>,
         layer: &types::Layer,
         // uuid: &str,
-    ) -> Result<UuidAcceptResponse, Error> {
+    ) -> Result<UuidAcceptResponse, errors::Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
         req.set_name(layer.name.to_owned());
         req.set_repo(layer.repo.to_owned());
         req.set_digest(layer.digest.to_owned());
 
-        let response = backend.cancel_upload(req)?;
+        //Log errors, don't send details to client
+        let response = match backend.cancel_upload(req) {
+            Ok(r) => r,
+            Err(e) => {
+                //why can't I call error!?
+                debug!("Error calling backend {:?}", e);
+                return Err(errors::Error::InternalError);
+            }
+        };
+
 
         debug!("Return: {:?}", response);
         match response.get_success() {
             true => Ok(UuidAcceptResponse::UuidDelete),
-            false => Err(errors::Client::BLOB_UPLOAD_UNKNOWN.into()),
+            false => Err(errors::Error::BlobUploadUnknown),
         }
     }
 }

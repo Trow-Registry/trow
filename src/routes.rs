@@ -3,13 +3,11 @@ use std::path::PathBuf;
 
 use rocket;
 
-use errors;
+use response::errors::Error;
 use config;
 use controller::uuid as cuuid;
 use response::admin::Admin;
-use response::{MaybeResponse, MaybeResponse2};
 use response::empty::Empty;
-use response::layers::LayerExists;
 use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
@@ -30,7 +28,6 @@ pub fn routes() -> Vec<rocket::Route> {
         check_image_manifest,
         get_blob,
         post_blob_uuid,
-        check_existing_layer,
         get_upload_progress,
         put_blob,
         patch_blob,
@@ -52,7 +49,6 @@ struct Blob {
 impl<'a, 'r> FromRequest<'a, 'r> for Blob {
     type Error = ();
     fn from_request(req: &'a Request<'r>) -> request::Outcome<Blob, ()> {
-
         //Look up catalogue to see if we have it
         let digest = req.get_param::<String>(2).unwrap();
 
@@ -70,6 +66,25 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
     fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
         Outcome::Success(AuthorisedUser("test".to_owned()))
+    }
+}
+
+struct Manifest {
+    file: PathBuf,
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for Manifest {
+    type Error = ();
+    fn from_request(req: &'a Request<'r>) -> request::Outcome<Manifest, ()> {
+        //Look up catalogue to see if we have it
+        let reference = req.get_param::<String>(2).unwrap();
+
+        if reference == "test_manifest" {
+            return Outcome::Success(Manifest {
+                file: PathBuf::from("./README.md"),
+            });
+        }
+        Outcome::Failure((Status::NotFound, ()))
     }
 }
 
@@ -118,13 +133,15 @@ Accept: manifest-version
 200 - return the manifest
 404 - manifest not known to the registry
  */
-#[get("/v2/<_name>/<_repo>/manifests/<reference>")]
-fn get_manifest(_name: String, _repo: String, reference: String) -> MaybeResponse<Empty> {
+#[get("/v2/<_name>/<_repo>/manifests/<_reference>")]
+fn get_manifest(
+    _name: String,
+    _repo: String,
+    _reference: String,
+    manifest: Manifest,
+) -> Option<NamedFile> {
     info!("Getting Manifest");
-    match reference.as_str() {
-        "good" => MaybeResponse::ok(Empty),
-        _ => MaybeResponse::err(Empty),
-    }
+    NamedFile::open(manifest.file).ok()
 }
 /*
 
@@ -193,39 +210,6 @@ fn post_blob_uuid(_name: String, _repo: String, _uuid: String) -> Empty {
 
 /*
 ---
-Check for existing layer
-HEAD /v2/<name>/blobs/<digest>
-name - name of repository
-digest - digest of blob to be checked
-
-# Headers
-Content-Length: <length of blob>
-Docker-Content-Digest: <digest>
-
-# Returns
-200 - exists
-404 - does not exist
- */
-
-#[head("/v2/<name>/<repo>/blobs/<digest>")]
-fn check_existing_layer(
-    backend: rocket::State<config::BackendHandler>,
-    name: String,
-    repo: String,
-    digest: String,
-) -> MaybeResponse<LayerExists> {
-    debug!("Handling LayerExists route");
-    LayerExists::handle(backend, Layer { name, repo, digest })
-        .map(|response| MaybeResponse::build(response))
-        .map_err(|e| {
-            warn!("{}", e);
-            errors::Client::BLOB_UNKNOWN
-        })
-        .unwrap_or(MaybeResponse::build(LayerExists::False))
-}
-
-/*
----
 Upload Progress
 GET /v2/<name>/blobs/uploads/<uuid>
 name - name of registry
@@ -273,14 +257,11 @@ fn put_blob(
     repo: String,
     uuid: String,
     digest: cuuid::DigestStruct,
-) -> MaybeResponse<UuidAcceptResponse> {
-    UuidAcceptResponse::handle(config, name, repo, uuid, digest.digest)
-        .map(|response| MaybeResponse::build(response))
-        .or_else(|e| {
-            warn!("put_blob: {}", e);
-            Err(e)
-        })
-        .unwrap_or(MaybeResponse::build(UuidAcceptResponse::UnknownError))
+) -> Result<UuidAcceptResponse, Error> {
+    match UuidAcceptResponse::handle(config, name, repo, uuid, digest.digest) {
+        Ok(x) => Ok(x),
+        Err(_) => Err(Error::InternalError)
+    }
 }
 
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data = "<chunk>")]
@@ -290,7 +271,7 @@ fn patch_blob(
     repo: String,
     uuid: String,
     chunk: rocket::data::Data,
-) -> MaybeResponse<UuidResponse> {
+) -> UuidResponse {
     debug!("Checking if uuid is valid!");
     let layer = Layer {
         name: name.clone(),
@@ -311,20 +292,20 @@ fn patch_blob(
                         Err(_) => 0,
                     },
                 );
-                MaybeResponse::build(UuidResponse::Uuid {
+                UuidResponse::Uuid {
                     uuid,
                     name,
                     repo,
                     range,
-                })
+                }
             }
-            Err(_) => MaybeResponse::build(UuidResponse::Empty),
+            Err(_) => UuidResponse::Empty,
         }
     } else {
         warn!("Uuid {} does not exist, piping to /dev/null", uuid);
         let len = chunk.stream_to_file("/dev/null");
         debug!("Chunk Length = {:?}", len);
-        MaybeResponse::build(UuidResponse::Empty)
+        UuidResponse::Empty
     }
 }
 
@@ -344,14 +325,10 @@ fn delete_upload(
     name: String,
     repo: String,
     uuid: String,
-) -> MaybeResponse2<UuidAcceptResponse> {
-    let response = UuidAcceptResponse::delete_upload(handler, &Layer::new(name, repo, uuid))
-        .map_err(|e| match e.downcast::<errors::Client>() {
-            Ok(e) => e,
-            Err(_) => errors::Client::UNSUPPORTED,
-        });
-    MaybeResponse::build(response)
+) -> Result<UuidAcceptResponse, Error> {
+    UuidAcceptResponse::delete_upload(handler, &Layer::new(name, repo, uuid))
 }
+
 /*
 ---
 Cross repo blob mounting (validate how regularly this is used)
@@ -364,14 +341,14 @@ fn post_blob_upload(
     handler: rocket::State<config::BackendHandler>,
     name: String,
     repo: String,
-) -> MaybeResponse<UuidResponse> {
+) -> UuidResponse {
     UuidResponse::handle(handler, name, repo)
         .map_err(|e| {
             warn!("Uuid Generate: {}", e);
         })
-        .map(|response| MaybeResponse::build(response))
-        .unwrap_or(MaybeResponse::build(UuidResponse::Empty))
+        .unwrap_or(UuidResponse::Empty)
 }
+
 /*
 
 ---
@@ -383,6 +360,7 @@ DELETE /v2/<name>/blobs/<digest>
 fn delete_blob(_name: String, _repo: String, _digest: String) -> Empty {
     Empty
 }
+
 /*
 
 ---
@@ -397,10 +375,11 @@ fn put_image_manifest(
     repo: String,
     reference: String,
     _chunk: rocket::data::Data,
-) -> MaybeResponse2<Empty> {
+) -> Result<Empty, Error> {
     debug!("{}/{}/{}", name, repo, reference);
-    MaybeResponse::err(Err(errors::Client::UNSUPPORTED))
+    Err(Error::Unsupported)
 }
+
 /*
 ---
 Listing Repositories
@@ -408,8 +387,8 @@ GET /v2/_catalog
 
  */
 #[get("/v2/_catalog")]
-fn get_catalog() -> MaybeResponse<Catalog> {
-    MaybeResponse::build(Catalog)
+fn get_catalog() -> Catalog {
+    Catalog
 }
 /*
 ---
@@ -417,9 +396,9 @@ Listing Image Tags
 GET /v2/<name>/tags/list
 
  */
-#[delete("/v2/<_name>/<_repo>/tags/list")]
-fn get_image_tags(_name: String, _repo: String) -> Empty {
-    Empty
+#[get("/v2/<_name>/<_repo>/tags/list")]
+fn get_image_tags(_name: String, _repo: String) -> Result<Empty, Error> {
+    Err(Error::Unsupported)
 }
 /*
 ---
@@ -428,20 +407,18 @@ DELETE /v2/<name>/manifests/<reference>
 
  */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Empty {
-    Empty
+fn delete_image_manifest(
+    _name: String,
+    _repo: String,
+    _reference: String,
+) -> Result<Empty, Error> {
+    Err(Error::Unsupported)
 }
 
 #[get("/admin/uuids")]
-fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> MaybeResponse<Admin> {
-    MaybeResponse::build(
-        Admin::get_uuids(handler)
-            .map(|uuids| {
-                // oMaybeResponse::build(uuids)
-                uuids
-            })
-            .unwrap_or(Admin::Uuids(vec![])),
-    )
+fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> Admin {
+    Admin::get_uuids(handler)
+        .unwrap_or(Admin::Uuids(vec![]))
 }
 
 /*

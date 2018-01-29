@@ -72,10 +72,17 @@ mod interface_tests {
         core.run(work)
     }
 
-    //#[test]
-    fn get_main() {
-        //let _lyc = start_lycaon();
+    fn delete_sync(url: &str) -> Result<Response, Error> {
+        let mut core = Core::new().expect("Failed to start hyper");
+        let client = Client::new(&core.handle());
 
+        let uri = url.parse()?;
+        let req = Request::new(Method::Delete, uri);
+        let work = client.request(req);
+        core.run(work)
+    }
+
+    fn get_main() {
         let resp = get_sync(LYCAON_ADDRESS).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         assert_eq!(
@@ -96,7 +103,6 @@ mod interface_tests {
         );
     }
 
-    //#[test]
     fn get_blob() {
 
         //Currently have stub value in lycaon
@@ -111,6 +117,14 @@ mod interface_tests {
         let resp =
             get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry")).unwrap();
         assert_eq!(resp.status(), StatusCode::NotFound);
+
+    }
+
+    fn unsupported() {
+
+        //Delete currently unimplemented
+        let resp = delete_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref")).unwrap();
+        assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
 
     }
 
@@ -137,6 +151,7 @@ mod interface_tests {
         let _lyc = start_lycaon();
         get_main();
         get_blob();
+        unsupported();
 
     }
 
