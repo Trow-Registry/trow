@@ -41,6 +41,7 @@ extern crate lycaon_errors as errors;
 extern crate lycaon_protobuf as grpc;
 
 extern crate env_logger;
+#[macro_use]
 extern crate failure_derive;
 #[macro_use(log, warn, info, debug)]
 extern crate log;
@@ -54,15 +55,12 @@ use std::thread;
 use failure::Error;
 use clap::ArgMatches;
 
-#[macro_use]
-mod macros;
 pub mod controller;
 pub mod config;
 pub mod response;
 mod routes;
 mod state;
 mod types;
-mod util;
 
 
 fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {

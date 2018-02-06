@@ -147,10 +147,13 @@ mod interface_tests {
     #[test]
     fn test_runner() {
         //Had issues with stopping and starting lycaon causing test fails.
-        //It might be able to improve things with a thread_local
+        //It might be possible to improve things with a thread_local
         let _lyc = start_lycaon();
+        println!("Running get_main()");
         get_main();
+        println!("Running get_blob()");
         get_blob();
+        println!("Running unsupported()");
         unsupported();
 
     }

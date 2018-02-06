@@ -5,10 +5,10 @@ use rocket::response::{Responder, Response};
 use rocket::request::Request;
 use hostname;
 use uuid::Uuid;
+use response::errors;
 
 use grpc::backend;
 use config;
-use errors;
 use types::Layer;
 
 #[derive(Debug, Serialize)]
@@ -58,7 +58,7 @@ impl UuidResponse {
         debug!("UuidExists: {:?}", response.get_success());
         match response.get_success() {
             true => Ok(true),
-            false => Err(errors::Client::DIGEST_INVALID.into()),
+            false => Err(errors::Error::DigestInvalid.into()),
         }
     }
 }

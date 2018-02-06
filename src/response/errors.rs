@@ -26,6 +26,7 @@ pub enum Error {
     BlobUploadUnknown,
     Unsupported,
     InternalError,
+    DigestInvalid
 }
 
 
@@ -35,6 +36,7 @@ impl fmt::Display for Error {
             Error::Unsupported => write!(f, "Unsupported Operation"),
             Error::BlobUploadUnknown => write!(f, "Blob Upload Unknown"),
             Error::InternalError => write!(f, "Internal Error"),
+            Error::DigestInvalid => write!(f, "Provided digest did not match uploaded content"),
         }
     }
 }
@@ -45,6 +47,7 @@ impl error::Error for Error {
             Error::Unsupported => "The operation was unsupported due to a missing implementation or invalid set of parameters.",
             Error::BlobUploadUnknown => "If a blob upload has been cancelled or was never started, this error code may be returned.",
             Error::InternalError => "An internal error occured, please consult the logs for more details.",
+            Error::DigestInvalid => "When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key \"digest\", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest."
         }
     }
     
@@ -55,7 +58,8 @@ impl<'r> Responder<'r> for Error {
         match self {
             Error::Unsupported => Err(Status::MethodNotAllowed),
             Error::BlobUploadUnknown => Err(Status::NotFound),
-            Error::InternalError => Err(Status::InternalServerError)
+            Error::InternalError => Err(Status::InternalServerError),
+            Error::DigestInvalid => Err(Status::BadRequest)
         }
     }
 }

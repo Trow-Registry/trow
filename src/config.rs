@@ -18,7 +18,6 @@ use rocket;
 use rocket::fairing;
 
 use backend;
-use errors;
 use grpc::backend_grpc::BackendClient;
 use routes;
 
@@ -100,6 +99,12 @@ impl LycaonConfig {
     }
 }
 
+//TODO: Make this take a cause or description
+#[derive(Fail, Debug)]
+#[fail(display = "invalid data directory")]
+pub struct ConfigError {
+}
+
 #[derive(Debug)]
 pub enum Backend {
     Test,
@@ -139,6 +144,8 @@ impl SocketHandler {
     }
 }
 
+
+
 /// Build the logging agent with formatting.
 pub fn main_logger() -> Result<(), SetLoggerError> {
     let mut builder = env_logger::LogBuilder::new();
@@ -177,7 +184,7 @@ fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
     let layers_path = data_path.join(LAYERS_DIR);
     setup_path(scratch_path)
         .and(setup_path(layers_path))
-        .map_err(|e| errors::Server::ConfigError(e).into())
+        .map_err(|_| ConfigError{}.into())
 }
 
 /// extract configuration values

@@ -1,4 +1,4 @@
-use failure::Error;
+use failure;
 use rocket::State;
 use rocket::http::{Header, Status};
 use rocket::response::{Responder, Response};
@@ -35,7 +35,7 @@ impl UuidAcceptResponse {
         repo: String,
         uuid: String,
         digest: String,
-    ) -> Result<UuidAcceptResponse, Error> {
+    ) -> Result<UuidAcceptResponse, failure::Error> {
         use std::fs;
         use std::path;
         // 1. copy file to new location
@@ -72,7 +72,8 @@ impl UuidAcceptResponse {
                 repo: repo,
             }),
             false => {
-                not_implemented!()
+                warn!("Function is not implemented");
+                Err(failure::format_err!("Not implemented"))
             }
         }
     }

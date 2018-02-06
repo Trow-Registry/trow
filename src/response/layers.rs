@@ -1,4 +1,4 @@
-use failure::Error;
+use failure;
 
 use rocket::State;
 use rocket::http::{Header, Status};
@@ -9,7 +9,6 @@ use config;
 use types::Layer;
 
 use grpc::backend;
-use util;
 
 #[derive(Debug, Clone)]
 pub enum LayerExists {
@@ -21,7 +20,7 @@ impl LayerExists {
     pub fn handle(
         handler: State<config::BackendHandler>,
         layer: Layer,
-    ) -> Result<LayerExists, Error> {
+    ) -> Result<LayerExists, failure::Error> {
         let backend = handler.backend();
 
         let mut proto_layer = backend::Layer::new();
@@ -39,7 +38,8 @@ impl LayerExists {
                 digest: layer.digest,
                 length: reply.get_length(),
             }),
-            false => Err(util::std_err("blob doesn't exist")),
+            //Should probably use a proper type
+            false => Err(failure::format_err!("blob doesn't exist")),
         }
     }
 }
