@@ -30,7 +30,7 @@ stdenv.mkDerivation rec {
     protobuf
 
     # dev
-    # rustfmt
+    rustfmt
     valgrind
   ];
 
