@@ -187,6 +187,12 @@ fn get_blob(
     _auth_user: AuthorisedUser,
     blob: Blob,
 ) -> Option<NamedFile> {
+    /*
+     * I suspect calling the guards directly would be better.
+     * We generally don't need to work through a call chain 
+     * (e.g. admin user -> authorised user -> anon user methods)
+     * and can either error/run happy path.
+     */
     info!("Getting Blob");
     NamedFile::open(blob.file).ok()
 }

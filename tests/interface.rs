@@ -1,6 +1,8 @@
 extern crate environment;
 extern crate futures;
+#[macro_use]
 extern crate hyper;
+extern crate rand;
 extern crate tokio_core;
 
 #[cfg(test)]
@@ -12,10 +14,19 @@ mod interface_tests {
     use std::process::Child;
     use std::time::Duration;
     use std::thread;
-    use hyper::{Client, Error, Method, Request, Response, StatusCode};
+    use std::io::Write;
+    use hyper::header::{ContentLength, ContentType, Headers, Location};
+    use hyper::{Chunk, Client, Error, Method, Request, Response, StatusCode};
     use tokio_core::reactor::Core;
+    use rand;
+    use rand::Rng;
+    use futures::Future;
+    use futures::Stream;
 
     const LYCAON_ADDRESS: &'static str = "http://localhost:8000";
+
+    header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
+    header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }
 
     struct LycaonInstance {
         pid: Child,
@@ -53,6 +64,15 @@ mod interface_tests {
         }
     }
 
+    fn gen_rand_blob(size: usize) -> Vec<u8> {
+        let mut rng = rand::thread_rng();
+        let mut blob = Vec::with_capacity(size);
+        for _ in 0..size {
+            blob.push(rng.gen::<u8>());
+        }
+        blob
+    }
+
     fn get_sync(url: &str) -> Result<Response, Error> {
         let mut core = Core::new().expect("Failed to start hyper");
         let client = Client::new(&core.handle());
@@ -61,6 +81,23 @@ mod interface_tests {
         let work = client.get(uri);
         core.run(work)
     }
+
+    /*
+
+    fn get_data_sync(url: &str, out: &mut Write) -> Result<Response, Error> {
+        let mut core = Core::new().expect("Failed to start hyper");
+        let client = Client::new(&core.handle());
+
+        let uri = url.parse()?;
+        let work = client.get(uri).and_then(|res| {
+            res.body()
+                .for_each(|chunk| out.write_all(&chunk).map(|_| ()).map_err(From::from));
+            res
+        });
+        core.run(work)
+    }
+
+    */
 
     fn post_sync(url: &str) -> Result<Response, Error> {
         let mut core = Core::new().expect("Failed to start hyper");
@@ -82,13 +119,40 @@ mod interface_tests {
         core.run(work)
     }
 
+    fn patch_sync(url: &str, data: &Vec<u8>) -> Result<Response, Error> {
+        let mut core = Core::new().expect("Failed to start hyper");
+        let client = Client::new(&core.handle());
+
+        let uri = url.parse()?;
+        let mut req = Request::new(Method::Patch, uri);
+
+        req.headers_mut().set(ContentType::octet_stream());
+        req.headers_mut().set(ContentLength(data.len() as u64));
+
+        req.set_body(data.clone());
+        let work = client.request(req);
+        core.run(work)
+    }
+
+    fn put_sync(url: &str) -> Result<Response, Error> {
+        let mut core = Core::new().expect("Failed to start hyper");
+        let client = Client::new(&core.handle());
+
+        let uri = url.parse()?;
+        let mut req = Request::new(Method::Put, uri);
+
+        req.headers_mut().set(ContentType::octet_stream());
+        req.headers_mut().set(ContentLength(0));
+
+        let work = client.request(req);
+        core.run(work)
+    }
+
     fn get_main() {
         let resp = get_sync(LYCAON_ADDRESS).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         assert_eq!(
-            resp.headers()
-                .get_raw("Docker-Distribution-API-Version")
-                .unwrap(),
+            resp.headers().get::<DistributionApi>().unwrap().0,
             "registry/2.0"
         );
 
@@ -96,52 +160,63 @@ mod interface_tests {
         let resp = get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/")).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         assert_eq!(
-            resp.headers()
-                .get_raw("Docker-Distribution-API-Version")
-                .unwrap(),
+            resp.headers().get::<DistributionApi>().unwrap().0,
             "registry/2.0"
         );
     }
 
     fn get_blob() {
-
         //Currently have stub value in lycaon
         let resp =
             get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/test_digest")).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         //Add test that we get file
 
-        //Try getting seomthing on another instance should redirect
+        //Try getting something on another instance should redirect
 
         //Try getting something that doesn't exist
         let resp =
             get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry")).unwrap();
         assert_eq!(resp.status(), StatusCode::NotFound);
-
     }
 
     fn unsupported() {
-
         //Delete currently unimplemented
-        let resp = delete_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref")).unwrap();
+        let resp =
+            delete_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref")).unwrap();
         assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
-
     }
 
-    #[test]
-    #[ignore]
     fn upload_layer() {
-        
-
+        //Should support both image/test and imagetest, only former working currently
         let resp =
-            post_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/imagetest/blobs/uploads/")).unwrap();
-
-        //should give 202 accepted
-
-        let _uuid = resp.headers().get_raw("Docker-Upload-Uuid").unwrap();
-        //assert uuid in request.headers.get("Location")
-
-        //return request.headers.get("Location")
+            post_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/image/test/blobs/uploads/")).unwrap();
+        assert_eq!(resp.status(), StatusCode::Accepted);
+        let uuid = resp.headers().get::<UploadUuid>().unwrap();
+        let location = resp.headers().get::<Location>().unwrap();
+        //PATCH for chunked, PUT for monolithic
+        //start with PATCH as don't need digest
+        let blob = gen_rand_blob(100);
+        let resp = patch_sync(location, &blob).unwrap();
+        assert_eq!(resp.status(), StatusCode::Accepted);
+        let digest = "123";
+        let resp = put_sync(&format!(
+            "{}/v2/image/test/blobs/uploads/{}?digest={}",
+            LYCAON_ADDRESS, uuid, digest
+        )).unwrap();
+        assert_eq!(resp.status(), StatusCode::Created);
+        
+        //Finally get it back again
+        let resp = get_sync(&format!(
+            "{}/v2/image/test/blobs/uploads/{}",
+            LYCAON_ADDRESS, uuid
+        )).unwrap();
+        assert_eq!(resp.status(), StatusCode::Ok);
+        let mut buf = Vec::new();
+        resp.body()
+            .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from));
+   
+        assert_eq!(blob, buf);
     }
 
     #[test]
@@ -155,7 +230,8 @@ mod interface_tests {
         get_blob();
         println!("Running unsupported()");
         unsupported();
-
+        println!("Running upload_layer()");
+        upload_layer();
     }
 
 }
