@@ -15,8 +15,8 @@ mod interface_tests {
     use std::time::Duration;
     use std::thread;
     use std::io::Write;
-    use hyper::header::{ContentLength, ContentType, Headers, Location};
-    use hyper::{Chunk, Client, Error, Method, Request, Response, StatusCode};
+    use hyper::header::{ContentLength, ContentType, Location};
+    use hyper::{Client, Error, Method, Request, Response, StatusCode};
     use tokio_core::reactor::Core;
     use rand;
     use rand::Rng;
@@ -216,7 +216,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::Ok);
         let mut buf = Vec::new();
         resp.body()
-            .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from));
+            .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from)).wait().unwrap();
    
         //assert_eq!(blob, buf);
     }
