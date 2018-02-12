@@ -208,7 +208,7 @@ mod interface_tests {
         let signed = token.signed(b"secret_key", Sha256::new()).ok();
 
         println!("{:?}", signed);
-        assert_eq!(true, false);
+        // assert_eq!(true, false);
     }
 
     fn get_sync(url: &str) -> Result<Response, Error> {
