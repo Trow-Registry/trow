@@ -1,3 +1,4 @@
+extern crate crypto;
 extern crate environment;
 extern crate futures;
 #[macro_use]
@@ -7,6 +8,9 @@ extern crate tokio_core;
 
 #[cfg(test)]
 mod interface_tests {
+
+    use crypto::digest::Digest;
+    use crypto::sha2::Sha256;
 
     use environment::Environment;
 
@@ -199,9 +203,11 @@ mod interface_tests {
         let blob = gen_rand_blob(100);
         let resp = patch_sync(location, &blob).unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
-        
+
         // TODO: digest handling
-        let digest = "123";
+        let mut hasher = Sha256::new();
+        hasher.input(&blob);
+        let digest = hasher.result_str();
         let resp = put_sync(&format!(
             "{}/v2/image/test/blobs/uploads/{}?digest={}",
             LYCAON_ADDRESS, uuid, digest
@@ -210,15 +216,15 @@ mod interface_tests {
 
         //Finally get it back again
         let resp = get_sync(&format!(
-            "{}/v2/image/test/blobs/uploads/{}",
+            "{}/v2/image/test/blobs/{}",
             LYCAON_ADDRESS, uuid
         )).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         let mut buf = Vec::new();
         resp.body()
             .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from)).wait().unwrap();
-   
-        //assert_eq!(blob, buf);
+
+        assert_eq!(blob, buf);
     }
 
     #[test]
