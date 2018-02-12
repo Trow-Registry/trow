@@ -217,7 +217,7 @@ mod interface_tests {
         //Finally get it back again
         let resp = get_sync(&format!(
             "{}/v2/image/test/blobs/{}",
-            LYCAON_ADDRESS, uuid
+            LYCAON_ADDRESS, digest
         )).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         let mut buf = Vec::new();
