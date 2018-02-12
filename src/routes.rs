@@ -1,5 +1,5 @@
 use std::string::ToString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use rocket;
 
@@ -50,12 +50,15 @@ impl<'a, 'r> FromRequest<'a, 'r> for Blob {
     type Error = ();
     fn from_request(req: &'a Request<'r>) -> request::Outcome<Blob, ()> {
         //Look up catalogue to see if we have it
+        let name = req.get_param::<String>(0).unwrap();
+        let repo = req.get_param::<String>(1).unwrap();
         let digest = req.get_param::<String>(2).unwrap();
+        let path = format!("data/layers/{}/{}/{}", name, repo, digest);
+        info!("Path: {}", path);
+        let path = Path::new(&path);
 
-        if digest == "test_digest" {
-            return Outcome::Success(Blob {
-                file: PathBuf::from("./README.md"),
-            });
+        if path.exists() {
+            return Outcome::Success(Blob { file: path.to_path_buf() });
         }
         Outcome::Failure((Status::NotFound, ()))
     }
@@ -80,9 +83,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Manifest {
         let reference = req.get_param::<String>(2).unwrap();
 
         if reference == "test_manifest" {
-            return Outcome::Success(Manifest {
-                file: PathBuf::from("./README.md"),
-            });
+            return Outcome::Success(Manifest { file: PathBuf::from("./README.md") });
         }
         Outcome::Failure((Status::NotFound, ()))
     }
@@ -189,7 +190,7 @@ fn get_blob(
 ) -> Option<NamedFile> {
     /*
      * I suspect calling the guards directly would be better.
-     * We generally don't need to work through a call chain 
+     * We generally don't need to work through a call chain
      * (e.g. admin user -> authorised user -> anon user methods)
      * and can either error/run happy path.
      */
@@ -256,17 +257,17 @@ Content-Type: application/octet-stream
 <Layer Chunk Binary Data>
  */
 
-#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<digest>")] // capture digest query string
+#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<query>")] // capture digest query string
 fn put_blob(
     config: rocket::State<config::BackendHandler>,
     name: String,
     repo: String,
     uuid: String,
-    digest: cuuid::DigestStruct,
+    query: cuuid::DigestStruct,
 ) -> Result<UuidAcceptResponse, Error> {
-    match UuidAcceptResponse::handle(config, name, repo, uuid, digest.digest) {
+    match UuidAcceptResponse::handle(config, name, repo, uuid, query.digest) {
         Ok(x) => Ok(x),
-        Err(_) => Err(Error::InternalError)
+        Err(_) => Err(Error::InternalError),
     }
 }
 
@@ -278,7 +279,6 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> UuidResponse {
-    debug!("Checking if uuid is valid!");
     let layer = Layer {
         name: name.clone(),
         repo: repo.clone(),
@@ -308,9 +308,9 @@ fn patch_blob(
             Err(_) => UuidResponse::Empty,
         }
     } else {
+        // TODO: pipe breaks if we don't accept the whole file...
         warn!("Uuid {} does not exist, piping to /dev/null", uuid);
-        let len = chunk.stream_to_file("/dev/null");
-        debug!("Chunk Length = {:?}", len);
+        let _ = chunk.stream_to_file("/dev/null");
         UuidResponse::Empty
     }
 }
@@ -413,18 +413,13 @@ DELETE /v2/<name>/manifests/<reference>
 
  */
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn delete_image_manifest(
-    _name: String,
-    _repo: String,
-    _reference: String,
-) -> Result<Empty, Error> {
+fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
     Err(Error::Unsupported)
 }
 
 #[get("/admin/uuids")]
 fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> Admin {
-    Admin::get_uuids(handler)
-        .unwrap_or(Admin::Uuids(vec![]))
+    Admin::get_uuids(handler).unwrap_or(Admin::Uuids(vec![]))
 }
 
 /*
