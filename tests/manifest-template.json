@@ -1,0 +1,13 @@
+{
+   "schemaVersion": 1,
+   "name": "test/test",
+   "tag": "latest",
+   "architecture": "amd64",
+   "fsLayers": [
+      {
+         "blobSum": "dummy_data"
+      }
+   ],
+   "history": [
+   ]
+}
