@@ -61,6 +61,14 @@ mod interface_tests {
         LycaonInstance { pid: child }
     }
 
+    fn setup() {
+        // create dummy layer
+        use std::fs;
+        fs::create_dir_all ("./data/layers/test/test").unwrap();
+        fs::File::create("./data/layers/test/test/test_digest").unwrap();
+
+    }
+
     impl Drop for LycaonInstance {
         fn drop(&mut self) {
             //Y U NO HV STOP?
@@ -232,6 +240,7 @@ mod interface_tests {
         //Had issues with stopping and starting lycaon causing test fails.
         //It might be possible to improve things with a thread_local
         let _lyc = start_lycaon();
+        setup();
         println!("Running get_main()");
         get_main();
         println!("Running get_blob()");
