@@ -73,9 +73,7 @@ fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
         None => config::LycaonConfig::default()?,
     };
 
-    Ok(thread::spawn(move || {
-        backend::server(cnfg.grpc());
-    }))
+    Ok(thread::spawn(move || { backend::server(cnfg.grpc()); }))
 }
 
 fn main() {

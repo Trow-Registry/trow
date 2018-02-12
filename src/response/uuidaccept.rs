@@ -81,7 +81,6 @@ impl UuidAcceptResponse {
     pub fn delete_upload(
         handler: State<config::BackendHandler>,
         layer: &types::Layer,
-        // uuid: &str,
     ) -> Result<UuidAcceptResponse, errors::Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
