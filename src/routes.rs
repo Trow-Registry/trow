@@ -1,4 +1,3 @@
-use std::string::ToString;
 use std::path::{Path, PathBuf};
 
 use rocket;
@@ -289,28 +288,23 @@ fn patch_blob(
     if let Ok(_) = UuidResponse::uuid_exists(handler, &layer) {
         let absolute_file = state::uuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
-        let file = chunk.stream_to_file(absolute_file);
+        let len = chunk.stream_to_file(absolute_file);
 
-        match file {
-            Ok(_) => {
-                let range = (
-                    0,
-                    match file.map(|x| x.to_string()) {
-                        Ok(x) => x.parse::<u32>().unwrap(),
-                        Err(_) => 0,
-                    },
-                );
+        match len {
+            Ok(len) => {
                 UuidResponse::Uuid {
                     uuid,
                     name,
                     repo,
-                    range,
+                    range: (0, len as u32),
                 }
             }
             Err(_) => UuidResponse::Empty,
         }
+
     } else {
         // TODO: pipe breaks if we don't accept the whole file...
+        // AM - shouldn't this return a 4xx? IllegalArgument or something?
         warn!("Uuid {} does not exist, piping to /dev/null", uuid);
         let _ = chunk.stream_to_file("/dev/null");
         UuidResponse::Empty
