@@ -25,7 +25,7 @@ impl<'r> Responder<'r> for Created {
 #[cfg(test)]
 mod test {
     use rocket::http::Status;
-    use response::empty::Empty;
+    use response::empty::{Created, Empty};
 
     use response::test_helper::test_route;
 
