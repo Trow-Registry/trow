@@ -16,6 +16,8 @@ use rocket::request::{self, FromRequest, Request};
 use rocket::Outcome;
 use rocket::http::Status;
 use rocket::response::NamedFile;
+use serde_json;
+use serde_json::{Value};
 
 use state;
 use types::Layer;
@@ -375,14 +377,28 @@ PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
  */
-#[put("/v2/<name>/<repo>/manifests/<reference>", data = "<_chunk>")]
+#[put("/v2/<name>/<repo>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest(
     name: String,
     repo: String,
     reference: String,
-    _chunk: rocket::data::Data,
+    chunk: rocket::data::Data,
 ) -> Result<Empty, Error> {
-    debug!("{}/{}/{}", name, repo, reference);
+    /*
+     * 0. accept manifest file. (done)
+     * 1. Check signature is valid (skip for now)
+     * 2. Verify name/repo:tag match with manifest
+     * 3. Verify all layers exist
+     * 4. Save Manifest file
+     *
+     * - do size check before accepting file
+     */
+    use std::str;
+    let mut manifest = Vec::new();
+    chunk.stream_to(&mut manifest);
+    let manifest = str::from_utf8(&manifest).unwrap();
+    let manifest: Value = serde_json::from_str(&manifest).unwrap();
+
     Err(Error::Unsupported)
 }
 
