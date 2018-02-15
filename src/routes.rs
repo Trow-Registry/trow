@@ -7,7 +7,7 @@ use response::errors::Error;
 use config;
 use controller::uuid as cuuid;
 use response::admin::Admin;
-use response::empty::Empty;
+use response::empty::{Created, Empty};
 use response::uuid::UuidResponse;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
@@ -383,7 +383,7 @@ fn put_image_manifest(
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
-) -> Result<Empty, Error> {
+) -> Result<Created, Error> {
     /*
      * 0. accept manifest file. (done)
      * 1. Check signature is valid (skip for now)
@@ -394,12 +394,44 @@ fn put_image_manifest(
      * - do size check before accepting file
      */
     use std::str;
+    use manifest;
+    use manifest::FromJson;
     let mut manifest = Vec::new();
-    chunk.stream_to(&mut manifest);
-    let manifest = str::from_utf8(&manifest).unwrap();
-    let manifest: Value = serde_json::from_str(&manifest).unwrap();
+    let _ = chunk.stream_to(&mut manifest).unwrap();
+    let raw_manifest = str::from_utf8(&manifest).unwrap();
+    let manifest: Value = serde_json::from_str(&raw_manifest).unwrap();
+    let manifest = manifest::Manifest::from_json(&manifest);
 
-    Err(Error::Unsupported)
+    // TODO: check signature is valid
+
+    // Verify name/repo:tag match with manifest
+    if format!("{}/{}", name, repo) != manifest.name || manifest.tag != reference {
+        warn!("name and repo don't match!");
+        return Err(Error::Unsupported)
+    }
+
+    // Verify all layers exist
+    for layer in manifest.fsLayers {
+        // Same code as respond_to for Blob struct
+        let path = format!("data/layers/{}/{}/{}", name, repo, layer.blobSum);
+        let path = Path::new(&path);
+
+        if !path.exists() {
+            warn!("Layer does not exist in repo");
+            return Err(Error::Unsupported);
+        }
+    }
+
+    // save manifest file
+    use std::fs;
+    use std::io::Write;
+    let manifest_directory = format!("./data/manifests/{}/{}", name, repo);
+    let manifest_path = format!("{}/{}", manifest_directory, reference);
+    fs::create_dir_all(manifest_directory).unwrap();
+    let mut file = fs::File::create(manifest_path).unwrap();
+    file.write_all(&raw_manifest.as_bytes()).unwrap();
+
+    Ok(Created)
 }
 
 /*
