@@ -6,7 +6,7 @@ extern crate hyper;
 extern crate jwt;
 extern crate rustc_serialize;
 extern crate rand;
-extern crate tokio_core;
+extern crate hypersync;
 
 #[cfg(test)]
 mod interface_tests {
@@ -21,9 +21,9 @@ mod interface_tests {
     use std::time::Duration;
     use std::thread;
     use std::io::Write;
-    use hyper::header::{ContentLength, ContentType, Location};
-    use hyper::{Client, Error, Method, Request, Response, StatusCode};
-    use tokio_core::reactor::Core;
+    use hyper::header::Location;
+    use hyper::StatusCode;
+    use hypersync::hypersync;
     use rand;
     use rand::Rng;
     use futures::Future;
@@ -51,10 +51,10 @@ mod interface_tests {
             .expect("failed to start");
 
         let mut timeout = 20;
-        let mut response = get_sync(LYCAON_ADDRESS);
+        let mut response = hypersync::get(LYCAON_ADDRESS);
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::Ok)) {
             thread::sleep(Duration::from_millis(100));
-            response = get_sync(LYCAON_ADDRESS);
+            response = hypersync::get(LYCAON_ADDRESS);
             timeout -= 1;
         }
         if timeout == 0 {
@@ -210,83 +210,8 @@ mod interface_tests {
         println!("{:?}", signed);
     }
 
-    fn get_sync(url: &str) -> Result<Response, Error> {
-        let mut core = Core::new().expect("Failed to start hyper");
-        let client = Client::new(&core.handle());
-
-        let uri = url.parse()?;
-        let work = client.get(uri);
-        core.run(work)
-    }
-
-    /*
-
-    fn get_data_sync(url: &str, out: &mut Write) -> Result<Response, Error> {
-        let mut core = Core::new().expect("Failed to start hyper");
-        let client = Client::new(&core.handle());
-
-        let uri = url.parse()?;
-        let work = client.get(uri).and_then(|res| {
-            res.body()
-                .for_each(|chunk| out.write_all(&chunk).map(|_| ()).map_err(From::from));
-            res
-        });
-        core.run(work)
-    }
-
-    */
-
-    fn post_sync(url: &str) -> Result<Response, Error> {
-        let mut core = Core::new().expect("Failed to start hyper");
-        let client = Client::new(&core.handle());
-
-        let uri = url.parse()?;
-        let req = Request::new(Method::Post, uri);
-        let work = client.request(req);
-        core.run(work)
-    }
-
-    fn delete_sync(url: &str) -> Result<Response, Error> {
-        let mut core = Core::new().expect("Failed to start hyper");
-        let client = Client::new(&core.handle());
-
-        let uri = url.parse()?;
-        let req = Request::new(Method::Delete, uri);
-        let work = client.request(req);
-        core.run(work)
-    }
-
-    fn patch_sync(url: &str, data: &Vec<u8>) -> Result<Response, Error> {
-        let mut core = Core::new().expect("Failed to start hyper");
-        let client = Client::new(&core.handle());
-
-        let uri = url.parse()?;
-        let mut req = Request::new(Method::Patch, uri);
-
-        req.headers_mut().set(ContentType::octet_stream());
-        req.headers_mut().set(ContentLength(data.len() as u64));
-
-        req.set_body(data.clone());
-        let work = client.request(req);
-        core.run(work)
-    }
-
-    fn put_sync(url: &str) -> Result<Response, Error> {
-        let mut core = Core::new().expect("Failed to start hyper");
-        let client = Client::new(&core.handle());
-
-        let uri = url.parse()?;
-        let mut req = Request::new(Method::Put, uri);
-
-        req.headers_mut().set(ContentType::octet_stream());
-        req.headers_mut().set(ContentLength(0));
-
-        let work = client.request(req);
-        core.run(work)
-    }
-
     fn get_main() {
-        let resp = get_sync(LYCAON_ADDRESS).unwrap();
+        let resp = hypersync::get(LYCAON_ADDRESS).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         assert_eq!(
             resp.headers().get::<DistributionApi>().unwrap().0,
@@ -294,7 +219,7 @@ mod interface_tests {
         );
 
         //All v2 registries should respond with a 200 to this
-        let resp = get_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/")).unwrap();
+        let resp = hypersync::get(&(LYCAON_ADDRESS.to_owned() + "/v2/")).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         assert_eq!(
             resp.headers().get::<DistributionApi>().unwrap().0,
@@ -304,7 +229,7 @@ mod interface_tests {
 
     fn get_blob() {
         //Currently have stub value in lycaon
-        let resp = get_sync(
+        let resp = hypersync::get(
             &(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/test_digest"),
         ).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
@@ -313,7 +238,7 @@ mod interface_tests {
         //Try getting something on another instance should redirect
 
         //Try getting something that doesn't exist
-        let resp = get_sync(
+        let resp = hypersync::get(
             &(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"),
         ).unwrap();
         assert_eq!(resp.status(), StatusCode::NotFound);
@@ -321,14 +246,14 @@ mod interface_tests {
 
     fn unsupported() {
         //Delete currently unimplemented
-        let resp = delete_sync(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
+        let resp = hypersync::delete(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
             .unwrap();
         assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
     }
 
     fn upload_layer() {
         //Should support both image/test and imagetest, only former working currently
-        let resp = post_sync(
+        let resp = hypersync::post(
             &(LYCAON_ADDRESS.to_owned() + "/v2/image/test/blobs/uploads/"),
         ).unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
@@ -337,14 +262,14 @@ mod interface_tests {
         //PATCH for chunked, PUT for monolithic
         //start with PATCH as don't need digest
         let blob = gen_rand_blob(100);
-        let resp = patch_sync(location, &blob).unwrap();
+        let resp = hypersync::patch(location, &blob).unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
 
         // TODO: digest handling
         let mut hasher = Sha256::new();
         hasher.input(&blob);
         let digest = hasher.result_str();
-        let resp = put_sync(&format!(
+        let resp = hypersync::put(&format!(
             "{}/v2/image/test/blobs/uploads/{}?digest={}",
             LYCAON_ADDRESS,
             uuid,
@@ -353,7 +278,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::Created);
 
         //Finally get it back again
-        let resp = get_sync(&format!(
+        let resp = hypersync::get(&format!(
             "{}/v2/image/test/blobs/{}",
             LYCAON_ADDRESS,
             digest
