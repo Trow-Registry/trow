@@ -56,7 +56,6 @@ use std::thread;
 use failure::Error;
 use clap::ArgMatches;
 
-pub mod controller;
 pub mod config;
 pub mod response;
 mod manifest;

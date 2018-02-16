@@ -4,7 +4,6 @@ use rocket;
 
 use response::errors::Error;
 use config;
-use controller::uuid as cuuid;
 use response::admin::Admin;
 use response::empty::{Created, Empty};
 use response::uuid::UuidResponse;
@@ -258,13 +257,18 @@ Content-Type: application/octet-stream
 <Layer Chunk Binary Data>
  */
 
+#[derive_FromForm]
+struct UploadQuery {
+    digest: String
+}
+
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<query>")] // capture digest query string
 fn put_blob(
     config: rocket::State<config::BackendHandler>,
     name: String,
     repo: String,
     uuid: String,
-    query: cuuid::DigestStruct,
+    query: UploadQuery,
 ) -> Result<UuidAcceptResponse, Error> {
     match UuidAcceptResponse::handle(config, name, repo, uuid, query.digest) {
         Ok(x) => Ok(x),
