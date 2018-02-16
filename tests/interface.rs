@@ -299,7 +299,7 @@ mod interface_tests {
         println!("Running get_main()");
         get_main();
         println!("Running get_blob()");
-        get_blob();
+        get_non_existent_blob();
         println!("Running unsupported()");
         unsupported();
         println!("Running upload_layer()");
