@@ -42,7 +42,6 @@ failure_derive = "0.1"
 
 lycaon-protobuf = { path = "./lib/protobuf" }
 lycaon-backend = { path = "./lib/backend" }
-lycaon-errors = { path = "./lib/errors" }
 
 [build-dependencies]
 

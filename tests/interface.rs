@@ -227,17 +227,7 @@ mod interface_tests {
         );
     }
 
-    fn get_blob() {
-        //Currently have stub value in lycaon
-        let resp = hypersync::get(
-            &(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/test_digest"),
-        ).unwrap();
-        assert_eq!(resp.status(), StatusCode::Ok);
-        //Add test that we get file
-
-        //Try getting something on another instance should redirect
-
-        //Try getting something that doesn't exist
+    fn get_non_existent_blob() {
         let resp = hypersync::get(
             &(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"),
         ).unwrap();
@@ -259,13 +249,12 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::Accepted);
         let uuid = resp.headers().get::<UploadUuid>().unwrap();
         let location = resp.headers().get::<Location>().unwrap();
-        //PATCH for chunked, PUT for monolithic
-        //start with PATCH as don't need digest
+        
+        //Upload file. Start uploading blob with patch then digest with put
         let blob = gen_rand_blob(100);
         let resp = hypersync::patch(location, &blob).unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
 
-        // TODO: digest handling
         let mut hasher = Sha256::new();
         hasher.input(&blob);
         let digest = hasher.result_str();
