@@ -20,8 +20,7 @@ pub enum UuidAcceptResponse {
         name: String,
         repo: String,
     },
-    UuidDelete,
-    UnknownError,
+    UuidDelete
 }
 
 fn construct_digest_path(layer: &types::Layer) -> String {

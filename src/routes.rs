@@ -5,8 +5,9 @@ use rocket;
 use response::errors::Error;
 use config;
 use response::admin::Admin;
-use response::empty::{Created, Empty};
+use response::empty::Empty;
 use response::uuid::UuidResponse;
+use response::manifest_upload::ManifestUpload;
 use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
 use response::html::HTML;
@@ -16,6 +17,8 @@ use rocket::http::Status;
 use rocket::response::NamedFile;
 use serde_json;
 use serde_json::{Value};
+use crypto::sha2::Sha256;
+use crypto::digest::Digest;
 
 use state;
 use types::Layer;
@@ -259,6 +262,7 @@ Content-Type: application/octet-stream
 
 #[derive_FromForm]
 struct UploadQuery {
+    query: bool,
     digest: String
 }
 
@@ -381,7 +385,7 @@ fn put_image_manifest(
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
-) -> Result<Created, Error> {
+) -> Result<ManifestUpload, Error> {
     /*
      * 0. accept manifest file. (done)
      * 1. Check signature is valid (skip for now)
@@ -394,22 +398,29 @@ fn put_image_manifest(
     use std::str;
     use manifest;
     use manifest::FromJson;
+
     let mut manifest = Vec::new();
     let _ = chunk.stream_to(&mut manifest).unwrap();
     let raw_manifest = str::from_utf8(&manifest).unwrap();
     let manifest: Value = serde_json::from_str(&raw_manifest).unwrap();
     let manifest = manifest::Manifest::from_json(&manifest);
 
+    if manifest.schemaVersion != 1 {
+        return Err(Error::Unsupported);
+    }
+
     // TODO: check signature is valid
 
+    debug!("verifying name/repo");
     // Verify name/repo:tag match with manifest
     if format!("{}/{}", name, repo) != manifest.name || manifest.tag != reference {
         warn!("name and repo don't match!");
         return Err(Error::Unsupported)
     }
 
+        debug!("verifying layers");
     // Verify all layers exist
-    for layer in manifest.fsLayers {
+    for layer in &manifest.fsLayers {
         // Same code as respond_to for Blob struct
         let path = format!("data/layers/{}/{}/{}", name, repo, layer.blobSum);
         let path = Path::new(&path);
@@ -420,6 +431,11 @@ fn put_image_manifest(
         }
     }
 
+    let mut hasher = Sha256::new();
+    hasher.input(&raw_manifest.as_bytes());
+    let digest = format!("sha256:{}", hasher.result_str());
+    let location = format!("http://localhost:5000/v2/alpine/manifests/{}", digest);
+
     // save manifest file
     use std::fs;
     use std::io::Write;
@@ -429,7 +445,11 @@ fn put_image_manifest(
     let mut file = fs::File::create(manifest_path).unwrap();
     file.write_all(&raw_manifest.as_bytes()).unwrap();
 
-    Ok(Created)
+    //Despite what the spec says, I think we need to return the location and
+    //Digest, but not the manifest itself
+    
+
+    Ok(ManifestUpload{digest, location})
 }
 
 /*

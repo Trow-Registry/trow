@@ -37,6 +37,7 @@ extern crate serde_json;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate uuid;
+extern crate crypto;
 
 extern crate lycaon_backend as backend;
 extern crate lycaon_protobuf as grpc;

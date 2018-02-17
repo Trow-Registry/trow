@@ -11,6 +11,7 @@ pub mod html;
 pub mod layers;
 pub mod uuid;
 pub mod uuidaccept;
+pub mod manifest_upload;
 pub mod errors;
 mod test_helper;
 
