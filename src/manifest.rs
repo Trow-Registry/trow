@@ -8,16 +8,29 @@ pub trait FromJson {
         Self: std::marker::Sized;
 }
 
-/*
-    Manifests should be stored in internal format, but mirroring schema 2.2 which is the way forward.
+/**
+ *
+ * This manifest format is a straight conversion from JSON to Rust for manipulation purposes.
+ *
+ * It should only be used for input/output; don't use it as an internal data structure.
+ * (In other words we may have our own concept of manifests which are used to build these versions).
+ *
+ * I'm not really sure this buys us much over the JSON deserialization though...
+ */
+pub enum Manifest {
+    V1(ManifestV1),
+    V2(ManifestV2),
+}
 
-    On input/output can be converted to appropriate format.
-    Keep the code simple and in keeping with 2.2. Any hacks should be in the conversion to 2.1 code.
+pub struct ManifestV2 {
+    pub schema_version: u8,
+    pub media_type: String,
+    //pub config: ImageConfig,
+    pub layers: Box<Vec<BlobSummary>>,
+}
 
-    I expect this code to change.
-*/
 #[derive(Debug, Default)]
-pub struct Manifest {
+pub struct ManifestV1 {
     pub schema_version: u8,
     pub name: String,
     pub tag: String,
@@ -41,7 +54,7 @@ fn schema_1(raw: &Value) -> Result<Manifest, Error> {
     let tag = raw["tag"].as_str().unwrap_or("latest").to_owned(); //Not sure this is correct
     let architecture = raw["architecture"].as_str().unwrap_or("amd64").to_owned();
 
-    Ok(Manifest {
+    Ok(Manifest::V1(ManifestV1 {
         schema_version: 1,
         name,
         tag,
@@ -54,19 +67,25 @@ fn schema_1(raw: &Value) -> Result<Manifest, Error> {
         fs_layers: Box::new(Vec::new()),
         signatures: Box::new(Vec::new()),
         history: Box::new(Vec::new()),
-    })
+    }))
 }
 
 fn schema_2(raw: &Value) -> Result<Manifest, Error> {
-    Ok(Manifest {
+    let mt = raw["mediaType"].as_str().ok_or(InvalidManifest {
+        err: "mediaType is required".to_owned(),
+    })?;
+
+    if mt != "application/vnd.docker.distribution.manifest.v2+json" {
+        return Err(InvalidManifest {
+            err: format!("Unexpected mediaType {}", mt).to_owned(),
+        })?;
+    }
+
+    Ok(Manifest::V2(ManifestV2 {
         schema_version: 2,
-        name: "UNSUPPORTED".to_owned(),
-        tag: "UNSUPPORTED".to_owned(),
-        architecture: "UNSUPPORTED".to_owned(),
-        fs_layers: Box::new(Vec::new()),
-        signatures: Box::new(Vec::new()),
-        history: Box::new(Vec::new()),
-    })
+        media_type: mt.to_owned(),
+        layers: Box::new(Vec::new()),
+    }))
 }
 
 impl FromJson for Manifest {
@@ -78,7 +97,9 @@ impl FromJson for Manifest {
         match schema_version {
             1 => schema_1(raw),
             2 => schema_2(raw),
-            n => Err(InvalidManifest{ err: format!("Unsupported version: {}", n).to_owned()})? //Something screwy here
+            n => Err(InvalidManifest {
+                err: format!("Unsupported version: {}", n).to_owned(),
+            })?, //Something screwy here
         }
     }
 }
@@ -215,7 +236,16 @@ mod test {
      ]
    }"#;
         let v: Value = serde_json::from_str(data).unwrap();
-        assert!(Manifest::from_json(&v).is_ok());
+        let mani = Manifest::from_json(&v).unwrap();
+
+        // There's probably an easier way to do this
+        let m_v2 = match mani {
+            Manifest::V2(m2) => m2,
+            Manifest::V1(_) => panic!(),
+        };
+
+        assert_eq!(m_v2.media_type, "application/vnd.docker.distribution.manifest.v2+json");
+        assert_eq!(m_v2.schema_version, 2);
     }
 
     #[test]

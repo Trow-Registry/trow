@@ -403,22 +403,29 @@ fn put_image_manifest(
         Err(_) => return Err(Error::ManifestInvalid)
     };
 
-    if manifest.schema_version != 1 {
+    /*
+    if let manifest::Manifest::v2(_) = manifest {
         return Err(Error::Unsupported);
     }
+    */
+
+    let manifest_v1 = match manifest {
+         manifest::Manifest::V2(_) => return Err(Error::Unsupported),
+         manifest::Manifest::V1(m1) => m1 
+    };
 
     // TODO: check signature is valid
 
     debug!("verifying name/repo");
     // Verify name/repo:tag match with manifest
-    if format!("{}/{}", name, repo) != manifest.name || manifest.tag != reference {
+    if format!("{}/{}", name, repo) != manifest_v1.name || manifest_v1.tag != reference {
         warn!("name and repo don't match!");
         return Err(Error::Unsupported)
     }
 
     debug!("verifying layers");
     // Verify all layers exist
-    for layer in manifest.fs_layers.into_iter() {
+    for layer in manifest_v1.fs_layers.into_iter() {
         // Same code as respond_to for Blob struct
         let path = format!("data/layers/{}/{}/{}", name, repo, layer.blob_sum);
         let path = Path::new(&path);
