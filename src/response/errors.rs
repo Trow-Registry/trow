@@ -13,7 +13,6 @@ pub enum Error {
     BLOB_UPLOAD_UNKNOWN,
     DIGEST_INVALID,
     MANIFEST_BLOB_UNKNOWN,
-    MANIFEST_INVALID,
     MANIFEST_UNKNOWN,
     MANIFEST_UNVERIFIED,
     NAME_INVALID,
@@ -23,6 +22,7 @@ pub enum Error {
     UNAUTHORIZED,
     DENIED,
     */
+    ManifestInvalid,
     BlobUploadUnknown,
     Unsupported,
     InternalError,
@@ -37,6 +37,7 @@ impl fmt::Display for Error {
             Error::BlobUploadUnknown => write!(f, "Blob Upload Unknown"),
             Error::InternalError => write!(f, "Internal Error"),
             Error::DigestInvalid => write!(f, "Provided digest did not match uploaded content"),
+            Error::ManifestInvalid => write!(f, "Manifest Invalid"),
         }
     }
 }
@@ -47,7 +48,8 @@ impl error::Error for Error {
             Error::Unsupported => "The operation was unsupported due to a missing implementation or invalid set of parameters.",
             Error::BlobUploadUnknown => "If a blob upload has been cancelled or was never started, this error code may be returned.",
             Error::InternalError => "An internal error occured, please consult the logs for more details.",
-            Error::DigestInvalid => "When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key \"digest\", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest."
+            Error::DigestInvalid => "When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key \"digest\", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest.",
+            Error::ManifestInvalid => "During upload, manifests undergo several checks ensuring validity. If those checks fail, this error may be returned, unless a more specific error is included. The detail will contain information the failed validation."
         }
     }
     
@@ -59,7 +61,8 @@ impl<'r> Responder<'r> for Error {
             Error::Unsupported => Err(Status::MethodNotAllowed),
             Error::BlobUploadUnknown => Err(Status::NotFound),
             Error::InternalError => Err(Status::InternalServerError),
-            Error::DigestInvalid => Err(Status::BadRequest)
+            Error::DigestInvalid => Err(Status::BadRequest),
+            Error::ManifestInvalid => Err(Status::BadRequest),
         }
     }
 }

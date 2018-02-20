@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
-
-use rocket;
+use std::str;
 
 use response::errors::Error;
 use config;
@@ -12,14 +11,13 @@ use response::uuidaccept::UuidAcceptResponse;
 use response::catalog::Catalog;
 use response::html::HTML;
 use rocket::request::{self, FromRequest, Request};
-use rocket::Outcome;
+use rocket::{self, Outcome};
 use rocket::http::Status;
 use rocket::response::NamedFile;
 use serde_json;
-use serde_json::{Value};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
-
+use manifest::{self, FromJson};
 use state;
 use types::Layer;
 
@@ -395,17 +393,17 @@ fn put_image_manifest(
      *
      * - do size check before accepting file
      */
-    use std::str;
-    use manifest;
-    use manifest::FromJson;
 
-    let mut manifest = Vec::new();
-    let _ = chunk.stream_to(&mut manifest).unwrap();
-    let raw_manifest = str::from_utf8(&manifest).unwrap();
-    let manifest: Value = serde_json::from_str(&raw_manifest).unwrap();
-    let manifest = manifest::Manifest::from_json(&manifest);
+    let mut manifest_bytes = Vec::new();
+    chunk.stream_to(&mut manifest_bytes).unwrap();
+    let raw_manifest = str::from_utf8(&manifest_bytes).unwrap();
+    let manifest_json: serde_json::Value = serde_json::from_str(&raw_manifest).unwrap();
+    let manifest = match manifest::Manifest::from_json(&manifest_json) {
+        Ok(x) => x,
+        Err(_) => return Err(Error::ManifestInvalid)
+    };
 
-    if manifest.schemaVersion != 1 {
+    if manifest.schema_version != 1 {
         return Err(Error::Unsupported);
     }
 
@@ -418,11 +416,11 @@ fn put_image_manifest(
         return Err(Error::Unsupported)
     }
 
-        debug!("verifying layers");
+    debug!("verifying layers");
     // Verify all layers exist
-    for layer in &manifest.fsLayers {
+    for layer in manifest.fs_layers.into_iter() {
         // Same code as respond_to for Blob struct
-        let path = format!("data/layers/{}/{}/{}", name, repo, layer.blobSum);
+        let path = format!("data/layers/{}/{}/{}", name, repo, layer.blob_sum);
         let path = Path::new(&path);
 
         if !path.exists() {
@@ -444,10 +442,6 @@ fn put_image_manifest(
     fs::create_dir_all(manifest_directory).unwrap();
     let mut file = fs::File::create(manifest_path).unwrap();
     file.write_all(&raw_manifest.as_bytes()).unwrap();
-
-    //Despite what the spec says, I think we need to return the location and
-    //Digest, but not the manifest itself
-    
 
     Ok(ManifestUpload{digest, location})
 }

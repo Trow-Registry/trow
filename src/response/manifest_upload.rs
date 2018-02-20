@@ -1,7 +1,6 @@
 use rocket::http::Status;
 use rocket::response::{Responder, Response};
 use rocket::request::Request;
-use manifest::Manifest;
 use rocket::http::Header;
 
 #[derive(Debug, Serialize)]
@@ -27,7 +26,6 @@ impl<'r> Responder<'r> for ManifestUpload {
 mod test {
     use rocket::http::Status;
     use response::manifest_upload::ManifestUpload;
-    use manifest::Manifest;
     use response::test_helper::test_route;
 
     #[test]
