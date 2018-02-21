@@ -377,9 +377,9 @@ PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
  */
-#[put("/v2/<name>/<repo>/manifests/<reference>", data = "<chunk>")]
+#[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest(
-    name: String,
+    user: String,
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
@@ -403,39 +403,11 @@ fn put_image_manifest(
         Err(_) => return Err(Error::ManifestInvalid)
     };
 
-    /*
-    if let manifest::Manifest::v2(_) = manifest {
-        return Err(Error::Unsupported);
-    }
-    */
 
-    let manifest_v1 = match manifest {
-         manifest::Manifest::V2(_) => return Err(Error::Unsupported),
-         manifest::Manifest::V1(m1) => m1 
-    };
+    //TODO change to our error
+    verify_manifest(&manifest, &user, &repo, &reference)?;
 
     // TODO: check signature is valid
-
-    debug!("verifying name/repo");
-    // Verify name/repo:tag match with manifest
-    if format!("{}/{}", name, repo) != manifest_v1.name || manifest_v1.tag != reference {
-        warn!("name and repo don't match!");
-        return Err(Error::Unsupported)
-    }
-
-    debug!("verifying layers");
-    // Verify all layers exist
-    for layer in manifest_v1.fs_layers.into_iter() {
-        // Same code as respond_to for Blob struct
-        let path = format!("data/layers/{}/{}/{}", name, repo, layer.blob_sum);
-        let path = Path::new(&path);
-
-        if !path.exists() {
-            warn!("Layer does not exist in repo");
-            return Err(Error::Unsupported);
-        }
-    }
-
     let mut hasher = Sha256::new();
     hasher.input(&raw_manifest.as_bytes());
     let digest = format!("sha256:{}", hasher.result_str());
@@ -444,7 +416,7 @@ fn put_image_manifest(
     // save manifest file
     use std::fs;
     use std::io::Write;
-    let manifest_directory = format!("./data/manifests/{}/{}", name, repo);
+    let manifest_directory = format!("./data/manifests/{}/{}", user, repo);
     let manifest_path = format!("{}/{}", manifest_directory, reference);
     fs::create_dir_all(manifest_directory).unwrap();
     let mut file = fs::File::create(manifest_path).unwrap();
@@ -453,6 +425,44 @@ fn put_image_manifest(
     Ok(ManifestUpload{digest, location})
 }
 
+fn verify_manifest(mani: &manifest::Manifest, user: &str, repo: &str, tag: &str) -> Result<(), Error> {
+
+    match mani {
+         &manifest::Manifest::V1(ref m1) => verify_v1_manifest(&m1, user, repo, tag),
+         &manifest::Manifest::V2(ref m2) => verify_v2_manifest(&m2, user, repo, tag) 
+    }
+}
+
+
+fn verify_v2_manifest(mani: &manifest::ManifestV2, user: &str, repo: &str, tag: &str) -> Result<(), Error> {
+
+    Ok(())
+}
+
+fn verify_v1_manifest(mani: &manifest::ManifestV1, user: &str, repo: &str, tag: &str) -> Result<(), Error> {
+        debug!("verifying name/repo");
+    // Verify name/repo:tag match with manifest
+    if format!("{}/{}", user, repo) != mani.name || (mani.tag != tag) {
+        warn!("name and repo don't match!");
+        return Err(Error::Unsupported)
+    }
+
+    debug!("verifying layers");
+    // Verify all layers exist
+    for layer in mani.fs_layers.iter() {
+        // Same code as respond_to for Blob struct
+        
+        let path = format!("data/layers/{}/{}/{}", user, repo, layer.blob_sum);
+        let path = Path::new(&path);
+
+        if !path.exists() {
+            warn!("Layer does not exist in repo");
+            return Err(Error::Unsupported);
+        }
+        
+    }
+    Ok(())
+}
 /*
 ---
 Listing Repositories
