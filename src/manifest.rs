@@ -1,6 +1,6 @@
 use failure::Error;
 use std;
-use serde_json::Value;
+use serde_json::{self, Value};
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self, Error>
@@ -15,6 +15,8 @@ pub trait FromJson {
  * It should only be used for input/output; don't use it as an internal data structure.
  * (In other words we may have our own concept of manifests which are used to build these versions).
  *
+ * Also note that image metadata may move to some sort of DB in the future for fast reliable searches etc.
+ *
  * I'm not really sure this buys us much over the JSON deserialization though...
  */
 pub enum Manifest {
@@ -22,11 +24,21 @@ pub enum Manifest {
     V2(ManifestV2),
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ManifestV2 {
     pub schema_version: u8,
-    pub media_type: String,
-    //pub config: ImageConfig,
-    pub layers: Box<Vec<BlobSummary>>,
+    pub media_type: String, //make enum
+    pub config: Object,
+    pub layers: Box<Vec<Object>>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Object {
+    pub media_type: String, //enum would be better
+    pub size: u64,
+    pub digest: String, //special type would be nice
 }
 
 #[derive(Debug, Default)]
@@ -81,11 +93,8 @@ fn schema_2(raw: &Value) -> Result<Manifest, Error> {
         })?;
     }
 
-    Ok(Manifest::V2(ManifestV2 {
-        schema_version: 2,
-        media_type: mt.to_owned(),
-        layers: Box::new(Vec::new()),
-    }))
+    let m: ManifestV2 = serde_json::from_value(raw.clone())?;
+    Ok(Manifest::V2(m))
 }
 
 impl FromJson for Manifest {
@@ -99,7 +108,7 @@ impl FromJson for Manifest {
             2 => schema_2(raw),
             n => Err(InvalidManifest {
                 err: format!("Unsupported version: {}", n).to_owned(),
-            })?, //Something screwy here
+            })?, //Seems a bit hacky
         }
     }
 }
@@ -244,8 +253,22 @@ mod test {
             Manifest::V1(_) => panic!(),
         };
 
-        assert_eq!(m_v2.media_type, "application/vnd.docker.distribution.manifest.v2+json");
+        assert_eq!(
+            m_v2.media_type,
+            "application/vnd.docker.distribution.manifest.v2+json"
+        );
         assert_eq!(m_v2.schema_version, 2);
+        assert_eq!(
+            m_v2.config.media_type,
+            "application/vnd.docker.container.image.v1+json"
+        );
+        assert_eq!(m_v2.config.size, 1278);
+        assert_eq!(m_v2.config.digest,
+            "sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
+        );
+        assert_eq!(m_v2.layers[0].media_type, "application/vnd.docker.image.rootfs.diff.tar.gzip");
+        assert_eq!(m_v2.layers[0].size, 1967949);
+        assert_eq!(m_v2.layers[0].digest, "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d");
     }
 
     #[test]
