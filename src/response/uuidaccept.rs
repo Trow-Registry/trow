@@ -131,7 +131,6 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
                 Response::build().status(Status::NotFound).ok()
             }
             UuidDelete => Response::build().status(Status::NoContent).ok(),
-            UnknownError => Response::build().status(Status::NotFound).ok(),
         }
     }
 }
