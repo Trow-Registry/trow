@@ -260,7 +260,7 @@ Content-Type: application/octet-stream
 
 #[derive_FromForm]
 struct UploadQuery {
-    query: bool,
+    _query: bool,
     digest: String
 }
 
