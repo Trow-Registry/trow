@@ -406,11 +406,7 @@ fn put_image_manifest(
         }
     }
 
-    // TODO: check signature is valid
-    let mut hasher = Sha256::new();
-    hasher.input(&raw_manifest.as_bytes());
-    let digest = format!("sha256:{}", hasher.result_str());
-    let location = format!("http://localhost:5000/v2/alpine/manifests/{}", digest);
+    // TODO: check signature and names are correct on v1 manifests
 
     // save manifest file
     
@@ -420,7 +416,16 @@ fn put_image_manifest(
     let mut file = fs::File::create(manifest_path).unwrap();
     file.write_all(&raw_manifest.as_bytes()).unwrap();
 
+    let digest = gen_digest(raw_manifest.as_bytes());
+    let location = format!("http://localhost:5000/v2/alpine/manifests/{}", digest);
+
     Ok(ManifestUpload{digest, location})
+}
+
+fn gen_digest(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.input(bytes);
+    format!("sha256:{}", hasher.result_str())
 }
 
 /*
