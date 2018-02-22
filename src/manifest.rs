@@ -113,6 +113,25 @@ impl FromJson for Manifest {
     }
 }
 
+impl Manifest {
+    /// Returns a Vector of the digests of all assets referenced in the Manifest
+    pub fn get_asset_digests(&self) -> Vec<&str> {
+        let mut digests: Vec<&str> = Vec::new();
+        match self {
+            &Manifest::V1(ref m1) => for bs in m1.fs_layers.iter() {
+                digests.push(&bs.blob_sum);
+            },
+            &Manifest::V2(ref m2) => {
+                digests.push(&m2.config.digest);
+                for layer in m2.layers.iter() {
+                    digests.push(&layer.digest);
+                }
+            }
+        };
+        digests
+    }
+}
+
 #[derive(Debug, Default)]
 struct SignatureJWK {
     crv: String,
@@ -249,7 +268,7 @@ mod test {
 
         // There's probably an easier way to do this
         let m_v2 = match mani {
-            Manifest::V2(m2) => m2,
+            Manifest::V2(ref m2) => m2,
             Manifest::V1(_) => panic!(),
         };
 
@@ -263,12 +282,31 @@ mod test {
             "application/vnd.docker.container.image.v1+json"
         );
         assert_eq!(m_v2.config.size, 1278);
-        assert_eq!(m_v2.config.digest,
+        assert_eq!(
+            m_v2.config.digest,
             "sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
         );
-        assert_eq!(m_v2.layers[0].media_type, "application/vnd.docker.image.rootfs.diff.tar.gzip");
+        assert_eq!(
+            m_v2.layers[0].media_type,
+            "application/vnd.docker.image.rootfs.diff.tar.gzip"
+        );
         assert_eq!(m_v2.layers[0].size, 1967949);
-        assert_eq!(m_v2.layers[0].digest, "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d");
+        assert_eq!(
+            m_v2.layers[0].digest,
+            "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
+        );
+
+        assert_eq!(mani.get_asset_digests().len(), 2);
+        assert!(
+            mani.get_asset_digests().contains(
+                &"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
+            )
+        );
+        assert!(
+            mani.get_asset_digests().contains(
+                &"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
+            )
+        );
     }
 
     #[test]
