@@ -30,23 +30,23 @@ pub struct Layer {
     pub digest: String,
 }
 
-fn process(layer: Layer) -> Result<u64, Error> {
+/// given a layer, it returns it's size on disk
+fn get_size(layer: Layer) -> Result<u64, Error> {
     let path = construct_absolute_path(layer)?;
     std::fs::metadata(path.as_os_str())?;
-    debug!("File {:?} Exists", path.as_os_str());
+    debug!("Getting length of file {:?}", path.as_os_str());
     let file = std::fs::File::open(path)?;
-    file_length(file)
-
+    file.metadata()
+        .and_then(|metadata| Ok(metadata.len()))
+        .map_err(|e| e.into())
 }
 
-/// Delete a file if we want
-pub fn delete_blob_by_uuid(layer: &Layer) -> bool {
+/// Delete a file by uuid.
+pub fn delete_blob_by_uuid(uuid: &str) -> bool {
     use std::fs;
     let path = format!(
-        "data/scratch/{}/{}/{}",
-        layer.name,
-        layer.repo,
-        layer.digest
+        "data/scratch/{}",
+        uuid
     );
 
     fs::remove_file(path).map(|_| true).unwrap_or(false)
@@ -60,12 +60,6 @@ fn construct_absolute_path(layer: Layer) -> Result<Box<Path>, Error> {
             debug!("Absolute Path: {:?}", absolute_dir);
             absolute_dir.into_boxed_path()
         })
-        .map_err(|e| e.into())
-}
-
-fn file_length(file: std::fs::File) -> Result<u64, Error> {
-    file.metadata()
-        .and_then(|metadata| Ok(metadata.len()))
         .map_err(|e| e.into())
 }
 
@@ -83,7 +77,7 @@ impl grpc::backend_grpc::Backend for BackendService {
         };
 
         let mut resp = grpc::backend::LayerExistsResult::new();
-        let _ = process(layer)
+        let _ = get_size(layer)
             .map(|length| {
                 debug!("Success, building return object");
                 resp.set_success(true);
@@ -111,7 +105,7 @@ impl grpc::backend_grpc::Backend for BackendService {
         let layer = Layer {
             name: req.get_name().to_owned(),
             repo: req.get_repo().to_owned(),
-            digest: gen_uuid().to_string(),
+            digest: Uuid::new_v4().to_string(),
         };
         {
             self.uploads.lock().unwrap().insert(layer.clone());
@@ -158,7 +152,7 @@ impl grpc::backend_grpc::Backend for BackendService {
             repo: req.get_repo().to_owned(),
             digest: req.get_digest().to_owned(),
         };
-        let _ = delete_blob_by_uuid(&layer);
+        let _ = delete_blob_by_uuid(&layer.digest);
         resp.set_success(set.remove(&layer));
 
         let f = sink.success(resp).map_err(
@@ -232,6 +226,9 @@ impl grpc::backend_grpc::Backend for BackendService {
     }
 }
 
-fn gen_uuid() -> Uuid {
-    Uuid::new_v4()
+
+#[cfg(test)]
+mod test {
+    // 1. start up a listening backend service
+    // 2. test the exposed service
 }
