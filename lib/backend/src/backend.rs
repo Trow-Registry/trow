@@ -235,36 +235,34 @@ impl grpc::backend_grpc::Backend for BackendService {
 mod test {
     // 1. start up a listening backend service
     // 2. test the exposed service
-    use std::thread;
-
-    use server;
+    use server_raw;
     use config::{LycaonBackendConfig, Service};
     use grpc::backend_grpc::BackendClient;
     use grpc::backend;
     use std::sync::Arc;
     use grpcio::{ChannelBuilder, EnvBuilder};
 
+    static mut COUNTER: u16 = 30000;
+
     fn default_config() -> LycaonBackendConfig {
+        let counter;
+        unsafe {
+            counter = COUNTER;
+            COUNTER += 1;
+        }
         let listen = Service {
             host: "localhost".to_owned(),
-            port: 30006,
+            port: counter,
         };
         let bootstrap = Service {
             host: "localhost".to_owned(),
-            port: 30007,
+            port: 1024,
         };
         LycaonBackendConfig { listen, bootstrap }
     }
 
-    fn test_server() -> thread::JoinHandle<()> {
-        // start server
-        let x = thread::spawn(move || { server(default_config()); });
-        x
-    }
-
-    fn client() -> BackendClient {
+    fn client(config: &LycaonBackendConfig) -> BackendClient {
         // configure client
-        let config = default_config();
         let env = Arc::new(EnvBuilder::new().build());
         let ch = ChannelBuilder::new(env).connect(&format!(
             "{}:{}",
@@ -275,8 +273,12 @@ mod test {
         client
     }
 
+    #[test]
     fn test_generated_uuid_in_struct() {
-        let client = client();
+        let config = default_config();
+        let client = client(&config);
+        let _server = server_raw(config);
+
         let empty = backend::Empty::new();
         let layer = backend::Layer::new();
 
@@ -294,8 +296,11 @@ mod test {
         assert_eq!(uuids.len(), 1);
     }
 
+    #[test]
     fn test_generated_uuid_accessible() {
-        let client = client();
+        let config = default_config();
+        let client = client(&config);
+        let _server = server_raw(config);
         let layer = backend::Layer::new();
 
         // gen uuid
@@ -314,8 +319,11 @@ mod test {
         assert!(result.get_success());
     }
 
+    #[test]
     fn test_layer_exists() {
-        let client = client();
+        let config = default_config();
+        let client = client(&config);
+        let _server = server_raw(config);
 
 
         // test valid layer
@@ -341,14 +349,7 @@ mod test {
         assert!(!result.get_success());
     }
 
-    #[test]
-    fn test_main() {
-        // start server
-        let _ = test_server();
-
-        // run tests
-        test_generated_uuid_in_struct();
-        test_generated_uuid_accessible();
-        test_layer_exists();
-    }
+    // TODO: cancelUpload
+    // TODO: deleteUuid
+    // TODO: uploadManifest
 }
