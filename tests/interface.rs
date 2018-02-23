@@ -32,7 +32,6 @@ mod interface_tests {
     use serde_json;
 
     const LYCAON_ADDRESS: &'static str = "http://localhost:8000";
-    // const MANIFEST_TEMPLATE: &'static str = "./tests/manifest-template.json";
 
     header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
     header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }
@@ -136,9 +135,13 @@ mod interface_tests {
         let mut hasher = Sha256::new();
         hasher.input(&blob);
         let digest = hasher.result_str();
-        let resp = hypersync::put(&format!(
-            "{}/v2/image/test/blobs/uploads/{}?digest={}",
-            LYCAON_ADDRESS, uuid, digest), &Vec::new()).unwrap();
+        let resp = hypersync::put(
+            &format!(
+                "{}/v2/image/test/blobs/uploads/{}?digest={}",
+                LYCAON_ADDRESS, uuid, digest
+            ),
+            &Vec::new(),
+        ).unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
 
         //Finally get it back again
@@ -176,11 +179,11 @@ mod interface_tests {
             config,
             layers,
         };
-        let resp = hypersync::put(&format!(
-            "{}/v2/image/test/manifests/test", LYCAON_ADDRESS), &serde_json::to_vec(&mani).unwrap()
+        let resp = hypersync::put(
+            &format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS),
+            &serde_json::to_vec(&mani).unwrap(),
         ).unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
-
     }
 
     #[test]
@@ -197,7 +200,6 @@ mod interface_tests {
         unsupported();
         println!("Running upload_layer()");
         upload_layer();
-        println!("Running upload_manifest()");
     }
 
 }
