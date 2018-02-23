@@ -6,6 +6,7 @@ extern crate hyper;
 extern crate hypersync;
 extern crate lycaon;
 extern crate rand;
+extern crate serde_json;
 
 #[cfg(test)]
 mod interface_tests {
@@ -28,6 +29,7 @@ mod interface_tests {
     use futures::Future;
     use futures::Stream;
     use lycaon::manifest;
+    use serde_json;
 
     const LYCAON_ADDRESS: &'static str = "http://localhost:8000";
     // const MANIFEST_TEMPLATE: &'static str = "./tests/manifest-template.json";
@@ -136,8 +138,7 @@ mod interface_tests {
         let digest = hasher.result_str();
         let resp = hypersync::put(&format!(
             "{}/v2/image/test/blobs/uploads/{}?digest={}",
-            LYCAON_ADDRESS, uuid, digest
-        )).unwrap();
+            LYCAON_ADDRESS, uuid, digest), &Vec::new()).unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
 
         //Finally get it back again
@@ -175,27 +176,10 @@ mod interface_tests {
             config,
             layers,
         };
-    }
-
-    fn upload_manifest() {
-        //let mani = manifest::ManifestV2{};
-
-        /*
-pub struct ManifestV2 {
-    pub schema_version: u8,
-    pub media_type: String, //make enum
-    pub config: Object,
-    pub layers: Box<Vec<Object>>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Object {
-    pub media_type: String, //enum would be better
-    pub size: u64,
-    pub digest: String, //special type would be nice
-}
-*/
+        let resp = hypersync::put(&format!(
+            "{}/v2/image/test/manifests/test", LYCAON_ADDRESS), &serde_json::to_vec(&mani).unwrap()
+        ).unwrap();
+        assert_eq!(resp.status(), StatusCode::Created);
 
     }
 
@@ -214,7 +198,6 @@ pub struct Object {
         println!("Running upload_layer()");
         upload_layer();
         println!("Running upload_manifest()");
-        upload_manifest();
     }
 
 }
