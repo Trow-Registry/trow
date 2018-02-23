@@ -3,9 +3,9 @@ extern crate environment;
 extern crate futures;
 #[macro_use]
 extern crate hyper;
-extern crate rustc_serialize;
-extern crate rand;
 extern crate hypersync;
+extern crate lycaon;
+extern crate rand;
 
 #[cfg(test)]
 mod interface_tests {
@@ -27,6 +27,7 @@ mod interface_tests {
     use rand::Rng;
     use futures::Future;
     use futures::Stream;
+    use lycaon::manifest;
 
     const LYCAON_ADDRESS: &'static str = "http://localhost:8000";
     // const MANIFEST_TEMPLATE: &'static str = "./tests/manifest-template.json";
@@ -68,7 +69,6 @@ mod interface_tests {
         use std::fs;
         fs::create_dir_all("./data/layers/test/test").unwrap();
         fs::File::create("./data/layers/test/test/test_digest").unwrap();
-
     }
 
     impl Drop for LycaonInstance {
@@ -120,13 +120,12 @@ mod interface_tests {
 
     fn upload_layer() {
         //Should support both image/test and imagetest, only former working currently
-        let resp = hypersync::post(
-            &(LYCAON_ADDRESS.to_owned() + "/v2/image/test/blobs/uploads/"),
-        ).unwrap();
+        let resp = hypersync::post(&(LYCAON_ADDRESS.to_owned() + "/v2/image/test/blobs/uploads/"))
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
         let uuid = resp.headers().get::<UploadUuid>().unwrap();
         let location = resp.headers().get::<Location>().unwrap();
-        
+
         //Upload file. Start uploading blob with patch then digest with put
         let blob = gen_rand_blob(100);
         let resp = hypersync::patch(location, &blob).unwrap();
@@ -137,31 +136,66 @@ mod interface_tests {
         let digest = hasher.result_str();
         let resp = hypersync::put(&format!(
             "{}/v2/image/test/blobs/uploads/{}?digest={}",
-            LYCAON_ADDRESS,
-            uuid,
-            digest
+            LYCAON_ADDRESS, uuid, digest
         )).unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
 
         //Finally get it back again
         let resp = hypersync::get(&format!(
             "{}/v2/image/test/blobs/{}",
-            LYCAON_ADDRESS,
-            digest
+            LYCAON_ADDRESS, digest
         )).unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         let mut buf = Vec::new();
         resp.body()
-            .for_each(|chunk| {
-                buf.write_all(&chunk).map(|_| ()).map_err(From::from)
-            })
+            .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from))
             .wait()
             .unwrap();
 
         assert_eq!(blob, buf);
+
+        //Upload manifest
+        //For time being use same blog for config and layer
+        let config = manifest::Object {
+            media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
+            size: blob.len() as u64,
+            digest: digest.clone(),
+        };
+        let layer = manifest::Object {
+            media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_owned(),
+            size: blob.len() as u64,
+            digest: digest.clone(),
+        };
+        let mut layer_vec = Vec::new();
+        layer_vec.push(layer);
+        let layers = Box::new(layer_vec);
+        let mani = manifest::ManifestV2 {
+            schema_version: 2,
+            media_type: "application/vnd.docker.distribution.manifest.v2+json".to_owned(),
+            config,
+            layers,
+        };
     }
 
     fn upload_manifest() {
+        //let mani = manifest::ManifestV2{};
+
+        /*
+pub struct ManifestV2 {
+    pub schema_version: u8,
+    pub media_type: String, //make enum
+    pub config: Object,
+    pub layers: Box<Vec<Object>>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Object {
+    pub media_type: String, //enum would be better
+    pub size: u64,
+    pub digest: String, //special type would be nice
+}
+*/
 
     }
 

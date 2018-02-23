@@ -15,20 +15,6 @@ pub mod manifest_upload;
 pub mod errors;
 mod test_helper;
 
-
-/// take in a request and a struct to be serialised.
-/// Return a response with the Json attached.
-///
-/// If one wants to continue modifying the response after attaching Json
-///
-/// ```
-/// use rocket::http::Header;
-/// let header = Header::new("Header", "Pizza");
-/// Response::build_from(json_response(req, &repositories).unwrap_or_default())
-///   .header(header)
-///   .ok()
-/// ```
-
 pub fn json_response<T: serde::Serialize>(
     req: &Request,
     var: &T,
