@@ -17,8 +17,8 @@ impl LycaonBackendConfig {
 // DUPLICATED
 #[derive(Clone, Debug, Deserialize)]
 pub struct Service {
-    host: String,
-    port: u16,
+    pub host: String,
+    pub port: u16,
 }
 
 impl Service {

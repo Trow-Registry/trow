@@ -20,10 +20,18 @@ use std::thread;
 use peer::PeerService;
 use backend::BackendService;
 use futures::Future;
+use grpcio::{Environment, ServerBuilder};
 
 pub fn server(config: config::LycaonBackendConfig) {
+    let mut server = server_raw(config);
+    thread::park();
+    let _ = server.shutdown().wait();
+    warn!("GRPC Server shutdown!");
+}
+
+// TODO: Rename this function
+pub fn server_raw(config: config::LycaonBackendConfig) -> grpcio::Server {
     use std::sync::Arc;
-    use grpcio::{Environment, ServerBuilder};
 
     let listen = config.listen();
 
@@ -41,7 +49,5 @@ pub fn server(config: config::LycaonBackendConfig) {
     for &(ref host, port) in server.bind_addrs() {
         info!("listening on {}:{}", host, port);
     }
-    thread::park();
-    let _ = server.shutdown().wait();
-    warn!("GRPC Server shutdown!");
+    server
 }
