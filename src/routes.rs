@@ -388,6 +388,11 @@ fn put_image_manifest(
 ) -> Result<ManifestUpload, Error> {
 
     let mut manifest_bytes = Vec::new();
+    //TODO From this point on, should stream to backend
+    //Note that back end will need to have manifest, user, repo, ref 
+    //and possibly some sort of auth token
+    //Needs to return digest & location or error
+    //Just do this synchronous, let grpc deal with timeouts
     chunk.stream_to(&mut manifest_bytes).unwrap();
     let raw_manifest = str::from_utf8(&manifest_bytes).unwrap();
     let manifest_json: serde_json::Value = serde_json::from_str(&raw_manifest).unwrap();
@@ -417,7 +422,7 @@ fn put_image_manifest(
     file.write_all(&raw_manifest.as_bytes()).unwrap();
 
     let digest = gen_digest(raw_manifest.as_bytes());
-    let location = format!("http://localhost:5000/v2/alpine/manifests/{}", digest);
+    let location = format!("http://localhost:5000/v2/{}/{}/manifests/{}", user, repo, digest);
 
     Ok(ManifestUpload{digest, location})
 }
