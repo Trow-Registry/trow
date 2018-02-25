@@ -116,19 +116,14 @@ impl FromJson for Manifest {
 impl Manifest {
     /// Returns a Vector of the digests of all assets referenced in the Manifest
     pub fn get_asset_digests(&self) -> Vec<&str> {
-        let mut digests: Vec<&str> = Vec::new();
         match self {
-            &Manifest::V1(ref m1) => for bs in m1.fs_layers.iter() {
-                digests.push(&bs.blob_sum);
-            },
+            &Manifest::V1(ref m1) => m1.fs_layers.iter().map(|x| x.blob_sum.as_str()).collect(),
             &Manifest::V2(ref m2) => {
+                let mut digests: Vec<&str> = m2.layers.iter().map(|x| x.digest.as_str()).collect();
                 digests.push(&m2.config.digest);
-                for layer in m2.layers.iter() {
-                    digests.push(&layer.digest);
-                }
+                digests
             }
-        };
-        digests
+        }
     }
 }
 
