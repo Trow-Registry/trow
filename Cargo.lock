@@ -442,7 +442,7 @@ dependencies = [
 [[package]]
 name = "hypersync"
 version = "0.1.0"
-source = "git+https://github.com/ContainerSolutions/hypersync#f31bcd4da83676710a28fbb494d48c5ae2e45f51"
+source = "git+https://github.com/ContainerSolutions/hypersync#d55e508cd7cbdef7f4c285e6192f559a9834b866"
 dependencies = [
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",

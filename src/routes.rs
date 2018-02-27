@@ -19,7 +19,7 @@ use rocket::response::NamedFile;
 use serde_json;
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
-use manifest::{self, FromJson};
+use manifest::{self, FromJson, Manifest};
 use state;
 use types::Layer;
 
@@ -28,7 +28,6 @@ pub fn routes() -> Vec<rocket::Route> {
         get_v2root,
         get_homepage,
         get_manifest,
-        check_image_manifest,
         get_blob,
         post_blob_uuid,
         get_upload_progress,
@@ -61,7 +60,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for Blob {
         let path = Path::new(&path);
 
         if path.exists() {
-            return Outcome::Success(Blob { file: path.to_path_buf() });
+            return Outcome::Success(Blob {
+                file: path.to_path_buf(),
+            });
         }
         Outcome::Failure((Status::NotFound, ()))
     }
@@ -72,23 +73,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
     fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
         Outcome::Success(AuthorisedUser("test".to_owned()))
-    }
-}
-
-struct Manifest {
-    file: PathBuf,
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for Manifest {
-    type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<Manifest, ()> {
-        //Look up catalogue to see if we have it
-        let reference = req.get_param::<String>(2).unwrap();
-
-        if reference == "test_manifest" {
-            return Outcome::Success(Manifest { file: PathBuf::from("./README.md") });
-        }
-        Outcome::Failure((Status::NotFound, ()))
     }
 }
 
@@ -137,39 +121,23 @@ Accept: manifest-version
 200 - return the manifest
 404 - manifest not known to the registry
  */
-#[get("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn get_manifest(
-    _name: String,
-    _repo: String,
-    _reference: String,
-    manifest: Manifest,
-) -> Option<NamedFile> {
-    info!("Getting Manifest");
-    NamedFile::open(manifest.file).ok()
-}
-/*
+#[get("/v2/<user>/<repo>/manifests/<reference>")]
+fn get_manifest(user: String, repo: String, reference: String) -> Option<Manifest> {
+    
+    let path = format!("data/manifests/{}/{}/{}", user, repo, reference);
+    info!("Path: {}", path);
+    let path = Path::new(&path);
 
----
-Check for existence
-HEAD /v2/<name>/manifests/<reference>
+    //Parse the manifest to get the response type
+    //We could do this faster by storing in appropriate folder and streaming file
+    //directly
+    if path.exists() {
+        let file = fs::File::open(path).unwrap();
+        let m: Manifest = serde_json::from_reader(file).unwrap();
+        return Some(m);
+    }
 
-# Parameters
-name - The name of the image
-reference - either a tag or a digest
-
-# Headers
-Content-Length: size of manifest
-?Docker-Content-Digest: digest of manifest file
-
-# Returns
-200 - manifest exists
-404 - manifest does not exist
-
-NOTE: this may not be needed due to autogen of HEAD methods.
- */
-#[head("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn check_image_manifest(_name: String, _repo: String, _reference: String) -> Empty {
-    Empty
+    None
 }
 
 /*
@@ -263,7 +231,7 @@ Content-Type: application/octet-stream
 #[derive_FromForm]
 struct UploadQuery {
     _query: bool,
-    digest: String
+    digest: String,
 }
 
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<query>")] // capture digest query string
@@ -299,17 +267,14 @@ fn patch_blob(
         let len = chunk.stream_to_file(absolute_file);
 
         match len {
-            Ok(len) => {
-                UuidResponse::Uuid {
-                    uuid,
-                    name,
-                    repo,
-                    range: (0, len as u32),
-                }
-            }
+            Ok(len) => UuidResponse::Uuid {
+                uuid,
+                name,
+                repo,
+                range: (0, len as u32),
+            },
             Err(_) => UuidResponse::Empty,
         }
-
     } else {
         // TODO: pipe breaks if we don't accept the whole file...
         // AM - shouldn't this return a 4xx? IllegalArgument or something?
@@ -386,10 +351,9 @@ fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<ManifestUpload, Error> {
-
     let mut manifest_bytes = Vec::new();
     //TODO From this point on, should stream to backend
-    //Note that back end will need to have manifest, user, repo, ref 
+    //Note that back end will need to have manifest, user, repo, ref
     //and possibly some sort of auth token
     //Needs to return digest & location or error
     //Just do this synchronous, let grpc deal with timeouts
@@ -398,7 +362,7 @@ fn put_image_manifest(
     let manifest_json: serde_json::Value = serde_json::from_str(&raw_manifest).unwrap();
     let manifest = match manifest::Manifest::from_json(&manifest_json) {
         Ok(x) => x,
-        Err(_) => return Err(Error::ManifestInvalid)
+        Err(_) => return Err(Error::ManifestInvalid),
     };
 
     for digest in manifest.get_asset_digests() {
@@ -414,7 +378,7 @@ fn put_image_manifest(
     // TODO: check signature and names are correct on v1 manifests
 
     // save manifest file
-    
+
     let manifest_directory = format!("./data/manifests/{}/{}", user, repo);
     let manifest_path = format!("{}/{}", manifest_directory, reference);
     fs::create_dir_all(manifest_directory).unwrap();
@@ -422,9 +386,12 @@ fn put_image_manifest(
     file.write_all(&raw_manifest.as_bytes()).unwrap();
 
     let digest = gen_digest(raw_manifest.as_bytes());
-    let location = format!("http://localhost:5000/v2/{}/{}/manifests/{}", user, repo, digest);
+    let location = format!(
+        "http://localhost:5000/v2/{}/{}/manifests/{}",
+        user, repo, digest
+    );
 
-    Ok(ManifestUpload{digest, location})
+    Ok(ManifestUpload { digest, location })
 }
 
 fn gen_digest(bytes: &[u8]) -> String {

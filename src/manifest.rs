@@ -1,6 +1,10 @@
 use failure::Error;
 use std;
+use std::io::Cursor;
 use serde_json::{self, Value};
+use rocket::response::{Responder, Response};
+use rocket::request::Request;
+use rocket::http::{Header, Status};
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self, Error>
@@ -18,7 +22,11 @@ pub trait FromJson {
  * Also note that image metadata may move to some sort of DB in the future for fast reliable searches etc.
  *
  * I'm not really sure this buys us much over the JSON deserialization though...
+ * 
+ * ARG, mistake here, manifest should be responsible for schema vesion tag
  */
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Manifest {
     V1(ManifestV1),
     V2(ManifestV2),
@@ -41,7 +49,8 @@ pub struct Object {
     pub digest: String, //special type would be nice
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ManifestV1 {
     pub schema_version: u8,
     pub name: String,
@@ -127,7 +136,7 @@ impl Manifest {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct SignatureJWK {
     crv: String,
     kty: String,
@@ -158,7 +167,7 @@ impl FromJson for SignatureJWK {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct SignatureHeader {
     alg: String,
     jwk: SignatureJWK,
@@ -176,7 +185,7 @@ impl FromJson for SignatureHeader {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Signature {
     header: SignatureHeader,
     payload: String,
@@ -210,7 +219,7 @@ impl FromJson for Signature {
     }
 }
 
-#[derive(Clone, Debug, Default, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Default, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
 pub struct BlobSummary {
     pub blob_sum: String,
 }
@@ -225,12 +234,39 @@ impl FromJson for BlobSummary {
     }
 }
 
-#[derive(Clone, Debug, Default, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Default, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
 pub struct EmptyStruct {}
 
 impl FromJson for EmptyStruct {
     fn from_json(_: &Value) -> Result<Self, Error> {
         Ok(EmptyStruct {})
+    }
+}
+
+impl<'a> Responder<'a> for Manifest {
+    fn respond_to(self, _: &Request) -> Result<Response<'a>, Status> {
+        match self {
+            Manifest::V1(_) => {
+                //TODO: Sign
+                let ct = Header::new(
+                    "Content-Type",
+                    "application/vnd.docker.distribution.manifest.v1+prettyjws",
+                );
+                Response::build()
+                    .header(ct)
+                    .ok()
+            }
+            Manifest::V2(m2) => {
+                let ct = Header::new(
+                    "Content-Type",
+                    "application/vnd.docker.distribution.manifest.v2+json",
+                );
+                Response::build()
+                    .header(ct)
+                    .sized_body(Cursor::new(serde_json::to_vec(&m2).unwrap()))
+                    .ok()
+            }
+        }
     }
 }
 
@@ -258,6 +294,7 @@ mod test {
         }
      ]
    }"#;
+        //Pretty sure we should be able to do this directly
         let v: Value = serde_json::from_str(data).unwrap();
         let mani = Manifest::from_json(&v).unwrap();
 

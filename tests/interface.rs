@@ -186,6 +186,19 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::Created);
     }
 
+    fn get_manifest() {
+        //Previous test should have upload image/test:test manifest
+        //Might need accept headers here
+        let resp =
+            hypersync::get(&format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS)).unwrap();
+        assert_eq!(resp.status(), StatusCode::Ok);
+        let mut buf = Vec::new();
+        resp.body()
+            .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from))
+            .wait()
+            .unwrap();
+    }
+
     #[test]
     fn test_runner() {
         //Had issues with stopping and starting lycaon causing test fails.
@@ -200,6 +213,9 @@ mod interface_tests {
         unsupported();
         println!("Running upload_layer()");
         upload_layer();
+        println!("Running get_manifest()");
+        get_manifest();
+        
     }
 
 }
