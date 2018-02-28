@@ -12,6 +12,7 @@ pub mod uuid;
 pub mod uuidaccept;
 pub mod manifest_upload;
 pub mod errors;
+mod test_helper;
 
 pub fn json_response<T: serde::Serialize>(
     req: &Request,
