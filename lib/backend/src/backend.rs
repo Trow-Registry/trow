@@ -382,8 +382,7 @@ mod test {
     }
 
 
-    // This function is the same as the above `test_cancel_upload` function ///
-    com
+    // This function is the same as the above `test_cancel_upload` function
     #[test]
     fn test_delete_uuid() {
         setup_grpc!(client);
@@ -413,5 +412,14 @@ mod test {
         let result = client.delete_uuid(layer).unwrap();
         assert!(result.get_success());
     }
-    // TODO: uploadManifest
+
+    #[test]
+    fn test_upload_manifest() {
+        setup_grpc!(client);
+        let manifest = backend::Manifest::new();
+
+        let result = client.upload_manifest(manifest).unwrap();
+
+        assert!(!result.get_success());
+    }
 }
