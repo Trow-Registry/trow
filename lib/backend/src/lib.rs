@@ -29,7 +29,6 @@ pub fn server(config: config::LycaonBackendConfig) {
     warn!("GRPC Server shutdown!");
 }
 
-// TODO: Rename this function
 pub fn server_async(config: config::LycaonBackendConfig) -> grpcio::Server {
     use std::sync::Arc;
 
