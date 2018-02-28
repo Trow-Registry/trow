@@ -24,15 +24,15 @@ impl BackendService {
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
-pub struct Layer {
-    pub name: String,
-    pub repo: String,
-    pub digest: String,
+struct Layer {
+    name: String,
+    repo: String,
+    digest: String,
 }
 
 /// given a layer, it returns it's size on disk
 fn get_size(layer: Layer) -> Result<u64, Error> {
-    let path = construct_absolute_path(layer)?;
+    let path = construct_absolute_path(&layer)?;
     std::fs::metadata(path.as_os_str())?;
     debug!("Getting length of file {:?}", path.as_os_str());
     let file = std::fs::File::open(path)?;
@@ -42,7 +42,7 @@ fn get_size(layer: Layer) -> Result<u64, Error> {
 }
 
 /// Delete a file by uuid.
-pub fn delete_blob_by_uuid(uuid: &str) -> bool {
+fn delete_blob_by_uuid(uuid: &str) -> bool {
     use std::fs;
     let path = format!("data/scratch/{}", uuid);
 
@@ -50,7 +50,7 @@ pub fn delete_blob_by_uuid(uuid: &str) -> bool {
 }
 
 /// Takes the digest, and constructs an absolute pathstring to the digest.
-fn construct_absolute_path(layer: Layer) -> Result<Box<Path>, Error> {
+fn construct_absolute_path(layer: &Layer) -> Result<Box<Path>, Error> {
     std::env::current_dir()
         .map(|cwd| {
             let absolute_dir = cwd.join(format!(
@@ -235,7 +235,8 @@ impl grpc::backend_grpc::Backend for BackendService {
 mod test {
     // 1. start up a listening backend service
     // 2. test the exposed service
-    use server_raw;
+    use super::*;
+    use server_async;
     use config::{LycaonBackendConfig, Service};
     use grpc::backend_grpc::BackendClient;
     use grpc::backend;
@@ -246,10 +247,11 @@ mod test {
         ($v:ident) => {
             let config = default_config();
             let $v = client(&config);
-            let _server = server_raw(config);
+            let _server = server_async(config);
         }
     }
 
+    // test grpc interface ////////////////////////////////////////////////////
     static mut COUNTER: u16 = 30000;
 
     fn default_config() -> LycaonBackendConfig {
@@ -421,5 +423,54 @@ mod test {
         let result = client.upload_manifest(manifest).unwrap();
 
         assert!(!result.get_success());
+    }
+    // end test grpc interface ////////////////////////////////////////////////
+
+    fn gen_layer() -> Layer {
+        Layer {
+            name: "test".to_owned(),
+            repo: "test".to_owned(),
+            digest: "test_layer".to_owned(),
+        }
+    }
+
+    #[test]
+    fn test_get_size() {
+
+        // non-existing file
+        let mut layer = gen_layer();
+        layer.digest = "invalid_digest".to_owned();
+
+        let result = get_size(layer);
+
+        match result {
+            Ok(_) => assert!(false),
+            Err(_) => assert!(true),
+        }
+
+        // existing file
+        let layer = gen_layer();
+
+        let result = get_size(layer);
+
+        match result {
+            Ok(val) => assert_eq!(0, val),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_construct_absolute_path() {
+        let layer = gen_layer();
+
+        let path = construct_absolute_path(&layer);
+
+        match path {
+            Ok(path) => {
+                assert!(path.is_absolute());
+                assert!(path.ends_with(layer.digest));
+            },
+            Err(_) => assert!(false),
+        }
     }
 }
