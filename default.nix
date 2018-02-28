@@ -1,7 +1,7 @@
 with import <nixpkgs> {};
 let
   pkgs = import <nixpkgs> {};
-  date = "2018-01-15";
+  date = "2018-02-25";
   mozilla-overlay = fetchFromGitHub {
     owner = "mozilla";
     repo = "nixpkgs-mozilla";
@@ -30,7 +30,6 @@ stdenv.mkDerivation rec {
     protobuf
 
     # dev
-    rustfmt
     valgrind
   ];
 
@@ -43,6 +42,6 @@ stdenv.mkDerivation rec {
 
 
   shellHook = ''
-    echo Rust Nightly: ${date}
+    >&2 echo Rust Nightly: ${date}
   '';
 }
