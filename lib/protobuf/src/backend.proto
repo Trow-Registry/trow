@@ -65,6 +65,8 @@ service Backend {
 
   // Cancel a pending upload
   // The digest field is used for the uuid in this rpc call
+  // Delete the upload from the stateful backend
+  // clean up the file from the filesystem.
   rpc cancelUpload (Layer) returns (Result) {}
 
   // Delete an uuid after a successful upload.
