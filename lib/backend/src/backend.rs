@@ -242,6 +242,14 @@ mod test {
     use std::sync::Arc;
     use grpcio::{ChannelBuilder, EnvBuilder};
 
+    macro_rules! setup_grpc {
+        ($v:ident) => {
+            let config = default_config();
+            let $v = client(&config);
+            let _server = server_raw(config);
+        }
+    }
+
     static mut COUNTER: u16 = 30000;
 
     fn default_config() -> LycaonBackendConfig {
@@ -275,9 +283,7 @@ mod test {
 
     #[test]
     fn test_generated_uuid_in_struct() {
-        let config = default_config();
-        let client = client(&config);
-        let _server = server_raw(config);
+        setup_grpc!(client);
 
         let empty = backend::Empty::new();
         let layer = backend::Layer::new();
@@ -298,9 +304,7 @@ mod test {
 
     #[test]
     fn test_generated_uuid_accessible() {
-        let config = default_config();
-        let client = client(&config);
-        let _server = server_raw(config);
+        setup_grpc!(client);
         let layer = backend::Layer::new();
 
         // gen uuid
@@ -321,9 +325,7 @@ mod test {
 
     #[test]
     fn test_layer_exists() {
-        let config = default_config();
-        let client = client(&config);
-        let _server = server_raw(config);
+        setup_grpc!(client);
 
 
         // test valid layer
@@ -349,7 +351,42 @@ mod test {
         assert!(!result.get_success());
     }
 
-    // TODO: cancelUpload
+    #[test]
+    fn test_cancel_upload() {
+        setup_grpc!(client);
+        // test non-existent uuid
+        let layer = backend::Layer::new();
+
+        let result = client.cancel_upload(layer).unwrap();
+
+        assert!(!result.get_success());
+
+        // test invalid uuid
+        let mut layer = backend::Layer::new();
+
+        layer.set_digest("invalid".to_owned());
+
+        let result = client.cancel_upload(layer).unwrap();
+
+        assert!(!result.get_success());
+
+        // test valid uuid
+        let layer = backend::Layer::new();
+        let uuid_result = client.gen_uuid(layer).unwrap();
+        let uuid = uuid_result.get_uuid();
+
+        let mut layer = backend::Layer::new();
+        layer.set_digest(uuid.to_owned());
+        let result = client.cancel_upload(layer).unwrap();
+        assert!(result.get_success());
+    }
+
+
     // TODO: deleteUuid
+    #[test]
+    fn test_delete_uuid() {
+        setup_grpc!(client);
+
+    }
     // TODO: uploadManifest
 }
