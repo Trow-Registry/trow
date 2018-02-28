@@ -382,11 +382,36 @@ mod test {
     }
 
 
-    // TODO: deleteUuid
+    // This function is the same as the above `test_cancel_upload` function ///
+    com
     #[test]
     fn test_delete_uuid() {
         setup_grpc!(client);
+        // test non-existent uuid
+        let layer = backend::Layer::new();
 
+        let result = client.delete_uuid(layer).unwrap();
+
+        assert!(!result.get_success());
+
+        // test invalid uuid
+        let mut layer = backend::Layer::new();
+
+        layer.set_digest("invalid".to_owned());
+
+        let result = client.delete_uuid(layer).unwrap();
+
+        assert!(!result.get_success());
+
+        // test valid uuid
+        let layer = backend::Layer::new();
+        let uuid_result = client.gen_uuid(layer).unwrap();
+        let uuid = uuid_result.get_uuid();
+
+        let mut layer = backend::Layer::new();
+        layer.set_digest(uuid.to_owned());
+        let result = client.delete_uuid(layer).unwrap();
+        assert!(result.get_success());
     }
     // TODO: uploadManifest
 }
