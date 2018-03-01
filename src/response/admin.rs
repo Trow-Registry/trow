@@ -18,7 +18,7 @@ pub enum Admin {
 impl Admin {
     pub fn get_uuids(handler: State<config::BackendHandler>) -> Result<Admin, Error> {
         let backend = handler.backend();
-        let response = backend.get_uuids(backend::Empty::new())?;
+        let response = backend.get_uuids(&backend::Empty::new())?;
 
         let uuids = response
             .get_uuids()

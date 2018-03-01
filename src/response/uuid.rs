@@ -33,7 +33,7 @@ impl UuidResponse {
         req.set_name(name.clone());
         req.set_repo(repo.clone());
 
-        let response = backend.gen_uuid(req)?;
+        let response = backend.gen_uuid(&req)?;
         debug!("Client received: {:?}", response);
 
         Ok(UuidResponse::Uuid {
@@ -54,7 +54,7 @@ impl UuidResponse {
         req.set_repo(layer.repo.to_owned());
         req.set_digest(layer.digest.to_owned());
 
-        let response = backend.uuid_exists(req)?;
+        let response = backend.uuid_exists(&req)?;
         debug!("UuidExists: {:?}", response.get_success());
         match response.get_success() {
             true => Ok(true),

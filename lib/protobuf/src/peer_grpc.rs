@@ -43,35 +43,35 @@ impl PeerClient {
         }
     }
 
-    pub fn heartbeat_opt(&self, req: super::peer::Heartbeat, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::peer::Heartbeat> {
+    pub fn heartbeat_opt(&self, req: &super::peer::Heartbeat, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::peer::Heartbeat> {
         self.client.unary_call(&METHOD_PEER_HEARTBEAT, req, opt)
     }
 
-    pub fn heartbeat(&self, req: super::peer::Heartbeat) -> ::grpcio::Result<super::peer::Heartbeat> {
+    pub fn heartbeat(&self, req: &super::peer::Heartbeat) -> ::grpcio::Result<super::peer::Heartbeat> {
         self.heartbeat_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn heartbeat_async_opt(&self, req: super::peer::Heartbeat, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::peer::Heartbeat> {
+    pub fn heartbeat_async_opt(&self, req: &super::peer::Heartbeat, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::peer::Heartbeat>> {
         self.client.unary_call_async(&METHOD_PEER_HEARTBEAT, req, opt)
     }
 
-    pub fn heartbeat_async(&self, req: super::peer::Heartbeat) -> ::grpcio::ClientUnaryReceiver<super::peer::Heartbeat> {
+    pub fn heartbeat_async(&self, req: &super::peer::Heartbeat) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::peer::Heartbeat>> {
         self.heartbeat_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn delta_sync_opt(&self, req: super::peer::ORSetDelta, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::peer::ORSetDeltaReply> {
+    pub fn delta_sync_opt(&self, req: &super::peer::ORSetDelta, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::peer::ORSetDeltaReply> {
         self.client.unary_call(&METHOD_PEER_DELTA_SYNC, req, opt)
     }
 
-    pub fn delta_sync(&self, req: super::peer::ORSetDelta) -> ::grpcio::Result<super::peer::ORSetDeltaReply> {
+    pub fn delta_sync(&self, req: &super::peer::ORSetDelta) -> ::grpcio::Result<super::peer::ORSetDeltaReply> {
         self.delta_sync_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn delta_sync_async_opt(&self, req: super::peer::ORSetDelta, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::peer::ORSetDeltaReply> {
+    pub fn delta_sync_async_opt(&self, req: &super::peer::ORSetDelta, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::peer::ORSetDeltaReply>> {
         self.client.unary_call_async(&METHOD_PEER_DELTA_SYNC, req, opt)
     }
 
-    pub fn delta_sync_async(&self, req: super::peer::ORSetDelta) -> ::grpcio::ClientUnaryReceiver<super::peer::ORSetDeltaReply> {
+    pub fn delta_sync_async(&self, req: &super::peer::ORSetDelta) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::peer::ORSetDeltaReply>> {
         self.delta_sync_async_opt(req, ::grpcio::CallOption::default())
     }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {

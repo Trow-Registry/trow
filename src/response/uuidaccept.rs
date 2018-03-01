@@ -61,7 +61,7 @@ impl UuidAcceptResponse {
         layer.set_name(name.clone());
         layer.set_repo(repo.clone());
         layer.set_digest(uuid.clone());
-        let resp = backend.delete_uuid(layer)?;
+        let resp = backend.delete_uuid(&layer)?;
         // 4. Construct response
         match resp.get_success() {
             true => Ok(UuidAcceptResponse::UuidAccept {
@@ -88,7 +88,7 @@ impl UuidAcceptResponse {
         req.set_digest(layer.digest.to_owned());
 
         //Log errors, don't send details to client
-        let response = match backend.cancel_upload(req) {
+        let response = match backend.cancel_upload(&req) {
             Ok(r) => r,
             Err(e) => {
                 //why can't I call error!?

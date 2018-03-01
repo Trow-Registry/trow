@@ -4,6 +4,6 @@ version = "0.1.0"
 authors = ["Hamish Hutchings <moredhel@aoeu.me>"]
 
 [dependencies]
-protobuf = "1.4.2"
-grpcio = "0.1.2"
+protobuf = "1.4"
+grpcio = "0.2"
 futures = "0.1"

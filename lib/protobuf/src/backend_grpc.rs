@@ -78,115 +78,115 @@ impl BackendClient {
         }
     }
 
-    pub fn layer_exists_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::LayerExistsResult> {
+    pub fn layer_exists_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::LayerExistsResult> {
         self.client.unary_call(&METHOD_BACKEND_LAYER_EXISTS, req, opt)
     }
 
-    pub fn layer_exists(&self, req: super::backend::Layer) -> ::grpcio::Result<super::backend::LayerExistsResult> {
+    pub fn layer_exists(&self, req: &super::backend::Layer) -> ::grpcio::Result<super::backend::LayerExistsResult> {
         self.layer_exists_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn layer_exists_async_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::LayerExistsResult> {
+    pub fn layer_exists_async_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::LayerExistsResult>> {
         self.client.unary_call_async(&METHOD_BACKEND_LAYER_EXISTS, req, opt)
     }
 
-    pub fn layer_exists_async(&self, req: super::backend::Layer) -> ::grpcio::ClientUnaryReceiver<super::backend::LayerExistsResult> {
+    pub fn layer_exists_async(&self, req: &super::backend::Layer) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::LayerExistsResult>> {
         self.layer_exists_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn gen_uuid_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::GenUuidResult> {
+    pub fn gen_uuid_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::GenUuidResult> {
         self.client.unary_call(&METHOD_BACKEND_GEN_UUID, req, opt)
     }
 
-    pub fn gen_uuid(&self, req: super::backend::Layer) -> ::grpcio::Result<super::backend::GenUuidResult> {
+    pub fn gen_uuid(&self, req: &super::backend::Layer) -> ::grpcio::Result<super::backend::GenUuidResult> {
         self.gen_uuid_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn gen_uuid_async_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::GenUuidResult> {
+    pub fn gen_uuid_async_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::GenUuidResult>> {
         self.client.unary_call_async(&METHOD_BACKEND_GEN_UUID, req, opt)
     }
 
-    pub fn gen_uuid_async(&self, req: super::backend::Layer) -> ::grpcio::ClientUnaryReceiver<super::backend::GenUuidResult> {
+    pub fn gen_uuid_async(&self, req: &super::backend::Layer) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::GenUuidResult>> {
         self.gen_uuid_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn uuid_exists_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
+    pub fn uuid_exists_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
         self.client.unary_call(&METHOD_BACKEND_UUID_EXISTS, req, opt)
     }
 
-    pub fn uuid_exists(&self, req: super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
+    pub fn uuid_exists(&self, req: &super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
         self.uuid_exists_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn uuid_exists_async_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn uuid_exists_async_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.client.unary_call_async(&METHOD_BACKEND_UUID_EXISTS, req, opt)
     }
 
-    pub fn uuid_exists_async(&self, req: super::backend::Layer) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn uuid_exists_async(&self, req: &super::backend::Layer) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.uuid_exists_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn cancel_upload_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
+    pub fn cancel_upload_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
         self.client.unary_call(&METHOD_BACKEND_CANCEL_UPLOAD, req, opt)
     }
 
-    pub fn cancel_upload(&self, req: super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
+    pub fn cancel_upload(&self, req: &super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
         self.cancel_upload_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn cancel_upload_async_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn cancel_upload_async_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.client.unary_call_async(&METHOD_BACKEND_CANCEL_UPLOAD, req, opt)
     }
 
-    pub fn cancel_upload_async(&self, req: super::backend::Layer) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn cancel_upload_async(&self, req: &super::backend::Layer) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.cancel_upload_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn delete_uuid_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
+    pub fn delete_uuid_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
         self.client.unary_call(&METHOD_BACKEND_DELETE_UUID, req, opt)
     }
 
-    pub fn delete_uuid(&self, req: super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
+    pub fn delete_uuid(&self, req: &super::backend::Layer) -> ::grpcio::Result<super::backend::Result> {
         self.delete_uuid_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn delete_uuid_async_opt(&self, req: super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn delete_uuid_async_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.client.unary_call_async(&METHOD_BACKEND_DELETE_UUID, req, opt)
     }
 
-    pub fn delete_uuid_async(&self, req: super::backend::Layer) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn delete_uuid_async(&self, req: &super::backend::Layer) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.delete_uuid_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn upload_manifest_opt(&self, req: super::backend::Manifest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
+    pub fn upload_manifest_opt(&self, req: &super::backend::Manifest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
         self.client.unary_call(&METHOD_BACKEND_UPLOAD_MANIFEST, req, opt)
     }
 
-    pub fn upload_manifest(&self, req: super::backend::Manifest) -> ::grpcio::Result<super::backend::Result> {
+    pub fn upload_manifest(&self, req: &super::backend::Manifest) -> ::grpcio::Result<super::backend::Result> {
         self.upload_manifest_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn upload_manifest_async_opt(&self, req: super::backend::Manifest, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn upload_manifest_async_opt(&self, req: &super::backend::Manifest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.client.unary_call_async(&METHOD_BACKEND_UPLOAD_MANIFEST, req, opt)
     }
 
-    pub fn upload_manifest_async(&self, req: super::backend::Manifest) -> ::grpcio::ClientUnaryReceiver<super::backend::Result> {
+    pub fn upload_manifest_async(&self, req: &super::backend::Manifest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::Result>> {
         self.upload_manifest_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_uuids_opt(&self, req: super::backend::Empty, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::UuidList> {
+    pub fn get_uuids_opt(&self, req: &super::backend::Empty, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::UuidList> {
         self.client.unary_call(&METHOD_BACKEND_GET_UUIDS, req, opt)
     }
 
-    pub fn get_uuids(&self, req: super::backend::Empty) -> ::grpcio::Result<super::backend::UuidList> {
+    pub fn get_uuids(&self, req: &super::backend::Empty) -> ::grpcio::Result<super::backend::UuidList> {
         self.get_uuids_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_uuids_async_opt(&self, req: super::backend::Empty, opt: ::grpcio::CallOption) -> ::grpcio::ClientUnaryReceiver<super::backend::UuidList> {
+    pub fn get_uuids_async_opt(&self, req: &super::backend::Empty, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::UuidList>> {
         self.client.unary_call_async(&METHOD_BACKEND_GET_UUIDS, req, opt)
     }
 
-    pub fn get_uuids_async(&self, req: super::backend::Empty) -> ::grpcio::ClientUnaryReceiver<super::backend::UuidList> {
+    pub fn get_uuids_async(&self, req: &super::backend::Empty) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::UuidList>> {
         self.get_uuids_async_opt(req, ::grpcio::CallOption::default())
     }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {

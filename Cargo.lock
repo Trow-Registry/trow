@@ -362,11 +362,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "grpcio"
-version = "0.1.2"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "grpcio-sys"
-version = "0.1.2"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cc 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -568,7 +568,7 @@ dependencies = [
  "fern 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hostname 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hypersync 0.1.0 (git+https://github.com/ContainerSolutions/hypersync)",
@@ -603,7 +603,7 @@ dependencies = [
  "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.0.1 (git+https://github.com/withoutboats/failure?rev=ae276f58615174e5b2dbba8dd7c6e47a033c7e2c)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "lycaon-protobuf 0.1.0",
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -618,7 +618,7 @@ name = "lycaon-protobuf"
 version = "0.1.0"
 dependencies = [
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1559,8 +1559,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum gcc 0.3.54 (registry+https://github.com/rust-lang/crates.io-index)" = "5e33ec290da0d127825013597dbdfc28bee4964690c7ce1166cbc2a7bd08b1bb"
 "checksum getopts 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)" = "b900c08c1939860ce8b54dc6a89e26e00c04c380fd0e09796799bd7f12861e05"
 "checksum glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "8be18de09a56b60ed0edf84bc9df007e30040691af7acd1c41874faac5895bfb"
-"checksum grpcio 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a621e23cdb6e172d331f65ca15e200aa78dbd1a5ef7a2e2ffaa31afc1802b6ca"
-"checksum grpcio-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "b195657ca69fb4dd51e8ef4aee437af807f8ebaaf85cc12a160a44bd49c483fb"
+"checksum grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9c1bc34b5cf6d43923d2b8567635fb80ea7f7d15f0adedf9fa9cd3592f7ba045"
+"checksum grpcio-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "43899079c21c006e2257ea2518a0644876ca53fc98cc059d76f4f5f922240437"
 "checksum hostname 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "58fab6e177434b0bb4cd344a4dabaa5bd6d7a8d792b1885aebcae7af1091d1cb"
 "checksum httparse 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "c2f407128745b78abc95c0ffbe4e5d37427fdc0d45470710cfef8c44522a2e37"
 "checksum hyper 0.10.13 (registry+https://github.com/rust-lang/crates.io-index)" = "368cb56b2740ebf4230520e2b90ebb0461e69034d85d1945febd9b3971426db2"
