@@ -3,22 +3,22 @@ FROM rustlang/rust:nightly as builder
 
 RUN apt-get update && apt-get install -y cmake golang
 
-WORKDIR /usr/src/lycaon
+WORKDIR /usr/src/trow
 
 #First get just the deps
 COPY Cargo.toml .
 COPY Cargo.lock .
 
-# lycaon
+# trow
 RUN mkdir src/
 RUN echo "fn main() {}" > src/main.rs
 
-# lycaon-backend
+# trow-backend
 COPY lib/backend/Cargo.toml lib/backend/
 RUN mkdir -p lib/backend/src
 RUN touch lib/backend/src/lib.rs
 
-# lycaon-protobuf
+# trow-protobuf
 COPY lib/protobuf/Cargo.toml lib/protobuf/
 RUN mkdir -p lib/protobuf/src
 RUN touch lib/protobuf/src/lib.rs
@@ -33,7 +33,7 @@ COPY tests tests
 
 FROM scratch
 
-COPY --from=builder /usr/src/lycaon/target/release/lycaon /lycaon
+COPY --from=builder /usr/src/trow/target/release/trow /trow
 
 #Need to copy c libs
 COPY --from=builder /lib/x86_64-linux-gnu/libdl.so.2 /lib/libdl.so.2
@@ -45,11 +45,11 @@ COPY --from=builder /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
 COPY --from=builder /lib/x86_64-linux-gnu/libm.so.6 /lib/libm.so.6
 
 COPY Rocket.toml /
-COPY lycaon-default.toml /
+COPY trow-default.toml /
 ##Yeah, it's another hack. Sue me. Note that you need 17.09+ to build this
 COPY --chown=65534:65534 README.md /data/layers/README.md
 COPY --chown=65534:65534 README.md /data/scratch/README.md
 USER 65534
 EXPOSE 8000
-ENTRYPOINT ["/lycaon"]
-CMD ["-c", "/lycaon-default.toml"]
+ENTRYPOINT ["/trow"]
+CMD ["-c", "/trow-default.toml"]

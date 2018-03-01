@@ -1,6 +1,6 @@
 #Not a big fan of using nightly, but such is our lot currently
 #FROM arm64v8/debian:stable-slim
-FROM multiarch/debian-debootstrap:arm64-stretch-slim
+FROM multiarch/debian-debootstrap:arm64-stretch-slim as builder
 
 RUN apt update && apt install -y curl
 ENV RUSTUP_HOME=/usr/local/rustup \
@@ -20,22 +20,22 @@ RUN set -eux; \
 RUN apt-get update && apt-get install -y cmake golang g++
 #RUN rustup target add aarch64-unknown-linux-gnu || true
 
-WORKDIR /usr/src/lycaon
+WORKDIR /usr/src/trow
 
 #First get just the deps
 COPY Cargo.toml .
 COPY Cargo.lock .
 
-# lycaon
+# trow
 RUN mkdir src/
 RUN echo "fn main() {}" > src/main.rs
 
-# lycaon-backend
+# trow-backend
 COPY lib/backend/Cargo.toml lib/backend/
 RUN mkdir -p lib/backend/src
 RUN touch lib/backend/src/lib.rs
 
-# lycaon-protobuf
+# trow-protobuf
 COPY lib/protobuf/Cargo.toml lib/protobuf/
 RUN mkdir -p lib/protobuf/src
 RUN touch lib/protobuf/src/lib.rs
@@ -46,26 +46,25 @@ COPY lib lib
 RUN touch src/main.rs
 RUN cargo build
 
-#Might need to force
 FROM arm64v8/debian:stable-slim
-
-COPY --from=builder /usr/src/lycaon/target/debug/lycaon /lycaon
-
-#Need to copy c libs
-#COPY --from=builder /lib/x86_64-linux-gnu/libdl.so.2 /lib/libdl.so.2
-#COPY --from=builder /lib/x86_64-linux-gnu/librt.so.1 /lib/librt.so.1
-#COPY --from=builder /lib/x86_64-linux-gnu/libpthread.so.0 /lib/libpthread.so.0
-#COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/libgcc_s.so.1
-#COPY --from=builder /lib/x86_64-linux-gnu/libc.so.6 /lib/libc.so.6
-#COPY --from=builder /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
-#COPY --from=builder /lib/x86_64-linux-gnu/libm.so.6 /lib/libm.so.6
-
-COPY Rocket.toml /
-COPY lycaon-default.toml /
-##Yeah, it's another hack. Sue me. Note that you need 17.09 to build this
+#
+COPY --from=builder /usr/src/trow/target/debug/trow /trow
+#
+##Need to copy c libs
+##COPY --from=builder /lib/x86_64-linux-gnu/libdl.so.2 /lib/libdl.so.2
+##COPY --from=builder /lib/x86_64-linux-gnu/librt.so.1 /lib/librt.so.1
+##COPY --from=builder /lib/x86_64-linux-gnu/libpthread.so.0 /lib/libpthread.so.0
+##COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/libgcc_s.so.1
+##COPY --from=builder /lib/x86_64-linux-gnu/libc.so.6 /lib/libc.so.6
+##COPY --from=builder /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
+##COPY --from=builder /lib/x86_64-linux-gnu/libm.so.6 /lib/libm.so.6
+#
+COPY Trow.toml /
+COPY trow-default.toml /
+#Yeah, it's another hack. Sue me. Note that you need 17.09 to build this
 COPY --chown=65534:65534 README.md /data/layers/README.md
 COPY --chown=65534:65534 README.md /data/scratch/README.md
 USER 65534
 EXPOSE 8000
-ENTRYPOINT ["/lycaon"]
-CMD ["-c", "/lycaon-default.toml"]
+ENTRYPOINT ["/trow"]
+CMD ["-c", "/trow-default.toml"]
