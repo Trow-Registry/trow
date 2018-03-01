@@ -23,7 +23,7 @@ mod cli {
             .succeeds()
             .and()
             .stdout()
-            .contains("Lycaon")
+            .contains("Trow")
             .unwrap();
     }
 }

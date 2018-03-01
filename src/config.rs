@@ -25,7 +25,7 @@ static DEFAULT_DATA_DIR: &'static str = "data";
 static SCRATCH_DIR: &'static str = "scratch";
 static LAYERS_DIR: &'static str = "layers";
 
-const PROGRAM_NAME: &'static str = "Lycaon";
+const PROGRAM_NAME: &'static str = "Trow";
 const PROGRAM_DESC: &'static str = "\nThe King of Registries";
 
 /// This encapsulates any stateful data that needs to be preserved and
@@ -65,36 +65,36 @@ impl HttpConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct LycaonConfig {
-    grpc: backend::config::LycaonBackendConfig,
+pub struct TrowConfig {
+    grpc: backend::config::TrowBackendConfig,
     web: HttpConfig,
 }
 
-impl LycaonConfig {
+impl TrowConfig {
     pub fn new(file: &str) -> Result<Self, Error> {
         use cfg::{Config, Environment, File};
         let mut s = Config::new();
 
         s.merge(File::with_name(&file))?;
-        s.merge(Environment::with_prefix("lycaon"))?;
+        s.merge(Environment::with_prefix("trow"))?;
 
         s.try_into().map_err(|e| e.into())
     }
 
     pub fn default() -> Result<Self, Error> {
-        LycaonConfig::new("Lycaon.toml")
+        TrowConfig::new("Trow.toml")
     }
 
     pub fn from_file(file: Result<String, Error>) -> Result<Self, Error> {
         file.map_err(|e| e.into())
-            .and_then(|file: String| LycaonConfig::new(&file))
+            .and_then(|file: String| TrowConfig::new(&file))
             .or_else(|_| {
                 debug!("No config file specified, using default");
-                LycaonConfig::default()
+                TrowConfig::default()
             })
     }
 
-    pub fn grpc(&self) -> backend::config::LycaonBackendConfig {
+    pub fn grpc(&self) -> backend::config::TrowBackendConfig {
         self.grpc.clone()
     }
 }
@@ -230,7 +230,7 @@ impl BackendHandler {
     }
 }
 
-fn build_handlers(config: &LycaonConfig) -> BackendHandler {
+fn build_handlers(config: &TrowConfig) -> BackendHandler {
     use std::sync::Arc;
     use grpcio::{ChannelBuilder, EnvBuilder};
 
@@ -246,7 +246,7 @@ fn build_handlers(config: &LycaonConfig) -> BackendHandler {
     BackendHandler::new(client)
 }
 
-fn build_rocket_config(config: &LycaonConfig) -> rocket::config::Config {
+fn build_rocket_config(config: &TrowConfig) -> rocket::config::Config {
     debug!("Config: {:?}", config.web);
     let bind = config.web.listen();
     rocket::config::Config::build(rocket::config::Environment::Production)
@@ -261,8 +261,8 @@ pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
     let f = args.value_of("config");
 
     let config = match f {
-        Some(v) => LycaonConfig::new(&v)?,
-        None => LycaonConfig::default()?,
+        Some(v) => TrowConfig::new(&v)?,
+        None => TrowConfig::default()?,
     };
 
     let rocket_config = build_rocket_config(&config);

@@ -553,76 +553,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lycaon"
-version = "0.1.0"
-dependencies = [
- "assert_cli 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "clap 2.29.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "config 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "ctrlc 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "environment 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "failure_derive 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "fern 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "getopts 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "hostname 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "hyper 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
- "hypersync 0.1.0 (git+https://github.com/ContainerSolutions/hypersync)",
- "jwt 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "lycaon-backend 0.1.0",
- "lycaon-protobuf 0.1.0",
- "orset 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "quickcheck 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "quickcheck_macros 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ring 0.13.0-alpha (registry+https://github.com/rust-lang/crates.io-index)",
- "rocket 0.4.0-dev (git+https://github.com/SergioBenitez/Rocket?rev=5a9d85732917a6bf2e1e1754d490ae8f6a0e697e)",
- "rocket_codegen 0.4.0-dev (git+https://github.com/SergioBenitez/Rocket?rev=5a9d85732917a6bf2e1e1754d490ae8f6a0e697e)",
- "rocket_contrib 0.4.0-dev (git+https://github.com/SergioBenitez/Rocket?rev=5a9d85732917a6bf2e1e1754d490ae8f6a0e697e)",
- "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-io 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "lycaon-backend"
-version = "0.1.0"
-dependencies = [
- "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "failure 0.0.1 (git+https://github.com/withoutboats/failure?rev=ae276f58615174e5b2dbba8dd7c6e47a033c7e2c)",
- "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "lycaon-protobuf 0.1.0",
- "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "lycaon-protobuf"
-version = "0.1.0"
-dependencies = [
- "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "matches"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1345,6 +1275,76 @@ dependencies = [
 name = "traitobject"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "trow"
+version = "0.1.0"
+dependencies = [
+ "assert_cli 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.29.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "config 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ctrlc 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "environment 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure_derive 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fern 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "getopts 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hostname 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hyper 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hypersync 0.1.0 (git+https://github.com/ContainerSolutions/hypersync)",
+ "jwt 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "orset 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quickcheck 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quickcheck_macros 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ring 0.13.0-alpha (registry+https://github.com/rust-lang/crates.io-index)",
+ "rocket 0.4.0-dev (git+https://github.com/SergioBenitez/Rocket?rev=5a9d85732917a6bf2e1e1754d490ae8f6a0e697e)",
+ "rocket_codegen 0.4.0-dev (git+https://github.com/SergioBenitez/Rocket?rev=5a9d85732917a6bf2e1e1754d490ae8f6a0e697e)",
+ "rocket_contrib 0.4.0-dev (git+https://github.com/SergioBenitez/Rocket?rev=5a9d85732917a6bf2e1e1754d490ae8f6a0e697e)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-io 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trow-backend 0.1.0",
+ "trow-protobuf 0.1.0",
+ "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "trow-backend"
+version = "0.1.0"
+dependencies = [
+ "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.0.1 (git+https://github.com/withoutboats/failure?rev=ae276f58615174e5b2dbba8dd7c6e47a033c7e2c)",
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trow-protobuf 0.1.0",
+ "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "trow-protobuf"
+version = "0.1.0"
+dependencies = [
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "typeable"

@@ -1,5 +1,5 @@
 [package]
-name = "lycaon-protobuf"
+name = "trow-protobuf"
 version = "0.1.0"
 authors = ["Hamish Hutchings <moredhel@aoeu.me>"]
 

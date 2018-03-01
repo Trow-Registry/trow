@@ -4,7 +4,7 @@ extern crate futures;
 #[macro_use]
 extern crate hyper;
 extern crate hypersync;
-extern crate lycaon;
+extern crate trow;
 extern crate rand;
 extern crate serde_json;
 
@@ -28,7 +28,7 @@ mod interface_tests {
     use rand::Rng;
     use futures::Future;
     use futures::Stream;
-    use lycaon::manifest;
+    use trow::manifest;
     use serde_json;
 
     const LYCAON_ADDRESS: &'static str = "http://localhost:8000";
@@ -36,13 +36,13 @@ mod interface_tests {
     header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
     header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }
 
-    struct LycaonInstance {
+    struct TrowInstance {
         pid: Child,
     }
-    /// Call out to cargo to start lycaon.
+    /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
 
-    fn start_lycaon() -> LycaonInstance {
+    fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             //.current_dir("../../")
             .arg("run")
@@ -60,9 +60,9 @@ mod interface_tests {
         }
         if timeout == 0 {
             child.kill().unwrap();
-            panic!("Failed to start Lycaon");
+            panic!("Failed to start Trow");
         }
-        LycaonInstance { pid: child }
+        TrowInstance { pid: child }
     }
 
     fn setup() {
@@ -72,7 +72,7 @@ mod interface_tests {
         fs::File::create("./data/layers/test/test/test_digest").unwrap();
     }
 
-    impl Drop for LycaonInstance {
+    impl Drop for TrowInstance {
         fn drop(&mut self) {
             //Y U NO HV STOP?
             self.pid.kill().unwrap();
@@ -201,9 +201,9 @@ mod interface_tests {
 
     #[test]
     fn test_runner() {
-        //Had issues with stopping and starting lycaon causing test fails.
+        //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _lyc = start_lycaon();
+        let _trow = start_trow();
         setup();
         println!("Running get_main()");
         get_main();

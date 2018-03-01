@@ -95,7 +95,7 @@ fn get_v2root() -> Empty {
 #[get("/")]
 fn get_homepage<'a>() -> HTML<'a> {
     const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
-<h1>Welcome to Lycaon, the King of Registries</h1>
+<h1>Welcome to Trow, the cluster registry</h1>
 </body></html>";
 
     HTML(ROOT_RESPONSE)

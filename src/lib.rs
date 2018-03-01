@@ -1,4 +1,4 @@
-//! # Lycaon Registry
+//! # Trow Registry
 //!
 //! The registry is aimed to fix the issues with the current registry
 //! options that are currently available
@@ -39,8 +39,8 @@ extern crate tokio_io;
 extern crate uuid;
 extern crate crypto;
 
-extern crate lycaon_backend as backend;
-extern crate lycaon_protobuf as grpc;
+extern crate trow_backend as backend;
+extern crate trow_protobuf as grpc;
 
 extern crate env_logger;
 #[macro_use]
@@ -71,8 +71,8 @@ fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
     let f = args.value_of("config");
 
     let cnfg = match f {
-        Some(v) => config::LycaonConfig::new(&v)?,
-        None => config::LycaonConfig::default()?,
+        Some(v) => config::TrowConfig::new(&v)?,
+        None => config::TrowConfig::default()?,
     };
 
     Ok(thread::spawn(move || { backend::server(cnfg.grpc()); }))

@@ -1,6 +1,6 @@
-extern crate lycaon;
+extern crate trow;
 
-use lycaon::start;
+use trow::start;
 
 fn main() {
 

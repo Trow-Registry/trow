@@ -13,7 +13,7 @@ let
 in
 # rustPlatform.buildRustPackage rec {
 stdenv.mkDerivation rec {
-  name = "lycaon";
+  name = "trow";
   env = buildEnv { name = name; paths = buildInputs; };
   # src = lib.sourceFilesBySuffices ./. [".lock" ".toml" ".rs"];
   # cargoSha256 = "0q68qyl2h6i0qsz82z840myxlnjay8p1w5z7hfyr8fqp7wgwa9cx";

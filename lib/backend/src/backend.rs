@@ -237,7 +237,7 @@ mod test {
     // 2. test the exposed service
     use super::*;
     use server_async;
-    use config::{LycaonBackendConfig, Service};
+    use config::{TrowBackendConfig, Service};
     use grpc::backend_grpc::BackendClient;
     use grpc::backend;
     use std::sync::Arc;
@@ -254,7 +254,7 @@ mod test {
     // test grpc interface ////////////////////////////////////////////////////
     static mut COUNTER: u16 = 30000;
 
-    fn default_config() -> LycaonBackendConfig {
+    fn default_config() -> TrowBackendConfig {
         let counter;
         unsafe {
             counter = COUNTER;
@@ -268,10 +268,10 @@ mod test {
             host: "localhost".to_owned(),
             port: 1024,
         };
-        LycaonBackendConfig { listen, bootstrap }
+        TrowBackendConfig { listen, bootstrap }
     }
 
-    fn client(config: &LycaonBackendConfig) -> BackendClient {
+    fn client(config: &TrowBackendConfig) -> BackendClient {
         // configure client
         let env = Arc::new(EnvBuilder::new().build());
         let ch = ChannelBuilder::new(env).connect(&format!(

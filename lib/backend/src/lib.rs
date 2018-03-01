@@ -4,7 +4,7 @@ extern crate failure;
 extern crate uuid;
 extern crate protobuf;
 
-extern crate lycaon_protobuf as grpc;
+extern crate trow_protobuf as grpc;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use(log, warn, info, debug)]
@@ -22,14 +22,14 @@ use backend::BackendService;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
 
-pub fn server(config: config::LycaonBackendConfig) {
+pub fn server(config: config::TrowBackendConfig) {
     let mut server = server_async(config);
     thread::park();
     let _ = server.shutdown().wait();
     warn!("GRPC Server shutdown!");
 }
 
-pub fn server_async(config: config::LycaonBackendConfig) -> grpcio::Server {
+pub fn server_async(config: config::TrowBackendConfig) -> grpcio::Server {
     use std::sync::Arc;
 
     let listen = config.listen();

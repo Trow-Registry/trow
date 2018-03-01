@@ -1,10 +1,10 @@
 #[derive(Clone, Debug, Deserialize)]
-pub struct LycaonBackendConfig {
+pub struct TrowBackendConfig {
     pub listen: Service,
     pub bootstrap: Service,
 }
 
-impl LycaonBackendConfig {
+impl TrowBackendConfig {
     pub fn listen(&self) -> Service {
         self.listen.clone()
     }

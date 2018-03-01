@@ -1,5 +1,5 @@
 [package]
-name = "lycaon"
+name = "trow"
 version = "0.1.0"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <moredhel@aoeu.me>"]
 
@@ -40,8 +40,8 @@ orset = "0.2.0"
 failure = "0.1"
 failure_derive = "0.1"
 
-lycaon-protobuf = { path = "./lib/protobuf" }
-lycaon-backend = { path = "./lib/backend" }
+trow-protobuf = { path = "./lib/protobuf" }
+trow-backend = { path = "./lib/backend" }
 
 [build-dependencies]
 
