@@ -4,7 +4,7 @@
 
 use std;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::fs;
 
@@ -65,9 +65,16 @@ impl HttpConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct TlsConfig {
+    certs: PathBuf,
+    key: PathBuf,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct TrowConfig {
     grpc: backend::config::TrowBackendConfig,
     web: HttpConfig,
+    tls: TlsConfig, // I have no idea how to make this optional.
 }
 
 impl TrowConfig {
@@ -102,8 +109,7 @@ impl TrowConfig {
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
 #[fail(display = "invalid data directory")]
-pub struct ConfigError {
-}
+pub struct ConfigError {}
 
 #[derive(Debug)]
 pub enum Backend {
@@ -144,8 +150,6 @@ impl SocketHandler {
     }
 }
 
-
-
 /// Build the logging agent with formatting.
 pub fn main_logger() -> Result<(), SetLoggerError> {
     let mut builder = env_logger::LogBuilder::new();
@@ -184,7 +188,7 @@ fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
     let layers_path = data_path.join(LAYERS_DIR);
     setup_path(scratch_path)
         .and(setup_path(layers_path))
-        .map_err(|_| ConfigError{}.into())
+        .map_err(|_| ConfigError {}.into())
 }
 
 /// extract configuration values
@@ -249,11 +253,17 @@ fn build_handlers(config: &TrowConfig) -> BackendHandler {
 fn build_rocket_config(config: &TrowConfig) -> rocket::config::Config {
     debug!("Config: {:?}", config.web);
     let bind = config.web.listen();
-    rocket::config::Config::build(rocket::config::Environment::Production)
+    let tls = &config.tls;
+    let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
         .address(bind.host())
-        .port(bind.port())
-        .finalize()
-        .expect("Error building Rocket Config")
+        .port(bind.port());
+    match (tls.certs.to_str(), tls.key.to_str()) {
+        (Some(cert), Some(key)) => if !cert.is_empty() && !key.is_empty() {
+            cfg = cfg.tls(cert, key);
+        },
+        (_, _) => (),
+    };
+    cfg.finalize().expect("Error building Rocket Config") // Fix this?
 }
 
 /// Construct the rocket instance and prepare for launch
@@ -273,7 +283,8 @@ pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
         .attach(fairing::AdHoc::on_attach(startup))
         .attach(fairing::AdHoc::on_response(|_, resp| {
             //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
-            resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");}))
+            resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
+        }))
         .mount("/", routes::routes()))
 }
 

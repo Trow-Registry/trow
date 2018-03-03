@@ -10,7 +10,7 @@ rust-crypto = "0.2.36"
 jwt = "0.4.0"
 rustc-serialize = "0.3.24"
 
-rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "5a9d85732917a6bf2e1e1754d490ae8f6a0e697e"}
+rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "5a9d85732917a6bf2e1e1754d490ae8f6a0e697e", features = ["tls"] }
 rocket_codegen = { git = "https://github.com/SergioBenitez/Rocket", rev = "5a9d85732917a6bf2e1e1754d490ae8f6a0e697e" }
 rocket_contrib = { git = "https://github.com/SergioBenitez/Rocket", rev = "5a9d85732917a6bf2e1e1754d490ae8f6a0e697e" }
 serde = "1.0"

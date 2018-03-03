@@ -8,3 +8,7 @@ port = 3117
 [web.listen]
 host = "::"
 port = 8000
+[tls]
+use_tls = true
+certs = "./tmp/certs/ca.crt"
+key = "./tmp/certs/domain.key"
