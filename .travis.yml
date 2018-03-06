@@ -2,9 +2,11 @@ language: rust
 rust:
   - nightly
 before_script:
-  - ./carts/make-certs.sh
-  - sudo echo "\n127.0.0.1 trow.local\n" >> /etc/hosts 
+  - ./certs/make-certs.sh
   - cargo update
+addons:
+  hosts:
+    - trow.local
 notifications:
   slack:
     rooms:
