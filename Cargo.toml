@@ -53,4 +53,4 @@ environment = "0.1"
 hyper = "0.11"
 libc = "0.2"
 rand = "0.4"
-hypersync = { git = "https://github.com/ContainerSolutions/hypersync" }
+reqwest = "0.8"

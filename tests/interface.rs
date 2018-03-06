@@ -3,10 +3,10 @@ extern crate environment;
 extern crate futures;
 #[macro_use]
 extern crate hyper;
-extern crate hypersync;
-extern crate trow;
 extern crate rand;
+extern crate reqwest;
 extern crate serde_json;
+extern crate trow;
 
 #[cfg(test)]
 mod interface_tests {
@@ -20,18 +20,14 @@ mod interface_tests {
     use std::process::Child;
     use std::time::Duration;
     use std::thread;
-    use std::io::Write;
     use std::io::Read;
     use std::fs::File;
     use hyper::header::Location;
     use hyper::StatusCode;
-    use hypersync::hypersync;
     use rand;
     use rand::Rng;
-    use futures::Future;
-    use futures::Stream;
     use trow::manifest;
-    use serde_json;
+    use reqwest;
 
     const LYCAON_ADDRESS: &'static str = "https://trow.local:8000";
 
@@ -53,30 +49,28 @@ mod interface_tests {
             .spawn()
             .expect("failed to start");
 
-        /*    
-
         let mut timeout = 20;
-        
-        let mut response = hypersync::get(LYCAON_ADDRESS);
+
+        let mut buf = Vec::new();
+        File::open("./tmp/certs/ca.crt").unwrap().read_to_end(&mut buf).unwrap();
+        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
+        // get a client builder
+        let client = reqwest::Client::builder()
+            .add_root_certificate(cert)
+            .build()
+            .unwrap();
+
+        let mut response = client.get(LYCAON_ADDRESS).send();
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::Ok)) {
             thread::sleep(Duration::from_millis(100));
-            response = hypersync::get(LYCAON_ADDRESS);
+            response = client.get(LYCAON_ADDRESS).send();
             timeout -= 1;
         }
         if timeout == 0 {
             child.kill().unwrap();
             panic!("Failed to start Trow");
         }
-        */
-        thread::sleep(Duration::from_millis(10000));
         TrowInstance { pid: child }
-    }
-
-    fn setup() {
-        // create dummy layer
-        use std::fs;
-        fs::create_dir_all("./data/layers/test/test").unwrap();
-        fs::File::create("./data/layers/test/test/test_digest").unwrap();
     }
 
     impl Drop for TrowInstance {
@@ -95,11 +89,8 @@ mod interface_tests {
         blob
     }
 
-    fn get_main() {
-        let mut cert = File::open("./tmp/certs/ca.crt").unwrap();
-        let mut cert_buf = Vec::new();
-        cert.read_to_end(&mut cert_buf).unwrap();
-        let resp = hypersync::get_with_cert(LYCAON_ADDRESS, &cert_buf).unwrap();
+    fn get_main(cl: &reqwest::Client) {
+        let resp = cl.get(LYCAON_ADDRESS).send().unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         assert_eq!(
             resp.headers().get::<DistributionApi>().unwrap().0,
@@ -107,7 +98,9 @@ mod interface_tests {
         );
 
         //All v2 registries should respond with a 200 to this
-        let resp = hypersync::get_with_cert(&(LYCAON_ADDRESS.to_owned() + "/v2/"), &cert_buf).unwrap();
+        let resp = cl.get(&(LYCAON_ADDRESS.to_owned() + "/v2/"))
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
         assert_eq!(
             resp.headers().get::<DistributionApi>().unwrap().0,
@@ -115,61 +108,63 @@ mod interface_tests {
         );
     }
 
-    fn get_non_existent_blob() {
-        let resp = hypersync::get(
-            &(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"),
-        ).unwrap();
+    fn get_non_existent_blob(cl: &reqwest::Client) {
+        let resp = cl.get(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"))
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::NotFound);
     }
 
-    fn unsupported() {
+    fn unsupported(cl: &reqwest::Client) {
         //Delete currently unimplemented
-        let resp = hypersync::delete(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
+        let resp = cl.delete(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
+            .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
     }
 
-    fn upload_layer() {
+    fn upload_layer(cl: &reqwest::Client) {
         //Should support both image/test and imagetest, only former working currently
-        let resp = hypersync::post(&(LYCAON_ADDRESS.to_owned() + "/v2/image/test/blobs/uploads/"))
+        let resp = cl.post(&(LYCAON_ADDRESS.to_owned() + "/v2/image/test/blobs/uploads/"))
+            .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
-        let uuid = resp.headers().get::<UploadUuid>().unwrap();
-        let location = resp.headers().get::<Location>().unwrap();
+        let uuid = resp.headers().get::<UploadUuid>().unwrap().to_string();
+        let location = resp.headers().get::<Location>().unwrap().to_string();
 
         //Upload file. Start uploading blob with patch then digest with put
         let blob = gen_rand_blob(100);
-        let resp = hypersync::patch(location, &blob).unwrap();
+        let resp = cl.patch(location.as_str())
+            .body(blob.clone())
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
 
         let mut hasher = Sha256::new();
         hasher.input(&blob);
         let digest = hasher.result_str();
-        let resp = hypersync::put(
-            &format!(
-                "{}/v2/image/test/blobs/uploads/{}?digest={}",
-                LYCAON_ADDRESS, uuid, digest
-            ),
-            &Vec::new(),
-        ).unwrap();
+        let resp = cl.put(&format!(
+            "{}/v2/image/test/blobs/uploads/{}?digest={}",
+            LYCAON_ADDRESS, uuid, digest
+        )).send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
 
         //Finally get it back again
-        let resp = hypersync::get(&format!(
+        let mut resp = cl.get(&format!(
             "{}/v2/image/test/blobs/{}",
             LYCAON_ADDRESS, digest
-        )).unwrap();
-        assert_eq!(resp.status(), StatusCode::Ok);
-        let mut buf = Vec::new();
-        resp.body()
-            .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from))
-            .wait()
+        )).send()
             .unwrap();
+        assert_eq!(resp.status(), StatusCode::Ok);
+
+        let mut buf = Vec::new();
+        resp.copy_to(&mut buf).unwrap();
 
         assert_eq!(blob, buf);
 
         //Upload manifest
-        //For time being use same blog for config and layer
+        //For time being use same blob for config and layer
         let config = manifest::Object {
             media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
             size: blob.len() as u64,
@@ -189,24 +184,21 @@ mod interface_tests {
             config,
             layers,
         };
-        let resp = hypersync::put(
-            &format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS),
-            &serde_json::to_vec(&mani).unwrap(),
-        ).unwrap();
+        let resp = cl.put(&format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS))
+            .json(&mani)
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
     }
-
-    fn get_manifest() {
+    
+    fn get_manifest(cl: &reqwest::Client) {
         //Previous test should have upload image/test:test manifest
         //Might need accept headers here
-        let resp =
-            hypersync::get(&format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS)).unwrap();
+        let mut resp = cl.get(&format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS))
+            .send().unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
-        let mut buf = Vec::new();
-        resp.body()
-            .for_each(|chunk| buf.write_all(&chunk).map(|_| ()).map_err(From::from))
-            .wait()
-            .unwrap();
+        let mani : manifest::ManifestV2 = resp.json().unwrap();
+        assert_eq!(mani.schema_version, 2);
     }
 
     #[test]
@@ -214,19 +206,29 @@ mod interface_tests {
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
         let _trow = start_trow();
-        setup();
+     
+        let mut buf = Vec::new();
+        File::open("./tmp/certs/ca.crt")
+            .unwrap()
+            .read_to_end(&mut buf)
+            .unwrap();
+        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
+        // get a client builder
+        let client = reqwest::Client::builder()
+            .add_root_certificate(cert)
+            .build()
+            .unwrap();
+
         println!("Running get_main()");
-        get_main();
-        /*
+        get_main(&client);
         println!("Running get_blob()");
-        get_non_existent_blob();
+        get_non_existent_blob(&client);
         println!("Running unsupported()");
-        unsupported();
+        unsupported(&client);
         println!("Running upload_layer()");
-        upload_layer();
+        upload_layer(&client);
         println!("Running get_manifest()");
-        get_manifest();
-        */
+        get_manifest(&client);
     }
 
 }

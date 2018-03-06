@@ -77,7 +77,7 @@ fn get_base_url(req: &Request) -> String {
         Some(shost) => shost.to_string(),
     };
 
-    format!("http://{}", host)
+    format!("https://{}", host)
 }
 
 impl<'r> Responder<'r> for UuidResponse {
