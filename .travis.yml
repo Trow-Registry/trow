@@ -2,7 +2,7 @@ language: rust
 rust:
   - nightly
 before_script:
-  - ./certs/make-certs.sh
+  - cd certs && ./make-certs.sh
   - cargo update
 addons:
   hosts:
