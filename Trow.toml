@@ -10,5 +10,5 @@ host = "::"
 port = 8000
 [tls]
 use_tls = true
-certs = "./tmp/certs/ca.crt"
-key = "./tmp/certs/domain.key"
+certs = "./certs/ca.crt"
+key = "./certs/domain.key"

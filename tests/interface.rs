@@ -52,7 +52,7 @@ mod interface_tests {
         let mut timeout = 20;
 
         let mut buf = Vec::new();
-        File::open("./tmp/certs/ca.crt").unwrap().read_to_end(&mut buf).unwrap();
+        File::open("./certs/ca.crt").unwrap().read_to_end(&mut buf).unwrap();
         let cert = reqwest::Certificate::from_pem(&buf).unwrap();
         // get a client builder
         let client = reqwest::Client::builder()
@@ -208,7 +208,7 @@ mod interface_tests {
         let _trow = start_trow();
      
         let mut buf = Vec::new();
-        File::open("./tmp/certs/ca.crt")
+        File::open("./certs/ca.crt")
             .unwrap()
             .read_to_end(&mut buf)
             .unwrap();
