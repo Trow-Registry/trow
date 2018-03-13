@@ -34,8 +34,8 @@ FROM debian:stable-slim
 
 COPY --from=builder /usr/src/trow/target/debug/trow /trow
 
-COPY Rocket.toml /
 COPY trow-default.toml /
+COPY certs /certs
 RUN mkdir --parents /data/layers
 RUN mkdir /data/scratch
 ENTRYPOINT ["/trow"]
