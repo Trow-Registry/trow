@@ -32,11 +32,17 @@ RUN cargo build
 
 FROM debian:stable-slim
 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /usr/src/trow/target/debug/trow /trow
 
 COPY trow-default.toml /
 COPY certs /certs
+COPY start-trow.sh /
 RUN mkdir --parents /data/layers
 RUN mkdir /data/scratch
-ENTRYPOINT ["/trow"]
-CMD ["-c", "trow-default.toml"]
+ENTRYPOINT ["/start-trow.sh"]
+CMD ["/trow", "-c", "trow-default.toml"]

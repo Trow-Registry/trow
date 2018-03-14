@@ -1,2 +1,4 @@
 data
 target
+certs/ca.crt
+certs/domain.key
