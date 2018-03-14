@@ -1,7 +1,7 @@
 # Trow
 Distributed Cluster Registry
 
-[![Build Status](https://travis-ci.org/ContainerSolutions/lycaon.svg?branch=master)](https://travis-ci.org/ContainerSolutions/lycaon)
+[![Build Status](https://travis-ci.org/ContainerSolutions/trow.svg?branch=master)](https://travis-ci.org/ContainerSolutions/trow)
 
 We're building a cluster-first registry for Kubernetes (and possibly other orchestrators).
 
