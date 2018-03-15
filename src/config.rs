@@ -66,6 +66,7 @@ impl HttpConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TlsConfig {
+    use_tls: bool,
     certs: PathBuf,
     key: PathBuf,
 }
@@ -257,12 +258,14 @@ fn build_rocket_config(config: &TrowConfig) -> rocket::config::Config {
     let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
         .address(bind.host())
         .port(bind.port());
-    match (tls.certs.to_str(), tls.key.to_str()) {
-        (Some(cert), Some(key)) => if !cert.is_empty() && !key.is_empty() {
-            cfg = cfg.tls(cert, key);
-        },
-        (_, _) => (),
-    };
+    if tls.use_tls {
+        match (tls.certs.to_str(), tls.key.to_str()) {
+            (Some(cert), Some(key)) => if !cert.is_empty() && !key.is_empty() {
+                cfg = cfg.tls(cert, key);
+            },
+            (_, _) => (),
+        };
+    }
     cfg.finalize().expect("Error building Rocket Config") // Fix this?
 }
 

@@ -77,6 +77,7 @@ fn get_base_url(req: &Request) -> String {
         Some(shost) => shost.to_string(),
     };
 
+    //TODO: Dynamically figure out whether to use http or https
     format!("https://{}", host)
 }
 
@@ -91,7 +92,7 @@ impl<'r> Responder<'r> for UuidResponse {
             } => {
                 debug!("Uuid Ok");
                 let location_url = format!(
-                    "{}/v2/{}/{}/blobs/uploads/{}?query=true",
+                    "{}/v2/{}/{}/blobs/uploads/{}",
                     get_base_url(req),
                     name,
                     repo,
