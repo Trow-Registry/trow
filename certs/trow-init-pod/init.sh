@@ -6,7 +6,10 @@ IFS=$'\n\t'
 cfssl genkey req.json | cfssljson -bare trow
 REQ=$(cat trow.csr | base64 | tr -d '\n')
 
-kubectl delete csr trow.kube-public
+# Change to output warning and exit instead.
+# Can't reuse CSRs due to changing IPs.
+# Can Docker clients trust k8s CA rather than certs?
+kubectl delete csr trow.kube-public || true
 
 cat <<EOF | kubectl create -f -
 apiVersion: certificates.k8s.io/v1beta1
