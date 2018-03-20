@@ -7,6 +7,6 @@
  ST                     = Trowland
  L                      = Trowie Knowe
  O                      = Trow Registry
- CN                     = trow.local
+ CN                     = trow.kube-public.svc.cluster.local
  emailAddress           = test@email.address
 
