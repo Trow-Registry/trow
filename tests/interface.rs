@@ -29,7 +29,7 @@ mod interface_tests {
     use trow::manifest;
     use reqwest;
 
-    const LYCAON_ADDRESS: &'static str = "https://trow.local:8000";
+    const LYCAON_ADDRESS: &'static str = "https://trow.test:8000";
 
     header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
     header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }

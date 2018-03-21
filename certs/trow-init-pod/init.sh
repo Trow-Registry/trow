@@ -8,6 +8,7 @@ echo "Getting IP of trow service"
 SERVICE_IP=$(dig +short trow.$POD_NAMESPACE.svc.cluster.local)
 while [[ $SERVICE_IP == "" ]]
 do
+  sleep 2
   SERVICE_IP=$(dig +short trow.$POD_NAMESPACE.svc.cluster.local)
 done
 
