@@ -12,7 +12,7 @@ is a small, mischevious creature, similar to the Scandanavian troll. In England,
 it is a old sytle of cargo boat that transported goods on rivers. Finally, it is
 an archaic word meaning "to think, believe, or trust". The reader is free to
 choose which interpretation they like most, but it should be pronounced to rhyme
-with "cow".
+with "brow".
  
 ## Notes
 
