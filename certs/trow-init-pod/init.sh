@@ -3,7 +3,30 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-cfssl genkey req.json | cfssljson -bare trow
+# Get service IP. Not sure how essential the IP addresses are, but let's do it
+echo "Getting IP of trow service"
+SERVICE_IP=$(dig +short trow.$POD_NAMESPACE.svc.cluster.local)
+while [[ $SERVICE_IP == "" ]]
+do
+  SERVICE_IP=$(dig +short trow.$POD_NAMESPACE.svc.cluster.local)
+done
+
+cat << EOF | cfssl genkey - | cfssljson -bare trow
+{
+  "hosts": [
+    "trow.$POD_NAMESPACE.svc.cluster.local",
+    "$POD_NAME.$POD_NAMESPACE.pod.cluster.local",
+    "$POD_IP",
+    "$SERVICE_IP"
+  ],
+  "CN": "trow.kube-public.cluster.local",
+  "key": {
+    "algo": "ecdsa",
+    "size": 256
+  }
+}
+EOF
+
 REQ=$(cat trow.csr | base64 | tr -d '\n')
 
 # Change to output warning and exit instead.
