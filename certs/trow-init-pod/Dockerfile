@@ -8,11 +8,7 @@ RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin/kubectl
 RUN apt update
 RUN apt install -y dnsutils jq
-RUN mkdir /certs
-WORKDIR /certs
-COPY init.sh /certs/
-COPY req.json /certs/
-COPY csr.yaml /certs/
+COPY init.sh /
 
 ENTRYPOINT [""]
-CMD ["./init.sh"]
+CMD ["/init.sh"]

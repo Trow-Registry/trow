@@ -20,26 +20,29 @@ cat << EOF | cfssl genkey - | cfssljson -bare trow
     "$POD_IP",
     "$SERVICE_IP"
   ],
-  "CN": "trow.kube-public.cluster.local",
+  "CN": "trow.$POD_NAMESPACE.cluster.local",
   "key": {
-    "algo": "ecdsa",
-    "size": 256
+    "algo": "rsa",
+    "size": 2048
   }
 }
 EOF
+
+# certs should be a volume that the main pod can read
+cp trow-key.pem /certs/domain.key
 
 REQ=$(cat trow.csr | base64 | tr -d '\n')
 
 # Change to output warning and exit instead.
 # Can't reuse CSRs due to changing IPs.
 # Can Docker clients trust k8s CA rather than certs?
-kubectl delete csr trow.kube-public || true
+kubectl delete csr trow.$POD_NAMESPACE || true
 
 cat <<EOF | kubectl create -f -
 apiVersion: certificates.k8s.io/v1beta1
 kind: CertificateSigningRequest
 metadata:
-  name: trow.kube-public
+  name: trow.$POD_NAMESPACE
 spec:
   groups:
   - system:authenticated
@@ -53,13 +56,18 @@ EOF
 echo """
 Waiting for CSR to be approved.
 
-Please run "kubectl certificate approve trow.kube-public".
+Please run:
+
+$ kubectl certificate approve trow.$POD_NAMESPACE
 """
 
-STAT=$(kubectl get csr trow.kube-public -o json | jq -r .status.conditions[0].type)
+STAT=$(kubectl get csr trow.$POD_NAMESPACE -o json | jq -r .status.conditions[0].type)
 
 while [[ $STAT != "Approved" ]]
 do
   sleep 10
-  STAT=$(kubectl get csr trow.kube-public -o json | jq -r .status.conditions[0].type)
+  STAT=$(kubectl get csr trow.$POD_NAMESPACE -o json | jq -r .status.conditions[0].type)
 done
+
+kubectl get csr trow.$POD_NAMESPACE -o jsonpath='{.status.certificate}' \
+    | base64 -d > /certs/ca.crt
