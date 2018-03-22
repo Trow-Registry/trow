@@ -7,7 +7,7 @@ host = 'localhost'
 port = 3117
 [web.listen]
 host = "::"
-port = 443
+port = 8443
 [tls]
 use_tls = true
 certs = "./certs/ca.crt"
