@@ -17,13 +17,14 @@ cat << EOF | cfssl genkey - | cfssljson -bare trow
   "hosts": [
     "trow.$POD_NAMESPACE.svc.cluster.local",
     "$POD_NAME.$POD_NAMESPACE.pod.cluster.local",
+    "trow.$POD_NAMESPACE",
     "$POD_IP",
     "$SERVICE_IP"
   ],
-  "CN": "trow.$POD_NAMESPACE.cluster.local",
+  "CN": "trow.$POD_NAMESPACE",
   "key": {
     "algo": "rsa",
-    "size": 2048
+    "size": 4096
   }
 }
 EOF
