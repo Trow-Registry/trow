@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trow-deploy
+  namespace: kube-public
+spec:
+  selector:
+    matchLabels:
+      app: trow
+  template:
+    metadata:
+      labels:
+        app: trow
+    spec:
+      containers:
+      - name: trow-pod
+        image: containersol/trow:default
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - mountPath: /certs
+          name: cert-vol
+      initContainers:
+      - name: trow-init
+        image: containersol/trow:init
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+        volumeMounts:
+        - mountPath: /certs
+          name: cert-vol
+      volumes:
+        - name: cert-vol
+          emptyDir:
+            medium: Memory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trow
+  namespace: kube-public
+spec:
+  selector:
+    app: trow
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 443
+    targetPort: 8443
+    nodePort: 31000

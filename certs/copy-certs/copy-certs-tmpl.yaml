@@ -1,0 +1,33 @@
+{{range .items}}{{if not .spec.unschedulable}}
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: copy-certs-{{.metadata.uid}}
+spec:
+  template:
+    metadata:
+      name: copy-certs-{{.metadata.uid}}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: copy-certs-{{.metadata.uid}}
+          image: containersol/trow-copy-certs:tag
+          #imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /etc/docker
+              name: cert-dir
+          #  - mountPath: /hostfile
+          #    name: host-dir
+          securityContext:
+            privileged: true
+      volumes:
+        - name: cert-dir
+          hostPath: 
+            path: /etc/docker
+          #- name: host-dir
+          #hostPath: 
+          #  path: /etc/hosts
+      nodeSelector: 
+        kubernetes.io/hostname: "{{.metadata.name}}"
+---
+{{end}}{{end}}
