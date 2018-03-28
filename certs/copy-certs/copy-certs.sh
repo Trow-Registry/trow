@@ -19,3 +19,4 @@ tmp_file=$(mktemp)
 kubectl get nodes -o go-template-file --template copy-certs-tmpl.yaml > "$tmp_file"
 kubectl create -f "$tmp_file"
 rm "$tmp_file"
+

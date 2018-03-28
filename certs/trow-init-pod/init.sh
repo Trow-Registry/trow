@@ -31,6 +31,7 @@ EOF
 
 # certs should be a volume that the main pod can read
 cp trow-key.pem /certs/domain.key
+echo "Saved key to /certs/domain.key"
 
 REQ=$(cat trow.csr | base64 | tr -d '\n')
 
@@ -72,3 +73,13 @@ done
 
 kubectl get csr trow.$POD_NAMESPACE -o jsonpath='{.status.certificate}' \
     | base64 -d > /certs/ca.crt
+
+echo "Saved signed cert to /certs/ca.crt"
+
+# CSRs get garbaged collected, so save the public cert to a configmap to make it
+# easy to retrieve later.
+
+# We're using the pipe through apply trick to handle case where configmap
+# already exists.
+kubectl create configmap trow-cert --from-file=cert=/certs/ca.crt \
+  --dry-run -o json | kubectl apply -n $POD_NAMESPACE -f -

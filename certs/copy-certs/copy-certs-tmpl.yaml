@@ -11,7 +11,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: copy-certs-{{.metadata.uid}}
-          image: containersol/trow-copy-certs:tag
+          image: containersol/trow:copy-certs
           #imagePullPolicy: Always
           volumeMounts:
             - mountPath: /etc/docker
