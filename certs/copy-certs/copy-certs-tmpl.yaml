@@ -14,7 +14,7 @@ spec:
       containers:
         - name: copy-certs-{{.metadata.uid}}
           image: containersol/trow:copy-certs
-          #imagePullPolicy: Always
+          imagePullPolicy: Always
           volumeMounts:
             - mountPath: /etc/docker
               name: cert-dir
@@ -26,7 +26,7 @@ spec:
         - name: cert-dir
           hostPath: 
             path: /etc/docker
-          - name: host-dir
+        - name: host-dir
           hostPath: 
             path: /etc/hosts
       nodeSelector: 
