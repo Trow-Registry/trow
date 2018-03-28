@@ -2,12 +2,14 @@
 kind: Job
 apiVersion: batch/v1
 metadata:
+  namespace: kube-public
   name: copy-certs-{{.metadata.uid}}
 spec:
   template:
     metadata:
       name: copy-certs-{{.metadata.uid}}
     spec:
+      serviceAccountName: trow
       restartPolicy: OnFailure
       containers:
         - name: copy-certs-{{.metadata.uid}}
@@ -16,17 +18,17 @@ spec:
           volumeMounts:
             - mountPath: /etc/docker
               name: cert-dir
-          #  - mountPath: /hostfile
-          #    name: host-dir
+            - mountPath: /hostfile
+              name: host-dir
           securityContext:
             privileged: true
       volumes:
         - name: cert-dir
           hostPath: 
             path: /etc/docker
-          #- name: host-dir
-          #hostPath: 
-          #  path: /etc/hosts
+          - name: host-dir
+          hostPath: 
+            path: /etc/hosts
       nodeSelector: 
         kubernetes.io/hostname: "{{.metadata.name}}"
 ---
