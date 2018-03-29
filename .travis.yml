@@ -2,11 +2,9 @@ language: rust
 rust:
   - nightly
 before_script:
-  - cd install/self-cert && \
-        ./make-certs.sh && cd ../.. && \
-        mkdir certs && \
-        cp install/self-cert/ca.crt ./certs/ && \
-        cp install/self-cert/domain.key ./certs/
+  - cd install/self-cert && ./make-certs.sh && cd ../.. 
+  - mkdir certs && cp install/self-cert/ca.crt ./certs/ 
+  - cp install/self-cert/domain.key ./certs/
   - cargo update
 addons:
   hosts:
