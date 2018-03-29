@@ -16,7 +16,7 @@ with "brow".
  
 ## Install
 
-See INSTALL.md. Note that it's currently very alpha software.
+See [INSTALL.md](./INSTALL.md). Note that it's currently very alpha software.
 
 ## Use Cases
 
