@@ -68,7 +68,7 @@ $ kubectl get deploy trow-test
 
 ### Troubleshooting
 
-If you get an error when pushing, check the logs for the Trow pod:
+If you get an error when pushing, check the logs for the Trow pod e.g:
 
 ```
 $ kubectl logs trow-deploy-5cf9bccdcc-g28vq -n kube-public
