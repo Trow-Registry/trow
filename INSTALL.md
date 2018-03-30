@@ -3,8 +3,7 @@ Installation Instructions
 
 ***These instructions modify nodes in your cluster. Only run on test clusters currently.***
 
-To install the Trow registry on Kubernetes, with a certificate signed by the k8s
-CA:
+The following instructions install the Trow registry on Kubernetes, with a certificate signed by the Kubernetes CA. They have been tested on both minikube (with the KVM2 driver on Linux) and GKE.
 
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account:
