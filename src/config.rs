@@ -251,7 +251,7 @@ fn build_handlers(config: &TrowConfig) -> BackendHandler {
     BackendHandler::new(client)
 }
 
-fn build_rocket_config(config: &TrowConfig) -> rocket::config::Config {
+fn build_rocket_config(config: &TrowConfig) -> Result<rocket::config::Config, Error> {
     debug!("Config: {:?}", config.web);
     let bind = config.web.listen();
     let tls = &config.tls;
@@ -266,7 +266,8 @@ fn build_rocket_config(config: &TrowConfig) -> rocket::config::Config {
             (_, _) => (),
         };
     }
-    cfg.finalize().expect("Error building Rocket Config") // Fix this?
+    let cfg = cfg.finalize()?;
+    Ok(cfg)
 }
 
 /// Construct the rocket instance and prepare for launch
@@ -278,7 +279,7 @@ pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
         None => TrowConfig::default()?,
     };
 
-    let rocket_config = build_rocket_config(&config);
+    let rocket_config = build_rocket_config(&config)?;
     debug!("Config: {:?}", config);
     Ok(rocket::custom(rocket_config, true)
         .manage(build_handlers(&config))

@@ -3,7 +3,7 @@ Installation Instructions
 
 ***These instructions modify nodes in your cluster. Only run on test clusters currently.***
 
-To install the trow registry on Kubernetes, with a certificate signed by the k8s
+To install the Trow registry on Kubernetes, with a certificate signed by the k8s
 CA:
 
  - If you're running on GKE or have RBAC configured you may need to expand your
@@ -18,9 +18,10 @@ $ kubectl create -f trow.yaml
 ```
 
  - This will create a service for Trow that includes a NodePort for external
-   access (if you don't want this, edit `trow.yaml`). It will also start up the
-trow pod which will get stuck in init, waiting for us to approve it's
-certificate. Do this by:
+   access (if you don't want this, edit `trow.yaml`). It will also pull the Trow
+image and start up the pod, which may take a moment to download. The Trow pod
+will then get stuck in init, waiting for us to approve its certificate. Do this
+by:
 
 ```
 $ kubectl certificate approve trow.kube-public
@@ -32,13 +33,13 @@ running the following script, but be aware that this will modify files on the
 Nodes, including /etc/hosts:
 
 ```
+$ cd install
 $ ./copy-certs.sh
 ```
 
 Note there is an issue with this approach, as new nodes will not automatically
-get the certs and will be unable to pull from Trow. It would be much easier if
-Kubernetes nodes automatically trusted the k8s certificate and were connected to
-the Kubernetes DNS. 
+get the certs and will be unable to pull from Trow. We hope to have a better
+solution in the future, but it may require changes to Kubernetes.
 
  - Finally, you probably want to be able to push from your development laptop,
    which you can do with:
@@ -66,7 +67,18 @@ $ kubectl run trow-test --image=trow.kube-public:31000/test/nginx:alpine
 $ kubectl get deploy trow-test
 ```
 
+### Troubleshooting
 
+If you get an error when pushing, check the logs for the Trow pod:
 
+```
+$ kubectl logs trow-deploy-5cf9bccdcc-g28vq -n kube-public
+```
+
+If there is a message about a malformed PEM file, you have probably hit a [bug
+in the underlying crypto
+libraries](https://github.com/briansmith/ring/issues/220). To fix this, delete
+the deployment (`kubectl delete deploy trow-deploy -n kube-public`) and rerun
+the above steps.
 
 

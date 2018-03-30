@@ -8,7 +8,6 @@ if [[ ! -f ./certs/domain.key && ! -f ./certs/ca.crt ]]; then
   ./make-certs.sh
   cd /
 fi
-ls -l /certs
 cat trow-default.toml
 
 exec "$@"
