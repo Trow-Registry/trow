@@ -16,18 +16,18 @@ mod interface_tests {
 
     use environment::Environment;
 
-    use std::process::Command;
-    use std::process::Child;
-    use std::time::Duration;
-    use std::thread;
-    use std::io::Read;
-    use std::fs::File;
-    use hyper::header::Location;
     use hyper::StatusCode;
+    use hyper::header::Location;
     use rand;
     use rand::Rng;
-    use trow::manifest;
     use reqwest;
+    use std::fs::File;
+    use std::io::Read;
+    use std::process::Child;
+    use std::process::Command;
+    use std::thread;
+    use std::time::Duration;
+    use trow::manifest;
 
     const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 
@@ -52,7 +52,10 @@ mod interface_tests {
         let mut timeout = 20;
 
         let mut buf = Vec::new();
-        File::open("./certs/ca.crt").unwrap().read_to_end(&mut buf).unwrap();
+        File::open("./certs/ca.crt")
+            .unwrap()
+            .read_to_end(&mut buf)
+            .unwrap();
         let cert = reqwest::Certificate::from_pem(&buf).unwrap();
         // get a client builder
         let client = reqwest::Client::builder()
@@ -189,14 +192,15 @@ mod interface_tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
     }
-    
+
     fn get_manifest(cl: &reqwest::Client) {
         //Previous test should have upload image/test:test manifest
         //Might need accept headers here
         let mut resp = cl.get(&format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS))
-            .send().unwrap();
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
-        let mani : manifest::ManifestV2 = resp.json().unwrap();
+        let mani: manifest::ManifestV2 = resp.json().unwrap();
         assert_eq!(mani.schema_version, 2);
     }
 
@@ -205,7 +209,7 @@ mod interface_tests {
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
         let _trow = start_trow();
-     
+
         let mut buf = Vec::new();
         File::open("./certs/ca.crt")
             .unwrap()

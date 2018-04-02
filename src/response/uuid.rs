@@ -1,14 +1,14 @@
 use failure::Error;
+use hostname;
+use response::errors;
 use rocket::State;
 use rocket::http::{Header, Status};
-use rocket::response::{Responder, Response};
 use rocket::request::Request;
-use hostname;
+use rocket::response::{Responder, Response};
 use uuid::Uuid;
-use response::errors;
 
-use grpc::backend;
 use config;
+use grpc::backend;
 use types::Layer;
 
 #[derive(Debug, Serialize)]
@@ -40,7 +40,7 @@ impl UuidResponse {
             uuid: response.get_uuid().to_owned(),
             name,
             repo,
-            range: (0, 0)
+            range: (0, 0),
         })
     }
 
@@ -73,8 +73,9 @@ fn _gen_uuid() -> Uuid {
 ///
 fn get_base_url(req: &Request) -> String {
     let host = match req.headers().get("HOST").next() {
-        None => hostname::get_hostname()
-            .expect("Server has no name; cannot give clients my address"),
+        None => {
+            hostname::get_hostname().expect("Server has no name; cannot give clients my address")
+        }
         Some(shost) => shost.to_string(),
     };
 
@@ -89,7 +90,7 @@ impl<'r> Responder<'r> for UuidResponse {
                 ref uuid,
                 ref name,
                 ref repo,
-                ref range
+                ref range,
             } => {
                 debug!("Uuid Ok");
                 let location_url = format!(
@@ -125,8 +126,8 @@ impl<'r> Responder<'r> for UuidResponse {
 
 #[cfg(test)]
 mod test {
-    use rocket::http::Status;
     use response::uuid::UuidResponse;
+    use rocket::http::Status;
 
     use response::test_helper::test_route;
     fn build_response() -> UuidResponse {
@@ -135,7 +136,7 @@ mod test {
             uuid: String::from("whatever"),
             name: String::from("moredhel"),
             repo: String::from("test"),
-            range: (0,0)
+            range: (0, 0),
         }
     }
 

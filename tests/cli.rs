@@ -13,7 +13,6 @@ mod cli {
             .stderr()
             .contains("error: Found argument '-Z' which wasn't expected")
             .unwrap();
-
     }
 
     #[test]

@@ -2,11 +2,11 @@
 use failure::Error;
 use rocket::State;
 use rocket::http::Status;
-use rocket::response::{Responder, Response};
 use rocket::request::Request;
+use rocket::response::{Responder, Response};
 
-use grpc::backend;
 use config;
+use grpc::backend;
 
 use response::json_response;
 

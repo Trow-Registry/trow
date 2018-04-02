@@ -10,7 +10,6 @@
 //! - replication and masterless
 //! - other stuff...
 
-
 #![feature(decl_macro)]
 #![feature(plugin)]
 #![feature(use_extern_macros)]
@@ -18,6 +17,7 @@
 
 extern crate clap;
 extern crate config as cfg;
+extern crate crypto;
 extern crate ctrlc;
 extern crate failure;
 extern crate fern;
@@ -37,7 +37,6 @@ extern crate serde_json;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate uuid;
-extern crate crypto;
 
 extern crate trow_backend as backend;
 extern crate trow_protobuf as grpc;
@@ -53,17 +52,16 @@ extern crate serde_derive;
 #[cfg(test)]
 extern crate quickcheck;
 
-use std::thread;
-use failure::Error;
 use clap::ArgMatches;
+use failure::Error;
+use std::thread;
 
 pub mod config;
-pub mod response;
 pub mod manifest;
+pub mod response;
 mod routes;
 mod state;
 mod types;
-
 
 fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Setting up RPC Server");
@@ -75,7 +73,9 @@ fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
         None => config::TrowConfig::default()?,
     };
 
-    Ok(thread::spawn(move || { backend::server(cnfg.grpc()); }))
+    Ok(thread::spawn(move || {
+        backend::server(cnfg.grpc());
+    }))
 }
 
 pub fn start() {

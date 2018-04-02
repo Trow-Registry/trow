@@ -1,7 +1,7 @@
-use rocket::http::Status;
-use rocket::response::{Responder, Response};
-use rocket::request::Request;
 use rocket::http::Header;
+use rocket::http::Status;
+use rocket::request::Request;
+use rocket::response::{Responder, Response};
 
 #[derive(Debug, Serialize)]
 pub struct ManifestUpload {
@@ -11,7 +11,6 @@ pub struct ManifestUpload {
 
 impl<'r> Responder<'r> for ManifestUpload {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
-
         let location = Header::new("Location", self.location);
         let digest = Header::new("Docker-Content-Digest", self.digest);
         Response::build()
@@ -24,14 +23,16 @@ impl<'r> Responder<'r> for ManifestUpload {
 
 #[cfg(test)]
 mod test {
-    use rocket::http::Status;
     use response::manifest_upload::ManifestUpload;
     use response::test_helper::test_route;
+    use rocket::http::Status;
 
     #[test]
     fn accepted_ok() {
-        
-        let response = test_route(ManifestUpload{location: "location".to_owned(), digest: "digest".to_owned()});
+        let response = test_route(ManifestUpload {
+            location: "location".to_owned(),
+            digest: "digest".to_owned(),
+        });
         assert_eq!(response.status(), Status::Created);
     }
 }

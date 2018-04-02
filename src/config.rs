@@ -4,15 +4,15 @@
 
 use std;
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use std::fs;
 
 use clap;
 use clap::{Arg, ArgMatches};
+use ctrlc;
 use env_logger;
 use failure::Error;
-use ctrlc;
 use log::{LogLevelFilter, LogRecord, SetLoggerError};
 use rocket;
 use rocket::fairing;
@@ -236,8 +236,8 @@ impl BackendHandler {
 }
 
 fn build_handlers(config: &TrowConfig) -> BackendHandler {
-    use std::sync::Arc;
     use grpcio::{ChannelBuilder, EnvBuilder};
+    use std::sync::Arc;
 
     let backend = config.grpc().listen();
     debug!(

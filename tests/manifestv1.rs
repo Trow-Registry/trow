@@ -1,8 +1,6 @@
-
+extern crate crypto;
 extern crate jwt;
 extern crate rustc_serialize;
-extern crate crypto;
-    
 
 #[cfg(test)]
 mod manifestv1_tests {
@@ -25,7 +23,7 @@ mod manifestv1_tests {
     #[derive(Clone, Debug, Default, RustcDecodable, RustcEncodable)]
     #[allow(non_snake_case)]
     struct BlobSummary {
-        blobSum: String
+        blobSum: String,
     }
 
     #[derive(Debug, RustcDecodable, RustcEncodable)]
@@ -36,7 +34,7 @@ mod manifestv1_tests {
         tag: String,
         architecture: String,
         fsLayers: Vec<BlobSummary>,
-        history: Vec<EmptyStruct>
+        history: Vec<EmptyStruct>,
     }
 
     impl Default for SigningManifest {
@@ -63,7 +61,7 @@ mod manifestv1_tests {
     #[derive(Debug, Default)]
     struct SignatureHeader {
         alg: String,
-        jwk: SignatureJWK
+        jwk: SignatureJWK,
     }
 
     #[derive(Debug, Default)]
@@ -84,7 +82,6 @@ mod manifestv1_tests {
         fsLayers: Vec<BlobSummary>,
         history: Vec<EmptyStruct>,
         signatures: Vec<Signature>,
-
     }
 
     #[test]
@@ -94,7 +91,6 @@ mod manifestv1_tests {
         // manifest with test/test/test_digest layer
     }
 
-
     fn sign_manifest(digest: &str) {
         // copying from https://github.com/ContainerSolutions/manifest-sample-python/blob/master/construct-manifest.py
         use jwt::{Header, Token};
@@ -102,13 +98,16 @@ mod manifestv1_tests {
         // let format_tail = '}';
         let header: Header = Default::default();
         let claims = SigningManifest {
-            fsLayers: vec!(BlobSummary { blobSum: digest.to_owned() }),
+            fsLayers: vec![
+                BlobSummary {
+                    blobSum: digest.to_owned(),
+                },
+            ],
             ..Default::default()
         };
 
         let manifest = Manifest::from_signing_manifest(&claims);
         let token = Token::new(header, claims);
-
 
         println!("{:?}", manifest);
 
@@ -135,6 +134,5 @@ mod manifestv1_tests {
                 signatures: Default::default(),
             }
         }
-
     }
 }

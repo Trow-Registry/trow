@@ -1,12 +1,12 @@
-use rocket::response::Responder;
-use rocket::response;
-use std::error;
-use rocket::request::Request;
 use rocket::http::Status;
+use rocket::request::Request;
+use rocket::response;
+use rocket::response::Responder;
+use std::error;
 use std::fmt;
 
 #[derive(Debug)]
-pub enum Error { 
+pub enum Error {
     /*
     BLOB_UNKNOWN,
     BLOB_UPLOAD_INVALID,
@@ -26,9 +26,8 @@ pub enum Error {
     BlobUploadUnknown,
     Unsupported,
     InternalError,
-    DigestInvalid
+    DigestInvalid,
 }
-
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -52,7 +51,6 @@ impl error::Error for Error {
             Error::ManifestInvalid => "During upload, manifests undergo several checks ensuring validity. If those checks fail, this error may be returned, unless a more specific error is included. The detail will contain information the failed validation."
         }
     }
-    
 }
 
 impl<'r> Responder<'r> for Error {

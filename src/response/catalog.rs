@@ -1,6 +1,6 @@
 use rocket::http::Status;
-use rocket::response::{Responder, Response};
 use rocket::request::Request;
+use rocket::response::{Responder, Response};
 
 use response::json_response;
 

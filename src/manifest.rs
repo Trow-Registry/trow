@@ -1,10 +1,10 @@
 use failure::Error;
+use rocket::http::{Header, Status};
+use rocket::request::Request;
+use rocket::response::{Responder, Response};
+use serde_json::{self, Value};
 use std;
 use std::io::Cursor;
-use serde_json::{self, Value};
-use rocket::response::{Responder, Response};
-use rocket::request::Request;
-use rocket::http::{Header, Status};
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self, Error>
@@ -22,7 +22,7 @@ pub trait FromJson {
  * Also note that image metadata may move to some sort of DB in the future for fast reliable searches etc.
  *
  * I'm not really sure this buys us much over the JSON deserialization though...
- * 
+ *
  * ARG, mistake here, manifest should be responsible for schema vesion tag
  */
 #[derive(Serialize, Deserialize)]
@@ -252,9 +252,7 @@ impl<'a> Responder<'a> for Manifest {
                     "Content-Type",
                     "application/vnd.docker.distribution.manifest.v1+prettyjws",
                 );
-                Response::build()
-                    .header(ct)
-                    .ok()
+                Response::build().header(ct).ok()
             }
             Manifest::V2(m2) => {
                 let ct = Header::new(
@@ -272,9 +270,9 @@ impl<'a> Responder<'a> for Manifest {
 
 #[cfg(test)]
 mod test {
-    use serde_json::{self, Value};
-    use super::Manifest;
     use super::FromJson;
+    use super::Manifest;
+    use serde_json::{self, Value};
 
     #[test]
     fn valid_v2() {

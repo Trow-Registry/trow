@@ -1,25 +1,25 @@
-use std::path::{Path, PathBuf};
-use std::str;
 use std::fs;
 use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::str;
 
-use response::errors::Error;
 use config;
-use response::admin::Admin;
-use response::empty::Empty;
-use response::uuid::UuidResponse;
-use response::manifest_upload::ManifestUpload;
-use response::uuidaccept::UuidAcceptResponse;
-use response::catalog::Catalog;
-use response::html::HTML;
-use rocket::request::{self, FromRequest, Request};
-use rocket::{self, Outcome};
-use rocket::http::Status;
-use rocket::response::NamedFile;
-use serde_json;
-use crypto::sha2::Sha256;
 use crypto::digest::Digest;
+use crypto::sha2::Sha256;
 use manifest::{self, FromJson, Manifest};
+use response::admin::Admin;
+use response::catalog::Catalog;
+use response::empty::Empty;
+use response::errors::Error;
+use response::html::HTML;
+use response::manifest_upload::ManifestUpload;
+use response::uuid::UuidResponse;
+use response::uuidaccept::UuidAcceptResponse;
+use rocket::http::Status;
+use rocket::request::{self, FromRequest, Request};
+use rocket::response::NamedFile;
+use rocket::{self, Outcome};
+use serde_json;
 use state;
 use types::Layer;
 
@@ -123,7 +123,6 @@ Accept: manifest-version
  */
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 fn get_manifest(user: String, repo: String, reference: String) -> Option<Manifest> {
-    
     let path = format!("data/manifests/{}/{}/{}", user, repo, reference);
     info!("Path: {}", path);
     let path = Path::new(&path);

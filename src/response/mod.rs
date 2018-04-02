@@ -1,18 +1,18 @@
 use rocket::http::Status;
-use rocket::response::{Responder, Response};
 use rocket::request::Request;
+use rocket::response::{Responder, Response};
 use serde;
 
 /// Exporting all routes for the project
 pub mod admin;
 pub mod catalog;
 pub mod empty;
+pub mod errors;
 pub mod html;
+pub mod manifest_upload;
+mod test_helper;
 pub mod uuid;
 pub mod uuidaccept;
-pub mod manifest_upload;
-pub mod errors;
-mod test_helper;
 
 pub fn json_response<T: serde::Serialize>(
     req: &Request,

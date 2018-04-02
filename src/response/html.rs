@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
-use rocket::request::Request;
 use rocket::http::{ContentType, Status};
+use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
 pub struct HTML<'a>(pub &'a str);

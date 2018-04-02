@@ -1,13 +1,13 @@
 use failure;
 use rocket::State;
 use rocket::http::{Header, Status};
-use rocket::response::{Responder, Response};
 use rocket::request::Request;
+use rocket::response::{Responder, Response};
 
 use config;
 use grpc::backend;
-use types;
 use response::errors;
+use types;
 
 const BASE_URL: &str = "http://localhost:8000";
 
@@ -64,7 +64,12 @@ impl UuidAcceptResponse {
         let resp = backend.delete_uuid(&layer)?;
         // 4. Construct response
         if resp.get_success() {
-            Ok(UuidAcceptResponse::UuidAccept{uuid, digest, name, repo})
+            Ok(UuidAcceptResponse::UuidAccept {
+                uuid,
+                digest,
+                name,
+                repo,
+            })
         } else {
             warn!("Function is not implemented");
             Err(failure::err_msg("Not implemented"))
@@ -128,8 +133,8 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
 
 #[cfg(test)]
 mod test {
-    use rocket::http::Status;
     use response::uuid::UuidResponse;
+    use rocket::http::Status;
 
     use response::test_helper::test_route;
     fn build_response() -> UuidResponse {
