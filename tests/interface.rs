@@ -29,7 +29,7 @@ mod interface_tests {
     use trow::manifest;
     use reqwest;
 
-    const LYCAON_ADDRESS: &'static str = "https://trow.test:8443";
+    const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 
     header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
     header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }
@@ -175,9 +175,8 @@ mod interface_tests {
             size: blob.len() as u64,
             digest: digest.clone(),
         };
-        let mut layer_vec = Vec::new();
-        layer_vec.push(layer);
-        let layers = Box::new(layer_vec);
+        let mut layers = Vec::new();
+        layers.push(layer);
         let mani = manifest::ManifestV2 {
             schema_version: 2,
             media_type: "application/vnd.docker.distribution.manifest.v2+json".to_owned(),

@@ -38,7 +38,7 @@ pub struct ManifestV2 {
     pub schema_version: u8,
     pub media_type: String, //make enum
     pub config: Object,
-    pub layers: Box<Vec<Object>>,
+    pub layers: Vec<Object>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -56,9 +56,9 @@ pub struct ManifestV1 {
     pub name: String,
     pub tag: String,
     pub architecture: String,
-    pub fs_layers: Box<Vec<BlobSummary>>,
-    pub history: Box<Vec<EmptyStruct>>,
-    pub signatures: Box<Vec<Signature>>,
+    pub fs_layers: Vec<BlobSummary>,
+    pub history: Vec<EmptyStruct>,
+    pub signatures: Vec<Signature>,
 }
 
 #[derive(Fail, Debug)]
@@ -85,9 +85,9 @@ fn schema_1(raw: &Value) -> Result<Manifest, Error> {
                 signatures: Signature::from_json_map(&raw["signatures"]),
                 history: EmptyStruct::from_json_map(&raw["history"]),
                 */
-        fs_layers: Box::new(Vec::new()),
-        signatures: Box::new(Vec::new()),
-        history: Box::new(Vec::new()),
+        fs_layers: Vec::new(),
+        signatures: Vec::new(),
+        history: Vec::new(),
     }))
 }
 
@@ -125,9 +125,9 @@ impl FromJson for Manifest {
 impl Manifest {
     /// Returns a Vector of the digests of all assets referenced in the Manifest
     pub fn get_asset_digests(&self) -> Vec<&str> {
-        match self {
-            &Manifest::V1(ref m1) => m1.fs_layers.iter().map(|x| x.blob_sum.as_str()).collect(),
-            &Manifest::V2(ref m2) => {
+        match *self {
+            Manifest::V1(ref m1) => m1.fs_layers.iter().map(|x| x.blob_sum.as_str()).collect(),
+            Manifest::V2(ref m2) => {
                 let mut digests: Vec<&str> = m2.layers.iter().map(|x| x.digest.as_str()).collect();
                 digests.push(&m2.config.digest);
                 digests

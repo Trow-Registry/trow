@@ -38,8 +38,8 @@ impl UuidResponse {
 
         Ok(UuidResponse::Uuid {
             uuid: response.get_uuid().to_owned(),
-            name: name,
-            repo: repo,
+            name,
+            repo,
             range: (0, 0)
         })
     }
@@ -56,9 +56,10 @@ impl UuidResponse {
 
         let response = backend.uuid_exists(&req)?;
         debug!("UuidExists: {:?}", response.get_success());
-        match response.get_success() {
-            true => Ok(true),
-            false => Err(errors::Error::DigestInvalid.into()),
+        if response.get_success() {
+            Ok(true)
+        } else {
+            Err(errors::Error::DigestInvalid.into())
         }
     }
 }
@@ -67,7 +68,7 @@ fn _gen_uuid() -> Uuid {
     Uuid::new_v4()
 }
 
-/// Gets the base URL e.g. http://registry:8000 using the HOST value from the request header.
+/// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
 /// Falls back to hostname if it doesn't exist.
 ///
 fn get_base_url(req: &Request) -> String {

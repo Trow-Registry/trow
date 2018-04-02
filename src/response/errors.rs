@@ -61,8 +61,7 @@ impl<'r> Responder<'r> for Error {
             Error::Unsupported => Err(Status::MethodNotAllowed),
             Error::BlobUploadUnknown => Err(Status::NotFound),
             Error::InternalError => Err(Status::InternalServerError),
-            Error::DigestInvalid => Err(Status::BadRequest),
-            Error::ManifestInvalid => Err(Status::BadRequest),
+            Error::DigestInvalid | Error::ManifestInvalid => Err(Status::BadRequest),
         }
     }
 }

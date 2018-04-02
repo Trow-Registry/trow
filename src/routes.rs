@@ -94,7 +94,7 @@ fn get_v2root() -> Empty {
 
 #[get("/")]
 fn get_homepage<'a>() -> HTML<'a> {
-    const ROOT_RESPONSE: &'static str = "<!DOCTYPE html><html><body>
+    const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
 <h1>Welcome to Trow, the cluster registry</h1>
 </body></html>";
 
@@ -261,7 +261,7 @@ fn patch_blob(
         repo: repo.clone(),
         digest: uuid.clone(),
     };
-    if let Ok(_) = UuidResponse::uuid_exists(handler, &layer) {
+    if UuidResponse::uuid_exists(handler, &layer).is_ok() {
         let absolute_file = state::uuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
         let len = chunk.stream_to_file(absolute_file);
@@ -358,8 +358,9 @@ fn put_image_manifest(
     //Needs to return digest & location or error
     //Just do this synchronous, let grpc deal with timeouts
     chunk.stream_to(&mut manifest_bytes).unwrap();
+    // TODO: wouldn't shadowing be better here?
     let raw_manifest = str::from_utf8(&manifest_bytes).unwrap();
-    let manifest_json: serde_json::Value = serde_json::from_str(&raw_manifest).unwrap();
+    let manifest_json: serde_json::Value = serde_json::from_str(raw_manifest).unwrap();
     let manifest = match manifest::Manifest::from_json(&manifest_json) {
         Ok(x) => x,
         Err(_) => return Err(Error::ManifestInvalid),
@@ -383,7 +384,7 @@ fn put_image_manifest(
     let manifest_path = format!("{}/{}", manifest_directory, reference);
     fs::create_dir_all(manifest_directory).unwrap();
     let mut file = fs::File::create(manifest_path).unwrap();
-    file.write_all(&raw_manifest.as_bytes()).unwrap();
+    file.write_all(raw_manifest.as_bytes()).unwrap();
 
     let digest = gen_digest(raw_manifest.as_bytes());
     let location = format!(

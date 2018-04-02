@@ -25,8 +25,8 @@ static DEFAULT_DATA_DIR: &'static str = "data";
 static SCRATCH_DIR: &'static str = "scratch";
 static LAYERS_DIR: &'static str = "layers";
 
-const PROGRAM_NAME: &'static str = "Trow";
-const PROGRAM_DESC: &'static str = "\nThe King of Registries";
+const PROGRAM_NAME: &str = "Trow";
+const PROGRAM_DESC: &str = "\nThe Cluster Registry";
 
 /// This encapsulates any stateful data that needs to be preserved and
 /// passed around during execution.
@@ -49,7 +49,7 @@ impl Service {
     }
 
     pub fn port(&self) -> u16 {
-        self.port.clone()
+        self.port
     }
 }
 
@@ -83,7 +83,7 @@ impl TrowConfig {
         use cfg::{Config, Environment, File};
         let mut s = Config::new();
 
-        s.merge(File::with_name(&file))?;
+        s.merge(File::with_name(file))?;
         s.merge(Environment::with_prefix("trow"))?;
 
         s.try_into().map_err(|e| e.into())
@@ -94,7 +94,7 @@ impl TrowConfig {
     }
 
     pub fn from_file(file: Result<String, Error>) -> Result<Self, Error> {
-        file.map_err(|e| e.into())
+        file.map_err(|e| e) // this looks broken or redundant...
             .and_then(|file: String| TrowConfig::new(&file))
             .or_else(|_| {
                 debug!("No config file specified, using default");
@@ -275,7 +275,7 @@ pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
     let f = args.value_of("config");
 
     let config = match f {
-        Some(v) => TrowConfig::new(&v)?,
+        Some(v) => TrowConfig::new(v)?,
         None => TrowConfig::default()?,
     };
 

@@ -20,7 +20,7 @@ pub enum UuidAcceptResponse {
         name: String,
         repo: String,
     },
-    UuidDelete
+    UuidDelete,
 }
 
 fn construct_digest_path(layer: &types::Layer) -> String {
@@ -42,7 +42,7 @@ impl UuidAcceptResponse {
         let layer = types::Layer {
             name: name.clone(),
             repo: repo.clone(),
-            digest: digest.clone()
+            digest: digest.clone(),
         };
         let digest_path = construct_digest_path(&layer);
         let path = format!("data/layers/{}/{}", layer.name, layer.repo);
@@ -63,17 +63,11 @@ impl UuidAcceptResponse {
         layer.set_digest(uuid.clone());
         let resp = backend.delete_uuid(&layer)?;
         // 4. Construct response
-        match resp.get_success() {
-            true => Ok(UuidAcceptResponse::UuidAccept {
-                uuid: uuid,
-                digest: digest,
-                name: name,
-                repo: repo,
-            }),
-            false => {
-                warn!("Function is not implemented");
-                Err(failure::format_err!("Not implemented"))
-            }
+        if resp.get_success() {
+            Ok(UuidAcceptResponse::UuidAccept{uuid, digest, name, repo})
+        } else {
+            warn!("Function is not implemented");
+            Err(failure::err_msg("Not implemented"))
         }
     }
 
@@ -97,11 +91,11 @@ impl UuidAcceptResponse {
             }
         };
 
-
         debug!("Return: {:?}", response);
-        match response.get_success() {
-            true => Ok(UuidAcceptResponse::UuidDelete),
-            false => Err(errors::Error::BlobUploadUnknown),
+        if response.get_success() {
+            Ok(UuidAcceptResponse::UuidDelete)
+        } else {
+            Err(errors::Error::BlobUploadUnknown)
         }
     }
 }
@@ -112,10 +106,7 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
 
         match self {
             UuidAccept {
-                name,
-                repo,
-                digest,
-                uuid: _,
+                name, repo, digest, ..
             } => {
                 let location = format!("{}/v2/{}/{}/blobs/{}", BASE_URL, name, repo, digest);
                 let location = Header::new("Location", location);
@@ -147,7 +138,7 @@ mod test {
             uuid: String::from("whatever"),
             name: String::from("moredhel"),
             repo: String::from("test"),
-            range: (0, 0)
+            range: (0, 0),
         }
     }
 

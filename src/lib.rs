@@ -71,7 +71,7 @@ fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
     let f = args.value_of("config");
 
     let cnfg = match f {
-        Some(v) => config::TrowConfig::new(&v)?,
+        Some(v) => config::TrowConfig::new(v)?,
         None => config::TrowConfig::default()?,
     };
 
