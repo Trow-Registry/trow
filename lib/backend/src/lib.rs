@@ -22,26 +22,24 @@ use backend::BackendService;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
 
-pub fn server(config: config::TrowBackendConfig) {
-    let mut server = server_async(config);
+pub fn server(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, bootstrap_port: u16) {
+    let mut server = server_async(listen_addr, listen_port, bootstrap_addr, bootstrap_port);
     thread::park();
     let _ = server.shutdown().wait();
     warn!("GRPC Server shutdown!");
 }
 
-pub fn server_async(config: config::TrowBackendConfig) -> grpcio::Server {
+pub fn server_async(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, bootstrap_port: u16) -> grpcio::Server {
     use std::sync::Arc;
-
-    let listen = config.listen();
 
     debug!("Setting up backend server");
     let env = Arc::new(Environment::new(1));
     let backend_service = grpc::backend_grpc::create_backend(BackendService::new());
-    let peer_service = grpc::peer_grpc::create_peer(PeerService::new(config.bootstrap));
+    let peer_service = grpc::peer_grpc::create_peer(PeerService::new(bootstrap_addr, bootstrap_port));
     let mut server = ServerBuilder::new(env)
         .register_service(peer_service)
         .register_service(backend_service)
-        .bind(listen.host(), listen.port())
+        .bind(listen_addr, listen_port)
         .build()
         .unwrap();
     server.start();

@@ -8,25 +8,20 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use clap;
-use clap::{Arg, ArgMatches};
 use ctrlc;
 use env_logger;
 use failure::Error;
 use log::{LogLevelFilter, LogRecord, SetLoggerError};
 use rocket;
-use rocket::fairing;
+
 
 use backend;
 use grpc::backend_grpc::BackendClient;
-use routes;
 
 static DEFAULT_DATA_DIR: &'static str = "data";
 static SCRATCH_DIR: &'static str = "scratch";
 static LAYERS_DIR: &'static str = "layers";
 
-const PROGRAM_NAME: &str = "Trow";
-const PROGRAM_DESC: &str = "\nThe Cluster Registry";
 
 /// This encapsulates any stateful data that needs to be preserved and
 /// passed around during execution.
@@ -56,12 +51,6 @@ impl Service {
 #[derive(Clone, Debug, Deserialize)]
 pub struct HttpConfig {
     listen: Service,
-}
-
-impl HttpConfig {
-    fn listen(&self) -> Service {
-        self.listen.clone()
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -213,7 +202,7 @@ pub(crate) fn extract_config(conf: &rocket::Config) -> Result<Config, Error> {
 /// - attach SIGTERM handler
 /// - Check necessary paths exist
 /// - Extract configuration values needed for runtime
-fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
+pub fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
     attach_sigterm()
         .and(create_data_dirs(Path::new(DEFAULT_DATA_DIR)))
         .and(extract_config(rocket.config()))
@@ -235,78 +224,23 @@ impl BackendHandler {
     }
 }
 
-fn build_handlers(config: &TrowConfig) -> BackendHandler {
+pub fn build_handlers(listen_host: &str, listen_port: u16) -> BackendHandler {
     use grpcio::{ChannelBuilder, EnvBuilder};
     use std::sync::Arc;
 
-    let backend = config.grpc().listen();
     debug!(
         "Connecting to backend: {}:{}",
-        backend.host(),
-        backend.port()
+        listen_host,
+        listen_port
     );
     let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", backend.host(), backend.port()));
+    let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", listen_host, listen_port));
     let client = BackendClient::new(ch);
     BackendHandler::new(client)
 }
 
-fn build_rocket_config(config: &TrowConfig) -> Result<rocket::config::Config, Error> {
-    debug!("Config: {:?}", config.web);
-    let bind = config.web.listen();
-    let tls = &config.tls;
-    let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
-        .address(bind.host())
-        .port(bind.port());
-    if tls.use_tls {
-        match (tls.certs.to_str(), tls.key.to_str()) {
-            (Some(cert), Some(key)) => if !cert.is_empty() && !key.is_empty() {
-                cfg = cfg.tls(cert, key);
-            },
-            (_, _) => (),
-        };
-    }
-    let cfg = cfg.finalize()?;
-    Ok(cfg)
-}
 
-/// Construct the rocket instance and prepare for launch
-pub(crate) fn rocket(args: &ArgMatches) -> Result<rocket::Rocket, Error> {
-    let f = args.value_of("config");
 
-    let config = match f {
-        Some(v) => TrowConfig::new(v)?,
-        None => TrowConfig::default()?,
-    };
 
-    let rocket_config = build_rocket_config(&config)?;
-    debug!("Config: {:?}", config);
-    Ok(rocket::custom(rocket_config, true)
-        .manage(build_handlers(&config))
-        .manage(config)
-        .attach(fairing::AdHoc::on_attach(startup))
-        .attach(fairing::AdHoc::on_response(|_, resp| {
-            //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
-            resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
-        }))
-        .mount("/", routes::routes()))
-}
 
-/*
-  Parses command line arguments and returns ArgMatches object.
-*/
-pub fn parse_args<'a>() -> ArgMatches<'a> {
-    clap::App::new(PROGRAM_NAME)
-        .version("0.1")
-        .author("From Container Solutions")
-        .about(PROGRAM_DESC)
-        .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .value_name("FILE")
-                .help("Sets a custom config file")
-                .takes_value(true),
-        )
-        .get_matches()
-}
+

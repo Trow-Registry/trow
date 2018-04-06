@@ -8,8 +8,6 @@ use grpcio::{ChannelBuilder, EnvBuilder};
 
 use std::sync::Arc;
 
-use config;
-
 /// Struct implementing callbacks for Peers
 ///
 /// _peers_: a Vector of all known clients, will be populated from
@@ -21,10 +19,10 @@ pub struct PeerService {
 }
 impl PeerService {
 
-    pub fn new(service: config::Service) -> PeerService {
+    pub fn new(host: &str, port: u16) -> PeerService {
 
         let env = Arc::new(EnvBuilder::new().build());
-        let ch = ChannelBuilder::new(env).connect(&service.address());
+        let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", host, port));
         let client = PeerClient::new(ch);
 
         PeerService {

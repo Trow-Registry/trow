@@ -15,7 +15,6 @@
 #![feature(use_extern_macros)]
 #![plugin(rocket_codegen)]
 
-extern crate clap;
 extern crate config as cfg;
 extern crate crypto;
 extern crate ctrlc;
@@ -52,9 +51,10 @@ extern crate serde_derive;
 #[cfg(test)]
 extern crate quickcheck;
 
-use clap::ArgMatches;
 use failure::Error;
 use std::thread;
+
+use rocket::fairing;
 
 pub mod config;
 pub mod manifest;
@@ -63,34 +63,95 @@ mod routes;
 mod state;
 mod types;
 
-fn grpc(args: &ArgMatches) -> Result<std::thread::JoinHandle<()>, Error> {
+#[derive(Clone)]
+pub struct NetAddr {
+    pub host: String,
+    pub port: u16,
+}
+
+pub struct TrowBuilder {
+    addr: NetAddr,
+    tls: Option<TlsConfig>,
+    grpc: GrpcConfig,
+}
+
+#[derive(Clone)]
+struct GrpcConfig {
+    listen: NetAddr,
+    bootstrap: NetAddr,
+}
+
+struct TlsConfig {
+    cert_file: String,
+    key_file: String,
+}
+
+fn grpc(
+    listen_host: String,
+    listen_port: u16,
+    bootstrap_host: String,
+    bootstrap_port: u16,
+) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Setting up RPC Server");
 
-    let f = args.value_of("config");
-
-    let cnfg = match f {
-        Some(v) => config::TrowConfig::new(v)?,
-        None => config::TrowConfig::default()?,
-    };
-
     Ok(thread::spawn(move || {
-        backend::server(cnfg.grpc());
+        backend::server(
+            &listen_host,
+            listen_port,
+            &bootstrap_host,
+            bootstrap_port,
+        );
     }))
 }
 
-pub fn start() {
-    config::main_logger().expect("Failed to init logging");
+impl TrowBuilder {
+    pub fn new(addr: NetAddr, listen: NetAddr, bootstrap: NetAddr) -> TrowBuilder {
+        TrowBuilder {
+            addr,
+            tls: None,
+            grpc: GrpcConfig { listen, bootstrap },
+        }
+    }
 
-    // Parse command line
-    let args = config::parse_args();
+    pub fn with_tls(&mut self, cert_file: String, key_file: String) -> &mut TrowBuilder {
+      
+        let cfg = TlsConfig {cert_file, key_file};
+        self.tls = Some(cfg);
+        self
+    }
 
-    // GRPC Backend thread.
-    let _grpc_thread = grpc(&args).expect("Failed to start GRPC");
+    fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
+        let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
+            .address(self.addr.host.clone())
+            .port(self.addr.port);
 
-    //Rocket web stuff
-    let rocket = config::rocket(&args).unwrap_or_else(|e| {
-        log::error!("Rocket failed to process arguments {}", e);
-        std::process::exit(1);
-    });
-    rocket.launch();
+        if let Some(ref tls) = self.tls {
+            cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
+        }
+        let cfg = cfg.finalize()?;
+        Ok(cfg)
+    }
+
+    pub fn start(&self) -> Result<(), Error> {
+        config::main_logger()?;
+        // GRPC Backend thread.
+        let _grpc_thread = grpc(self.grpc.listen.host.clone(), self.grpc.listen.port, self.grpc.bootstrap.host.clone(), self.grpc.bootstrap.port)?;
+
+        //TODO: get rid of this clone
+        let rocket_config = &self.build_rocket_config()?;
+        rocket::custom(rocket_config.clone(), true)
+            .manage(config::build_handlers(
+                &self.grpc.listen.host,
+                self.grpc.listen.port,
+            ))
+            //.manage(self.clone())
+            .attach(fairing::AdHoc::on_attach(config::startup))
+            .attach(fairing::AdHoc::on_response(|_, resp| {
+                //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
+                resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
+            }))
+            .mount("/", routes::routes())
+            .launch();
+            Ok(())
+    }
 }
