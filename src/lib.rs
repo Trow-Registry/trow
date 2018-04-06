@@ -27,7 +27,6 @@ extern crate hostname;
 extern crate jwt;
 extern crate orset;
 extern crate protobuf;
-extern crate ring;
 extern crate rocket;
 extern crate rocket_contrib;
 extern crate rustc_serialize;
