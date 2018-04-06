@@ -1,6 +1,4 @@
-//! This module holds helpers for setting up the project
-//! as well as data-structures for setting and maintaining the
-//! system configuration.
+//! This module should die and code moved to correct files
 
 use std;
 use std::env;
