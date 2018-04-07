@@ -52,6 +52,7 @@ extern crate quickcheck;
 
 use failure::Error;
 use std::thread;
+use std::path::Path;
 
 use rocket::fairing;
 
@@ -69,6 +70,7 @@ pub struct NetAddr {
 }
 
 pub struct TrowBuilder {
+    data_dir: String,
     addr: NetAddr,
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
@@ -94,18 +96,19 @@ fn grpc(
     debug!("Setting up RPC Server");
 
     Ok(thread::spawn(move || {
-        backend::server(
-            &listen_host,
-            listen_port,
-            &bootstrap_host,
-            bootstrap_port,
-        );
+        backend::server(&listen_host, listen_port, &bootstrap_host, bootstrap_port);
     }))
 }
 
 impl TrowBuilder {
-    pub fn new(addr: NetAddr, listen: NetAddr, bootstrap: NetAddr) -> TrowBuilder {
+    pub fn new(
+        data_dir: String,
+        addr: NetAddr,
+        listen: NetAddr,
+        bootstrap: NetAddr,
+    ) -> TrowBuilder {
         TrowBuilder {
+            data_dir,
             addr,
             tls: None,
             grpc: GrpcConfig { listen, bootstrap },
@@ -113,8 +116,10 @@ impl TrowBuilder {
     }
 
     pub fn with_tls(&mut self, cert_file: String, key_file: String) -> &mut TrowBuilder {
-      
-        let cfg = TlsConfig {cert_file, key_file};
+        let cfg = TlsConfig {
+            cert_file,
+            key_file,
+        };
         self.tls = Some(cfg);
         self
     }
@@ -133,8 +138,14 @@ impl TrowBuilder {
 
     pub fn start(&self) -> Result<(), Error> {
         config::main_logger()?;
+        config::create_data_dirs(Path::new(&self.data_dir))?;
         // GRPC Backend thread.
-        let _grpc_thread = grpc(self.grpc.listen.host.clone(), self.grpc.listen.port, self.grpc.bootstrap.host.clone(), self.grpc.bootstrap.port)?;
+        let _grpc_thread = grpc(
+            self.grpc.listen.host.clone(),
+            self.grpc.listen.port,
+            self.grpc.bootstrap.host.clone(),
+            self.grpc.bootstrap.port,
+        )?;
 
         //TODO: get rid of this clone
         let rocket_config = &self.build_rocket_config()?;
@@ -143,14 +154,21 @@ impl TrowBuilder {
                 &self.grpc.listen.host,
                 self.grpc.listen.port,
             ))
+            //Think we can largely delete the following
             //.manage(self.clone())
-            .attach(fairing::AdHoc::on_attach(config::startup))
+            .attach(fairing::AdHoc::on_attach(
+                |r| {
+                    match config::attach_sigterm() {
+                        Ok(_) => Ok(r),
+                        Err(_) => Err(r)
+                    }
+                    }))
             .attach(fairing::AdHoc::on_response(|_, resp| {
                 //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
                 resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
             }))
             .mount("/", routes::routes())
             .launch();
-            Ok(())
+        Ok(())
     }
 }

@@ -10,13 +10,10 @@ use ctrlc;
 use env_logger;
 use failure::Error;
 use log::{LogLevelFilter, LogRecord, SetLoggerError};
-use rocket;
-
 
 use backend;
 use grpc::backend_grpc::BackendClient;
 
-static DEFAULT_DATA_DIR: &'static str = "data";
 static SCRATCH_DIR: &'static str = "scratch";
 static LAYERS_DIR: &'static str = "layers";
 
@@ -155,7 +152,7 @@ pub fn main_logger() -> Result<(), SetLoggerError> {
 }
 
 /// Attaches SIGTERM handler
-fn attach_sigterm() -> Result<(), Error> {
+pub fn attach_sigterm() -> Result<(), Error> {
     ctrlc::set_handler(|| {
         info!("SIGTERM caught, shutting down...");
         std::process::exit(0);
@@ -164,7 +161,7 @@ fn attach_sigterm() -> Result<(), Error> {
 
 /// Creates needed directories under given path if they don't already exist.
 ///
-fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
+pub fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
     fn setup_path(path: std::path::PathBuf) -> Result<(), Error> {
         if !path.exists() {
             fs::create_dir_all(&path)?;
@@ -177,35 +174,6 @@ fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
     setup_path(scratch_path)
         .and(setup_path(layers_path))
         .map_err(|_| ConfigError {}.into())
-}
-
-/// extract configuration values
-///
-pub(crate) fn extract_config(conf: &rocket::Config) -> Result<Config, Error> {
-    let address = &conf.address;
-    let port = conf.port;
-    let console_port = match conf.get_int("console_port") {
-        Ok(x) => x,
-        Err(_) => 29999,
-    };
-    Ok(Config {
-        address: address.clone(),
-        port,
-        console_port,
-    })
-}
-
-/// Handle all code relating to bootstrapping the project
-///
-/// - attach SIGTERM handler
-/// - Check necessary paths exist
-/// - Extract configuration values needed for runtime
-pub fn startup(rocket: rocket::Rocket) -> Result<rocket::Rocket, rocket::Rocket> {
-    attach_sigterm()
-        .and(create_data_dirs(Path::new(DEFAULT_DATA_DIR)))
-        .and(extract_config(rocket.config()))
-        .and_then(|config| Ok(rocket.manage(config)))
-        .map_err(|e| panic!("{}", e))
 }
 
 pub struct BackendHandler {
