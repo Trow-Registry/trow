@@ -154,8 +154,6 @@ impl TrowBuilder {
                 &self.grpc.listen.host,
                 self.grpc.listen.port,
             ))
-            //Think we can largely delete the following
-            //.manage(self.clone())
             .attach(fairing::AdHoc::on_attach(
                 |r| {
                     match config::attach_sigterm() {
