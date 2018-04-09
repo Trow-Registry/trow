@@ -5,8 +5,8 @@ use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
-use config;
 use grpc::backend;
+use backend as bh;
 
 use response::json_response;
 
@@ -16,7 +16,7 @@ pub enum Admin {
 }
 
 impl Admin {
-    pub fn get_uuids(handler: State<config::BackendHandler>) -> Result<Admin, Error> {
+    pub fn get_uuids(handler: State<bh::BackendHandler>) -> Result<Admin, Error> {
         let backend = handler.backend();
         let response = backend.get_uuids(&backend::Empty::new())?;
 

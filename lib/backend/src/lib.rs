@@ -21,6 +21,7 @@ use peer::PeerService;
 use backend::BackendService;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
+use grpc::backend_grpc::BackendClient;
 
 pub fn server(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, bootstrap_port: u16) {
     let mut server = server_async(listen_addr, listen_port, bootstrap_addr, bootstrap_port);
@@ -47,4 +48,34 @@ pub fn server_async(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, b
         info!("listening on {}:{}", host, port);
     }
     server
+}
+
+
+pub struct BackendHandler {
+    backend: BackendClient,
+}
+
+impl BackendHandler {
+    pub fn new(backend: BackendClient) -> Self {
+        BackendHandler { backend }
+    }
+
+    pub fn backend(&self) -> &BackendClient {
+        &self.backend
+    }
+}
+
+pub fn build_handlers(listen_host: &str, listen_port: u16) -> BackendHandler {
+    use grpcio::{ChannelBuilder, EnvBuilder};
+    use std::sync::Arc;
+
+    debug!(
+        "Connecting to backend: {}:{}",
+        listen_host,
+        listen_port
+    );
+    let env = Arc::new(EnvBuilder::new().build());
+    let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", listen_host, listen_port));
+    let client = BackendClient::new(ch);
+    BackendHandler::new(client)
 }

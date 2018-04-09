@@ -3,7 +3,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str;
 
-use config;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use manifest::{self, FromJson, Manifest};
@@ -22,6 +21,7 @@ use rocket::{self, Outcome};
 use serde_json;
 use state;
 use types::Layer;
+use backend;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -235,7 +235,7 @@ struct UploadQuery {
 
 #[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<query>")] // capture digest query string
 fn put_blob(
-    config: rocket::State<config::BackendHandler>,
+    config: rocket::State<backend::BackendHandler>,
     name: String,
     repo: String,
     uuid: String,
@@ -249,7 +249,7 @@ fn put_blob(
 
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
-    handler: rocket::State<config::BackendHandler>,
+    handler: rocket::State<backend::BackendHandler>,
     name: String,
     repo: String,
     uuid: String,
@@ -295,7 +295,7 @@ DELETE /v2/<name>/blobs/uploads/<uuid>
 /// This route assumes that no more data will be uploaded to the specified uuid.
 #[delete("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
 fn delete_upload(
-    handler: rocket::State<config::BackendHandler>,
+    handler: rocket::State<backend::BackendHandler>,
     name: String,
     repo: String,
     uuid: String,
@@ -312,7 +312,7 @@ POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
 fn post_blob_upload(
-    handler: rocket::State<config::BackendHandler>,
+    handler: rocket::State<backend::BackendHandler>,
     name: String,
     repo: String,
 ) -> UuidResponse {
@@ -432,7 +432,7 @@ fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Re
 }
 
 #[get("/admin/uuids")]
-fn admin_get_uuids(handler: rocket::State<config::BackendHandler>) -> Admin {
+fn admin_get_uuids(handler: rocket::State<backend::BackendHandler>) -> Admin {
     Admin::get_uuids(handler).unwrap_or(Admin::Uuids(vec![]))
 }
 

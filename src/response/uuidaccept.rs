@@ -4,10 +4,10 @@ use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
-use config;
 use grpc::backend;
 use response::errors;
 use types;
+use backend as be;
 
 const BASE_URL: &str = "http://localhost:8000";
 
@@ -29,7 +29,7 @@ fn construct_digest_path(layer: &types::Layer) -> String {
 
 impl UuidAcceptResponse {
     pub fn handle(
-        handler: State<config::BackendHandler>,
+        handler: State<be::BackendHandler>,
         name: String,
         repo: String,
         uuid: String,
@@ -77,7 +77,7 @@ impl UuidAcceptResponse {
     }
 
     pub fn delete_upload(
-        handler: State<config::BackendHandler>,
+        handler: State<be::BackendHandler>,
         layer: &types::Layer,
     ) -> Result<UuidAcceptResponse, errors::Error> {
         let backend = handler.backend();

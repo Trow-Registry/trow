@@ -7,7 +7,7 @@ use rocket::request::Request;
 use rocket::response::{Responder, Response};
 use uuid::Uuid;
 
-use config;
+use backend as bh;
 use grpc::backend;
 use types::Layer;
 
@@ -24,7 +24,7 @@ pub enum UuidResponse {
 
 impl UuidResponse {
     pub fn handle(
-        handler: State<config::BackendHandler>,
+        handler: State<bh::BackendHandler>,
         name: String,
         repo: String,
     ) -> Result<UuidResponse, Error> {
@@ -45,7 +45,7 @@ impl UuidResponse {
     }
 
     pub fn uuid_exists(
-        handler: State<config::BackendHandler>,
+        handler: State<bh::BackendHandler>,
         layer: &Layer,
     ) -> Result<bool, Error> {
         let backend = handler.backend();
