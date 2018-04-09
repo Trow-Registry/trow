@@ -4,11 +4,13 @@
 
 if [[ ! -f ./certs/domain.key && ! -f ./certs/ca.crt ]]; then
   echo "No certs found, creating new ones"
+  mkdir ./certs || true
+  cp install/self-cert/* ./certs/
   cd certs
   ./make-certs.sh
   cd /
 fi
-cat trow-default.toml
+echo "Running $@"
 
-exec "$@"
+exec /trow "$@"
 

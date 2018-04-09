@@ -1,5 +1,7 @@
 #Not a big fan of using nightly, but such is our lot currently
-FROM rustlang/rust:nightly as builder
+FROM rust:latest as builder
+
+RUN rustup update nightly && rustup default nightly;
 
 RUN apt-get update && apt-get install -y cmake golang
 
@@ -39,10 +41,8 @@ RUN apt-get update \
 
 COPY --from=builder /usr/src/trow/target/debug/trow /trow
 
-COPY trow-default.toml /
-COPY certs /certs
+COPY install/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers
 RUN mkdir /data/scratch
 ENTRYPOINT ["/start-trow.sh"]
-CMD ["/trow", "-c", "trow-default.toml"]
