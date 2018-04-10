@@ -1,9 +1,13 @@
 Installation Instructions
 =========================
 
+## Install with TLS
+
 ***These instructions modify nodes in your cluster. Only run on test clusters currently.***
 
-The following instructions install the Trow registry on Kubernetes, with a certificate signed by the Kubernetes CA. They have been tested on both minikube (with the KVM2 driver on Linux) and GKE.
+The following instructions install the Trow registry on Kubernetes, with a
+certificate signed by the Kubernetes CA. They have been tested on both minikube
+(with the KVM2 driver on Linux) and GKE.
 
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account:
@@ -80,4 +84,21 @@ libraries](https://github.com/briansmith/ring/issues/220). To fix this, delete
 the deployment (`kubectl delete deploy trow-deploy -n kube-public`) and rerun
 the above steps.
 
+## Install without TLS
+
+Trow can be run with the `--no-tls` flag to serve over HTTP only. This can be
+useful in development and testing, or when running on an internal, secure
+network where the risks are understood.
+
+The major problem is that the Docker client will not by default allow images to
+be pushed or pulled without TLS. This can be circumvented in two ways:
+
+ 1) Using the localhost address for the registry.  
+
+ 2) By adding an "insecure-registries" entry to the Docker `daemon.json` file.
+https://docs.docker.com/registry/insecure/
+
+Method 1) can work well internally in a cluster using NodePort to forward
+traffic. Method 2) can then be used to get an image into the registry from a
+development machine.
 

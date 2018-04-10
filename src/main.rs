@@ -28,13 +28,13 @@ fn parse_args<'a>() -> ArgMatches<'a> {
             Arg::with_name("port")
                 .long("port")
                 .value_name("port")
-                .help("The port that trow will listen on. Defaults to 8443.")
+                .help("The port that trow will listen on. Defaults to 8443 with TLS, 8000 without.")
                 .takes_value(true),
         )
         .arg(
             Arg::with_name("no-tls")
                 .long("no-tls")
-                .help("Turns off TLS. Should only be used in development and debugging. If used in production, make sure you understand the risks.")
+                .help("Turns off TLS. Normally only used in development and debugging. If used in production, make sure you understand the risks.")
         )
         .arg(
             Arg::with_name("cert")
@@ -66,14 +66,16 @@ fn parse_args<'a>() -> ArgMatches<'a> {
 fn main() {
     let matches = parse_args();
 
+    let no_tls = matches.is_present("no-tls");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
+    let default_port = if no_tls {8000} else {8443};
     let port: u16 = matches
         .value_of("port")
-        .map_or(8443, |x| x.parse().unwrap());
+        .map_or(default_port, |x| x.parse().unwrap());
     let cert_path = matches.value_of("cert").unwrap_or("./certs/ca.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("key").unwrap_or("./data");
-    let no_tls = matches.is_present("no-tls");
+    
 
     let addr = NetAddr {
         host: host.to_string(),
