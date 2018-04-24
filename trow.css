@@ -15,8 +15,10 @@ body {
 }
 
 .blue-bg {
-  background-color: #2841f9;
+  background:#2841f9 url(bg-blueprint.png) no-repeat top right;
   color: #fff;
+  background-size:cover;
+  background-attachment:fixed;
 }
 
 .blue-bg a {
@@ -61,11 +63,11 @@ li {
 li:before {
     float: left;
     content: "▆";
-    font-size: 18px;
+    font-size: 20px;
     padding-left: 0px;
     padding-right: 0px;
     margin-left: -30px;
-    margin-top: -4px;
+    margin-top: -3px;
     color: #2841f9;
 }
 
@@ -89,6 +91,11 @@ li:before {
 
 .pad {
   padding-top: 10px;
+  padding-bottom: 20px;
+}
+
+.footer-pad {
+  padding-top: 30px;
   padding-bottom: 20px;
 }
 
@@ -136,7 +143,7 @@ li:before {
 
 .uptest {
   float: left;
-  padding-top: 20px;
+  padding-top: 15px;
 }
 @media  {
   .masthead-brand {
