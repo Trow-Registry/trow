@@ -48,6 +48,7 @@ body {
   padding-top: 10px;
 }
 
+/*
 ul.no-bull {
   list-style-type: none;
   padding: 0;
@@ -58,6 +59,21 @@ li.bull {
   background: url('bullet.png') no-repeat left top;
   height: 30px;
   padding-left: 30px;
+}
+
+
+*/
+li {
+    display: block;
+}
+
+li:before {
+    /*Using a Bootstrap glyphicon as the bullet point*/
+    content: "▆";
+    font-size: 18px;
+    margin-left: -40px;
+    padding-right: 5px;
+    color: #2841f9;
 }
 
 .features h2:after {
