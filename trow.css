@@ -1,0 +1,148 @@
+/*
+ * Globals
+ */
+
+
+html,
+body {
+  height: 100%;
+  font-family: 'route_159regular', Arial, sans-serif;
+}
+
+
+.cover-container {
+  max-width: 42em;
+}
+
+.blue-bg {
+  background-color: #2841f9;
+  color: #fff;
+}
+
+.intro {
+  padding-top: 30px; 
+  padding-bottom: 20px; 
+}
+
+.features {
+  padding-top: 30px; 
+  padding-bottom: 20px; 
+}
+
+.cover-heading {
+  font-family: 'route_159heavy', Arial, sans-serif;
+  font-weight: 700;
+  font-size: 52px;
+  padding-top: 10px;
+}
+
+.feature-heading {
+  font-family: 'route_159heavy', Arial, sans-serif;
+  font-weight: 700;
+  font-size: 36px;
+  padding-top: 10px;
+}
+
+ul.no_bullet {
+list-style-type: none;
+padding: 0;
+margin: 0;
+}
+li.leaf {
+background: url('/images/leaf_icon.jpg') no-repeat left top;
+}
+/*
+h2:before {
+	content:"";
+	display:block;
+	width:230px;
+	height:5px;
+	background-color:#1DD5B2;
+	position:absolute;
+	bottom:-7px;
+}
+*/
+.features h2:after {
+  content: "";
+  display:block;
+  background-color:#1DD5B2;
+  position: absolute;
+  width: 135px;
+  height: 5px;
+}
+
+.btn-primary,
+.btn-primary:hover,
+.btn-primary:active,
+.btn-primary:visited,
+.btn-primary:focus {
+    background-color: #ff16aa;
+    border-color: #ff16aa;
+}
+
+.pad {
+  padding-top: 10px;
+  padding-bottom: 20px;
+}
+
+.turq {
+  color: #1ed6b3;
+}
+/*
+ * Header
+ */
+.masthead {
+  margin-bottom: 2rem;
+}
+
+.masthead-brand {
+  margin-bottom: 0;
+}
+
+.nav-masthead .nav-link {
+  padding: .25rem 0;
+  font-weight: 700;
+  background-color: transparent;
+  border-bottom: .25rem solid transparent;
+}
+
+.nav-masthead .nav-link:hover,
+.nav-masthead .nav-link:focus {
+  border-bottom-color: rgba(255, 255, 255, .25);
+}
+
+.nav-masthead .nav-link + .nav-link {
+  margin-left: 1rem;
+}
+
+.nav-masthead .active {
+  border-bottom-color: #fff;
+}
+
+@media (min-width: 48em) {
+  .masthead-brand {
+    float: left;
+  }
+  .nav-masthead {
+    float: right;
+  }
+}
+
+
+/*
+ * Cover
+ */
+.cover {
+  padding: 0 1.5rem;
+}
+.cover .btn-lg {
+  padding: .75rem 1.25rem;
+  font-weight: 700;
+}
+
+
+/*
+ * Footer
+ */
+.mastfoot {
+}

@@ -12,52 +12,76 @@
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css" integrity="sha384-9gVQ4dYFwwWSjIDZnLEWnxCjeSWFphJiwGPXr1jddIhOegiu1FwO5qRGvFXOdJZ4" crossorigin="anonymous">
     <!-- Custom styles for this template -->
-    <link href="cover.css" rel="stylesheet">
+    <link rel="stylesheet" href="font.css" type="text/css" charset="utf-8" />
+    <link href="trow.css" rel="stylesheet">
   </head>
 
-  <body class="text-center">
+  <body> 
+    <div class="container-fluid">
+      <div class="row blue-bg">
+        <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
+          <header class="masthead mb-auto">
+            <div class="inner">
+              <img src="cslogo.png" height="40" alt="Container Solutions logo"/>
+              <nav class="nav nav-masthead justify-content-center">
+                <img src="cslabslogo.png"  height="40" alt="Container Solutions Labs logo"/>
+              </nav>
+            </div>
+          </header>
 
-    <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
-      <header class="masthead mb-auto">
-        <div class="inner">
-          <h3 class="masthead-brand">Trow</h3>
-          <nav class="nav nav-masthead justify-content-center">
-            <a class="nav-link active" href="#">Home</a>
-          </nav>
+          <div class="intro text-center">
+
+            <img src="trow.png" width="100" alt="Trow logo"/>
+            <h1 class="cover-heading">TROW</h1>
+            <h2 class="turq" >Image Management for Clusters</h2>
+            <p class="pad lead">Manage and control the flow of container images through your Kubernetes cluster. </p>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSef_RofmYRPxfkopOmpd8MLSZ6IugEZoJch5bnWSsHErNOznQ/viewform?usp=sf_link" class="btn btn-lg btn-primary">SIGN-UP</a>
+          </div>
         </div>
-      </header>
+      </div>
 
-      <main role="main" class="inner cover">
-      <h1 class="cover-heading">Trow - Image Management for Clusters</h1>
-      <p class="lead">Manage and control the flow of container images through your Kubernetes cluster. </p>
+      <div class="row">
+        <div class="container features">
+          <h2 class="feature-heading">FEATURES</h2>
 
-      <h2>Features</h2>
-      <ul>
-        <li>Get a registry for your organisations images up-and-running quickly</li>
-        <li>Lock down the images that can run in your cluster</li>
-        <ul>
-          <li> no more surprises from out-of-date and unverified images from the Docker Hub</li>
-        </ul>
-        <li>Integrate with existing authentication and authorization solutions</li>
-        <li>Designed to be HA</li>
-        <li>Full audit log of operations</li>
-        <li>Advanced distribution options for quick deployment</li>
-        <li>Support for immutable tags and image streams</li>
-        <li>Open-source with enterprise subscription and add-on options</li>
-      </ul>
+          <div class="row">
+            <div class="col-sm">
+              <ul>
+                <li>Get a registry for your organisations images up-and-running quickly</li>
+                <li>Lock down the images that can run in your cluster</li>
+                <ul>
+                  <li> no more surprises from out-of-date and unverified images from the Docker Hub</li>
+                </ul>
+                <li>Integrate with existing authentication and authorization solutions</li>
+              </ul>
+            </div>
 
-        <p class="lead">
-          <a href="https://docs.google.com/forms/d/e/1FAIpQLSef_RofmYRPxfkopOmpd8MLSZ6IugEZoJch5bnWSsHErNOznQ/viewform?usp=sf_link" class="btn btn-lg btn-secondary">Sign-up</a> for future announcements and early-access
-        </p>
-      </main>
-
-      <footer class="mastfoot mt-auto">
-        <div class="inner">
-          <p>An Open Source product from <a href="https://container-solutions.com">Container Solutions</a>.</p>
-           © Container Solutions Labs 2018
+            <div class="col-sm">
+              <ul>
+                <li>Designed to be HA</li>
+                <li>Full audit log of operations</li>
+                <li>Advanced distribution options for quick deployment</li>
+                <li>Support for immutable tags and image streams</li>
+                <li>Open-source with enterprise subscription and add-on options</li>
+              </ul>
+            </div>
+          </div>
         </div>
-      </footer>
+      </div>
+      <div class="row">
+
+        <div class="w-100 text-center">
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSef_RofmYRPxfkopOmpd8MLSZ6IugEZoJch5bnWSsHErNOznQ/viewform?usp=sf_link" class="btn btn-lg btn-secondary">Sign-up</a> for future announcements and early-access
+        </div>
+      </div>
+
     </div>
+    <footer class="blue-bg h-100 text-center mastfoot mt-auto">
+      <div class="inner">
+        <p>An Open Source product from <a href="https://container-solutions.com">Container Solutions</a>.</p>
+        © Container Solutions Labs 2018
+      </div>
+    </footer>
 
 
     <!-- Optional JavaScript -->
