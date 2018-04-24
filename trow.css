@@ -19,6 +19,10 @@ body {
   color: #fff;
 }
 
+.blue-bg a {
+
+  color: #fff;
+}
 .intro {
   padding-top: 30px; 
   padding-bottom: 20px; 
@@ -32,7 +36,7 @@ body {
 
 .action {
   padding-top: 20px; 
-  padding-bottom: 30px; 
+  padding-bottom: 50px; 
 }
 
 .cover-heading {
@@ -51,10 +55,10 @@ body {
 
 li {
     display: block;
+    padding-bottom: 10px;
 }
 
 li:before {
-    /*Using a Bootstrap glyphicon as the bullet point*/
     float: left;
     content: "▆";
     font-size: 18px;
@@ -122,7 +126,19 @@ li:before {
   border-bottom-color: #fff;
 }
 
-@media (min-width: 48em) {
+.rtest {
+  float: right;
+}
+
+.clear {
+  clear: both;
+}
+
+.uptest {
+  float: left;
+  padding-top: 20px;
+}
+@media  {
   .masthead-brand {
     float: left;
   }
@@ -131,21 +147,8 @@ li:before {
   }
 }
 
-
-/*
- * Cover
- */
-.cover {
-  padding: 0 1.5rem;
-}
-.cover .btn-lg {
-  padding: .75rem 1.25rem;
-  font-weight: 700;
-}
-
-
-/*
- * Footer
- */
-.mastfoot {
+hr.bar {
+  height: 2px;
+  color: #1DD5B2;
+  background-color: #1DD5B2;
 }
