@@ -27,6 +27,7 @@ body {
 .features {
   padding-top: 30px; 
   padding-bottom: 20px; 
+  font-size: 20px;
 }
 
 .action {
@@ -54,10 +55,13 @@ li {
 
 li:before {
     /*Using a Bootstrap glyphicon as the bullet point*/
+    float: left;
     content: "▆";
     font-size: 18px;
-    margin-left: -40px;
-    padding-right: 5px;
+    padding-left: 0px;
+    padding-right: 0px;
+    margin-left: -30px;
+    margin-top: -4px;
     color: #2841f9;
 }
 
