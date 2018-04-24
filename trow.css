@@ -48,21 +48,6 @@ body {
   padding-top: 10px;
 }
 
-/*
-ul.no-bull {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-}
-
-li.bull {
-  background: url('bullet.png') no-repeat left top;
-  height: 30px;
-  padding-left: 30px;
-}
-
-
-*/
 li {
     display: block;
 }
