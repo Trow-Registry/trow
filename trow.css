@@ -29,6 +29,11 @@ body {
   padding-bottom: 20px; 
 }
 
+.action {
+  padding-top: 20px; 
+  padding-bottom: 30px; 
+}
+
 .cover-heading {
   font-family: 'route_159heavy', Arial, sans-serif;
   font-weight: 700;
@@ -43,25 +48,18 @@ body {
   padding-top: 10px;
 }
 
-ul.no_bullet {
-list-style-type: none;
-padding: 0;
-margin: 0;
+ul.no-bull {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
 }
-li.leaf {
-background: url('/images/leaf_icon.jpg') no-repeat left top;
+
+li.bull {
+  background: url('bullet.png') no-repeat left top;
+  height: 30px;
+  padding-left: 30px;
 }
-/*
-h2:before {
-	content:"";
-	display:block;
-	width:230px;
-	height:5px;
-	background-color:#1DD5B2;
-	position:absolute;
-	bottom:-7px;
-}
-*/
+
 .features h2:after {
   content: "";
   display:block;
