@@ -66,7 +66,7 @@ li{
 
 
 li {
-    padding-bottom: 30px;
+    padding-bottom: 2.9vh;
     align-items: left;
     justify-content: left;
 }
@@ -234,6 +234,11 @@ hr.bar {
         font-weight: 300;
         margin: 10px 0;
     }
+    li {
+        padding-bottom: 30px;
+        align-items: left;
+        justify-content: left;
+    }
 }
 
 
@@ -248,3 +253,4 @@ hr.bar {
         max-height: 32px;
     }
 }
+
