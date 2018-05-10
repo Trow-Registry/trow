@@ -6,6 +6,8 @@ use trow::{NetAddr, TrowBuilder};
 
 const PROGRAM_NAME: &str = "Trow";
 const PROGRAM_DESC: &str = "\nThe Cluster Registry";
+const DEFAULT_CERT_PATH: &str = "./certs/ca.crt";
+const DEFAULT_KEY_PATH: &str = "./certs/domain.key";
 
 /*
   Parses command line arguments and returns ArgMatches object.
@@ -41,7 +43,7 @@ fn parse_args<'a>() -> ArgMatches<'a> {
                 .short("c")
                 .long("cert")
                 .value_name("cert")
-                .help("Path to TLS certificate. Defaults to ./certs/ca.crt.")
+                .help(&format!("Path to TLS certificate. Defaults to {}.", DEFAULT_CERT_PATH))
                 .takes_value(true),
         )
         .arg(
@@ -49,7 +51,7 @@ fn parse_args<'a>() -> ArgMatches<'a> {
                 .short("k")
                 .long("key")
                 .value_name("key")
-                .help("Path to TLS private key. Defaults to ./certs/domain.key.")
+                .help(&format!("Path to TLS private key. Defaults to {}.", DEFAULT_KEY_PATH))
                 .takes_value(true),
         )
         .arg(
