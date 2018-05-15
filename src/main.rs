@@ -10,6 +10,8 @@ const DEFAULT_CERT_PATH: &str = "./certs/ca.crt";
 const DEFAULT_KEY_PATH: &str = "./certs/domain.key";
 
 /*
+  Responsible for configuring and starting the Trow registry.
+
   Parses command line arguments and returns ArgMatches object.
 
   Will cause the program to exit if error or on help/version argument.

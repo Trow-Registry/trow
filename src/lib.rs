@@ -1,15 +1,3 @@
-//! # Trow Registry
-//!
-//! The registry is aimed to fix the issues with the current registry
-//! options that are currently available
-//!
-//! There are many features available:
-//!
-
-//! - Ability to delete images
-//! - replication and masterless
-//! - other stuff...
-
 #![feature(decl_macro)]
 #![feature(plugin)]
 #![feature(use_extern_macros)]
@@ -190,7 +178,7 @@ impl TrowBuilder {
             self.grpc.bootstrap.port,
         )?;
 
-        //TODO: get rid of this clone
+        //TODO: shouldn't need to clone rocket config
         let rocket_config = &self.build_rocket_config()?;
         rocket::custom(rocket_config.clone(), true)
             .manage(backend::build_handlers(

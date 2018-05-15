@@ -1,7 +1,7 @@
 [package]
 name = "trow"
 version = "0.1.0"
-authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <moredhel@aoeu.me>"]
+authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.huthcings@container-solutions.com>"]
 
 [dependencies]
 # pinned
@@ -24,11 +24,12 @@ chrono = "0.4.0"
 ctrlc = { version = "3.0", features = ["termination"] }
 hostname = "^0.1"
 
-protobuf = "1.4.2"
-grpcio = "0.2.1"
+grpcio = "=0.2.3"
+protobuf = "=1.4.5"
+
 config = "0.7.0"
 clap = "~2.29"
-getopts = "0.2.15"
+getopts = "0.2"
 
 futures = "0.1"
 tokio-core = "0.1"
