@@ -1,9 +1,11 @@
 # Trow
-Distributed Cluster Registry
+Image Management for Kubernetes
 
 [![Build Status](https://travis-ci.org/ContainerSolutions/trow.svg?branch=master)](https://travis-ci.org/ContainerSolutions/trow)
 
-We're building a cluster-first registry for Kubernetes (and possibly other orchestrators).
+We're building an image management solution for Kubernetes (and possibly other orchestrators).
+At its heart is the Trow Registry, which runs inside the cluster, is simple to set-up and fully
+integrated with Kubernetes, including support for auditing and RBAC.
 
 ### Why "Trow"
 
