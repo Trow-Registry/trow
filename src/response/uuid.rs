@@ -18,8 +18,7 @@ pub enum UuidResponse {
         name: String,
         repo: String,
         range: (u32, u32),
-    },
-    Empty,
+    }
 }
 
 impl UuidResponse {
@@ -27,13 +26,13 @@ impl UuidResponse {
         handler: State<bh::BackendHandler>,
         name: String,
         repo: String,
-    ) -> Result<UuidResponse, Error> {
+    ) -> Result<UuidResponse, errors::Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
         req.set_name(name.clone());
         req.set_repo(repo.clone());
 
-        let response = backend.gen_uuid(&req)?;
+        let response = backend.gen_uuid(&req).map_err(|_| errors::Error::InternalError)?;
         debug!("Client received: {:?}", response);
 
         Ok(UuidResponse::Uuid {
@@ -116,10 +115,6 @@ impl<'r> Responder<'r> for UuidResponse {
                 .status(Status::Accepted)
                 .ok()
             }
-            UuidResponse::Empty => {
-                debug!("Uuid Error");
-                Response::build().status(Status::NotFound).ok()
-            }
         }
     }
 }
@@ -150,9 +145,4 @@ mod test {
         assert!(headers.contains("Range"));
     }
 
-    #[test]
-    fn uuid_empty() {
-        let response = test_route(UuidResponse::Empty);
-        assert_eq!(response.status(), Status::NotFound);
-    }
 }

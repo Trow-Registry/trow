@@ -78,18 +78,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
         Outcome::Success(AuthorisedUser("test".to_owned()))
     }
 }
+/*
+Registry root.
 
-/// Routes of a 2.0 Registry
-///
-/// Version Check of the registry
-/// GET /v2/
-///
-/// # Responses
-/// 200 - We Exist (and you are authenticated)
-/// 401 - Please Authorize (WWW-Authenticate header with instuctions).
-///
-/// # Headers
-/// Docker-Distribution-API-Version: registry/2.0
+Returns 200.
+*/
 #[get("/v2")]
 fn get_v2root() -> Empty {
     Empty
@@ -217,7 +210,7 @@ fn patch_blob(
     repo: String,
     uuid: String,
     chunk: rocket::data::Data,
-) -> UuidResponse {
+) -> Result<UuidResponse, Error> {
     let layer = Layer {
         name: name.clone(),
         repo: repo.clone(),
@@ -229,25 +222,26 @@ fn patch_blob(
         let len = chunk.stream_to_file(absolute_file);
 
         match len {
-            Ok(len) => UuidResponse::Uuid {
+            Ok(len) => Ok(UuidResponse::Uuid {
                 uuid,
                 name,
                 repo,
                 range: (0, len as u32),
-            },
-            Err(_) => UuidResponse::Empty,
+            }),
+            Err(_) => Err(Error::InternalError)
         }
     } else {
         // TODO: pipe breaks if we don't accept the whole file...
-        // AM - shouldn't this return a 4xx? IllegalArgument or something?
         warn!("Uuid {} does not exist, piping to /dev/null", uuid);
         let _ = chunk.stream_to_file("/dev/null");
-        UuidResponse::Empty
+        Err(Error::BlobUnknown)
     }
 }
 
 /*
-  Starting point for an upload.
+  Starting point for an uploading a new image or new version of an image.
+
+  We respond with details of location and UUID to upload to with patch/put.
  */
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
@@ -255,12 +249,8 @@ fn post_blob_upload(
     handler: rocket::State<backend::BackendHandler>,
     name: String,
     repo: String,
-) -> UuidResponse {
+) -> Result<UuidResponse, Error> {
     UuidResponse::handle(handler, name, repo)
-        .map_err(|e| {
-            warn!("Uuid Generate: {}", e);
-        })
-        .unwrap_or(UuidResponse::Empty)
 }
 
 /*

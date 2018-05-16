@@ -156,10 +156,4 @@ mod test {
         assert!(headers.contains("Location"));
         assert!(headers.contains("Range"));
     }
-
-    #[test]
-    fn uuid_empty() {
-        let response = test_route(UuidResponse::Empty);
-        assert_eq!(response.status(), Status::NotFound);
-    }
 }
