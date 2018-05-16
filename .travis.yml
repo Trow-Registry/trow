@@ -7,6 +7,7 @@ before_script:
   - cp install/self-cert/domain.key ./certs/
   - cargo update
   - cargo install protobuf --version =1.4.5
+  - cargo install grpcio-compiler
 addons:
   hosts:
     - trow.test
