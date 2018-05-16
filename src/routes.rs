@@ -6,8 +6,6 @@ use std::str;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use manifest::{self, FromJson, Manifest};
-use response::admin::Admin;
-use response::catalog::Catalog;
 use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
@@ -29,20 +27,25 @@ pub fn routes() -> Vec<rocket::Route> {
         get_homepage,
         get_manifest,
         get_blob,
-        post_blob_uuid,
-        get_upload_progress,
         put_blob,
         patch_blob,
-        delete_upload,
         post_blob_upload,
-        delete_blob,
         put_image_manifest,
-        get_catalog,
-        get_image_tags,
         delete_image_manifest,
-        // admin routes
-        admin_get_uuids,
     ]
+    /* The following routes used to have stub methods, but I removed them as they were cluttering the code
+          post_blob_uuid,
+          get_upload_progress,
+          delete_upload,
+          delete_blob,
+          get_catalog,
+          get_image_tags,
+          admin routes,
+          admin_get_uuids
+
+    To find the stubs, go to https://github.com/ContainerSolutions/trow/tree/4b007088bb0657a98238870d9aaca638e01f6487
+    Please add tests for any routes that you recover.
+    */
 }
 
 struct Blob {
@@ -168,47 +171,7 @@ fn get_blob(
     NamedFile::open(blob.file).ok()
 }
 
-/// Pushing a Layer
-/// POST /v2/<name>/blobs/uploads/
-/// name - name of repository
-///
-/// # Headers
-/// Location: /v2/<name>/blobs/uploads/<uuid>
-/// Range: bytes=0-<offset>
-/// Content-Length: 0
-/// Docker-Upload-UUID: <uuid>
-///
-/// # Returns
-/// 202 - accepted
-#[post("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn post_blob_uuid(_name: String, _repo: String, _uuid: String) -> Empty {
-    Empty
-}
-
 /*
----
-Upload Progress
-GET /v2/<name>/blobs/uploads/<uuid>
-name - name of registry
-uuid - unique id for the upload that is to be checked
-
-# Client Headers
-Host: <registry host>
-
-# Headers
-Location: /v2/<name>/blobs/uploads/<uuid>
-Range: bytes=0-<offset>
-Docker-Upload-UUID: <uuid>
-
-# Returns
-204
- */
-#[get("/v2/<_name>/<_repo>/blobs/uploads/<_uuid>")]
-fn get_upload_progress(_name: String, _repo: String, _uuid: String) -> Empty {
-    Empty
-}
-/*
-
 ---
 Monolithic Upload
 PUT /v2/<name>/blobs/uploads/<uuid>?digest=<digest>
@@ -284,30 +247,7 @@ fn patch_blob(
 }
 
 /*
-
-
----
-Cancelling an upload
-DELETE /v2/<name>/blobs/uploads/<uuid>
-
- */
-
-/// This route assumes that no more data will be uploaded to the specified uuid.
-#[delete("/v2/<name>/<repo>/blobs/uploads/<uuid>")]
-fn delete_upload(
-    handler: rocket::State<backend::BackendHandler>,
-    name: String,
-    repo: String,
-    uuid: String,
-) -> Result<UuidAcceptResponse, Error> {
-    UuidAcceptResponse::delete_upload(handler, &Layer::new(name, repo, uuid))
-}
-
-/*
----
-Cross repo blob mounting (validate how regularly this is used)
-POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
-
+  Starting point for an upload.
  */
 
 #[post("/v2/<name>/<repo>/blobs/uploads")]
@@ -321,18 +261,6 @@ fn post_blob_upload(
             warn!("Uuid Generate: {}", e);
         })
         .unwrap_or(UuidResponse::Empty)
-}
-
-/*
-
----
-Delete a layer
-DELETE /v2/<name>/blobs/<digest>
-
- */
-#[delete("/v2/<_name>/<_repo>/blobs/<_digest>")]
-fn delete_blob(_name: String, _repo: String, _digest: String) -> Empty {
-    Empty
 }
 
 /*
@@ -400,43 +328,15 @@ fn gen_digest(bytes: &[u8]) -> String {
     format!("sha256:{}", hasher.result_str())
 }
 
-/*
----
-Listing Repositories
-GET /v2/_catalog
 
- */
-#[get("/v2/_catalog")]
-fn get_catalog() -> Catalog {
-    Catalog
-}
-/*
----
-Listing Image Tags
-GET /v2/<name>/tags/list
-
- */
-#[get("/v2/<_name>/<_repo>/tags/list")]
-fn get_image_tags(_name: String, _repo: String) -> Result<Empty, Error> {
-    Err(Error::Unsupported)
-}
 /*
 ---
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
-
- */
+*/
+ 
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
     Err(Error::Unsupported)
 }
 
-#[get("/admin/uuids")]
-fn admin_get_uuids(handler: rocket::State<backend::BackendHandler>) -> Admin {
-    Admin::get_uuids(handler).unwrap_or(Admin::Uuids(vec![]))
-}
-
-/*
----
-[1]: Could possibly be used to redirect a client to a local cache
- */
