@@ -6,8 +6,9 @@ before_script:
   - mkdir certs && cp install/self-cert/ca.crt ./certs/ 
   - cp install/self-cert/domain.key ./certs/
   - cargo update
-  - mkdir protoc && cd protoc && curl -o protoc.zip -sSL https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip && unzip protoc.zip 
-  - export PATH=$PATH:$PWD/protoc/bin/
+  - mkdir protoc && cd protoc 
+  - curl -o protoc.zip -sSL https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip && unzip protoc.zip 
+  - export PATH=$PATH:$PWD/bin/
 addons:
   hosts:
     - trow.test
