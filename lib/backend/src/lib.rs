@@ -9,12 +9,10 @@ extern crate trow_protobuf as grpc;
 extern crate serde_derive;
 #[macro_use(log, warn, info, debug)]
 extern crate log;
-extern crate env_logger;
 
 pub mod config;
 mod peer;
 mod backend;
-
 use std::thread;
 use peer::PeerService;
 use backend::BackendService;

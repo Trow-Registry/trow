@@ -4,42 +4,32 @@ version = "0.1.0"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.huthcings@container-solutions.com>"]
 
 [dependencies]
-# pinned
-rust-crypto = "0.2.36"
-jwt = "0.4.0"
-rustc-serialize = "0.3.24"
+rust-crypto = "^0.2"
+jwt = "^0.4"
+rustc-serialize = "^0.3"
 
 rocket = { version = "0.3", features = ["tls"] }
-rocket_codegen = "0.3"
-rocket_contrib = "0.3"
+rocket_codegen = "^0.3"
+rocket_contrib = "^0.3"
 
-serde = "1.0"
-serde_json = "1.0"
-serde_derive = "1.0"
-uuid = { version = "0.5.1", features = ["v4", "rustc-serialize"] }
-log = "0.3"
-env_logger = "0.4.3"
-fern = "0.4"
-chrono = "0.4.0"
-ctrlc = { version = "3.0", features = ["termination"] }
+serde = "^1.0"
+serde_json = "^1.0"
+serde_derive = "^1.0"
+uuid = { version = "^0.5", features = ["v4", "rustc-serialize"] }
+log = "^0.3"
+env_logger = "^0.4"
+ctrlc = { version = "^3.0", features = ["termination"] }
 hostname = "^0.1"
 
 grpcio = "=0.2.3"
 protobuf = "=1.4.5"
 
-config = "0.7.0"
 clap = "~2.29"
-getopts = "0.2"
 
-futures = "0.1"
-tokio-core = "0.1"
-tokio-io = "0.1"
+orset = "^0.2"
 
-orset = "0.2.0"
-
-# failure = { git = 'https://github.com/withoutboats/failure', rev = "ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"}
-failure = "0.1"
-failure_derive = "0.1"
+failure = "^0.1"
+failure_derive = "^0.1"
 
 trow-protobuf = { path = "./lib/protobuf" }
 trow-backend = { path = "./lib/backend" }
@@ -47,11 +37,9 @@ trow-backend = { path = "./lib/backend" }
 [build-dependencies]
 
 [dev-dependencies]
-quickcheck = "0.6"
-quickcheck_macros = "0.6"
-assert_cli = "0.5"
-environment = "0.1"
-hyper = "0.11"
-libc = "0.2"
-rand = "0.4"
-reqwest = "0.8"
+quickcheck = "^0.6"
+assert_cli = "^0.5"
+environment = "^0.1"
+hyper = "^0.11"
+rand = "^0.4"
+reqwest = "^0.8"

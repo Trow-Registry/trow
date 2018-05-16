@@ -3,13 +3,9 @@
 #![feature(use_extern_macros)]
 #![plugin(rocket_codegen)]
 
-extern crate config as cfg;
 extern crate crypto;
 extern crate ctrlc;
 extern crate failure;
-extern crate fern;
-extern crate futures;
-extern crate getopts;
 extern crate grpcio;
 extern crate hostname;
 extern crate jwt;
@@ -20,8 +16,6 @@ extern crate rocket_contrib;
 extern crate rustc_serialize;
 extern crate serde;
 extern crate serde_json;
-extern crate tokio_core;
-extern crate tokio_io;
 extern crate uuid;
 
 extern crate trow_backend as backend;

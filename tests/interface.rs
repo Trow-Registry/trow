@@ -1,6 +1,5 @@
 extern crate crypto;
 extern crate environment;
-extern crate futures;
 #[macro_use]
 extern crate hyper;
 extern crate rand;
