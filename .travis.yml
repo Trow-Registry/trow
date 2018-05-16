@@ -6,7 +6,7 @@ before_script:
   - mkdir certs && cp install/self-cert/ca.crt ./certs/ 
   - cp install/self-cert/domain.key ./certs/
   - cargo update
-  - cargo install protobuf
+  - cargo install protobuf --version =1.4.5
 addons:
   hosts:
     - trow.test
