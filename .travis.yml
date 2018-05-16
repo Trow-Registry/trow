@@ -6,8 +6,7 @@ before_script:
   - mkdir certs && cp install/self-cert/ca.crt ./certs/ 
   - cp install/self-cert/domain.key ./certs/
   - cargo update
-  - cargo install protobuf --version =1.4.5
-  - cargo install grpcio-compiler
+  - cd /usr/local && curl -o protoc.zip -sSL https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip && unzip protoc.zip
 addons:
   hosts:
     - trow.test

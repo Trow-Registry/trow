@@ -14,7 +14,6 @@ extern crate env_logger;
 pub mod config;
 mod peer;
 mod backend;
-mod util;
 
 use std::thread;
 use peer::PeerService;
