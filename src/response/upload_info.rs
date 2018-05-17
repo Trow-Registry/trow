@@ -5,7 +5,6 @@ use rocket::State;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-use uuid::Uuid;
 
 use backend as bh;
 use grpc::backend;
@@ -13,43 +12,30 @@ use types::Layer;
 
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
-        uuid: String,
-        name: String,
-        repo: String,
-        range: (u32, u32)
+    uuid: String,
+    name: String,
+    repo: String,
+    range: (u32, u32),
 }
 
-pub fn create_upload_info (uuid: String, name: String, repo: String, range: (u32,u32)) -> UploadInfo {
-
-    UploadInfo{uuid, name, repo, range}
+pub fn create_upload_info(
+    uuid: String,
+    name: String,
+    repo: String,
+    range: (u32, u32),
+) -> UploadInfo {
+    UploadInfo {
+        uuid,
+        name,
+        repo,
+        range,
+    }
 }
 
 impl UploadInfo {
-    pub fn handle(
-        handler: State<bh::BackendHandler>,
-        name: String,
-        repo: String,
-    ) -> Result<UploadInfo, errors::Error> {
-        let backend = handler.backend();
-        let mut req = backend::Layer::new();
-        req.set_name(name.clone());
-        req.set_repo(repo.clone());
 
-        let response = backend.gen_uuid(&req).map_err(|_| errors::Error::InternalError)?;
-        debug!("Client received: {:?}", response);
-
-        Ok(UploadInfo {
-            uuid: response.get_uuid().to_owned(),
-            name,
-            repo,
-            range: (0, 0),
-        })
-    }
-
-    pub fn uuid_exists(
-        handler: State<bh::BackendHandler>,
-        layer: &Layer,
-    ) -> Result<bool, Error> {
+    //Move this
+    pub fn uuid_exists(handler: State<bh::BackendHandler>, layer: &Layer) -> Result<bool, Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
         req.set_name(layer.name.to_owned());
@@ -64,10 +50,6 @@ impl UploadInfo {
             Err(errors::Error::DigestInvalid.into())
         }
     }
-}
-
-fn _gen_uuid() -> Uuid {
-    Uuid::new_v4()
 }
 
 /// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.

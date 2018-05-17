@@ -8,7 +8,7 @@ rust-crypto = "^0.2"
 jwt = "^0.4"
 rustc-serialize = "^0.3"
 
-rocket = { version = "0.3", features = ["tls"] }
+rocket = { version = "^0.3", features = ["tls"] }
 rocket_codegen = "^0.3"
 rocket_contrib = "^0.3"
 

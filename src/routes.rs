@@ -20,6 +20,7 @@ use serde_json;
 use state;
 use types::Layer;
 use backend;
+use grpc;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -250,7 +251,26 @@ fn post_blob_upload(
     name: String,
     repo: String,
 ) -> Result<UploadInfo, Error> {
-    UploadInfo::handle(handler, name, repo)
+
+    let backend = handler.backend();
+    let mut req = grpc::backend::Layer::new();
+    req.set_name(name.clone());
+    req.set_repo(repo.clone());
+
+    let response = backend
+        .gen_uuid(&req)
+        .map_err(|e| {
+            //TODO should be stronger than a warn
+            warn!("Error getting ref from backend: {}", e);
+            Error::InternalError})?;
+    debug!("Client received: {:?}", response);
+
+    Ok(upload_info::create_upload_info(
+        response.get_uuid().to_owned(),
+        name,
+        repo,
+        (0, 0),
+    ))
 }
 
 /*

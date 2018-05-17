@@ -1,14 +1,14 @@
-extern crate grpcio;
-extern crate futures;
 extern crate failure;
-extern crate uuid;
+extern crate futures;
+extern crate grpcio;
 extern crate protobuf;
+extern crate uuid;
 
-extern crate trow_protobuf as grpc;
-#[macro_use]
-extern crate serde_derive;
 #[macro_use(log, warn, info, debug)]
 extern crate log;
+#[macro_use]
+extern crate serde_derive;
+extern crate trow_protobuf as grpc;
 
 pub mod config;
 mod peer;
@@ -27,13 +27,19 @@ pub fn server(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, bootstr
     warn!("GRPC Server shutdown!");
 }
 
-pub fn server_async(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, bootstrap_port: u16) -> grpcio::Server {
+pub fn server_async(
+    listen_addr: &str,
+    listen_port: u16,
+    bootstrap_addr: &str,
+    bootstrap_port: u16,
+) -> grpcio::Server {
     use std::sync::Arc;
 
     debug!("Setting up backend server");
     let env = Arc::new(Environment::new(1));
     let backend_service = grpc::backend_grpc::create_backend(BackendService::new());
-    let peer_service = grpc::peer_grpc::create_peer(PeerService::new(bootstrap_addr, bootstrap_port));
+    let peer_service =
+        grpc::peer_grpc::create_peer(PeerService::new(bootstrap_addr, bootstrap_port));
     let mut server = ServerBuilder::new(env)
         .register_service(peer_service)
         .register_service(backend_service)
@@ -46,7 +52,6 @@ pub fn server_async(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, b
     }
     server
 }
-
 
 pub struct BackendHandler {
     backend: BackendClient,
@@ -66,11 +71,7 @@ pub fn build_handlers(listen_host: &str, listen_port: u16) -> BackendHandler {
     use grpcio::{ChannelBuilder, EnvBuilder};
     use std::sync::Arc;
 
-    debug!(
-        "Connecting to backend: {}:{}",
-        listen_host,
-        listen_port
-    );
+    debug!("Connecting to backend: {}:{}", listen_host, listen_port);
     let env = Arc::new(EnvBuilder::new().build());
     let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", listen_host, listen_port));
     let client = BackendClient::new(ch);
