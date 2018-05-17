@@ -133,18 +133,17 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
 
 #[cfg(test)]
 mod test {
-    use response::uuid::UuidResponse;
+    use response::upload_info::{create_upload_info, UploadInfo};
     use rocket::http::Status;
 
     use response::test_helper::test_route;
-    fn build_response() -> UuidResponse {
-        UuidResponse::Uuid {
-            // TODO: keep this as a real Uuid!
-            uuid: String::from("whatever"),
-            name: String::from("moredhel"),
-            repo: String::from("test"),
-            range: (0, 0),
-        }
+    fn build_response() -> UploadInfo {
+        create_upload_info(
+            String::from("whatever"),
+            String::from("moredhel"),
+            String::from("test"),
+            (0, 0)
+        )
     }
 
     #[test]

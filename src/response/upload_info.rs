@@ -12,21 +12,24 @@ use grpc::backend;
 use types::Layer;
 
 #[derive(Debug, Serialize)]
-pub enum UuidResponse {
-    Uuid {
+pub struct UploadInfo {
         uuid: String,
         name: String,
         repo: String,
-        range: (u32, u32),
-    }
+        range: (u32, u32)
 }
 
-impl UuidResponse {
+pub fn create_upload_info (uuid: String, name: String, repo: String, range: (u32,u32)) -> UploadInfo {
+
+    UploadInfo{uuid, name, repo, range}
+}
+
+impl UploadInfo {
     pub fn handle(
         handler: State<bh::BackendHandler>,
         name: String,
         repo: String,
-    ) -> Result<UuidResponse, errors::Error> {
+    ) -> Result<UploadInfo, errors::Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
         req.set_name(name.clone());
@@ -35,7 +38,7 @@ impl UuidResponse {
         let response = backend.gen_uuid(&req).map_err(|_| errors::Error::InternalError)?;
         debug!("Client received: {:?}", response);
 
-        Ok(UuidResponse::Uuid {
+        Ok(UploadInfo {
             uuid: response.get_uuid().to_owned(),
             name,
             repo,
@@ -82,10 +85,10 @@ fn get_base_url(req: &Request) -> String {
     format!("https://{}", host)
 }
 
-impl<'r> Responder<'r> for UuidResponse {
+impl<'r> Responder<'r> for UploadInfo {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
         match self {
-            UuidResponse::Uuid {
+            UploadInfo {
                 ref uuid,
                 ref name,
                 ref repo,
@@ -121,12 +124,12 @@ impl<'r> Responder<'r> for UuidResponse {
 
 #[cfg(test)]
 mod test {
-    use response::uuid::UuidResponse;
+    use response::upload_info::UploadInfo;
     use rocket::http::Status;
 
     use response::test_helper::test_route;
-    fn build_response() -> UuidResponse {
-        UuidResponse::Uuid {
+    fn build_response() -> UploadInfo {
+        UploadInfo {
             // TODO: keep this as a real Uuid!
             uuid: String::from("whatever"),
             name: String::from("moredhel"),

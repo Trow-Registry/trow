@@ -8,7 +8,7 @@ pub mod errors;
 pub mod html;
 pub mod manifest_upload;
 mod test_helper;
-pub mod uuid;
+pub mod upload_info;
 pub mod uuidaccept;
 
 pub fn json_response<T: serde::Serialize>(

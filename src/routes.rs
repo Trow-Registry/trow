@@ -10,7 +10,7 @@ use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
 use response::manifest_upload::ManifestUpload;
-use response::uuid::UuidResponse;
+use response::upload_info::{self, UploadInfo};
 use response::uuidaccept::UuidAcceptResponse;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
@@ -210,25 +210,25 @@ fn patch_blob(
     repo: String,
     uuid: String,
     chunk: rocket::data::Data,
-) -> Result<UuidResponse, Error> {
+) -> Result<UploadInfo, Error> {
     let layer = Layer {
         name: name.clone(),
         repo: repo.clone(),
         digest: uuid.clone(),
     };
-    if UuidResponse::uuid_exists(handler, &layer).is_ok() {
+    if UploadInfo::uuid_exists(handler, &layer).is_ok() {
         let absolute_file = state::uuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
         let len = chunk.stream_to_file(absolute_file);
 
         match len {
-            Ok(len) => Ok(UuidResponse::Uuid {
+            Ok(len) => Ok(upload_info::create_upload_info(
                 uuid,
                 name,
                 repo,
-                range: (0, len as u32),
-            }),
-            Err(_) => Err(Error::InternalError)
+                (0, len as u32),
+            )),
+            Err(_) => Err(Error::InternalError),
         }
     } else {
         // TODO: pipe breaks if we don't accept the whole file...
@@ -249,8 +249,8 @@ fn post_blob_upload(
     handler: rocket::State<backend::BackendHandler>,
     name: String,
     repo: String,
-) -> Result<UuidResponse, Error> {
-    UuidResponse::handle(handler, name, repo)
+) -> Result<UploadInfo, Error> {
+    UploadInfo::handle(handler, name, repo)
 }
 
 /*
@@ -318,15 +318,13 @@ fn gen_digest(bytes: &[u8]) -> String {
     format!("sha256:{}", hasher.result_str())
 }
 
-
 /*
 ---
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
 */
- 
+
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
     Err(Error::Unsupported)
 }
-
