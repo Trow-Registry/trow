@@ -57,6 +57,7 @@ impl UuidAcceptResponse {
         debug!("Deleting file: {}", uuid);
         fs::remove_file(scratch_path)?;
         // 3. delete uuid from the backend
+        // TODO is this process right? Should the backend be doing this?!
         let mut layer = backend::Layer::new();
         layer.set_name(name.clone());
         layer.set_repo(repo.clone());
@@ -71,7 +72,7 @@ impl UuidAcceptResponse {
                 repo,
             })
         } else {
-            warn!("Function is not implemented");
+            warn!("Failed to remove UUID");
             Err(failure::err_msg("Not implemented"))
         }
     }
@@ -123,7 +124,8 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
                     .ok()
             }
             DigestMismatch => {
-                debug!("Digest mismatched");
+                //Needs to be an error. Fix this FFS.
+                warn!("Digest mismatched");
                 Response::build().status(Status::NotFound).ok()
             }
             UuidDelete => Response::build().status(Status::NoContent).ok(),

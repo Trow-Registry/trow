@@ -125,9 +125,9 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
     }
 
-    fn upload_layer(cl: &reqwest::Client) {
+    fn upload_layer(cl: &reqwest::Client, name: &str) {
         //Should support both image/test and imagetest, only former working currently
-        let resp = cl.post(&(LYCAON_ADDRESS.to_owned() + "/v2/image/test/blobs/uploads/"))
+        let resp = cl.post(&format!("{}/v2/{}/blobs/uploads/", LYCAON_ADDRESS, name))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
@@ -146,16 +146,16 @@ mod interface_tests {
         hasher.input(&blob);
         let digest = hasher.result_str();
         let resp = cl.put(&format!(
-            "{}/v2/image/test/blobs/uploads/{}?digest={}",
-            LYCAON_ADDRESS, uuid, digest
+            "{}/v2/{}/blobs/uploads/{}?digest={}",
+            LYCAON_ADDRESS, name, uuid, digest
         )).send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
 
         //Finally get it back again
         let mut resp = cl.get(&format!(
-            "{}/v2/image/test/blobs/{}",
-            LYCAON_ADDRESS, digest
+            "{}/v2/{}/blobs/{}",
+            LYCAON_ADDRESS, name, digest
         )).send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
@@ -185,7 +185,7 @@ mod interface_tests {
             config,
             layers,
         };
-        let resp = cl.put(&format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS))
+        let resp = cl.put(&format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name))
             .json(&mani)
             .send()
             .unwrap();
@@ -227,8 +227,10 @@ mod interface_tests {
         get_non_existent_blob(&client);
         println!("Running unsupported()");
         unsupported(&client);
-        println!("Running upload_layer()");
-        upload_layer(&client);
+        println!("Running upload_layer(image/test)");
+        upload_layer(&client, "image/test");
+        println!("Running upload_layer(onename)");
+        upload_layer(&client, "onename");
         println!("Running get_manifest()");
         get_manifest(&client);
     }

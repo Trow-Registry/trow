@@ -204,6 +204,13 @@ fn put_blob(
     }
 }
 
+/*
+
+Uploads a blob or chunk of a blog.
+
+Checks UUID. Returns UploadInfo with range set to correct position.
+
+*/
 #[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
     handler: rocket::State<backend::BackendHandler>,
@@ -212,11 +219,17 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
+
+    //This needs to change to be a blob, no digest, or just go away
+    //There is no digest at the minute; that comes at put stage
     let layer = Layer {
         name: name.clone(),
         repo: repo.clone(),
         digest: uuid.clone(),
     };
+    //TODO change to is_valid_uuid()
+    //Should return path to write to or URL, client should *not*
+    //be in charge of this
     if UploadInfo::uuid_exists(handler, &layer).is_ok() {
         let absolute_file = state::uuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
@@ -232,7 +245,8 @@ fn patch_blob(
             Err(_) => Err(Error::InternalError),
         }
     } else {
-        // TODO: pipe breaks if we don't accept the whole file...
+        // TODO: pipe breaks if we don't accept the whole file
+        // Currently makes us prone to DOS attack
         warn!("Uuid {} does not exist, piping to /dev/null", uuid);
         let _ = chunk.stream_to_file("/dev/null");
         Err(Error::BlobUnknown)
@@ -243,8 +257,9 @@ fn patch_blob(
   Starting point for an uploading a new image or new version of an image.
 
   We respond with details of location and UUID to upload to with patch/put.
- */
 
+  No data is being transferred yet.
+ */
 #[post("/v2/<name>/<repo>/blobs/uploads")]
 fn post_blob_upload(
     handler: rocket::State<backend::BackendHandler>,
@@ -252,13 +267,13 @@ fn post_blob_upload(
     repo: String,
 ) -> Result<UploadInfo, Error> {
 
+    //Ask the backend for a UUID
     let backend = handler.backend();
-    let mut req = grpc::backend::Layer::new();
-    req.set_name(name.clone());
-    req.set_repo(repo.clone());
+    let mut req = grpc::backend::CreateUuidRequest::new();
+    req.set_repo_name(format!("{}/{}", name, repo));
 
     let response = backend
-        .gen_uuid(&req)
+        .create_uuid(&req)
         .map_err(|e| {
             //TODO should be stronger than a warn
             warn!("Error getting ref from backend: {}", e);

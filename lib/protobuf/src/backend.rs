@@ -1431,6 +1431,358 @@ impl ::protobuf::reflect::ProtobufValue for UuidList {
     }
 }
 
+#[derive(PartialEq,Clone,Default)]
+pub struct CreateUuidRequest {
+    // message fields
+    pub repo_name: ::std::string::String,
+    // special fields
+    unknown_fields: ::protobuf::UnknownFields,
+    cached_size: ::protobuf::CachedSize,
+}
+
+// see codegen.rs for the explanation why impl Sync explicitly
+unsafe impl ::std::marker::Sync for CreateUuidRequest {}
+
+impl CreateUuidRequest {
+    pub fn new() -> CreateUuidRequest {
+        ::std::default::Default::default()
+    }
+
+    pub fn default_instance() -> &'static CreateUuidRequest {
+        static mut instance: ::protobuf::lazy::Lazy<CreateUuidRequest> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const CreateUuidRequest,
+        };
+        unsafe {
+            instance.get(CreateUuidRequest::new)
+        }
+    }
+
+    // string repo_name = 1;
+
+    pub fn clear_repo_name(&mut self) {
+        self.repo_name.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_repo_name(&mut self, v: ::std::string::String) {
+        self.repo_name = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_repo_name(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
+    }
+
+    // Take field
+    pub fn take_repo_name(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.repo_name, ::std::string::String::new())
+    }
+
+    pub fn get_repo_name(&self) -> &str {
+        &self.repo_name
+    }
+
+    fn get_repo_name_for_reflect(&self) -> &::std::string::String {
+        &self.repo_name
+    }
+
+    fn mut_repo_name_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
+    }
+}
+
+impl ::protobuf::Message for CreateUuidRequest {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.repo_name)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.repo_name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.repo_name);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        if !self.repo_name.is_empty() {
+            os.write_string(1, &self.repo_name)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for CreateUuidRequest {
+    fn new() -> CreateUuidRequest {
+        CreateUuidRequest::new()
+    }
+
+    fn descriptor_static(_: ::std::option::Option<CreateUuidRequest>) -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "repo_name",
+                    CreateUuidRequest::get_repo_name_for_reflect,
+                    CreateUuidRequest::mut_repo_name_for_reflect,
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<CreateUuidRequest>(
+                    "CreateUuidRequest",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+}
+
+impl ::protobuf::Clear for CreateUuidRequest {
+    fn clear(&mut self) {
+        self.clear_repo_name();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for CreateUuidRequest {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for CreateUuidRequest {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct CreateUuidResult {
+    // message fields
+    pub uuid: ::std::string::String,
+    // special fields
+    unknown_fields: ::protobuf::UnknownFields,
+    cached_size: ::protobuf::CachedSize,
+}
+
+// see codegen.rs for the explanation why impl Sync explicitly
+unsafe impl ::std::marker::Sync for CreateUuidResult {}
+
+impl CreateUuidResult {
+    pub fn new() -> CreateUuidResult {
+        ::std::default::Default::default()
+    }
+
+    pub fn default_instance() -> &'static CreateUuidResult {
+        static mut instance: ::protobuf::lazy::Lazy<CreateUuidResult> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const CreateUuidResult,
+        };
+        unsafe {
+            instance.get(CreateUuidResult::new)
+        }
+    }
+
+    // string uuid = 1;
+
+    pub fn clear_uuid(&mut self) {
+        self.uuid.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_uuid(&mut self, v: ::std::string::String) {
+        self.uuid = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_uuid(&mut self) -> &mut ::std::string::String {
+        &mut self.uuid
+    }
+
+    // Take field
+    pub fn take_uuid(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.uuid, ::std::string::String::new())
+    }
+
+    pub fn get_uuid(&self) -> &str {
+        &self.uuid
+    }
+
+    fn get_uuid_for_reflect(&self) -> &::std::string::String {
+        &self.uuid
+    }
+
+    fn mut_uuid_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.uuid
+    }
+}
+
+impl ::protobuf::Message for CreateUuidResult {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.uuid)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.uuid.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.uuid);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        if !self.uuid.is_empty() {
+            os.write_string(1, &self.uuid)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for CreateUuidResult {
+    fn new() -> CreateUuidResult {
+        CreateUuidResult::new()
+    }
+
+    fn descriptor_static(_: ::std::option::Option<CreateUuidResult>) -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "uuid",
+                    CreateUuidResult::get_uuid_for_reflect,
+                    CreateUuidResult::mut_uuid_for_reflect,
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<CreateUuidResult>(
+                    "CreateUuidResult",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+}
+
+impl ::protobuf::Clear for CreateUuidResult {
+    fn clear(&mut self) {
+        self.clear_uuid();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for CreateUuidResult {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for CreateUuidResult {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\rbackend.proto\x12\x06lycaon\"G\n\x05Layer\x12\x12\n\x04name\x18\x01\
     \x20\x01(\tR\x04name\x12\x12\n\x04repo\x18\x02\x20\x01(\tR\x04repo\x12\
@@ -1442,14 +1794,16 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x01\x20\x01(\x08R\x07success\x12\x16\n\x06length\x18\x02\x20\x01(\x04R\
     \x06length\"#\n\rGenUuidResult\x12\x12\n\x04uuid\x18\x01\x20\x01(\tR\x04\
     uuid\"7\n\x08UuidList\x12+\n\x05uuids\x18\x01\x20\x03(\x0b2\x15.lycaon.G\
-    enUuidResultR\x05uuids2\xeb\x02\n\x07Backend\x129\n\x0blayerExists\x12\r\
-    .lycaon.Layer\x1a\x19.lycaon.LayerExistsResult\"\0\x121\n\x07GenUuid\x12\
-    \r.lycaon.Layer\x1a\x15.lycaon.GenUuidResult\"\0\x12-\n\nUuidExists\x12\
-    \r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\x12/\n\x0ccancelUpload\x12\r.l\
-    ycaon.Layer\x1a\x0e.lycaon.Result\"\0\x12-\n\ndeleteUuid\x12\r.lycaon.La\
-    yer\x1a\x0e.lycaon.Result\"\0\x124\n\x0euploadManifest\x12\x10.lycaon.Ma\
-    nifest\x1a\x0e.lycaon.Result\"\0\x12-\n\x08getUuids\x12\r.lycaon.Empty\
-    \x1a\x10.lycaon.UuidList\"\0b\x06proto3\
+    enUuidResultR\x05uuids\"0\n\x11CreateUuidRequest\x12\x1b\n\trepo_name\
+    \x18\x01\x20\x01(\tR\x08repoName\"&\n\x10CreateUuidResult\x12\x12\n\x04u\
+    uid\x18\x01\x20\x01(\tR\x04uuid2\xf5\x02\n\x07Backend\x12C\n\nCreateUuid\
+    \x12\x19.lycaon.CreateUuidRequest\x1a\x18.lycaon.CreateUuidResult\"\0\
+    \x121\n\x07GenUuid\x12\r.lycaon.Layer\x1a\x15.lycaon.GenUuidResult\"\0\
+    \x12-\n\nUuidExists\x12\r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\x12/\n\
+    \x0ccancelUpload\x12\r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\x12-\n\nde\
+    leteUuid\x12\r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\x124\n\x0euploadMa\
+    nifest\x12\x10.lycaon.Manifest\x1a\x0e.lycaon.Result\"\0\x12-\n\x08getUu\
+    ids\x12\r.lycaon.Empty\x1a\x10.lycaon.UuidList\"\0b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

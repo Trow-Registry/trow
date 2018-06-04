@@ -33,7 +33,6 @@ pub fn create_upload_info(
 }
 
 impl UploadInfo {
-
     //Move this
     pub fn uuid_exists(handler: State<bh::BackendHandler>, layer: &Layer) -> Result<bool, Error> {
         let backend = handler.backend();
@@ -92,13 +91,13 @@ impl<'r> Responder<'r> for UploadInfo {
 
                 debug!("Range: {}-{}, Length: {}", left, right, right - left);
                 Response::build()
-                .header(upload_uuid)
-                .header(location)
-                .header(range)
-                .header(length)
-                // TODO: move into the type so it is better encoded?...
-                .status(Status::Accepted)
-                .ok()
+                    .header(upload_uuid)
+                    .header(location)
+                    .header(range)
+                    .header(length)
+                    // TODO: move into the type so it is better encoded?...
+                    .status(Status::Accepted)
+                    .ok()
             }
         }
     }

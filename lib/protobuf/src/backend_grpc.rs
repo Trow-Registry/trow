@@ -18,9 +18,9 @@
 #![allow(unused_imports)]
 #![allow(unused_results)]
 
-const METHOD_BACKEND_LAYER_EXISTS: ::grpcio::Method<super::backend::Layer, super::backend::LayerExistsResult> = ::grpcio::Method {
+const METHOD_BACKEND_CREATE_UUID: ::grpcio::Method<super::backend::CreateUuidRequest, super::backend::CreateUuidResult> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
-    name: "/lycaon.Backend/layerExists",
+    name: "/lycaon.Backend/CreateUuid",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
@@ -78,20 +78,20 @@ impl BackendClient {
         }
     }
 
-    pub fn layer_exists_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::LayerExistsResult> {
-        self.client.unary_call(&METHOD_BACKEND_LAYER_EXISTS, req, opt)
+    pub fn create_uuid_opt(&self, req: &super::backend::CreateUuidRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::CreateUuidResult> {
+        self.client.unary_call(&METHOD_BACKEND_CREATE_UUID, req, opt)
     }
 
-    pub fn layer_exists(&self, req: &super::backend::Layer) -> ::grpcio::Result<super::backend::LayerExistsResult> {
-        self.layer_exists_opt(req, ::grpcio::CallOption::default())
+    pub fn create_uuid(&self, req: &super::backend::CreateUuidRequest) -> ::grpcio::Result<super::backend::CreateUuidResult> {
+        self.create_uuid_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn layer_exists_async_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::LayerExistsResult>> {
-        self.client.unary_call_async(&METHOD_BACKEND_LAYER_EXISTS, req, opt)
+    pub fn create_uuid_async_opt(&self, req: &super::backend::CreateUuidRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::CreateUuidResult>> {
+        self.client.unary_call_async(&METHOD_BACKEND_CREATE_UUID, req, opt)
     }
 
-    pub fn layer_exists_async(&self, req: &super::backend::Layer) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::LayerExistsResult>> {
-        self.layer_exists_async_opt(req, ::grpcio::CallOption::default())
+    pub fn create_uuid_async(&self, req: &super::backend::CreateUuidRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::CreateUuidResult>> {
+        self.create_uuid_async_opt(req, ::grpcio::CallOption::default())
     }
 
     pub fn gen_uuid_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::GenUuidResult> {
@@ -195,7 +195,7 @@ impl BackendClient {
 }
 
 pub trait Backend {
-    fn layer_exists(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::LayerExistsResult>);
+    fn create_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::CreateUuidRequest, sink: ::grpcio::UnarySink<super::backend::CreateUuidResult>);
     fn gen_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::GenUuidResult>);
     fn uuid_exists(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
     fn cancel_upload(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
@@ -207,8 +207,8 @@ pub trait Backend {
 pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
     let mut builder = ::grpcio::ServiceBuilder::new();
     let instance = s.clone();
-    builder = builder.add_unary_handler(&METHOD_BACKEND_LAYER_EXISTS, move |ctx, req, resp| {
-        instance.layer_exists(ctx, req, resp)
+    builder = builder.add_unary_handler(&METHOD_BACKEND_CREATE_UUID, move |ctx, req, resp| {
+        instance.create_uuid(ctx, req, resp)
     });
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_BACKEND_GEN_UUID, move |ctx, req, resp| {

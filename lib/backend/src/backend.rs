@@ -1,11 +1,9 @@
 use std;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use grpcio;
 use grpc;
 
-use failure::Error;
 use futures::Future;
 use uuid::Uuid;
 
@@ -30,15 +28,9 @@ struct Layer {
     digest: String,
 }
 
-/// given a layer, it returns it's size on disk
-fn get_size(layer: Layer) -> Result<u64, Error> {
-    let path = construct_absolute_path(&layer)?;
-    std::fs::metadata(path.as_os_str())?;
-    debug!("Getting length of file {:?}", path.as_os_str());
-    let file = std::fs::File::open(path)?;
-    file.metadata()
-        .and_then(|metadata| Ok(metadata.len()))
-        .map_err(|e| e.into())
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
+struct CreateUuidRequest {
+    repo_name: String
 }
 
 /// Delete a file by uuid.
@@ -49,54 +41,33 @@ fn delete_blob_by_uuid(uuid: &str) -> bool {
     fs::remove_file(path).map(|_| true).unwrap_or(false)
 }
 
-/// Takes the digest, and constructs an absolute pathstring to the digest.
-fn construct_absolute_path(layer: &Layer) -> Result<Box<Path>, Error> {
-    std::env::current_dir()
-        .map(|cwd| {
-            let absolute_dir = cwd.join(format!(
-                "data/layers/{}/{}/{}",
-                layer.name,
-                layer.repo,
-                layer.digest
-            ));
-            debug!("Absolute Path: {:?}", absolute_dir);
-            absolute_dir.into_boxed_path()
-        })
-        .map_err(|e| e.into())
-}
-
 impl grpc::backend_grpc::Backend for BackendService {
-    fn layer_exists(
+  
+    fn create_uuid(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::Layer,
-        sink: grpcio::UnarySink<grpc::backend::LayerExistsResult>,
+        req: grpc::backend::CreateUuidRequest,
+        sink: grpcio::UnarySink<grpc::backend::CreateUuidResult>,
     ) {
+        let mut resp = grpc::backend::CreateUuidResult::new();
         let layer = Layer {
-            name: req.get_name().to_owned(),
-            repo: req.get_repo().to_owned(),
-            digest: req.get_digest().to_owned(),
+            name: req.get_repo_name().to_owned(),
+            repo: req.get_repo_name().to_owned(),
+            //WTF?!
+            digest: Uuid::new_v4().to_string(),
         };
-
-        let mut resp = grpc::backend::LayerExistsResult::new();
-        let _ = get_size(layer)
-            .map(|length| {
-                debug!("Success, building return object");
-                resp.set_success(true);
-                resp.set_length(length);
-            })
-            .map_err(|_| {
-                debug!("Failure, building return object");
-                resp.set_success(false);
-            });
-
-        let req = req.clone();
-        let f = sink.success(resp).map_err(move |e| {
-            warn!("failed to reply! {:?}, {:?}", req, e)
-        });
+        {
+            self.uploads.lock().unwrap().insert(layer.clone());
+            debug!("Hash Table: {:?}", self.uploads);
+        }
+        resp.set_uuid(layer.digest.to_owned());
+        let f = sink.success(resp).map_err(
+            move |e| warn!("failed to reply! {:?}", e),
+        );
         ctx.spawn(f);
     }
 
+    ///DEPRECATED
     fn gen_uuid(
         &self,
         ctx: grpcio::RpcContext,
@@ -107,6 +78,7 @@ impl grpc::backend_grpc::Backend for BackendService {
         let layer = Layer {
             name: req.get_name().to_owned(),
             repo: req.get_repo().to_owned(),
+            //WTF?!
             digest: Uuid::new_v4().to_string(),
         };
         {
@@ -128,9 +100,11 @@ impl grpc::backend_grpc::Backend for BackendService {
     ) {
         let mut resp = grpc::backend::Result::new();
         let set = self.uploads.lock().unwrap();
+        //LAYER MUST DIE!
+        let name_repo = format!("{}/{}", req.get_name(), req.get_repo());
         let layer = Layer {
-            name: req.get_name().to_owned(),
-            repo: req.get_repo().to_owned(),
+            name: name_repo.clone(),
+            repo: name_repo,
             digest: req.get_digest().to_owned(),
         };
         resp.set_success(set.contains(&layer));
@@ -169,9 +143,11 @@ impl grpc::backend_grpc::Backend for BackendService {
         req: grpc::backend::Layer,
         sink: grpcio::UnarySink<grpc::backend::Result>,
     ) {
+
+        let name_repo = format!("{}/{}", req.get_name(), req.get_repo());
         let layer = Layer {
-            name: req.get_name().to_owned(),
-            repo: req.get_repo().to_owned(),
+            name: name_repo.clone(),
+            repo: name_repo,
             digest: req.get_digest().to_owned(),
         };
         let mut set = self.uploads.lock().unwrap();

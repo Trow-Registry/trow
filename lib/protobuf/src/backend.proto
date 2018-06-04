@@ -25,6 +25,7 @@ message Manifest {
 // An Empty message used where no inputs are needed
 message Empty {}
 
+// TODO: this needs to die
 // A generic success/fail response message
 message Result {
   bool success = 1;
@@ -52,10 +53,23 @@ message UuidList {
   repeated GenUuidResult uuids = 1;
 }
 
+message CreateUuidRequest {
+  //e.g. "amouat/network-utils", "nginx", "my-org/my-team/my-repo"
+  string repo_name = 1;
+  //Expect some auth stuff as well later
+}
+
+message CreateUuidResult {
+  //e.g. "amouat/network-utils", "nginx", "my-org/my-team/my-repo"
+  string uuid = 1;
+  //Expect some auth stuff as well later
+}
+
 service Backend {
-  // ----- Image Upload Flow ----------
-  // Check if a layer exists in the Registry
-  rpc layerExists (Layer) returns (LayerExistsResult) {}
+
+  //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
+  //Assigns a "UUID" to a Upload that is then used to track it
+  rpc CreateUuid (CreateUuidRequest) returns (CreateUuidResult) {}
 
   // Generate a uuid for a new layer being uploaded
   rpc GenUuid (Layer) returns (GenUuidResult) {}
