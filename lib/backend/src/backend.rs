@@ -23,8 +23,7 @@ impl BackendService {
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 struct Layer {
-    name: String,
-    repo: String,
+    repo_name: String,
     digest: String,
 }
 
@@ -51,8 +50,7 @@ impl grpc::backend_grpc::Backend for BackendService {
     ) {
         let mut resp = grpc::backend::CreateUuidResult::new();
         let layer = Layer {
-            name: req.get_repo_name().to_owned(),
-            repo: req.get_repo_name().to_owned(),
+            repo_name: req.get_repo_name().to_owned(),
             //WTF?!
             digest: Uuid::new_v4().to_string(),
         };
@@ -76,8 +74,7 @@ impl grpc::backend_grpc::Backend for BackendService {
     ) {
         let mut resp = grpc::backend::GenUuidResult::new();
         let layer = Layer {
-            name: req.get_name().to_owned(),
-            repo: req.get_repo().to_owned(),
+            repo_name: req.get_repo_name().to_owned(),
             //WTF?!
             digest: Uuid::new_v4().to_string(),
         };
@@ -101,10 +98,8 @@ impl grpc::backend_grpc::Backend for BackendService {
         let mut resp = grpc::backend::Result::new();
         let set = self.uploads.lock().unwrap();
         //LAYER MUST DIE!
-        let name_repo = format!("{}/{}", req.get_name(), req.get_repo());
         let layer = Layer {
-            name: name_repo.clone(),
-            repo: name_repo,
+            repo_name: req.get_repo_name().to_owned(),
             digest: req.get_digest().to_owned(),
         };
         resp.set_success(set.contains(&layer));
@@ -124,8 +119,7 @@ impl grpc::backend_grpc::Backend for BackendService {
         let mut resp = grpc::backend::Result::new();
         let mut set = self.uploads.lock().unwrap();
         let layer = Layer {
-            name: req.get_name().to_owned(),
-            repo: req.get_repo().to_owned(),
+            repo_name: req.get_repo_name().to_owned(),
             digest: req.get_digest().to_owned(),
         };
         let _ = delete_blob_by_uuid(&layer.digest);
@@ -144,10 +138,8 @@ impl grpc::backend_grpc::Backend for BackendService {
         sink: grpcio::UnarySink<grpc::backend::Result>,
     ) {
 
-        let name_repo = format!("{}/{}", req.get_name(), req.get_repo());
         let layer = Layer {
-            name: name_repo.clone(),
-            repo: name_repo,
+            repo_name: req.get_repo_name().to_owned(),
             digest: req.get_digest().to_owned(),
         };
         let mut set = self.uploads.lock().unwrap();

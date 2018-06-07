@@ -24,8 +24,7 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 #[derive(PartialEq,Clone,Default)]
 pub struct Layer {
     // message fields
-    pub name: ::std::string::String,
-    pub repo: ::std::string::String,
+    pub repo_name: ::std::string::String,
     pub digest: ::std::string::String,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
@@ -50,72 +49,38 @@ impl Layer {
         }
     }
 
-    // string name = 1;
+    // string repo_name = 1;
 
-    pub fn clear_name(&mut self) {
-        self.name.clear();
+    pub fn clear_repo_name(&mut self) {
+        self.repo_name.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_name(&mut self, v: ::std::string::String) {
-        self.name = v;
+    pub fn set_repo_name(&mut self, v: ::std::string::String) {
+        self.repo_name = v;
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_name(&mut self) -> &mut ::std::string::String {
-        &mut self.name
+    pub fn mut_repo_name(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
     }
 
     // Take field
-    pub fn take_name(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.name, ::std::string::String::new())
+    pub fn take_repo_name(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.repo_name, ::std::string::String::new())
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.name
+    pub fn get_repo_name(&self) -> &str {
+        &self.repo_name
     }
 
-    fn get_name_for_reflect(&self) -> &::std::string::String {
-        &self.name
+    fn get_repo_name_for_reflect(&self) -> &::std::string::String {
+        &self.repo_name
     }
 
-    fn mut_name_for_reflect(&mut self) -> &mut ::std::string::String {
-        &mut self.name
-    }
-
-    // string repo = 2;
-
-    pub fn clear_repo(&mut self) {
-        self.repo.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_repo(&mut self, v: ::std::string::String) {
-        self.repo = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_repo(&mut self) -> &mut ::std::string::String {
-        &mut self.repo
-    }
-
-    // Take field
-    pub fn take_repo(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.repo, ::std::string::String::new())
-    }
-
-    pub fn get_repo(&self) -> &str {
-        &self.repo
-    }
-
-    fn get_repo_for_reflect(&self) -> &::std::string::String {
-        &self.repo
-    }
-
-    fn mut_repo_for_reflect(&mut self) -> &mut ::std::string::String {
-        &mut self.repo
+    fn mut_repo_name_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
     }
 
     // string digest = 3;
@@ -163,10 +128,7 @@ impl ::protobuf::Message for Layer {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.name)?;
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.repo)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.repo_name)?;
                 },
                 3 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.digest)?;
@@ -183,11 +145,8 @@ impl ::protobuf::Message for Layer {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.name.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.name);
-        }
-        if !self.repo.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.repo);
+        if !self.repo_name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.repo_name);
         }
         if !self.digest.is_empty() {
             my_size += ::protobuf::rt::string_size(3, &self.digest);
@@ -198,11 +157,8 @@ impl ::protobuf::Message for Layer {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if !self.name.is_empty() {
-            os.write_string(1, &self.name)?;
-        }
-        if !self.repo.is_empty() {
-            os.write_string(2, &self.repo)?;
+        if !self.repo_name.is_empty() {
+            os.write_string(1, &self.repo_name)?;
         }
         if !self.digest.is_empty() {
             os.write_string(3, &self.digest)?;
@@ -252,14 +208,9 @@ impl ::protobuf::MessageStatic for Layer {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "name",
-                    Layer::get_name_for_reflect,
-                    Layer::mut_name_for_reflect,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "repo",
-                    Layer::get_repo_for_reflect,
-                    Layer::mut_repo_for_reflect,
+                    "repo_name",
+                    Layer::get_repo_name_for_reflect,
+                    Layer::mut_repo_name_for_reflect,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "digest",
@@ -278,8 +229,7 @@ impl ::protobuf::MessageStatic for Layer {
 
 impl ::protobuf::Clear for Layer {
     fn clear(&mut self) {
-        self.clear_name();
-        self.clear_repo();
+        self.clear_repo_name();
         self.clear_digest();
         self.unknown_fields.clear();
     }
@@ -1784,26 +1734,26 @@ impl ::protobuf::reflect::ProtobufValue for CreateUuidResult {
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\rbackend.proto\x12\x06lycaon\"G\n\x05Layer\x12\x12\n\x04name\x18\x01\
-    \x20\x01(\tR\x04name\x12\x12\n\x04repo\x18\x02\x20\x01(\tR\x04repo\x12\
-    \x16\n\x06digest\x18\x03\x20\x01(\tR\x06digest\"N\n\x08Manifest\x12$\n\r\
-    schemaVersion\x18\x01\x20\x01(\rR\rschemaVersion\x12\x1c\n\tmediaType\
-    \x18\x02\x20\x01(\tR\tmediaType\"\x07\n\x05Empty\"6\n\x06Result\x12\x18\
-    \n\x07success\x18\x01\x20\x01(\x08R\x07success\x12\x12\n\x04text\x18\x02\
-    \x20\x01(\tR\x04text\"E\n\x11LayerExistsResult\x12\x18\n\x07success\x18\
-    \x01\x20\x01(\x08R\x07success\x12\x16\n\x06length\x18\x02\x20\x01(\x04R\
-    \x06length\"#\n\rGenUuidResult\x12\x12\n\x04uuid\x18\x01\x20\x01(\tR\x04\
-    uuid\"7\n\x08UuidList\x12+\n\x05uuids\x18\x01\x20\x03(\x0b2\x15.lycaon.G\
-    enUuidResultR\x05uuids\"0\n\x11CreateUuidRequest\x12\x1b\n\trepo_name\
-    \x18\x01\x20\x01(\tR\x08repoName\"&\n\x10CreateUuidResult\x12\x12\n\x04u\
-    uid\x18\x01\x20\x01(\tR\x04uuid2\xf5\x02\n\x07Backend\x12C\n\nCreateUuid\
-    \x12\x19.lycaon.CreateUuidRequest\x1a\x18.lycaon.CreateUuidResult\"\0\
-    \x121\n\x07GenUuid\x12\r.lycaon.Layer\x1a\x15.lycaon.GenUuidResult\"\0\
-    \x12-\n\nUuidExists\x12\r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\x12/\n\
-    \x0ccancelUpload\x12\r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\x12-\n\nde\
-    leteUuid\x12\r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\x124\n\x0euploadMa\
-    nifest\x12\x10.lycaon.Manifest\x1a\x0e.lycaon.Result\"\0\x12-\n\x08getUu\
-    ids\x12\r.lycaon.Empty\x1a\x10.lycaon.UuidList\"\0b\x06proto3\
+    \n\rbackend.proto\x12\x06lycaon\"<\n\x05Layer\x12\x1b\n\trepo_name\x18\
+    \x01\x20\x01(\tR\x08repoName\x12\x16\n\x06digest\x18\x03\x20\x01(\tR\x06\
+    digest\"N\n\x08Manifest\x12$\n\rschemaVersion\x18\x01\x20\x01(\rR\rschem\
+    aVersion\x12\x1c\n\tmediaType\x18\x02\x20\x01(\tR\tmediaType\"\x07\n\x05\
+    Empty\"6\n\x06Result\x12\x18\n\x07success\x18\x01\x20\x01(\x08R\x07succe\
+    ss\x12\x12\n\x04text\x18\x02\x20\x01(\tR\x04text\"E\n\x11LayerExistsResu\
+    lt\x12\x18\n\x07success\x18\x01\x20\x01(\x08R\x07success\x12\x16\n\x06le\
+    ngth\x18\x02\x20\x01(\x04R\x06length\"#\n\rGenUuidResult\x12\x12\n\x04uu\
+    id\x18\x01\x20\x01(\tR\x04uuid\"7\n\x08UuidList\x12+\n\x05uuids\x18\x01\
+    \x20\x03(\x0b2\x15.lycaon.GenUuidResultR\x05uuids\"0\n\x11CreateUuidRequ\
+    est\x12\x1b\n\trepo_name\x18\x01\x20\x01(\tR\x08repoName\"&\n\x10CreateU\
+    uidResult\x12\x12\n\x04uuid\x18\x01\x20\x01(\tR\x04uuid2\xf5\x02\n\x07Ba\
+    ckend\x12C\n\nCreateUuid\x12\x19.lycaon.CreateUuidRequest\x1a\x18.lycaon\
+    .CreateUuidResult\"\0\x121\n\x07GenUuid\x12\r.lycaon.Layer\x1a\x15.lycao\
+    n.GenUuidResult\"\0\x12-\n\nUuidExists\x12\r.lycaon.Layer\x1a\x0e.lycaon\
+    .Result\"\0\x12/\n\x0ccancelUpload\x12\r.lycaon.Layer\x1a\x0e.lycaon.Res\
+    ult\"\0\x12-\n\ndeleteUuid\x12\r.lycaon.Layer\x1a\x0e.lycaon.Result\"\0\
+    \x124\n\x0euploadManifest\x12\x10.lycaon.Manifest\x1a\x0e.lycaon.Result\
+    \"\0\x12-\n\x08getUuids\x12\r.lycaon.Empty\x1a\x10.lycaon.UuidList\"\0b\
+    \x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

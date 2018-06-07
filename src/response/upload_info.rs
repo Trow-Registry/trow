@@ -13,21 +13,18 @@ use types::Layer;
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
     uuid: String,
-    name: String,
-    repo: String,
+    repo_name: String,
     range: (u32, u32),
 }
 
 pub fn create_upload_info(
     uuid: String,
-    name: String,
-    repo: String,
+    repo_name: String,
     range: (u32, u32),
 ) -> UploadInfo {
     UploadInfo {
         uuid,
-        name,
-        repo,
+        repo_name,
         range,
     }
 }
@@ -37,8 +34,7 @@ impl UploadInfo {
     pub fn uuid_exists(handler: State<bh::BackendHandler>, layer: &Layer) -> Result<bool, Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
-        req.set_name(layer.name.to_owned());
-        req.set_repo(layer.repo.to_owned());
+        req.set_repo_name(layer.repo_name.to_owned());
         req.set_digest(layer.digest.to_owned());
 
         let response = backend.uuid_exists(&req)?;
@@ -71,16 +67,14 @@ impl<'r> Responder<'r> for UploadInfo {
         match self {
             UploadInfo {
                 ref uuid,
-                ref name,
-                ref repo,
+                ref repo_name,
                 ref range,
             } => {
                 debug!("Uuid Ok");
                 let location_url = format!(
-                    "{}/v2/{}/{}/blobs/uploads/{}",
+                    "{}/v2/{}/blobs/uploads/{}",
                     get_base_url(req),
-                    name,
-                    repo,
+                    repo_name,
                     uuid
                 );
                 let &(left, right) = range;
@@ -113,8 +107,7 @@ mod test {
         UploadInfo {
             // TODO: keep this as a real Uuid!
             uuid: String::from("whatever"),
-            name: String::from("moredhel"),
-            repo: String::from("test"),
+            repo_name: String::from("moredhel/test"),
             range: (0, 0),
         }
     }

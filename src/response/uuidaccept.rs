@@ -17,21 +17,19 @@ pub enum UuidAcceptResponse {
     UuidAccept {
         uuid: String,
         digest: String,
-        name: String,
-        repo: String,
+        repo_name: String,
     },
     UuidDelete,
 }
 
 fn construct_digest_path(layer: &types::Layer) -> String {
-    format!("data/layers/{}/{}/{}", layer.name, layer.repo, layer.digest)
+    format!("data/layers/{}/{}", layer.repo_name, layer.digest)
 }
 
 impl UuidAcceptResponse {
     pub fn handle(
         handler: State<be::BackendHandler>,
-        name: String,
-        repo: String,
+        repo_name: String,
         uuid: String,
         digest: String,
     ) -> Result<UuidAcceptResponse, failure::Error> {
@@ -40,12 +38,11 @@ impl UuidAcceptResponse {
         // 1. copy file to new location
         let backend = handler.backend();
         let layer = types::Layer {
-            name: name.clone(),
-            repo: repo.clone(),
+            repo_name: repo_name.clone(),
             digest: digest.clone(),
         };
         let digest_path = construct_digest_path(&layer);
-        let path = format!("data/layers/{}/{}", layer.name, layer.repo);
+        let path = format!("data/layers/{}", layer.repo_name);
         let scratch_path = format!("data/scratch/{}", uuid);
         debug!("Saving file");
         // 1.1 check direcory exists
@@ -59,8 +56,7 @@ impl UuidAcceptResponse {
         // 3. delete uuid from the backend
         // TODO is this process right? Should the backend be doing this?!
         let mut layer = backend::Layer::new();
-        layer.set_name(name.clone());
-        layer.set_repo(repo.clone());
+        layer.set_repo_name(repo_name.clone());
         layer.set_digest(uuid.clone());
         let resp = backend.delete_uuid(&layer)?;
         // 4. Construct response
@@ -68,8 +64,7 @@ impl UuidAcceptResponse {
             Ok(UuidAcceptResponse::UuidAccept {
                 uuid,
                 digest,
-                name,
-                repo,
+                repo_name,
             })
         } else {
             warn!("Failed to remove UUID");
@@ -83,8 +78,7 @@ impl UuidAcceptResponse {
     ) -> Result<UuidAcceptResponse, errors::Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
-        req.set_name(layer.name.to_owned());
-        req.set_repo(layer.repo.to_owned());
+        req.set_repo_name(layer.repo_name.to_owned());
         req.set_digest(layer.digest.to_owned());
 
         //Log errors, don't send details to client
@@ -112,9 +106,9 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
 
         match self {
             UuidAccept {
-                name, repo, digest, ..
+                repo_name, digest, ..
             } => {
-                let location = format!("{}/v2/{}/{}/blobs/{}", BASE_URL, name, repo, digest);
+                let location = format!("{}/v2/{}/blobs/{}", BASE_URL, repo_name, digest);
                 let location = Header::new("Location", location);
                 let digest = Header::new("Docker-Content-Digest", digest);
                 Response::build()
@@ -142,8 +136,7 @@ mod test {
     fn build_response() -> UploadInfo {
         create_upload_info(
             String::from("whatever"),
-            String::from("moredhel"),
-            String::from("test"),
+            String::from("moredhel/test"),
             (0, 0)
         )
     }

@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str;
 
 use crypto::digest::Digest;
@@ -12,7 +12,6 @@ use response::html::HTML;
 use response::manifest_upload::ManifestUpload;
 use response::upload_info::{self, UploadInfo};
 use response::uuidaccept::UuidAcceptResponse;
-use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::NamedFile;
 use rocket::{self, Outcome};
@@ -28,10 +27,15 @@ pub fn routes() -> Vec<rocket::Route> {
         get_homepage,
         get_manifest,
         get_blob,
+        get_blob_qualified,
         put_blob,
+        put_blob_qualified,
         patch_blob,
+        patch_blob_qualified,
         post_blob_upload,
+        post_blob_upload_onename,
         put_image_manifest,
+        put_image_manifest_qualified,
         delete_image_manifest,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
@@ -47,29 +51,6 @@ pub fn routes() -> Vec<rocket::Route> {
     To find the stubs, go to https://github.com/ContainerSolutions/trow/tree/4b007088bb0657a98238870d9aaca638e01f6487
     Please add tests for any routes that you recover.
     */
-}
-
-struct Blob {
-    file: PathBuf,
-}
-impl<'a, 'r> FromRequest<'a, 'r> for Blob {
-    type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<Blob, ()> {
-        //Look up catalogue to see if we have it
-        let name = req.get_param::<String>(0).unwrap();
-        let repo = req.get_param::<String>(1).unwrap();
-        let digest = req.get_param::<String>(2).unwrap();
-        let path = format!("data/layers/{}/{}/{}", name, repo, digest);
-        info!("Path: {}", path);
-        let path = Path::new(&path);
-
-        if path.exists() {
-            return Outcome::Success(Blob {
-                file: path.to_path_buf(),
-            });
-        }
-        Outcome::Failure((Status::NotFound, ()))
-    }
 }
 
 struct AuthorisedUser(String);
@@ -147,22 +128,32 @@ digest - unique identifier for the blob to be downoaded
 200 - blob is downloaded
 307 - redirect to another service for downloading[1]
  */
-#[get("/v2/<_name>/<_repo>/blobs/<_digest>")]
-fn get_blob(
-    _name: String,
-    _repo: String,
-    _digest: String,
-    _auth_user: AuthorisedUser,
-    blob: Blob,
+#[get("/v2/<name>/<repo>/blobs/<digest>")]
+fn get_blob_qualified(
+    name: String,
+    repo: String,
+    digest: String,
+    auth_user: AuthorisedUser,
 ) -> Option<NamedFile> {
-    /*
-     * I suspect calling the guards directly would be better.
-     * We generally don't need to work through a call chain
-     * (e.g. admin user -> authorised user -> anon user methods)
-     * and can either error/run happy path.
-     */
-    info!("Getting Blob");
-    NamedFile::open(blob.file).ok()
+    get_blob(format!("{}/{}", name, repo), digest, auth_user)
+}
+
+#[get("/v2/<name_repo>/blobs/<digest>")]
+fn get_blob(
+    name_repo: String,
+    digest: String,
+    _auth_user: AuthorisedUser,
+) -> Option<NamedFile> {
+
+    let path = format!("data/layers/{}/{}", name_repo, digest);
+    info!("Path: {}", path);
+    let path = Path::new(&path);
+
+    if path.exists() {
+        NamedFile::open(path).ok()
+    } else {
+        None
+    }
 }
 
 /*
@@ -190,18 +181,28 @@ struct UploadQuery {
     digest: String,
 }
 
-#[put("/v2/<name>/<repo>/blobs/uploads/<uuid>?<query>")] // capture digest query string
+#[put("/v2/<repo_name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob(
     config: rocket::State<backend::BackendHandler>,
-    name: String,
-    repo: String,
+    repo_name: String,
     uuid: String,
     query: UploadQuery,
 ) -> Result<UuidAcceptResponse, Error> {
-    match UuidAcceptResponse::handle(config, name, repo, uuid, query.digest) {
+    match UuidAcceptResponse::handle(config, repo_name, uuid, query.digest) {
         Ok(x) => Ok(x),
         Err(_) => Err(Error::InternalError),
     }
+}
+
+#[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
+fn put_blob_qualified(
+    config: rocket::State<backend::BackendHandler>,
+    repo: String,
+    name: String,
+    uuid: String,
+    query: UploadQuery,
+) -> Result<UuidAcceptResponse, Error> {
+    put_blob(config, format!("{}/{}", repo, name), uuid, query)
 }
 
 /*
@@ -211,11 +212,10 @@ Uploads a blob or chunk of a blog.
 Checks UUID. Returns UploadInfo with range set to correct position.
 
 */
-#[patch("/v2/<name>/<repo>/blobs/uploads/<uuid>", data = "<chunk>")]
+#[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
     handler: rocket::State<backend::BackendHandler>,
-    name: String,
-    repo: String,
+    repo_name: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
@@ -223,8 +223,7 @@ fn patch_blob(
     //This needs to change to be a blob, no digest, or just go away
     //There is no digest at the minute; that comes at put stage
     let layer = Layer {
-        name: name.clone(),
-        repo: repo.clone(),
+        repo_name: repo_name.clone(),
         digest: uuid.clone(),
     };
     //TODO change to is_valid_uuid()
@@ -238,8 +237,7 @@ fn patch_blob(
         match len {
             Ok(len) => Ok(upload_info::create_upload_info(
                 uuid,
-                name,
-                repo,
+                repo_name,
                 (0, len as u32),
             )),
             Err(_) => Err(Error::InternalError),
@@ -253,6 +251,18 @@ fn patch_blob(
     }
 }
 
+#[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
+fn patch_blob_qualified(
+    handler: rocket::State<backend::BackendHandler>,
+    repo: String,
+    name: String,
+    uuid: String,
+    chunk: rocket::data::Data,
+) -> Result<UploadInfo, Error> {
+    patch_blob(handler, format!("{}/{}", repo, name), uuid, chunk)
+}
+
+
 /*
   Starting point for an uploading a new image or new version of an image.
 
@@ -260,17 +270,16 @@ fn patch_blob(
 
   No data is being transferred yet.
  */
-#[post("/v2/<name>/<repo>/blobs/uploads")]
-fn post_blob_upload(
+#[post("/v2/<repo_name>/blobs/uploads")]
+fn post_blob_upload_onename(
     handler: rocket::State<backend::BackendHandler>,
-    name: String,
-    repo: String,
+    repo_name: String,
 ) -> Result<UploadInfo, Error> {
 
     //Ask the backend for a UUID
     let backend = handler.backend();
     let mut req = grpc::backend::CreateUuidRequest::new();
-    req.set_repo_name(format!("{}/{}", name, repo));
+    req.set_repo_name(repo_name.clone());
 
     let response = backend
         .create_uuid(&req)
@@ -282,10 +291,19 @@ fn post_blob_upload(
 
     Ok(upload_info::create_upload_info(
         response.get_uuid().to_owned(),
-        name,
-        repo,
+        repo_name,
         (0, 0),
     ))
+}
+
+#[post("/v2/<repo>/<name>/blobs/uploads")]
+fn post_blob_upload(
+    handler: rocket::State<backend::BackendHandler>,
+    repo: String,
+    name: String
+) -> Result<UploadInfo, Error> {
+
+    post_blob_upload_onename(handler, format!("{}/{}", repo, name))
 }
 
 /*
@@ -296,10 +314,9 @@ PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
  */
-#[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
+#[put("/v2/<repo_name>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest(
-    user: String,
-    repo: String,
+    repo_name: String,
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<ManifestUpload, Error> {
@@ -319,7 +336,7 @@ fn put_image_manifest(
     };
 
     for digest in manifest.get_asset_digests() {
-        let path = format!("data/layers/{}/{}/{}", user, repo, digest);
+        let path = format!("data/layers/{}/{}", repo_name, digest);
         let path = Path::new(&path);
 
         if !path.exists() {
@@ -332,7 +349,7 @@ fn put_image_manifest(
 
     // save manifest file
 
-    let manifest_directory = format!("./data/manifests/{}/{}", user, repo);
+    let manifest_directory = format!("./data/manifests/{}/", repo_name);
     let manifest_path = format!("{}/{}", manifest_directory, reference);
     fs::create_dir_all(manifest_directory).unwrap();
     let mut file = fs::File::create(manifest_path).unwrap();
@@ -340,11 +357,22 @@ fn put_image_manifest(
 
     let digest = gen_digest(raw_manifest.as_bytes());
     let location = format!(
-        "http://localhost:5000/v2/{}/{}/manifests/{}",
-        user, repo, digest
+        "http://localhost:5000/v2/{}/manifests/{}",
+        repo_name, digest
     );
 
     Ok(ManifestUpload { digest, location })
+}
+
+
+#[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
+fn put_image_manifest_qualified(
+    user: String,
+    repo: String,
+    reference: String,
+    chunk: rocket::data::Data,
+) -> Result<ManifestUpload, Error> {
+    put_image_manifest(format!("{}/{}", user, repo), reference, chunk)
 }
 
 fn gen_digest(bytes: &[u8]) -> String {

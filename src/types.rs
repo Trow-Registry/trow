@@ -3,12 +3,11 @@ pub type Digest = String;
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub digest: Digest,
-    pub name: String,
-    pub repo: String,
+    pub repo_name: String,
 }
 impl Layer {
-    pub fn new(name: String, repo: String, digest: Digest) -> Layer {
-        Layer { digest, name, repo }
+    pub fn new(repo_name: String, digest: Digest) -> Layer {
+        Layer { digest, repo_name }
     }
 
     pub fn digest(&self) -> Digest {

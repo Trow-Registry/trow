@@ -10,8 +10,7 @@ package lycaon;
 //
 
 message Layer {
-  string name = 1;
-  string repo = 2;
+  string repo_name = 1;
   string digest = 3;
 }
 
