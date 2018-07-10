@@ -21,21 +21,32 @@ use types::Layer;
 use backend;
 use grpc;
 
+static DATA_DIR: &'static str = "data";
+static MANIFESTS_DIR: &'static str = "manifests";
+static LAYERS_DIR: &'static str = "layers";
+
+
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
         get_manifest,
+        get_manifest_3level,
         get_blob,
         get_blob_qualified,
+        put_blob_qualified_3level,
+        get_blob_qualified_3level,
+        patch_blob_qualified_3level,
         put_blob,
         put_blob_qualified,
         patch_blob,
         patch_blob_qualified,
         post_blob_upload,
+        post_blob_upload_3level,
         post_blob_upload_onename,
         put_image_manifest,
         put_image_manifest_qualified,
+        put_image_manifest_qualified_3level,
         delete_image_manifest,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
@@ -101,7 +112,29 @@ Accept: manifest-version
  */
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 fn get_manifest(user: String, repo: String, reference: String) -> Option<Manifest> {
-    let path = format!("data/manifests/{}/{}/{}", user, repo, reference);
+    let path = format!("{}/{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, user, repo, reference);
+    println!("Path: {}", path);
+    info!("Path: {}", path);
+    let path = Path::new(&path);
+
+    //Parse the manifest to get the response type
+    //We could do this faster by storing in appropriate folder and streaming file
+    //directly
+    if path.exists() {
+        let file = fs::File::open(path).unwrap();
+        let m: Manifest = serde_json::from_reader(file).unwrap();
+        return Some(m);
+    }
+
+    None
+}
+/*
+ * Process 3 level manifest path - not sure this one is needed
+ */
+#[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
+fn get_manifest_3level(org: String, user: String, repo: String, reference: String) -> Option<Manifest> {
+    let path = format!("{}/{}/{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, org, user, repo, reference);
+    println!("Path: {}", path);
     info!("Path: {}", path);
     let path = Path::new(&path);
 
@@ -128,6 +161,29 @@ digest - unique identifier for the blob to be downoaded
 200 - blob is downloaded
 307 - redirect to another service for downloading[1]
  */
+
+#[get("/v2/<name_repo>/blobs/<digest>")]
+fn get_blob(
+    name_repo: String,
+    digest: String,
+    _auth_user: AuthorisedUser,
+) -> Option<NamedFile> {
+
+    let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, name_repo, digest);
+    println!("Path: {}", path);
+    info!("Path: {}", path);
+    let path = Path::new(&path);
+
+    if path.exists() {
+        NamedFile::open(path).ok()
+    } else {
+        None
+    }
+}
+/*
+ * Parse 2 level <repo>/<name> style path and pass it to get_blob
+ */
+
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
 fn get_blob_qualified(
     name: String,
@@ -138,24 +194,19 @@ fn get_blob_qualified(
     get_blob(format!("{}/{}", name, repo), digest, auth_user)
 }
 
-#[get("/v2/<name_repo>/blobs/<digest>")]
-fn get_blob(
-    name_repo: String,
+/*
+ * Parse 3 level <org>/<repo>/<name> style path and pass it to get_blob
+ */
+#[get("/v2/<org>/<name>/<repo>/blobs/<digest>")]
+fn get_blob_qualified_3level(
+    org: String,
+    name: String,
+    repo: String,
     digest: String,
-    _auth_user: AuthorisedUser,
+    auth_user: AuthorisedUser,
 ) -> Option<NamedFile> {
-
-    let path = format!("data/layers/{}/{}", name_repo, digest);
-    info!("Path: {}", path);
-    let path = Path::new(&path);
-
-    if path.exists() {
-        NamedFile::open(path).ok()
-    } else {
-        None
-    }
+    get_blob(format!("{}/{}/{}", org, name, repo), digest, auth_user)
 }
-
 /*
 ---
 Monolithic Upload
@@ -194,6 +245,9 @@ fn put_blob(
     }
 }
 
+/*
+ * Parse 2 level <repo>/<name> style path and pass it to put_blob
+ */
 #[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob_qualified(
     config: rocket::State<backend::BackendHandler>,
@@ -203,6 +257,22 @@ fn put_blob_qualified(
     query: UploadQuery,
 ) -> Result<UuidAcceptResponse, Error> {
     put_blob(config, format!("{}/{}", repo, name), uuid, query)
+}
+
+
+/*
+ * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
+ */
+#[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
+fn put_blob_qualified_3level(
+    config: rocket::State<backend::BackendHandler>,
+    org: String,
+    repo: String,
+    name: String,
+    uuid: String,
+    query: UploadQuery,
+) -> Result<UuidAcceptResponse, Error> {
+    put_blob(config, format!("{}/{}/{}", org, repo, name), uuid, query)
 }
 
 /*
@@ -251,6 +321,9 @@ fn patch_blob(
     }
 }
 
+/*
+ * Parse 2 level <repo>/<name> style path and pass it to patch_blob
+ */
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_qualified(
     handler: rocket::State<backend::BackendHandler>,
@@ -262,7 +335,20 @@ fn patch_blob_qualified(
     patch_blob(handler, format!("{}/{}", repo, name), uuid, chunk)
 }
 
-
+/*
+ * Parse 3 level <org>/<repo>/<name> style path and pass it to patch_blob
+ */
+#[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
+fn patch_blob_qualified_3level(
+    handler: rocket::State<backend::BackendHandler>,
+    org:  String,
+    repo: String,
+    name: String,
+    uuid: String,
+    chunk: rocket::data::Data,
+) -> Result<UploadInfo, Error> {
+    patch_blob(handler, format!("{}/{}/{}", org, repo, name), uuid, chunk)
+}
 /*
   Starting point for an uploading a new image or new version of an image.
 
@@ -296,15 +382,33 @@ fn post_blob_upload_onename(
     ))
 }
 
+/*
+ * Parse 2 level <repo>/<name> style path and pass it to put_blob_upload_onename
+ */
 #[post("/v2/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload(
     handler: rocket::State<backend::BackendHandler>,
     repo: String,
     name: String
 ) -> Result<UploadInfo, Error> {
-
+    println!("upload {}/{}", repo, name);
     post_blob_upload_onename(handler, format!("{}/{}", repo, name))
 }
+/*
+ * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
+ */
+#[post("/v2/<org>/<repo>/<name>/blobs/uploads")]
+fn post_blob_upload_3level(
+    handler: rocket::State<backend::BackendHandler>,
+    org: String,
+    repo: String,
+    name: String
+) -> Result<UploadInfo, Error> {
+    println!("upload 3 way {}/{}/{}", org, repo, name);
+    post_blob_upload_onename(handler, format!("{}/{}/{}", org, repo, name))
+}
+
+
 
 /*
 
@@ -336,7 +440,8 @@ fn put_image_manifest(
     };
 
     for digest in manifest.get_asset_digests() {
-        let path = format!("data/layers/{}/{}", repo_name, digest);
+        let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, repo_name, digest);
+    println!("Path: {}", path);
         let path = Path::new(&path);
 
         if !path.exists() {
@@ -349,7 +454,7 @@ fn put_image_manifest(
 
     // save manifest file
 
-    let manifest_directory = format!("./data/manifests/{}/", repo_name);
+    let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, repo_name);
     let manifest_path = format!("{}/{}", manifest_directory, reference);
     fs::create_dir_all(manifest_directory).unwrap();
     let mut file = fs::File::create(manifest_path).unwrap();
@@ -364,7 +469,9 @@ fn put_image_manifest(
     Ok(ManifestUpload { digest, location })
 }
 
-
+/*
+ * Parse 2 level <user>/<repo> style path and pass it to put_image_manifest
+ */
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest_qualified(
     user: String,
@@ -375,6 +482,19 @@ fn put_image_manifest_qualified(
     put_image_manifest(format!("{}/{}", user, repo), reference, chunk)
 }
 
+/*
+ * Parse 3 level <org>/<user>/<repo> style path and pass it to put_image_manifest
+ */
+#[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
+fn put_image_manifest_qualified_3level(
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+    chunk: rocket::data::Data,
+) -> Result<ManifestUpload, Error> {
+    put_image_manifest(format!("{}/{}/{}", org, user, repo), reference, chunk)
+}
 fn gen_digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.input(bytes);

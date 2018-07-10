@@ -78,9 +78,8 @@ fn main() {
         .map_or(default_port, |x| x.parse().unwrap());
     let cert_path = matches.value_of("cert").unwrap_or("./certs/ca.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
-    let data_path = matches.value_of("key").unwrap_or("./data");
+    let data_path = matches.value_of("data-dir").unwrap_or("./data");
     
-
     let addr = NetAddr {
         host: host.to_string(),
         port: port,
