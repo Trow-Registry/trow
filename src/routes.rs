@@ -113,7 +113,6 @@ Accept: manifest-version
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 fn get_manifest(user: String, repo: String, reference: String) -> Option<Manifest> {
     let path = format!("{}/{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, user, repo, reference);
-    println!("Path: {}", path);
     info!("Path: {}", path);
     let path = Path::new(&path);
 
@@ -134,7 +133,6 @@ fn get_manifest(user: String, repo: String, reference: String) -> Option<Manifes
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(org: String, user: String, repo: String, reference: String) -> Option<Manifest> {
     let path = format!("{}/{}/{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, org, user, repo, reference);
-    println!("Path: {}", path);
     info!("Path: {}", path);
     let path = Path::new(&path);
 
@@ -170,7 +168,6 @@ fn get_blob(
 ) -> Option<NamedFile> {
 
     let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, name_repo, digest);
-    println!("Path: {}", path);
     info!("Path: {}", path);
     let path = Path::new(&path);
 
@@ -391,7 +388,7 @@ fn post_blob_upload(
     repo: String,
     name: String
 ) -> Result<UploadInfo, Error> {
-    println!("upload {}/{}", repo, name);
+    info!("upload {}/{}", repo, name);
     post_blob_upload_onename(handler, format!("{}/{}", repo, name))
 }
 /*
@@ -404,7 +401,7 @@ fn post_blob_upload_3level(
     repo: String,
     name: String
 ) -> Result<UploadInfo, Error> {
-    println!("upload 3 way {}/{}/{}", org, repo, name);
+    info!("upload 3 way {}/{}/{}", org, repo, name);
     post_blob_upload_onename(handler, format!("{}/{}/{}", org, repo, name))
 }
 
@@ -441,7 +438,7 @@ fn put_image_manifest(
 
     for digest in manifest.get_asset_digests() {
         let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, repo_name, digest);
-    println!("Path: {}", path);
+        info!("Path: {}", path);
         let path = Path::new(&path);
 
         if !path.exists() {
