@@ -120,13 +120,15 @@ fn get_manifest(user: String, repo: String, reference: String) -> Option<Manifes
     //We could do this faster by storing in appropriate folder and streaming file
     //directly
     if path.exists() {
-        let file = fs::File::open(path).unwrap();
-        let m: Manifest = serde_json::from_reader(file).unwrap();
-        return Some(m);
+        return match fs::File::open(path) {
+            Ok(f) => serde_json::from_reader(f).ok(),
+            Err(_) => None
+        }
     }
 
     None
 }
+
 /*
  * Process 3 level manifest path - not sure this one is needed
  */
@@ -140,9 +142,10 @@ fn get_manifest_3level(org: String, user: String, repo: String, reference: Strin
     //We could do this faster by storing in appropriate folder and streaming file
     //directly
     if path.exists() {
-        let file = fs::File::open(path).unwrap();
-        let m: Manifest = serde_json::from_reader(file).unwrap();
-        return Some(m);
+        return match fs::File::open(path) {
+            Ok(f) => serde_json::from_reader(f).ok(),
+            Err(_) => None
+        }
     }
 
     None
