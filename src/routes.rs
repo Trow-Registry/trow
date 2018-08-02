@@ -31,6 +31,7 @@ pub fn routes() -> Vec<rocket::Route> {
         get_v2root,
         get_homepage,
         get_manifest,
+        get_manifest_2level,
         get_manifest_3level,
         get_blob,
         get_blob_qualified,
@@ -110,8 +111,27 @@ Accept: manifest-version
 200 - return the manifest
 404 - manifest not known to the registry
  */
+#[get("/v2/<onename>/manifests/<reference>")]
+fn get_manifest(onename: String, reference: String) -> Option<Manifest> {
+    let path = format!("{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, onename, reference);
+    info!("Path: {}", path);
+    let path = Path::new(&path);
+
+    //Parse the manifest to get the response type
+    //We could do this faster by storing in appropriate folder and streaming file
+    //directly
+    if path.exists() {
+        return match fs::File::open(path) {
+            Ok(f) => serde_json::from_reader(f).ok(),
+            Err(_) => None
+        }
+    }
+
+    None
+}
+
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
-fn get_manifest(user: String, repo: String, reference: String) -> Option<Manifest> {
+fn get_manifest_2level(user: String, repo: String, reference: String) -> Option<Manifest> {
     let path = format!("{}/{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, user, repo, reference);
     info!("Path: {}", path);
     let path = Path::new(&path);

@@ -192,10 +192,10 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::Created);
     }
 
-    fn get_manifest(cl: &reqwest::Client) {
+    fn get_manifest(cl: &reqwest::Client, name: &str) {
         //Previous test should have upload image/test:test manifest
         //Might need accept headers here
-        let mut resp = cl.get(&format!("{}/v2/image/test/manifests/test", LYCAON_ADDRESS))
+        let mut resp = cl.get(&format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
@@ -227,14 +227,18 @@ mod interface_tests {
         get_non_existent_blob(&client);
         println!("Running unsupported()");
         unsupported(&client);
-        println!("Running upload_layer(image/test/notwork)");
-        upload_layer(&client, "image/test/notwork");
+        println!("Running upload_layer(repo/image/test)");
+        upload_layer(&client, "repo/image/test");
         println!("Running upload_layer(image/test)");
         upload_layer(&client, "image/test");
         println!("Running upload_layer(onename)");
         upload_layer(&client, "onename");
-        println!("Running get_manifest()");
-        get_manifest(&client);
+        println!("Running get_manifest(onename)");
+        get_manifest(&client, "onename");
+        println!("Running get_manifest(image/test)");
+        get_manifest(&client, "image/test");
+        println!("Running get_manifest(repo/image/test)");
+        get_manifest(&client, "repo/image/test");
     }
 
 }
