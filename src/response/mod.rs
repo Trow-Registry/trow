@@ -9,7 +9,7 @@ pub mod html;
 pub mod manifest_upload;
 mod test_helper;
 pub mod upload_info;
-pub mod uuidaccept;
+pub mod accepted_upload;
 
 pub fn json_response<T: serde::Serialize>(
     req: &Request,

@@ -11,7 +11,7 @@ use response::errors::Error;
 use response::html::HTML;
 use response::manifest_upload::ManifestUpload;
 use response::upload_info::{self, UploadInfo};
-use response::uuidaccept::UuidAcceptResponse;
+use response::accepted_upload::AcceptedUpload;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::NamedFile;
 use rocket::{self, Outcome};
@@ -258,8 +258,8 @@ fn put_blob(
     repo_name: String,
     uuid: String,
     query: UploadQuery,
-) -> Result<UuidAcceptResponse, Error> {
-    match UuidAcceptResponse::handle(config, repo_name, uuid, query.digest) {
+) -> Result<AcceptedUpload, Error> {
+    match AcceptedUpload::handle(config, repo_name, uuid, query.digest) {
         Ok(x) => Ok(x),
         Err(_) => Err(Error::InternalError),
     }
@@ -275,7 +275,7 @@ fn put_blob_qualified(
     name: String,
     uuid: String,
     query: UploadQuery,
-) -> Result<UuidAcceptResponse, Error> {
+) -> Result<AcceptedUpload, Error> {
     put_blob(config, format!("{}/{}", repo, name), uuid, query)
 }
 
@@ -291,7 +291,7 @@ fn put_blob_qualified_3level(
     name: String,
     uuid: String,
     query: UploadQuery,
-) -> Result<UuidAcceptResponse, Error> {
+) -> Result<AcceptedUpload, Error> {
     put_blob(config, format!("{}/{}/{}", org, repo, name), uuid, query)
 }
 

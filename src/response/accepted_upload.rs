@@ -9,10 +9,12 @@ use response::errors;
 use types;
 use backend as be;
 
+//TODO: WTF?
 const BASE_URL: &str = "http://localhost:8000";
 
+//shouldn't be an enum
 #[derive(Debug, Serialize)]
-pub enum UuidAcceptResponse {
+pub enum AcceptedUpload {
     DigestMismatch,
     UuidAccept {
         uuid: String,
@@ -26,13 +28,13 @@ fn construct_digest_path(layer: &types::Layer) -> String {
     format!("data/layers/{}/{}", layer.repo_name, layer.digest)
 }
 
-impl UuidAcceptResponse {
+impl AcceptedUpload {
     pub fn handle(
         handler: State<be::BackendHandler>,
         repo_name: String,
         uuid: String,
         digest: String,
-    ) -> Result<UuidAcceptResponse, failure::Error> {
+    ) -> Result<AcceptedUpload, failure::Error> {
         use std::fs;
         use std::path;
         // 1. copy file to new location
@@ -61,7 +63,7 @@ impl UuidAcceptResponse {
         let resp = backend.delete_uuid(&layer)?;
         // 4. Construct response
         if resp.get_success() {
-            Ok(UuidAcceptResponse::UuidAccept {
+            Ok(AcceptedUpload::UuidAccept {
                 uuid,
                 digest,
                 repo_name,
@@ -75,7 +77,7 @@ impl UuidAcceptResponse {
     pub fn delete_upload(
         handler: State<be::BackendHandler>,
         layer: &types::Layer,
-    ) -> Result<UuidAcceptResponse, errors::Error> {
+    ) -> Result<AcceptedUpload, errors::Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
         req.set_repo_name(layer.repo_name.to_owned());
@@ -93,16 +95,16 @@ impl UuidAcceptResponse {
 
         debug!("Return: {:?}", response);
         if response.get_success() {
-            Ok(UuidAcceptResponse::UuidDelete)
+            Ok(AcceptedUpload::UuidDelete)
         } else {
             Err(errors::Error::BlobUploadUnknown)
         }
     }
 }
 
-impl<'r> Responder<'r> for UuidAcceptResponse {
+impl<'r> Responder<'r> for AcceptedUpload {
     fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
-        use self::UuidAcceptResponse::*;
+        use self::AcceptedUpload::{DigestMismatch, UuidAccept, UuidDelete};
 
         match self {
             UuidAccept {
@@ -118,7 +120,7 @@ impl<'r> Responder<'r> for UuidAcceptResponse {
                     .ok()
             }
             DigestMismatch => {
-                //Needs to be an error. Fix this FFS.
+                //TODO: Needs to be an error. Fix this FFS.
                 warn!("Digest mismatched");
                 Response::build().status(Status::NotFound).ok()
             }

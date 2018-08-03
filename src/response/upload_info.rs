@@ -30,7 +30,7 @@ pub fn create_upload_info(
 }
 
 impl UploadInfo {
-    //Move this
+    //TODO: Move this
     pub fn uuid_exists(handler: State<bh::BackendHandler>, layer: &Layer) -> Result<bool, Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
