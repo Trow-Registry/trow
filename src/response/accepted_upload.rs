@@ -3,13 +3,11 @@ use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 use rocket::State;
+use response::get_base_url;
 
 use backend as be;
 use grpc::backend;
 use types;
-
-//TODO: WTF?
-const BASE_URL: &str = "http://localhost:8000";
 
 #[derive(Debug, Serialize)]
 pub struct AcceptedUpload {
@@ -74,9 +72,9 @@ impl AcceptedUpload {
 }
 
 impl<'r> Responder<'r> for AcceptedUpload {
-    fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
+    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
 
-        let location = format!("{}/v2/{}/blobs/{}", BASE_URL, self.repo_name, self.digest);
+        let location = format!("{}/v2/{}/blobs/{}", get_base_url(req), self.repo_name, self.digest);
         let location_header = Header::new("Location", location);
         let digest_header = Header::new("Docker-Content-Digest", self.digest);
         Response::build()

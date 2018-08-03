@@ -1,6 +1,5 @@
 use failure::Error;
-use hostname;
-use response::errors;
+use response::{errors,get_base_url};
 use rocket::State;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
@@ -47,20 +46,6 @@ impl UploadInfo {
     }
 }
 
-/// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
-/// Falls back to hostname if it doesn't exist.
-///
-fn get_base_url(req: &Request) -> String {
-    let host = match req.headers().get("HOST").next() {
-        None => {
-            hostname::get_hostname().expect("Server has no name; cannot give clients my address")
-        }
-        Some(shost) => shost.to_string(),
-    };
-
-    //TODO: Dynamically figure out whether to use http or https
-    format!("https://{}", host)
-}
 
 impl<'r> Responder<'r> for UploadInfo {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
