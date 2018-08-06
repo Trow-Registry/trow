@@ -91,6 +91,7 @@ spec:
       containers:
       - name: trow-pod
         image: containersol/trow:default
+        imagePullPolicy: Always
         ports:
         - containerPort: 8443
         volumeMounts:
@@ -99,6 +100,7 @@ spec:
       initContainers:
       - name: trow-init
         image: containersol/trow:init
+        imagePullPolicy: Always
         env:
           - name: POD_NAME
             valueFrom:
