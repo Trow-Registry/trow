@@ -174,7 +174,7 @@ impl TrowBuilder {
 
         //TODO: shouldn't need to clone rocket config
         let rocket_config = &self.build_rocket_config()?;
-        rocket::custom(rocket_config.clone(), true)
+        rocket::custom(rocket_config.clone())
             .manage(backend::build_handlers(
                 &self.grpc.listen.host,
                 self.grpc.listen.port,

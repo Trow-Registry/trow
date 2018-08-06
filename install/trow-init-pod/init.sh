@@ -12,6 +12,11 @@ do
   SERVICE_IP=$(dig +short trow.$POD_NAMESPACE.svc.cluster.local)
 done
 
+echo "POD NAMESPACE: $POD_NAMESPACE"
+echo "POD NAME: $POD_NAME"
+echo "POD IP: $POD_IP"
+echo "SERVICE IP: $SERVICE_IP"
+
 cat << EOF | cfssl genkey - | cfssljson -bare trow
 {
   "hosts": [
