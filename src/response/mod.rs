@@ -23,6 +23,7 @@ pub fn json_response<T: serde::Serialize>(
 /// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
 /// Falls back to hostname if it doesn't exist.
 ///
+/// Move this.
 fn get_base_url(req: &Request) -> String {
     let host = match req.headers().get("HOST").next() {
         None => {

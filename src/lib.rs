@@ -18,8 +18,11 @@ extern crate serde;
 extern crate serde_json;
 extern crate uuid;
 
+//TODO: Remove these short names
 extern crate trow_backend as backend;
 extern crate trow_protobuf as grpc;
+
+use grpc::backend_grpc::BackendClient;
 
 extern crate env_logger;
 
@@ -44,10 +47,12 @@ use rocket::fairing;
 
 pub mod manifest;
 pub mod response;
+mod client_interface;
 mod routes;
 mod state;
 mod types;
 
+use client_interface::ClientInterface;
 
 static SCRATCH_DIR: &'static str = "scratch";
 static LAYERS_DIR: &'static str = "layers";
@@ -175,7 +180,7 @@ impl TrowBuilder {
         //TODO: shouldn't need to clone rocket config
         let rocket_config = &self.build_rocket_config()?;
         rocket::custom(rocket_config.clone())
-            .manage(backend::build_handlers(
+            .manage(build_handlers(
                 &self.grpc.listen.host,
                 self.grpc.listen.port,
             ))
@@ -202,3 +207,14 @@ fn attach_sigterm() -> Result<(), Error> {
     }).map_err(|e| e.into())
 }
 
+
+pub fn build_handlers(listen_host: &str, listen_port: u16) -> ClientInterface {
+    use grpcio::{ChannelBuilder, EnvBuilder};
+    use std::sync::Arc;
+
+    debug!("Connecting to backend: {}:{}", listen_host, listen_port);
+    let env = Arc::new(EnvBuilder::new().build());
+    let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", listen_host, listen_port));
+    let client = BackendClient::new(ch);
+    ClientInterface::new(client)
+}

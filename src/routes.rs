@@ -3,28 +3,29 @@ use std::io::Write;
 use std::path::Path;
 use std::str;
 
+use failure;
+use types::create_upload_info;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
+use grpc;
 use manifest::{self, FromJson, Manifest};
+use response::accepted_upload::AcceptedUpload;
 use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
 use response::manifest_upload::ManifestUpload;
-use response::upload_info::{self, UploadInfo};
-use response::accepted_upload::AcceptedUpload;
+use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::NamedFile;
 use rocket::{self, Outcome};
 use serde_json;
 use state;
 use types::Layer;
-use backend;
-use grpc;
+use client_interface::ClientInterface;
 
 static DATA_DIR: &'static str = "data";
 static MANIFESTS_DIR: &'static str = "manifests";
 static LAYERS_DIR: &'static str = "layers";
-
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -123,8 +124,8 @@ fn get_manifest(onename: String, reference: String) -> Option<Manifest> {
     if path.exists() {
         return match fs::File::open(path) {
             Ok(f) => serde_json::from_reader(f).ok(),
-            Err(_) => None
-        }
+            Err(_) => None,
+        };
     }
 
     None
@@ -132,7 +133,10 @@ fn get_manifest(onename: String, reference: String) -> Option<Manifest> {
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_2level(user: String, repo: String, reference: String) -> Option<Manifest> {
-    let path = format!("{}/{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, user, repo, reference);
+    let path = format!(
+        "{}/{}/{}/{}/{}",
+        DATA_DIR, MANIFESTS_DIR, user, repo, reference
+    );
     info!("Path: {}", path);
     let path = Path::new(&path);
 
@@ -142,8 +146,8 @@ fn get_manifest_2level(user: String, repo: String, reference: String) -> Option<
     if path.exists() {
         return match fs::File::open(path) {
             Ok(f) => serde_json::from_reader(f).ok(),
-            Err(_) => None
-        }
+            Err(_) => None,
+        };
     }
 
     None
@@ -153,8 +157,16 @@ fn get_manifest_2level(user: String, repo: String, reference: String) -> Option<
  * Process 3 level manifest path - not sure this one is needed
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
-fn get_manifest_3level(org: String, user: String, repo: String, reference: String) -> Option<Manifest> {
-    let path = format!("{}/{}/{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, org, user, repo, reference);
+fn get_manifest_3level(
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+) -> Option<Manifest> {
+    let path = format!(
+        "{}/{}/{}/{}/{}/{}",
+        DATA_DIR, MANIFESTS_DIR, org, user, repo, reference
+    );
     info!("Path: {}", path);
     let path = Path::new(&path);
 
@@ -164,8 +176,8 @@ fn get_manifest_3level(org: String, user: String, repo: String, reference: Strin
     if path.exists() {
         return match fs::File::open(path) {
             Ok(f) => serde_json::from_reader(f).ok(),
-            Err(_) => None
-        }
+            Err(_) => None,
+        };
     }
 
     None
@@ -184,12 +196,7 @@ digest - unique identifier for the blob to be downoaded
  */
 
 #[get("/v2/<name_repo>/blobs/<digest>")]
-fn get_blob(
-    name_repo: String,
-    digest: String,
-    _auth_user: AuthorisedUser,
-) -> Option<NamedFile> {
-
+fn get_blob(name_repo: String, digest: String, _auth_user: AuthorisedUser) -> Option<NamedFile> {
     let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, name_repo, digest);
     info!("Path: {}", path);
     let path = Path::new(&path);
@@ -254,7 +261,7 @@ struct UploadQuery {
 
 #[put("/v2/<repo_name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob(
-    config: rocket::State<backend::ClientInterface>,
+    config: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
     query: UploadQuery,
@@ -270,7 +277,7 @@ fn put_blob(
  */
 #[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob_qualified(
-    config: rocket::State<backend::ClientInterface>,
+    config: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
@@ -279,13 +286,12 @@ fn put_blob_qualified(
     put_blob(config, format!("{}/{}", repo, name), uuid, query)
 }
 
-
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
  */
 #[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob_qualified_3level(
-    config: rocket::State<backend::ClientInterface>,
+    config: rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
@@ -293,6 +299,22 @@ fn put_blob_qualified_3level(
     query: UploadQuery,
 ) -> Result<AcceptedUpload, Error> {
     put_blob(config, format!("{}/{}/{}", org, repo, name), uuid, query)
+}
+
+//TODO: Move this shite.
+fn uuid_exists(handler: rocket::State<ClientInterface>, layer: &Layer) -> Result<bool, failure::Error> {
+    let backend = handler.backend();
+    let mut req = grpc::backend::Layer::new();
+    req.set_repo_name(layer.repo_name.to_owned());
+    req.set_digest(layer.digest.to_owned());
+
+    let response = backend.uuid_exists(&req)?;
+    debug!("UuidExists: {:?}", response.get_success());
+    if response.get_success() {
+        Ok(true)
+    } else {
+        Err(Error::DigestInvalid.into())
+    }
 }
 
 /*
@@ -304,12 +326,11 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 */
 #[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
-    handler: rocket::State<backend::ClientInterface>,
+    handler: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-
     //This needs to change to be a blob, no digest, or just go away
     //There is no digest at the minute; that comes at put stage
     let layer = Layer {
@@ -319,13 +340,13 @@ fn patch_blob(
     //TODO change to is_valid_uuid()
     //Should return path to write to or URL, client should *not*
     //be in charge of this
-    if UploadInfo::uuid_exists(handler, &layer).is_ok() {
+    if uuid_exists(handler, &layer).is_ok() {
         let absolute_file = state::uuid::scratch_path(&uuid);
         debug!("Streaming out to {}", absolute_file);
         let len = chunk.stream_to_file(absolute_file);
 
         match len {
-            Ok(len) => Ok(upload_info::create_upload_info(
+            Ok(len) => Ok(create_upload_info(
                 uuid,
                 repo_name,
                 (0, len as u32),
@@ -346,7 +367,7 @@ fn patch_blob(
  */
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_qualified(
-    handler: rocket::State<backend::ClientInterface>,
+    handler: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
@@ -358,10 +379,13 @@ fn patch_blob_qualified(
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to patch_blob
  */
-#[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
+#[patch(
+    "/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>",
+    data = "<chunk>"
+)]
 fn patch_blob_qualified_3level(
-    handler: rocket::State<backend::ClientInterface>,
-    org:  String,
+    handler: rocket::State<ClientInterface>,
+    org: String,
     repo: String,
     name: String,
     uuid: String,
@@ -378,10 +402,9 @@ fn patch_blob_qualified_3level(
  */
 #[post("/v2/<repo_name>/blobs/uploads")]
 fn post_blob_upload_onename(
-    handler: rocket::State<backend::ClientInterface>,
+    handler: rocket::State<ClientInterface>,
     repo_name: String,
 ) -> Result<UploadInfo, Error> {
-
     /*
     Ask the backend for a UUID.
 
@@ -396,15 +419,14 @@ fn post_blob_upload_onename(
     let mut req = grpc::backend::CreateUuidRequest::new();
     req.set_repo_name(repo_name.clone());
 
-    let response = backend
-        .create_uuid(&req)
-        .map_err(|e| {
-            //TODO should be stronger than a warn
-            warn!("Error getting ref from backend: {}", e);
-            Error::InternalError})?;
+    let response = backend.create_uuid(&req).map_err(|e| {
+        //TODO should be stronger than a warn
+        warn!("Error getting ref from backend: {}", e);
+        Error::InternalError
+    })?;
     debug!("Client received: {:?}", response);
 
-    Ok(upload_info::create_upload_info(
+    Ok(create_upload_info(
         response.get_uuid().to_owned(),
         repo_name,
         (0, 0),
@@ -416,9 +438,9 @@ fn post_blob_upload_onename(
  */
 #[post("/v2/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload(
-    handler: rocket::State<backend::ClientInterface>,
+    handler: rocket::State<ClientInterface>,
     repo: String,
-    name: String
+    name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload {}/{}", repo, name);
     post_blob_upload_onename(handler, format!("{}/{}", repo, name))
@@ -428,16 +450,14 @@ fn post_blob_upload(
  */
 #[post("/v2/<org>/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload_3level(
-    handler: rocket::State<backend::ClientInterface>,
+    handler: rocket::State<ClientInterface>,
     org: String,
     repo: String,
-    name: String
+    name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload 3 way {}/{}/{}", org, repo, name);
     post_blob_upload_onename(handler, format!("{}/{}/{}", org, repo, name))
 }
-
-
 
 /*
 
@@ -514,7 +534,10 @@ fn put_image_manifest_qualified(
 /*
  * Parse 3 level <org>/<user>/<repo> style path and pass it to put_image_manifest
  */
-#[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
+#[put(
+    "/v2/<org>/<user>/<repo>/manifests/<reference>",
+    data = "<chunk>"
+)]
 fn put_image_manifest_qualified_3level(
     org: String,
     user: String,

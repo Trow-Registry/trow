@@ -4,8 +4,8 @@ use rocket::request::Request;
 use rocket::response::{Responder, Response};
 use rocket::State;
 use response::get_base_url;
+use client_interface::ClientInterface;
 
-use backend as be;
 use grpc::backend;
 use types;
 
@@ -30,7 +30,7 @@ fn construct_digest_path(layer: &types::Layer) -> String {
 
 impl AcceptedUpload {
     pub fn handle(
-        handler: State<be::ClientInterface>,
+        handler: State<ClientInterface>,
         repo_name: String,
         uuid: String,
         digest: String,
