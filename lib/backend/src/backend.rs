@@ -2,7 +2,7 @@ use std;
 use std::sync::{Arc, Mutex};
 
 use grpcio;
-use grpc;
+use trow_protobuf;
 
 use futures::Future;
 use uuid::Uuid;
@@ -40,15 +40,15 @@ fn delete_blob_by_uuid(uuid: &str) -> bool {
     fs::remove_file(path).map(|_| true).unwrap_or(false)
 }
 
-impl grpc::backend_grpc::Backend for BackendService {
+impl trow_protobuf::backend_grpc::Backend for BackendService {
   
     fn create_uuid(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::CreateUuidRequest,
-        sink: grpcio::UnarySink<grpc::backend::CreateUuidResult>,
+        req: trow_protobuf::backend::CreateUuidRequest,
+        sink: grpcio::UnarySink<trow_protobuf::backend::CreateUuidResult>,
     ) {
-        let mut resp = grpc::backend::CreateUuidResult::new();
+        let mut resp = trow_protobuf::backend::CreateUuidResult::new();
         let layer = Layer {
             repo_name: req.get_repo_name().to_owned(),
             //WTF?!
@@ -69,10 +69,10 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn gen_uuid(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::Layer,
-        sink: grpcio::UnarySink<grpc::backend::GenUuidResult>,
+        req: trow_protobuf::backend::Layer,
+        sink: grpcio::UnarySink<trow_protobuf::backend::GenUuidResult>,
     ) {
-        let mut resp = grpc::backend::GenUuidResult::new();
+        let mut resp = trow_protobuf::backend::GenUuidResult::new();
         let layer = Layer {
             repo_name: req.get_repo_name().to_owned(),
             //WTF?!
@@ -92,10 +92,10 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn uuid_exists(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::Layer,
-        sink: grpcio::UnarySink<grpc::backend::Result>,
+        req: trow_protobuf::backend::Layer,
+        sink: grpcio::UnarySink<trow_protobuf::backend::Result>,
     ) {
-        let mut resp = grpc::backend::Result::new();
+        let mut resp = trow_protobuf::backend::Result::new();
         let set = self.uploads.lock().unwrap();
         //LAYER MUST DIE!
         let layer = Layer {
@@ -113,10 +113,10 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn cancel_upload(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::Layer,
-        sink: grpcio::UnarySink<grpc::backend::Result>,
+        req: trow_protobuf::backend::Layer,
+        sink: grpcio::UnarySink<trow_protobuf::backend::Result>,
     ) {
-        let mut resp = grpc::backend::Result::new();
+        let mut resp = trow_protobuf::backend::Result::new();
         let mut set = self.uploads.lock().unwrap();
         let layer = Layer {
             repo_name: req.get_repo_name().to_owned(),
@@ -134,8 +134,8 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn delete_uuid(
         &self,
         ctx: grpcio::RpcContext,
-        req: grpc::backend::Layer,
-        sink: grpcio::UnarySink<grpc::backend::Result>,
+        req: trow_protobuf::backend::Layer,
+        sink: grpcio::UnarySink<trow_protobuf::backend::Result>,
     ) {
 
         let layer = Layer {
@@ -144,7 +144,7 @@ impl grpc::backend_grpc::Backend for BackendService {
         };
         let mut set = self.uploads.lock().unwrap();
 
-        let mut resp = grpc::backend::Result::new();
+        let mut resp = trow_protobuf::backend::Result::new();
         debug!("Before Delete: {:?}", self.uploads);
         resp.set_success(set.remove(&layer));
         debug!("After Delete: {:?}", self.uploads);
@@ -158,11 +158,11 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn upload_manifest(
         &self,
         ctx: grpcio::RpcContext,
-        _req: grpc::backend::Manifest,
-        sink: grpcio::UnarySink<grpc::backend::Result>,
+        _req: trow_protobuf::backend::Manifest,
+        sink: grpcio::UnarySink<trow_protobuf::backend::Result>,
     ) {
         warn!("upload manifest not implemented");
-        let mut resp = grpc::backend::Result::new();
+        let mut resp = trow_protobuf::backend::Result::new();
         resp.set_success(false);
 
         let f = sink.success(resp).map_err(
@@ -176,16 +176,16 @@ impl grpc::backend_grpc::Backend for BackendService {
     fn get_uuids(
         &self,
         ctx: grpcio::RpcContext,
-        _req: grpc::backend::Empty,
-        sink: grpcio::UnarySink<grpc::backend::UuidList>,
+        _req: trow_protobuf::backend::Empty,
+        sink: grpcio::UnarySink<trow_protobuf::backend::UuidList>,
     ) {
-        let mut resp = grpc::backend::UuidList::new();
+        let mut resp = trow_protobuf::backend::UuidList::new();
         {
             use protobuf;
             use std::iter::FromIterator;
             let set = self.uploads.lock().unwrap();
             let set = set.clone().into_iter().map(|x| {
-                let mut val = grpc::backend::GenUuidResult::new();
+                let mut val = trow_protobuf::backend::GenUuidResult::new();
                 val.set_uuid(x.digest);
                 val
             });
@@ -206,8 +206,8 @@ mod test {
     use super::*;
     use server_async;
     use config::{TrowBackendConfig, Service};
-    use grpc::backend_grpc::BackendClient;
-    use grpc::backend;
+    use trow_protobuf::backend_grpc::BackendClient;
+    use trow_protobuf::backend;
     use std::sync::Arc;
     use grpcio::{ChannelBuilder, EnvBuilder};
 

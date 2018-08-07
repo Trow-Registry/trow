@@ -8,7 +8,7 @@ extern crate uuid;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-extern crate trow_protobuf as grpc;
+extern crate trow_protobuf;
 
 pub mod config;
 mod peer;
@@ -18,7 +18,7 @@ use peer::PeerService;
 use backend::BackendService;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
-use grpc::backend_grpc::BackendClient;
+use trow_protobuf::backend_grpc::BackendClient;
 
 pub fn server(listen_addr: &str, listen_port: u16, bootstrap_addr: &str, bootstrap_port: u16) {
     let mut server = server_async(listen_addr, listen_port, bootstrap_addr, bootstrap_port);
@@ -37,9 +37,9 @@ pub fn server_async(
 
     debug!("Setting up backend server");
     let env = Arc::new(Environment::new(1));
-    let backend_service = grpc::backend_grpc::create_backend(BackendService::new());
+    let backend_service = trow_protobuf::backend_grpc::create_backend(BackendService::new());
     let peer_service =
-        grpc::peer_grpc::create_peer(PeerService::new(bootstrap_addr, bootstrap_port));
+        trow_protobuf::peer_grpc::create_peer(PeerService::new(bootstrap_addr, bootstrap_port));
     let mut server = ServerBuilder::new(env)
         .register_service(peer_service)
         .register_service(backend_service)

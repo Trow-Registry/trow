@@ -2,8 +2,8 @@ use std::cell::Cell;
 
 use futures::Future;
 use grpcio;
-use grpc::peer;
-use grpc::peer_grpc::{Peer, PeerClient};
+use trow_protobuf::peer;
+use trow_protobuf::peer_grpc::{Peer, PeerClient};
 use grpcio::{ChannelBuilder, EnvBuilder};
 
 use std::sync::Arc;
