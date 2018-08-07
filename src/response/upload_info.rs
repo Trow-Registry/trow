@@ -30,7 +30,7 @@ pub fn create_upload_info(
 
 impl UploadInfo {
     //TODO: Move this
-    pub fn uuid_exists(handler: State<bh::BackendHandler>, layer: &Layer) -> Result<bool, Error> {
+    pub fn uuid_exists(handler: State<bh::ClientInterface>, layer: &Layer) -> Result<bool, Error> {
         let backend = handler.backend();
         let mut req = backend::Layer::new();
         req.set_repo_name(layer.repo_name.to_owned());
@@ -90,7 +90,6 @@ mod test {
     use response::test_helper::test_route;
     fn build_response() -> UploadInfo {
         UploadInfo {
-            // TODO: keep this as a real Uuid!
             uuid: String::from("whatever"),
             repo_name: String::from("moredhel/test"),
             range: (0, 0),

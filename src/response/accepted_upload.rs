@@ -30,7 +30,7 @@ fn construct_digest_path(layer: &types::Layer) -> String {
 
 impl AcceptedUpload {
     pub fn handle(
-        handler: State<be::BackendHandler>,
+        handler: State<be::ClientInterface>,
         repo_name: String,
         uuid: String,
         digest: String,

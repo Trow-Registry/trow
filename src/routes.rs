@@ -254,7 +254,7 @@ struct UploadQuery {
 
 #[put("/v2/<repo_name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob(
-    config: rocket::State<backend::BackendHandler>,
+    config: rocket::State<backend::ClientInterface>,
     repo_name: String,
     uuid: String,
     query: UploadQuery,
@@ -270,7 +270,7 @@ fn put_blob(
  */
 #[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob_qualified(
-    config: rocket::State<backend::BackendHandler>,
+    config: rocket::State<backend::ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
@@ -285,7 +285,7 @@ fn put_blob_qualified(
  */
 #[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob_qualified_3level(
-    config: rocket::State<backend::BackendHandler>,
+    config: rocket::State<backend::ClientInterface>,
     org: String,
     repo: String,
     name: String,
@@ -304,7 +304,7 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 */
 #[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
-    handler: rocket::State<backend::BackendHandler>,
+    handler: rocket::State<backend::ClientInterface>,
     repo_name: String,
     uuid: String,
     chunk: rocket::data::Data,
@@ -346,7 +346,7 @@ fn patch_blob(
  */
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_qualified(
-    handler: rocket::State<backend::BackendHandler>,
+    handler: rocket::State<backend::ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
@@ -360,7 +360,7 @@ fn patch_blob_qualified(
  */
 #[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_qualified_3level(
-    handler: rocket::State<backend::BackendHandler>,
+    handler: rocket::State<backend::ClientInterface>,
     org:  String,
     repo: String,
     name: String,
@@ -378,11 +378,20 @@ fn patch_blob_qualified_3level(
  */
 #[post("/v2/<repo_name>/blobs/uploads")]
 fn post_blob_upload_onename(
-    handler: rocket::State<backend::BackendHandler>,
+    handler: rocket::State<backend::ClientInterface>,
     repo_name: String,
 ) -> Result<UploadInfo, Error> {
 
-    //Ask the backend for a UUID
+    /*
+    Ask the backend for a UUID.
+
+    We should also need to do some checking that the user is allowed
+    to upload first.
+
+    If using a true UUID it is possible for the frontend to generate
+    and tell the backend what the UUID is. This is a potential
+    optimisation, but is arguably less flexible.
+    */
     let backend = handler.backend();
     let mut req = grpc::backend::CreateUuidRequest::new();
     req.set_repo_name(repo_name.clone());
@@ -407,7 +416,7 @@ fn post_blob_upload_onename(
  */
 #[post("/v2/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload(
-    handler: rocket::State<backend::BackendHandler>,
+    handler: rocket::State<backend::ClientInterface>,
     repo: String,
     name: String
 ) -> Result<UploadInfo, Error> {
@@ -419,7 +428,7 @@ fn post_blob_upload(
  */
 #[post("/v2/<org>/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload_3level(
-    handler: rocket::State<backend::BackendHandler>,
+    handler: rocket::State<backend::ClientInterface>,
     org: String,
     repo: String,
     name: String
