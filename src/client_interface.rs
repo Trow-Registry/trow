@@ -1,7 +1,10 @@
-use failure::Error;
+use failure::{self, Error};
+use std::fs::OpenOptions;
 use trow_protobuf::backend::{CreateUuidRequest, Layer};
 use trow_protobuf::backend_grpc::BackendClient;
-use types::{self, create_upload_info, UploadInfo};
+use types::{create_upload_info, UploadInfo};
+use state;
+use std::io::prelude::*;
 
 pub struct ClientInterface {
     backend: BackendClient,
@@ -43,18 +46,27 @@ impl ClientInterface {
         ))
     }
 
-    //TODO: Change to get path for uuid
-    //TODO: layer type change is shite
-    pub fn uuid_exists(&self, layer: &types::Layer) -> Result<bool, Error> {
+    pub fn get_write_sink_for_upload (
+        &self,
+        repo_name: &str,
+        uuid: &str,
+    ) -> Result<impl Write, Error> {
+
+        //TODO move path gen to backend and rearchitect.
         let mut req = Layer::new();
-        req.set_repo_name(layer.repo_name.to_owned());
-        req.set_digest(layer.digest.to_owned());
+        req.set_repo_name(repo_name.to_owned());
+        req.set_digest(uuid.to_owned());
 
         let response = self.backend.uuid_exists(&req)?;
-        //TODO: get_success is probably a really bad overloading
-        //would be better to use an option or result somehow
-        //Returning Ok(false) seems pure shite
-        debug!("UuidExists: {:?}", response.get_success());
-        Ok(response.get_success())
+
+        match response.get_success() {
+            true => {
+                let path = state::uuid::scratch_path(&uuid);
+                let file = OpenOptions::new().create(true).append(true).open(path)?;
+                Ok(file)
+            }
+            //TODO: return proper error
+            false => Err(failure::err_msg("UUID unknown"))
+        }
     }
 }
