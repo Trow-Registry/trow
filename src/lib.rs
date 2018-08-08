@@ -18,11 +18,10 @@ extern crate serde;
 extern crate serde_json;
 extern crate uuid;
 
-//TODO: Remove these short names
-extern crate trow_backend as backend;
-extern crate trow_protobuf as grpc;
+extern crate trow_backend;
+extern crate trow_protobuf;
 
-use grpc::backend_grpc::BackendClient;
+use trow_protobuf::backend_grpc::BackendClient;
 
 extern crate env_logger;
 
@@ -95,7 +94,7 @@ fn init_grpc(
     debug!("Setting up RPC Server");
 
     Ok(thread::spawn(move || {
-        backend::server(&listen_host, listen_port, &bootstrap_host, bootstrap_port);
+        trow_backend::server(&listen_host, listen_port, &bootstrap_host, bootstrap_port);
     }))
 }
 

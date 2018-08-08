@@ -6,7 +6,7 @@ use rocket::State;
 use response::get_base_url;
 use client_interface::ClientInterface;
 
-use grpc::backend;
+use trow_protobuf::backend;
 use types;
 
 #[derive(Debug, Serialize)]
