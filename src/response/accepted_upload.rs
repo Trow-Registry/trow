@@ -6,7 +6,7 @@ use rocket::State;
 use response::get_base_url;
 use client_interface::ClientInterface;
 
-use trow_protobuf::backend;
+use trow_protobuf::server;
 use types;
 
 #[derive(Debug, Serialize)]
@@ -57,7 +57,7 @@ impl AcceptedUpload {
         fs::remove_file(scratch_path)?;
         // 3. delete uuid from the backend
         // TODO is this process right? Should the backend be doing this?!
-        let mut layer = backend::Layer::new();
+        let mut layer = server::Layer::new();
         layer.set_repo_name(repo_name.clone());
         layer.set_digest(uuid.clone());
         let resp = backend.delete_uuid(&layer)?;

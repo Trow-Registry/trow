@@ -18,10 +18,10 @@ extern crate serde;
 extern crate serde_json;
 extern crate uuid;
 
-extern crate trow_backend;
+extern crate trow_server;
 extern crate trow_protobuf;
 
-use trow_protobuf::backend_grpc::BackendClient;
+use trow_protobuf::server_grpc::BackendClient;
 
 extern crate env_logger;
 
@@ -93,7 +93,7 @@ fn init_grpc(
     debug!("Setting up RPC Server");
 
     Ok(thread::spawn(move || {
-        trow_backend::server(&listen_host, listen_port, &bootstrap_host, bootstrap_port);
+        trow_server::server(&listen_host, listen_port, &bootstrap_host, bootstrap_port);
     }))
 }
 

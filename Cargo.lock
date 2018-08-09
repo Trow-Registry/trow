@@ -1589,13 +1589,23 @@ dependencies = [
  "serde 1.0.71 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.71 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "trow-backend 0.1.0",
  "trow-protobuf 0.1.0",
+ "trow-server 0.1.0",
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
-name = "trow-backend"
+name = "trow-protobuf"
+version = "0.1.0"
+dependencies = [
+ "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf 1.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protoc-grpcio 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "trow-server"
 version = "0.1.0"
 dependencies = [
  "failure 0.0.1 (git+https://github.com/withoutboats/failure?rev=ae276f58615174e5b2dbba8dd7c6e47a033c7e2c)",
@@ -1608,16 +1618,6 @@ dependencies = [
  "serde_json 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "trow-protobuf 0.1.0",
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "trow-protobuf"
-version = "0.1.0"
-dependencies = [
- "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf 1.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "protoc-grpcio 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

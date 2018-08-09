@@ -1,7 +1,7 @@
 use failure::Error;
 use std::fs::OpenOptions;
-use trow_protobuf::backend::{CreateUuidRequest, BlobRef};
-use trow_protobuf::backend_grpc::BackendClient;
+use trow_protobuf::server::{CreateUuidRequest, BlobRef};
+use trow_protobuf::server_grpc::BackendClient;
 use types::{create_upload_info, UploadInfo};
 use std::io::prelude::*;
 

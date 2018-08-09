@@ -1,5 +1,5 @@
 [package]
-name = "trow-backend"
+name = "trow-server"
 version = "0.1.0"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
 

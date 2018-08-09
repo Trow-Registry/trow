@@ -32,7 +32,7 @@ failure = "^0.1"
 failure_derive = "^0.1"
 
 trow-protobuf = { path = "./lib/protobuf" }
-trow-backend = { path = "./lib/backend" }
+trow-server = { path = "./lib/server" }
 
 #This is a rocket dependency, but we need a newer version with the p>q bugfix
 ring ="^0.13"

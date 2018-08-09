@@ -9,10 +9,10 @@ extern crate log;
 extern crate trow_protobuf;
 
 mod peer;
-mod backend;
+mod server;
 use std::thread;
 use peer::PeerService;
-use backend::BackendService;
+use server::BackendService;
 use futures::Future;
 use grpcio::{Environment, ServerBuilder};
 
@@ -33,7 +33,7 @@ pub fn server_async(
 
     debug!("Setting up backend server");
     let env = Arc::new(Environment::new(1));
-    let backend_service = trow_protobuf::backend_grpc::create_backend(BackendService::new());
+    let backend_service = trow_protobuf::server_grpc::create_backend(BackendService::new());
     let peer_service =
         trow_protobuf::peer_grpc::create_peer(PeerService::new(bootstrap_addr, bootstrap_port));
     let mut server = ServerBuilder::new(env)
