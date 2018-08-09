@@ -14,11 +14,6 @@ impl ClientInterface {
         ClientInterface { backend }
     }
 
-    //TODO: delete
-    pub fn backend(&self) -> &BackendClient {
-        &self.backend
-    }
-
     /**
      * Ok so these functions are largely boilerplate to call the GRPC backend.
      * But doing it here lets us change things behind the scenes much cleaner.

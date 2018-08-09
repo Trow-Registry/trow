@@ -49,5 +49,4 @@ mod test {
         assert!(headers.contains("Location"));
         assert!(headers.contains("Range"));
     }
-
 }

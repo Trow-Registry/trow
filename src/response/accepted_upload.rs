@@ -38,7 +38,7 @@ impl AcceptedUpload {
         use std::fs;
         use std::path;
         // 1. copy file to new location
-        let backend = handler.backend();
+        //let backend = handler.backend();
         let layer = types::Layer {
             repo_name: repo_name.clone(),
             digest: digest.clone(),
@@ -55,8 +55,10 @@ impl AcceptedUpload {
         // 2. delete uploaded temporary file
         debug!("Deleting file: {}", uuid);
         fs::remove_file(scratch_path)?;
+        Ok(create_accepted_upload(uuid, digest, repo_name))
         // 3. delete uuid from the backend
         // TODO is this process right? Should the backend be doing this?!
+        /*
         let mut layer = server::Layer::new();
         layer.set_repo_name(repo_name.clone());
         layer.set_digest(uuid.clone());
@@ -68,6 +70,7 @@ impl AcceptedUpload {
             warn!("Failed to remove UUID");
             Err(failure::err_msg("Not implemented"))
         }
+        */
     }
 }
 
