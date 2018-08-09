@@ -39,6 +39,13 @@ const METHOD_BACKEND_UUID_EXISTS: ::grpcio::Method<super::backend::Layer, super:
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
+const METHOD_BACKEND_GET_WRITE_LOCATION_FOR_BLOB: ::grpcio::Method<super::backend::BlobRef, super::backend::WriteLocation> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::Unary,
+    name: "/lycaon.Backend/GetWriteLocationForBlob",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
 const METHOD_BACKEND_CANCEL_UPLOAD: ::grpcio::Method<super::backend::Layer, super::backend::Result> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/lycaon.Backend/cancelUpload",
@@ -126,6 +133,22 @@ impl BackendClient {
         self.uuid_exists_async_opt(req, ::grpcio::CallOption::default())
     }
 
+    pub fn get_write_location_for_blob_opt(&self, req: &super::backend::BlobRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::WriteLocation> {
+        self.client.unary_call(&METHOD_BACKEND_GET_WRITE_LOCATION_FOR_BLOB, req, opt)
+    }
+
+    pub fn get_write_location_for_blob(&self, req: &super::backend::BlobRef) -> ::grpcio::Result<super::backend::WriteLocation> {
+        self.get_write_location_for_blob_opt(req, ::grpcio::CallOption::default())
+    }
+
+    pub fn get_write_location_for_blob_async_opt(&self, req: &super::backend::BlobRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::WriteLocation>> {
+        self.client.unary_call_async(&METHOD_BACKEND_GET_WRITE_LOCATION_FOR_BLOB, req, opt)
+    }
+
+    pub fn get_write_location_for_blob_async(&self, req: &super::backend::BlobRef) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::backend::WriteLocation>> {
+        self.get_write_location_for_blob_async_opt(req, ::grpcio::CallOption::default())
+    }
+
     pub fn cancel_upload_opt(&self, req: &super::backend::Layer, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::backend::Result> {
         self.client.unary_call(&METHOD_BACKEND_CANCEL_UPLOAD, req, opt)
     }
@@ -198,6 +221,7 @@ pub trait Backend {
     fn create_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::CreateUuidRequest, sink: ::grpcio::UnarySink<super::backend::CreateUuidResult>);
     fn gen_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::GenUuidResult>);
     fn uuid_exists(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
+    fn get_write_location_for_blob(&self, ctx: ::grpcio::RpcContext, req: super::backend::BlobRef, sink: ::grpcio::UnarySink<super::backend::WriteLocation>);
     fn cancel_upload(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
     fn delete_uuid(&self, ctx: ::grpcio::RpcContext, req: super::backend::Layer, sink: ::grpcio::UnarySink<super::backend::Result>);
     fn upload_manifest(&self, ctx: ::grpcio::RpcContext, req: super::backend::Manifest, sink: ::grpcio::UnarySink<super::backend::Result>);
@@ -217,6 +241,10 @@ pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Se
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_BACKEND_UUID_EXISTS, move |ctx, req, resp| {
         instance.uuid_exists(ctx, req, resp)
+    });
+    let instance = s.clone();
+    builder = builder.add_unary_handler(&METHOD_BACKEND_GET_WRITE_LOCATION_FOR_BLOB, move |ctx, req, resp| {
+        instance.get_write_location_for_blob(ctx, req, resp)
     });
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_BACKEND_CANCEL_UPLOAD, move |ctx, req, resp| {

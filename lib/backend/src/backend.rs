@@ -1,10 +1,10 @@
 use std;
 use std::sync::{Arc, Mutex};
 
-use grpcio;
-use trow_protobuf;
-
 use futures::Future;
+use grpcio::{self, RpcStatus, RpcStatusCode};
+use trow_protobuf;
+use trow_protobuf::backend::WriteLocation;
 use uuid::Uuid;
 
 /// Struct implementing callbacks for the Frontend
@@ -17,7 +17,9 @@ pub struct BackendService {
 
 impl BackendService {
     pub fn new() -> Self {
-        BackendService { uploads: Arc::new(Mutex::new(std::collections::HashSet::new())) }
+        BackendService {
+            uploads: Arc::new(Mutex::new(std::collections::HashSet::new())),
+        }
     }
 }
 
@@ -29,7 +31,7 @@ struct Layer {
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 struct CreateUuidRequest {
-    repo_name: String
+    repo_name: String,
 }
 
 /// Delete a file by uuid.
@@ -40,8 +42,40 @@ fn delete_blob_by_uuid(uuid: &str) -> bool {
     fs::remove_file(path).map(|_| true).unwrap_or(false)
 }
 
+fn get_path_for_uuid(uuid: &str) -> String {
+    format!("data/scratch/{}", uuid)
+}
+
 impl trow_protobuf::backend_grpc::Backend for BackendService {
-  
+    fn get_write_location_for_blob(
+        &self,
+        ctx: grpcio::RpcContext,
+        blob_ref: trow_protobuf::backend::BlobRef,
+        resp: grpcio::UnarySink<WriteLocation>,
+    ) {
+        let set = self.uploads.lock().unwrap();
+        //LAYER MUST DIE!
+        let layer = Layer {
+            repo_name: blob_ref.get_repo_name().to_owned(),
+            digest: blob_ref.get_uuid().to_owned(),
+        };
+
+        if set.contains(&layer) {
+            let path = get_path_for_uuid(blob_ref.get_uuid());
+            let mut w = WriteLocation::new();
+            w.set_path(path);
+            let f = resp
+                .success(w)
+                .map_err(move |e| warn!("Failed sending to client {:?}", e));
+            ctx.spawn(f);
+        } else {
+            let f = resp
+                .fail(RpcStatus::new(RpcStatusCode::Unknown, Some("UUID Not Known".to_string())))
+                .map_err(|e| warn!("Received request for unknown UUID {:?}", e));
+            ctx.spawn(f);
+        }
+    }
+
     fn create_uuid(
         &self,
         ctx: grpcio::RpcContext,
@@ -59,9 +93,9 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
             debug!("Hash Table: {:?}", self.uploads);
         }
         resp.set_uuid(layer.digest.to_owned());
-        let f = sink.success(resp).map_err(
-            move |e| warn!("failed to reply! {:?}", e),
-        );
+        let f = sink
+            .success(resp)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 
@@ -83,9 +117,9 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
             debug!("Hash Table: {:?}", self.uploads);
         }
         resp.set_uuid(layer.digest.to_owned());
-        let f = sink.success(resp).map_err(
-            move |e| warn!("failed to reply! {:?}", e),
-        );
+        let f = sink
+            .success(resp)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 
@@ -104,9 +138,9 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
         };
         resp.set_success(set.contains(&layer));
 
-        let f = sink.success(resp).map_err(
-            move |e| warn!("failed to reply! {:?}", e),
-        );
+        let f = sink
+            .success(resp)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 
@@ -125,9 +159,9 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
         let _ = delete_blob_by_uuid(&layer.digest);
         resp.set_success(set.remove(&layer));
 
-        let f = sink.success(resp).map_err(
-            move |e| warn!("failed to reply! {:?}", e),
-        );
+        let f = sink
+            .success(resp)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 
@@ -137,7 +171,6 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
         req: trow_protobuf::backend::Layer,
         sink: grpcio::UnarySink<trow_protobuf::backend::Result>,
     ) {
-
         let layer = Layer {
             repo_name: req.get_repo_name().to_owned(),
             digest: req.get_digest().to_owned(),
@@ -149,9 +182,9 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
         resp.set_success(set.remove(&layer));
         debug!("After Delete: {:?}", self.uploads);
 
-        let f = sink.success(resp).map_err(
-            move |e| warn!("failed to reply! {:?}", e),
-        );
+        let f = sink
+            .success(resp)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 
@@ -165,9 +198,9 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
         let mut resp = trow_protobuf::backend::Result::new();
         resp.set_success(false);
 
-        let f = sink.success(resp).map_err(
-            move |e| warn!("failed to reply! {:?}", e),
-        );
+        let f = sink
+            .success(resp)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 
@@ -191,32 +224,31 @@ impl trow_protobuf::backend_grpc::Backend for BackendService {
             });
             resp.set_uuids(protobuf::RepeatedField::from_iter(set));
         }
-        let f = sink.success(resp).map_err(
-            move |e| warn!("failed to reply! {:?}", e),
-        );
+        let f = sink
+            .success(resp)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 }
-
 
 #[cfg(test)]
 mod test {
     // 1. start up a listening backend service
     // 2. test the exposed service
     use super::*;
-    use server_async;
-    use config::{TrowBackendConfig, Service};
-    use trow_protobuf::backend_grpc::BackendClient;
-    use trow_protobuf::backend;
-    use std::sync::Arc;
+    use config::{Service, TrowBackendConfig};
     use grpcio::{ChannelBuilder, EnvBuilder};
+    use server_async;
+    use std::sync::Arc;
+    use trow_protobuf::backend;
+    use trow_protobuf::backend_grpc::BackendClient;
 
     macro_rules! setup_grpc {
         ($v:ident) => {
             let config = default_config();
             let $v = client(&config);
             let _server = server_async(config);
-        }
+        };
     }
 
     // test grpc interface ////////////////////////////////////////////////////
@@ -264,9 +296,11 @@ mod test {
 
         // check existence
         let uuids = client.get_uuids(empty).unwrap();
-        let uuids = uuids.get_uuids().iter().map(|wrapper| {
-            wrapper.get_uuid().to_owned()
-        }).collect::<Vec<String>>();
+        let uuids = uuids
+            .get_uuids()
+            .iter()
+            .map(|wrapper| wrapper.get_uuid().to_owned())
+            .collect::<Vec<String>>();
 
         assert!(uuids.contains(&uuid.to_owned()));
         assert_eq!(uuids.len(), 1);
@@ -296,7 +330,6 @@ mod test {
     #[test]
     fn test_layer_exists() {
         setup_grpc!(client);
-
 
         // test valid layer
         let mut layer = backend::Layer::new();
@@ -351,7 +384,6 @@ mod test {
         assert!(result.get_success());
     }
 
-
     // This function is the same as the above `test_cancel_upload` function
     #[test]
     fn test_delete_uuid() {
@@ -404,7 +436,6 @@ mod test {
 
     #[test]
     fn test_get_size() {
-
         // non-existing file
         let mut layer = gen_layer();
         layer.digest = "invalid_digest".to_owned();
@@ -437,7 +468,7 @@ mod test {
             Ok(path) => {
                 assert!(path.is_absolute());
                 assert!(path.ends_with(layer.digest));
-            },
+            }
             Err(_) => assert!(false),
         }
     }

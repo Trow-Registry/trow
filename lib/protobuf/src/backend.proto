@@ -64,6 +64,16 @@ message CreateUuidResult {
   //Expect some auth stuff as well later
 }
 
+message BlobRef {
+  string repo_name = 1;
+  string uuid = 2;
+}
+
+//At the moment this will be a simple file path, but could evolve in future
+message WriteLocation {
+  string path = 1;
+}
+
 service Backend {
 
   //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
@@ -75,6 +85,10 @@ service Backend {
 
   // Given a Uuid, check whether it exists in the cluster
   rpc UuidExists (Layer) returns (Result) {}
+
+  //Given a UUID, return where to write the upload to
+  //For the moment this is just a file path
+  rpc GetWriteLocationForBlob (BlobRef) returns (WriteLocation) {}
 
   // Cancel a pending upload
   // The digest field is used for the uuid in this rpc call

@@ -1,9 +1,8 @@
-use failure::{self, Error};
+use failure::Error;
 use std::fs::OpenOptions;
-use trow_protobuf::backend::{CreateUuidRequest, Layer};
+use trow_protobuf::backend::{CreateUuidRequest, BlobRef};
 use trow_protobuf::backend_grpc::BackendClient;
 use types::{create_upload_info, UploadInfo};
-use state;
 use std::io::prelude::*;
 
 pub struct ClientInterface {
@@ -29,13 +28,11 @@ impl ClientInterface {
      * just changing this file...
      **/
 
-    /*
-     * change this sodding name.
-     */
     pub fn request_upload(&self, repo_name: &str) -> Result<UploadInfo, Error> {
         let mut req = CreateUuidRequest::new();
         req.set_repo_name(repo_name.to_owned());
 
+        //TODO: this should not be called create_uuid; again request upload or similar
         let response = self.backend.create_uuid(&req)?;
         debug!("Client received: {:?}", response);
 
@@ -52,21 +49,15 @@ impl ClientInterface {
         uuid: &str,
     ) -> Result<impl Write, Error> {
 
-        //TODO move path gen to backend and rearchitect.
-        let mut req = Layer::new();
-        req.set_repo_name(repo_name.to_owned());
-        req.set_digest(uuid.to_owned());
+        let mut br = BlobRef::new();
+        br.set_uuid(uuid.to_owned());
+        br.set_repo_name(repo_name.to_owned());
 
-        let response = self.backend.uuid_exists(&req)?;
-
-        match response.get_success() {
-            true => {
-                let path = state::uuid::scratch_path(&uuid);
-                let file = OpenOptions::new().create(true).append(true).open(path)?;
-                Ok(file)
-            }
-            //TODO: return proper error
-            false => Err(failure::err_msg("UUID unknown"))
-        }
+        let resp = self.backend.get_write_location_for_blob(&br)?;
+        
+        //For the moment we know it's a file location
+        let file = OpenOptions::new().create(true).append(true).open(resp.path)?;
+        Ok(file)
     }
+    
 }

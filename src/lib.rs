@@ -48,7 +48,6 @@ pub mod manifest;
 pub mod response;
 mod client_interface;
 mod routes;
-mod state;
 mod types;
 
 use client_interface::ClientInterface;
