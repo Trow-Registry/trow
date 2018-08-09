@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use futures::Future;
 use grpcio::{self, RpcStatus, RpcStatusCode};
 use trow_protobuf;
-use trow_protobuf::server::{WriteLocation, CreateUuidRequest, CreateUuidResult, GenUuidResult, BlobRef};
+use trow_protobuf::server::{WriteLocation, UploadRequest, UploadDetails, GenUuidResult, BlobRef};
 use uuid::Uuid;
 
 /// Struct implementing callbacks for the Frontend
@@ -72,13 +72,13 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         }
     }
 
-    fn create_uuid(
+    fn request_upload(
         &self,
         ctx: grpcio::RpcContext,
-        req: CreateUuidRequest,
-        sink: grpcio::UnarySink<CreateUuidResult>,
+        req: UploadRequest,
+        sink: grpcio::UnarySink<UploadDetails>,
     ) {
-        let mut resp = CreateUuidResult::new();
+        let mut resp = UploadDetails::new();
         let layer = Layer {
             repo_name: req.get_repo_name().to_owned(),
             //WTF?!

@@ -1,6 +1,6 @@
 use failure::Error;
 use std::fs::OpenOptions;
-use trow_protobuf::server::{CreateUuidRequest, BlobRef};
+use trow_protobuf::server::{UploadRequest, BlobRef};
 use trow_protobuf::server_grpc::BackendClient;
 use types::{create_upload_info, UploadInfo};
 use std::io::prelude::*;
@@ -29,11 +29,11 @@ impl ClientInterface {
      **/
 
     pub fn request_upload(&self, repo_name: &str) -> Result<UploadInfo, Error> {
-        let mut req = CreateUuidRequest::new();
+        let mut req = UploadRequest::new();
         req.set_repo_name(repo_name.to_owned());
 
         //TODO: this should not be called create_uuid; again request upload or similar
-        let response = self.backend.create_uuid(&req)?;
+        let response = self.backend.request_upload(&req)?;
         debug!("Client received: {:?}", response);
 
         Ok(create_upload_info(

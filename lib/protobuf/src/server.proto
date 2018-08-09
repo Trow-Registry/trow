@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package lycaon;
+
+// The backend Protobuf protocol is used between the Client-facing
+// frontend and the Business-logic backend.
+//
+// A single service defines the legal rpc calls that can be made to
+// the backend from the Frontend.
+//
+
+message Layer {
+  string repo_name = 1;
+  string digest = 3;
+}
+
+message Manifest {
+  uint32 schemaVersion = 1;
+  string mediaType = 2;
+  // config..
+  // layers..
+}
+
+// An Empty message used where no inputs are needed
+message Empty {}
+
+// TODO: this needs to die
+// A generic success/fail response message
+message Result {
+  bool success = 1;
+  string text = 2;
+}
+
+// The result message for a request of image existence.
+//
+// success := whether or not the image exists
+// length  := the length of the queried image (if exists)
+message LayerExistsResult {
+  bool success = 1;
+  uint64 length = 2;
+}
+
+// The result message of a uuid Generation.
+// uuid := the generated uuid
+message GenUuidResult {
+  string uuid = 1;
+}
+
+// A list of Uuids
+// :Admin:
+message UuidList {
+  repeated GenUuidResult uuids = 1;
+}
+
+message UploadRequest {
+  //e.g. "amouat/network-utils", "nginx", "my-org/my-team/my-repo"
+  string repo_name = 1;
+  //Expect some auth stuff as well later
+}
+
+message UploadDetails {
+  string uuid = 1;
+}
+
+message BlobRef {
+  string repo_name = 1;
+  string uuid = 2;
+}
+
+//At the moment this will be a simple file path, but could evolve in future
+message WriteLocation {
+  string path = 1;
+}
+
+service Backend {
+
+  //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
+  //Assigns a "UUID" to a Upload that is then used to track it
+  rpc RequestUpload (UploadRequest) returns (UploadDetails) {}
+
+  // Generate a uuid for a new layer being uploaded
+  rpc GenUuid (Layer) returns (GenUuidResult) {}
+
+  // Given a Uuid, check whether it exists in the cluster
+  rpc UuidExists (Layer) returns (Result) {}
+
+  //Given a UUID, return where to write the upload to
+  //For the moment this is just a file path
+  rpc GetWriteLocationForBlob (BlobRef) returns (WriteLocation) {}
+
+  // Cancel a pending upload
+  // The digest field is used for the uuid in this rpc call
+  // Delete the upload from the stateful backend
+  // clean up the file from the filesystem.
+  rpc cancelUpload (Layer) returns (Result) {}
+
+  // Delete an uuid after a successful upload.
+  rpc deleteUuid (Layer) returns (Result) {}
+
+  rpc uploadManifest (Manifest) returns (Result) {}
+
+  // ------------ Admin calls --------------------
+
+  // returns a list of all Uuids currently in the  backend
+  rpc getUuids (Empty) returns (UuidList) {}
+}
