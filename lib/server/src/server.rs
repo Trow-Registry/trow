@@ -7,6 +7,16 @@ use trow_protobuf;
 use trow_protobuf::server::{WriteLocation, UploadRequest, UploadDetails, BlobRef};
 use uuid::Uuid;
 
+
+/*
+ * TODO: figure out what needs to be stored in the backend
+ * and what it's keyed on
+ * probably need a path
+ * 
+ * remember will probably want to split out metadata for search
+ * 
+ * Accepted Upload is borked atm
+ */
 /// Struct implementing callbacks for the Frontend
 ///
 /// _uploads_: a HashSet of all uuids that are currently being tracked

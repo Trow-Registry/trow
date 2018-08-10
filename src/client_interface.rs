@@ -27,9 +27,7 @@ impl ClientInterface {
         let mut req = UploadRequest::new();
         req.set_repo_name(repo_name.to_owned());
 
-        //TODO: this should not be called create_uuid; again request upload or similar
         let response = self.backend.request_upload(&req)?;
-        debug!("Client received: {:?}", response);
 
         Ok(create_upload_info(
             response.get_uuid().to_owned(),
