@@ -32,6 +32,13 @@ const METHOD_BACKEND_GET_WRITE_LOCATION_FOR_BLOB: ::grpcio::Method<super::server
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
+const METHOD_BACKEND_COMPLETE_UPLOAD: ::grpcio::Method<super::server::CompleteRequest, super::server::CompletedUpload> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::Unary,
+    name: "/lycaon.Backend/CompleteUpload",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
 pub struct BackendClient {
     client: ::grpcio::Client,
 }
@@ -74,6 +81,22 @@ impl BackendClient {
     pub fn get_write_location_for_blob_async(&self, req: &super::server::BlobRef) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::WriteLocation>> {
         self.get_write_location_for_blob_async_opt(req, ::grpcio::CallOption::default())
     }
+
+    pub fn complete_upload_opt(&self, req: &super::server::CompleteRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::server::CompletedUpload> {
+        self.client.unary_call(&METHOD_BACKEND_COMPLETE_UPLOAD, req, opt)
+    }
+
+    pub fn complete_upload(&self, req: &super::server::CompleteRequest) -> ::grpcio::Result<super::server::CompletedUpload> {
+        self.complete_upload_opt(req, ::grpcio::CallOption::default())
+    }
+
+    pub fn complete_upload_async_opt(&self, req: &super::server::CompleteRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::CompletedUpload>> {
+        self.client.unary_call_async(&METHOD_BACKEND_COMPLETE_UPLOAD, req, opt)
+    }
+
+    pub fn complete_upload_async(&self, req: &super::server::CompleteRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::CompletedUpload>> {
+        self.complete_upload_async_opt(req, ::grpcio::CallOption::default())
+    }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
         self.client.spawn(f)
     }
@@ -82,6 +105,7 @@ impl BackendClient {
 pub trait Backend {
     fn request_upload(&self, ctx: ::grpcio::RpcContext, req: super::server::UploadRequest, sink: ::grpcio::UnarySink<super::server::UploadDetails>);
     fn get_write_location_for_blob(&self, ctx: ::grpcio::RpcContext, req: super::server::BlobRef, sink: ::grpcio::UnarySink<super::server::WriteLocation>);
+    fn complete_upload(&self, ctx: ::grpcio::RpcContext, req: super::server::CompleteRequest, sink: ::grpcio::UnarySink<super::server::CompletedUpload>);
 }
 
 pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
@@ -93,6 +117,10 @@ pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Se
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_BACKEND_GET_WRITE_LOCATION_FOR_BLOB, move |ctx, req, resp| {
         instance.get_write_location_for_blob(ctx, req, resp)
+    });
+    let instance = s.clone();
+    builder = builder.add_unary_handler(&METHOD_BACKEND_COMPLETE_UPLOAD, move |ctx, req, resp| {
+        instance.complete_upload(ctx, req, resp)
     });
     builder.build()
 }

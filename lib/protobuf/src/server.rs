@@ -775,15 +775,472 @@ impl ::protobuf::reflect::ProtobufValue for WriteLocation {
     }
 }
 
+#[derive(PartialEq,Clone,Default)]
+pub struct CompleteRequest {
+    // message fields
+    pub repo_name: ::std::string::String,
+    pub uuid: ::std::string::String,
+    pub user_digest: ::std::string::String,
+    // special fields
+    unknown_fields: ::protobuf::UnknownFields,
+    cached_size: ::protobuf::CachedSize,
+}
+
+// see codegen.rs for the explanation why impl Sync explicitly
+unsafe impl ::std::marker::Sync for CompleteRequest {}
+
+impl CompleteRequest {
+    pub fn new() -> CompleteRequest {
+        ::std::default::Default::default()
+    }
+
+    pub fn default_instance() -> &'static CompleteRequest {
+        static mut instance: ::protobuf::lazy::Lazy<CompleteRequest> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const CompleteRequest,
+        };
+        unsafe {
+            instance.get(CompleteRequest::new)
+        }
+    }
+
+    // string repo_name = 1;
+
+    pub fn clear_repo_name(&mut self) {
+        self.repo_name.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_repo_name(&mut self, v: ::std::string::String) {
+        self.repo_name = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_repo_name(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
+    }
+
+    // Take field
+    pub fn take_repo_name(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.repo_name, ::std::string::String::new())
+    }
+
+    pub fn get_repo_name(&self) -> &str {
+        &self.repo_name
+    }
+
+    fn get_repo_name_for_reflect(&self) -> &::std::string::String {
+        &self.repo_name
+    }
+
+    fn mut_repo_name_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
+    }
+
+    // string uuid = 2;
+
+    pub fn clear_uuid(&mut self) {
+        self.uuid.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_uuid(&mut self, v: ::std::string::String) {
+        self.uuid = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_uuid(&mut self) -> &mut ::std::string::String {
+        &mut self.uuid
+    }
+
+    // Take field
+    pub fn take_uuid(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.uuid, ::std::string::String::new())
+    }
+
+    pub fn get_uuid(&self) -> &str {
+        &self.uuid
+    }
+
+    fn get_uuid_for_reflect(&self) -> &::std::string::String {
+        &self.uuid
+    }
+
+    fn mut_uuid_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.uuid
+    }
+
+    // string user_digest = 3;
+
+    pub fn clear_user_digest(&mut self) {
+        self.user_digest.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_user_digest(&mut self, v: ::std::string::String) {
+        self.user_digest = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_user_digest(&mut self) -> &mut ::std::string::String {
+        &mut self.user_digest
+    }
+
+    // Take field
+    pub fn take_user_digest(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.user_digest, ::std::string::String::new())
+    }
+
+    pub fn get_user_digest(&self) -> &str {
+        &self.user_digest
+    }
+
+    fn get_user_digest_for_reflect(&self) -> &::std::string::String {
+        &self.user_digest
+    }
+
+    fn mut_user_digest_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.user_digest
+    }
+}
+
+impl ::protobuf::Message for CompleteRequest {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.repo_name)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.uuid)?;
+                },
+                3 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.user_digest)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.repo_name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.repo_name);
+        }
+        if !self.uuid.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.uuid);
+        }
+        if !self.user_digest.is_empty() {
+            my_size += ::protobuf::rt::string_size(3, &self.user_digest);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        if !self.repo_name.is_empty() {
+            os.write_string(1, &self.repo_name)?;
+        }
+        if !self.uuid.is_empty() {
+            os.write_string(2, &self.uuid)?;
+        }
+        if !self.user_digest.is_empty() {
+            os.write_string(3, &self.user_digest)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for CompleteRequest {
+    fn new() -> CompleteRequest {
+        CompleteRequest::new()
+    }
+
+    fn descriptor_static(_: ::std::option::Option<CompleteRequest>) -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "repo_name",
+                    CompleteRequest::get_repo_name_for_reflect,
+                    CompleteRequest::mut_repo_name_for_reflect,
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "uuid",
+                    CompleteRequest::get_uuid_for_reflect,
+                    CompleteRequest::mut_uuid_for_reflect,
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "user_digest",
+                    CompleteRequest::get_user_digest_for_reflect,
+                    CompleteRequest::mut_user_digest_for_reflect,
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<CompleteRequest>(
+                    "CompleteRequest",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+}
+
+impl ::protobuf::Clear for CompleteRequest {
+    fn clear(&mut self) {
+        self.clear_repo_name();
+        self.clear_uuid();
+        self.clear_user_digest();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for CompleteRequest {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for CompleteRequest {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct CompletedUpload {
+    // message fields
+    pub digest: ::std::string::String,
+    // special fields
+    unknown_fields: ::protobuf::UnknownFields,
+    cached_size: ::protobuf::CachedSize,
+}
+
+// see codegen.rs for the explanation why impl Sync explicitly
+unsafe impl ::std::marker::Sync for CompletedUpload {}
+
+impl CompletedUpload {
+    pub fn new() -> CompletedUpload {
+        ::std::default::Default::default()
+    }
+
+    pub fn default_instance() -> &'static CompletedUpload {
+        static mut instance: ::protobuf::lazy::Lazy<CompletedUpload> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const CompletedUpload,
+        };
+        unsafe {
+            instance.get(CompletedUpload::new)
+        }
+    }
+
+    // string digest = 1;
+
+    pub fn clear_digest(&mut self) {
+        self.digest.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_digest(&mut self, v: ::std::string::String) {
+        self.digest = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_digest(&mut self) -> &mut ::std::string::String {
+        &mut self.digest
+    }
+
+    // Take field
+    pub fn take_digest(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.digest, ::std::string::String::new())
+    }
+
+    pub fn get_digest(&self) -> &str {
+        &self.digest
+    }
+
+    fn get_digest_for_reflect(&self) -> &::std::string::String {
+        &self.digest
+    }
+
+    fn mut_digest_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.digest
+    }
+}
+
+impl ::protobuf::Message for CompletedUpload {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.digest)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.digest.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.digest);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        if !self.digest.is_empty() {
+            os.write_string(1, &self.digest)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for CompletedUpload {
+    fn new() -> CompletedUpload {
+        CompletedUpload::new()
+    }
+
+    fn descriptor_static(_: ::std::option::Option<CompletedUpload>) -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "digest",
+                    CompletedUpload::get_digest_for_reflect,
+                    CompletedUpload::mut_digest_for_reflect,
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<CompletedUpload>(
+                    "CompletedUpload",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+}
+
+impl ::protobuf::Clear for CompletedUpload {
+    fn clear(&mut self) {
+        self.clear_digest();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for CompletedUpload {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for CompletedUpload {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x0cserver.proto\x12\x06lycaon\",\n\rUploadRequest\x12\x1b\n\trepo_nam\
     e\x18\x01\x20\x01(\tR\x08repoName\"#\n\rUploadDetails\x12\x12\n\x04uuid\
     \x18\x01\x20\x01(\tR\x04uuid\":\n\x07BlobRef\x12\x1b\n\trepo_name\x18\
     \x01\x20\x01(\tR\x08repoName\x12\x12\n\x04uuid\x18\x02\x20\x01(\tR\x04uu\
-    id\"#\n\rWriteLocation\x12\x12\n\x04path\x18\x01\x20\x01(\tR\x04path2\
-    \x8f\x01\n\x07Backend\x12?\n\rRequestUpload\x12\x15.lycaon.UploadRequest\
-    \x1a\x15.lycaon.UploadDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\
-    \x0f.lycaon.BlobRef\x1a\x15.lycaon.WriteLocation\"\0b\x06proto3\
+    id\"#\n\rWriteLocation\x12\x12\n\x04path\x18\x01\x20\x01(\tR\x04path\"c\
+    \n\x0fCompleteRequest\x12\x1b\n\trepo_name\x18\x01\x20\x01(\tR\x08repoNa\
+    me\x12\x12\n\x04uuid\x18\x02\x20\x01(\tR\x04uuid\x12\x1f\n\x0buser_diges\
+    t\x18\x03\x20\x01(\tR\nuserDigest\")\n\x0fCompletedUpload\x12\x16\n\x06d\
+    igest\x18\x01\x20\x01(\tR\x06digest2\xd5\x01\n\x07Backend\x12?\n\rReques\
+    tUpload\x12\x15.lycaon.UploadRequest\x1a\x15.lycaon.UploadDetails\"\0\
+    \x12C\n\x17GetWriteLocationForBlob\x12\x0f.lycaon.BlobRef\x1a\x15.lycaon\
+    .WriteLocation\"\0\x12D\n\x0eCompleteUpload\x12\x17.lycaon.CompleteReque\
+    st\x1a\x17.lycaon.CompletedUpload\"\0b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

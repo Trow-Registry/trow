@@ -1,20 +1,22 @@
 use std;
 use std::sync::{Arc, Mutex};
 
+use failure::Error;
 use futures::Future;
 use grpcio::{self, RpcStatus, RpcStatusCode};
+use std::fs;
+use std::path::Path;
 use trow_protobuf;
-use trow_protobuf::server::{WriteLocation, UploadRequest, UploadDetails, BlobRef};
+use trow_protobuf::server::*;
 use uuid::Uuid;
-
 
 /*
  * TODO: figure out what needs to be stored in the backend
  * and what it's keyed on
  * probably need a path
- * 
+ *
  * remember will probably want to split out metadata for search
- * 
+ *
  * Accepted Upload is borked atm
  */
 /// Struct implementing callbacks for the Frontend
@@ -44,6 +46,28 @@ fn get_path_for_uuid(uuid: &str) -> String {
     format!("data/scratch/{}", uuid)
 }
 
+fn save_layer(repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
+    debug!("Saving layer {}", user_digest);
+
+    //TODO: This is wrong; user digest needs to be verified and potentially changed to our own digest
+    //if we want to use consistent compression alg
+    let digest_path = format!("data/layers/{}/{}", repo_name, user_digest);
+    let path = format!("data/layers/{}", repo_name);
+    let scratch_path = format!("data/scratch/{}", uuid);
+
+    if !Path::new(&path).exists() {
+        fs::create_dir_all(path)?;
+    }
+
+    fs::copy(&scratch_path, digest_path)?;
+
+    //Not an error, even if it's not great
+    fs::remove_file(&scratch_path)
+        .unwrap_or_else(|e| warn!("Error deleting file {} {:?}", &scratch_path, e));
+
+    Ok(())
+}
+
 impl trow_protobuf::server_grpc::Backend for BackendService {
     fn get_write_location_for_blob(
         &self,
@@ -68,8 +92,10 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
             ctx.spawn(f);
         } else {
             let f = resp
-                .fail(RpcStatus::new(RpcStatusCode::Unknown, Some("UUID Not Known".to_string())))
-                .map_err(|e| warn!("Received request for unknown UUID {:?}", e));
+                .fail(RpcStatus::new(
+                    RpcStatusCode::Unknown,
+                    Some("UUID Not Known".to_string()),
+                )).map_err(|e| warn!("Received request for unknown UUID {:?}", e));
             ctx.spawn(f);
         }
     }
@@ -93,8 +119,45 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         resp.set_uuid(layer.digest.to_owned());
         let f = sink
             .success(resp)
-            .map_err(move |e| warn!("failed to reply! {:?}", e));
+            .map_err(|e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
     }
 
+    fn complete_upload(
+        &self,
+        ctx: grpcio::RpcContext,
+        cr: CompleteRequest,
+        sink: grpcio::UnarySink<CompletedUpload>,
+    ) {
+
+        
+        match save_layer(cr.get_repo_name(), cr.get_user_digest(), cr.get_uuid()) {
+            Ok(_) => {
+                let mut cu = CompletedUpload::new();
+                cu.set_digest(cr.get_user_digest().to_string());
+                let f = sink
+                    .success(cu)
+                    .map_err(move |e| warn!("failed to reply! {:?}", e));
+                ctx.spawn(f);
+            }
+            Err(_) => {
+                let f = sink
+                    .fail(RpcStatus::new(
+                        RpcStatusCode::Internal,
+                        Some("Internal error saving file".to_string()),
+                    )).map_err(|e| warn!("Internal error saving file {:?}", e));
+                ctx.spawn(f);
+            }
+        }
+
+        //delete uuid from uploads tracking
+        let layer = Layer {
+            repo_name: cr.get_repo_name().to_string(),
+            digest: cr.get_user_digest().to_string(),
+        };
+
+        let mut set = self.uploads.lock().unwrap();
+        set.remove(&layer);
+            
+    }
 }
