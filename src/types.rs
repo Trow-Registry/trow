@@ -29,6 +29,36 @@ pub fn create_upload_info(uuid: String, repo_name: String, range: (u32, u32)) ->
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct AcceptedUpload {
+    uuid: String,
+    digest: String,
+    repo_name: String,
+}
+
+pub fn create_accepted_upload(uuid: String, digest: String, repo_name: String) -> AcceptedUpload {
+    AcceptedUpload {
+        uuid,
+        digest,
+        repo_name,
+    }
+}
+impl AcceptedUpload {
+    pub fn uuid(&self) -> &str {
+        &self.uuid
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    pub fn repo_name(&self) -> &str {
+        &self.repo_name
+    }
+
+}
+
+//DIE MOFO
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub digest: Digest,

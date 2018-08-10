@@ -7,7 +7,6 @@ use client_interface::ClientInterface;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use manifest::{self, FromJson, Manifest};
-use response::accepted_upload::{AcceptedUpload, create_accepted_upload};
 use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
@@ -17,7 +16,7 @@ use rocket::request::{self, FromRequest, Request};
 use rocket::response::NamedFile;
 use rocket::{self, Outcome};
 use serde_json;
-use types::{self, create_upload_info};
+use types::{AcceptedUpload, create_upload_info};
 
 static DATA_DIR: &'static str = "data";
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -255,49 +254,21 @@ struct UploadQuery {
     digest: String,
 }
 
+/**
+ * Completes the upload.
+ *
+ * TODO: allow uploading of final data
+ * TODO: add other failure states
+ */
 #[put("/v2/<repo_name>/blobs/uploads/<uuid>?<query>")]
 fn put_blob(
-    _ci: rocket::State<ClientInterface>,
+    ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
     query: UploadQuery,
 ) -> Result<AcceptedUpload, Error> {
 
-         // 1. copy file to new location
-        //let backend = handler.backend();
-        let layer = types::Layer {
-            repo_name: repo_name.clone(),
-            digest: query.digest.clone(),
-        };
-        let digest_path = format!("data/layers/{}/{}", layer.repo_name, layer.digest);
-        let path = format!("data/layers/{}", layer.repo_name);
-        let scratch_path = format!("data/scratch/{}", uuid);
-        debug!("Saving file");
-        // 1.1 check direcory exists
-        if !Path::new(&path).exists() {
-            fs::create_dir_all(path).map_err(|_| Error::InternalError)?;
-        }
-        fs::copy(&scratch_path, digest_path).map_err(|_| Error::InternalError)?;
-        // 2. delete uploaded temporary file
-        debug!("Deleting file: {}", uuid);
-        fs::remove_file(scratch_path).map_err(|_| Error::InternalError)?;
-        Ok(create_accepted_upload(uuid, query.digest, repo_name))
-        // 3. delete uuid from the backend
-        // TODO is this process right? Should the backend be doing this?!
-        /*
-        let mut layer = server::Layer::new();
-        layer.set_repo_name(repo_name.clone());
-        layer.set_digest(uuid.clone());
-        let resp = backend.delete_uuid(&layer)?;
-        // 4. Construct response
-        if resp.get_success() {
-            Ok(create_accepted_upload(uuid, digest, repo_name))
-        } else {
-            warn!("Failed to remove UUID");
-            Err(failure::err_msg("Not implemented"))
-        }
-        */
-
+    ci.complete_upload(&repo_name, &uuid, &query.digest).map_err(|_| Error::InternalError)
 }
 
 /*

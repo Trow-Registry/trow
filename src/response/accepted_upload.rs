@@ -2,28 +2,15 @@ use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 use response::get_base_url;
+use types::AcceptedUpload;
 
-#[derive(Debug, Serialize)]
-pub struct AcceptedUpload {
-    uuid: String,
-    digest: String,
-    repo_name: String,
-}
-
-pub fn create_accepted_upload(uuid: String, digest: String, repo_name: String) -> AcceptedUpload {
-    AcceptedUpload {
-        uuid,
-        digest,
-        repo_name,
-    }
-}
 
 impl<'r> Responder<'r> for AcceptedUpload {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
 
-        let location = format!("{}/v2/{}/blobs/{}", get_base_url(req), self.repo_name, self.digest);
+        let location = format!("{}/v2/{}/blobs/{}", get_base_url(req), self.repo_name(), self.digest());
         let location_header = Header::new("Location", location);
-        let digest_header = Header::new("Docker-Content-Digest", self.digest);
+        let digest_header = Header::new("Docker-Content-Digest", self.digest().to_owned());
         Response::build()
             .status(Status::Created)
             .header(location_header)
