@@ -130,9 +130,8 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
             dr.get_repo_name(),
             dr.get_digest()
         );
-        warn!("Looking for {}", path);
         if !Path::new(&path).exists() {
-             let f = sink
+            let f = sink
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,
                     Some("Blob Not Known".to_string()),
@@ -158,13 +157,25 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, mr.get_repo_name());
         let manifest_path = format!("{}/{}", manifest_directory, mr.get_reference());
 
-        fs::create_dir_all(manifest_directory).unwrap();
-        let mut w = WriteLocation::new();
-        w.set_path(manifest_path);
-        let f = sink
-            .success(w)
-            .map_err(move |e| warn!("Failed sending to client {:?}", e));
-        ctx.spawn(f);
+        match fs::create_dir_all(manifest_directory) {
+            Ok(_) => {
+                let mut w = WriteLocation::new();
+                w.set_path(manifest_path);
+                let f = sink
+                    .success(w)
+                    .map_err(move |e| warn!("Failed sending to client {:?}", e));
+                ctx.spawn(f);
+            }
+            Err(e) => {
+                warn!("Internal error creating directory {:?}", e);
+                let f = sink
+                    .fail(RpcStatus::new(
+                        RpcStatusCode::Internal,
+                        Some("Internal error creating directory".to_string()),
+                    )).map_err(|e| warn!("Failed to send error message to client {:?}", e));
+                ctx.spawn(f);
+            }
+        }
     }
 
     fn get_read_location_for_manifest(

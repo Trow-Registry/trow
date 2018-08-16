@@ -11,15 +11,15 @@ extern crate hostname;
 extern crate jwt;
 extern crate orset;
 extern crate protobuf;
-extern crate rocket;
+#[macro_use] extern crate rocket;
 extern crate rocket_contrib;
 extern crate rustc_serialize;
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
 
-extern crate trow_server;
 extern crate trow_protobuf;
+extern crate trow_server;
 
 use trow_protobuf::server_grpc::BackendClient;
 
@@ -37,15 +37,15 @@ extern crate serde_derive;
 extern crate quickcheck;
 
 use failure::Error;
-use std::thread;
-use std::path::Path;
 use std::env;
 use std::fs;
+use std::path::Path;
+use std::thread;
 
 use rocket::fairing;
 
-pub mod response;
 mod client_interface;
+pub mod response;
 mod routes;
 mod types;
 
@@ -54,12 +54,10 @@ use client_interface::ClientInterface;
 static SCRATCH_DIR: &'static str = "scratch";
 static LAYERS_DIR: &'static str = "layers";
 
-
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
 #[fail(display = "invalid data directory")]
 pub struct ConfigError {}
-
 
 pub struct NetAddr {
     pub host: String,
@@ -102,8 +100,7 @@ fn init_logger() -> Result<(), SetLoggerError> {
     builder
         .format(|record: &LogRecord| {
             format!("{}[{}] {}", record.target(), record.level(), record.args(),)
-        })
-        .filter(None, LogLevelFilter::Error);
+        }).filter(None, LogLevelFilter::Error);
 
     if env::var("RUST_LOG").is_ok() {
         builder.parse(&env::var("RUST_LOG").unwrap());
@@ -182,12 +179,15 @@ impl TrowBuilder {
                 self.grpc.listen.port,
             ))
             .attach(fairing::AdHoc::on_attach(
+                "SIGTERM handler",
                 |r| match attach_sigterm() {
                     Ok(_) => Ok(r),
                     Err(_) => Err(r),
                 },
             ))
-            .attach(fairing::AdHoc::on_response(|_, resp| {
+            .attach(
+                fairing::AdHoc::on_response(
+                    "Set API Version Header", |_, resp| {
                 //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
                 resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
             }))
@@ -203,7 +203,6 @@ fn attach_sigterm() -> Result<(), Error> {
         std::process::exit(0);
     }).map_err(|e| e.into())
 }
-
 
 pub fn build_handlers(listen_host: &str, listen_port: u16) -> ClientInterface {
     use grpcio::{ChannelBuilder, EnvBuilder};
