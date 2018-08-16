@@ -8,6 +8,8 @@ pub mod empty;
 pub mod errors;
 pub mod html;
 pub mod manifest_upload;
+pub mod manifest_reader;
+pub mod blob_reader;
 mod test_helper;
 pub mod upload_info;
 pub mod accepted_upload;

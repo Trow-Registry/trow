@@ -301,14 +301,6 @@ dependencies = [
 
 [[package]]
 name = "failure"
-version = "0.0.1"
-source = "git+https://github.com/withoutboats/failure?rev=ae276f58615174e5b2dbba8dd7c6e47a033c7e2c#ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"
-dependencies = [
- "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "failure"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -1608,11 +1600,14 @@ dependencies = [
 name = "trow-server"
 version = "0.1.0"
 dependencies = [
- "failure 0.0.1 (git+https://github.com/withoutboats/failure?rev=ae276f58615174e5b2dbba8dd7c6e47a033c7e2c)",
+ "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure_derive 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.71 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.71 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1883,7 +1878,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum env_logger 0.5.12 (registry+https://github.com/rust-lang/crates.io-index)" = "f4d7e69c283751083d53d01eac767407343b8b69c4bd70058e08adc2637cb257"
 "checksum environment 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1f4b14e20978669064c33b4c1e0fb4083412e40fe56cbea2eae80fd7591503ee"
 "checksum error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff511d5dc435d703f4971bc399647c9bc38e20cb41452e3b9feb4765419ed3f3"
-"checksum failure 0.0.1 (git+https://github.com/withoutboats/failure?rev=ae276f58615174e5b2dbba8dd7c6e47a033c7e2c)" = "<none>"
 "checksum failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7efb22686e4a466b1ec1a15c2898f91fa9cb340452496dca654032de20ff95b9"
 "checksum failure_derive 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "946d0e98a50d9831f5d589038d2ca7f8f455b1c21028c0db0e84116a12696426"
 "checksum foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"

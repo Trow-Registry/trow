@@ -4,11 +4,20 @@ use std::sync::{Arc, Mutex};
 use failure::Error;
 use futures::Future;
 use grpcio::{self, RpcStatus, RpcStatusCode};
+use manifest::{FromJson, Manifest};
+use serde_json;
 use std::fs;
 use std::path::Path;
 use trow_protobuf;
 use trow_protobuf::server::*;
 use uuid::Uuid;
+
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
+
+static DATA_DIR: &'static str = "data";
+static MANIFESTS_DIR: &'static str = "manifests";
+static LAYERS_DIR: &'static str = "layers";
 
 /*
  * TODO: figure out what needs to be stored in the backend
@@ -46,6 +55,12 @@ fn get_path_for_uuid(uuid: &str) -> String {
     format!("data/scratch/{}", uuid)
 }
 
+fn gen_digest(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.input(bytes);
+    format!("sha256:{}", hasher.result_str())
+}
+
 fn save_layer(repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
     debug!("Saving layer {}", user_digest);
 
@@ -73,7 +88,7 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         &self,
         ctx: grpcio::RpcContext,
         blob_ref: BlobRef,
-        resp: grpcio::UnarySink<WriteLocation>,
+        sink: grpcio::UnarySink<WriteLocation>,
     ) {
         let set = self.uploads.lock().unwrap();
         //LAYER MUST DIE!
@@ -86,18 +101,93 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
             let path = get_path_for_uuid(blob_ref.get_uuid());
             let mut w = WriteLocation::new();
             w.set_path(path);
-            let f = resp
+            let f = sink
                 .success(w)
                 .map_err(move |e| warn!("Failed sending to client {:?}", e));
             ctx.spawn(f);
         } else {
-            let f = resp
+            let f = sink
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,
                     Some("UUID Not Known".to_string()),
                 )).map_err(|e| warn!("Received request for unknown UUID {:?}", e));
             ctx.spawn(f);
         }
+    }
+
+    fn get_read_location_for_blob(
+        &self,
+        ctx: grpcio::RpcContext,
+        dr: DownloadRef,
+        sink: grpcio::UnarySink<ReadLocation>,
+    ) {
+        //TODO: test that it exists
+
+        let path = format!(
+            "{}/{}/{}/{}",
+            DATA_DIR,
+            LAYERS_DIR,
+            dr.get_repo_name(),
+            dr.get_digest()
+        );
+        warn!("Looking for {}", path);
+        if !Path::new(&path).exists() {
+             let f = sink
+                .fail(RpcStatus::new(
+                    RpcStatusCode::Unknown,
+                    Some("Blob Not Known".to_string()),
+                )).map_err(|e| warn!("Received request for unknown blob {:?}", e));
+            ctx.spawn(f);
+        } else {
+            let mut r = ReadLocation::new();
+            r.set_path(path);
+            let f = sink
+                .success(r)
+                .map_err(move |e| warn!("Failed sending to client {:?}", e));
+            ctx.spawn(f);
+        }
+    }
+
+    fn get_write_location_for_manifest(
+        &self,
+        ctx: grpcio::RpcContext,
+        mr: ManifestRef,
+        sink: grpcio::UnarySink<super::server::WriteLocation>,
+    ) {
+        //TODO: First save to temporary file and copy over after verify
+        let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, mr.get_repo_name());
+        let manifest_path = format!("{}/{}", manifest_directory, mr.get_reference());
+
+        fs::create_dir_all(manifest_directory).unwrap();
+        let mut w = WriteLocation::new();
+        w.set_path(manifest_path);
+        let f = sink
+            .success(w)
+            .map_err(move |e| warn!("Failed sending to client {:?}", e));
+        ctx.spawn(f);
+    }
+
+    fn get_read_location_for_manifest(
+        &self,
+        ctx: grpcio::RpcContext,
+        mr: ManifestRef,
+        sink: grpcio::UnarySink<VerifiedManifest>,
+    ) {
+        let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, mr.get_repo_name());
+        let manifest_path = format!("{}/{}", manifest_directory, mr.get_reference());
+
+        let manifest_bytes = std::fs::read(&manifest_path).unwrap();
+        let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
+        let manifest = Manifest::from_json(&manifest_json).unwrap();
+
+        let mut vm = VerifiedManifest::new();
+        vm.set_location(manifest_path);
+        vm.set_digest(gen_digest(&manifest_bytes));
+        vm.set_content_type(manifest.get_media_type().to_string());
+        let f = sink
+            .success(vm)
+            .map_err(move |e| warn!("Failed sending to client {:?}", e));
+        ctx.spawn(f);
     }
 
     fn request_upload(
@@ -129,8 +219,6 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         cr: CompleteRequest,
         sink: grpcio::UnarySink<CompletedUpload>,
     ) {
-
-        
         match save_layer(cr.get_repo_name(), cr.get_user_digest(), cr.get_uuid()) {
             Ok(_) => {
                 let mut cu = CompletedUpload::new();
@@ -158,6 +246,58 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
 
         let mut set = self.uploads.lock().unwrap();
         set.remove(&layer);
-            
+    }
+
+    fn verify_manifest(
+        &self,
+        ctx: grpcio::RpcContext,
+        mr: ManifestRef,
+        sink: grpcio::UnarySink<VerifiedManifest>,
+    ) {
+        // TODO: wouldn't shadowing be better here?
+        let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, mr.get_repo_name());
+        let manifest_path = format!("{}/{}", manifest_directory, mr.get_reference());
+        //let mut file = File::open(manifest_path).unwrap();
+        let manifest_bytes = std::fs::read(manifest_path).unwrap();
+        let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
+        let manifest = Manifest::from_json(&manifest_json).unwrap();
+
+        //TODO: Need to make sure we find things indexed by digest or tag
+        for digest in manifest.get_asset_digests() {
+            let path = format!(
+                "{}/{}/{}/{}",
+                DATA_DIR,
+                LAYERS_DIR,
+                mr.get_repo_name(),
+                digest
+            );
+            info!("Path: {}", path);
+            let path = Path::new(&path);
+
+            if !path.exists() {
+                warn!("Layer does not exist in repo");
+                //TODO: Error out here
+            }
+        }
+
+        // TODO: check signature and names are correct on v1 manifests
+
+        // save manifest file
+
+        let digest = gen_digest(&manifest_bytes);
+        let location = format!(
+            "http://localhost:5000/v2/{}/manifests/{}",
+            mr.get_repo_name(),
+            digest
+        );
+
+        let mut mv = VerifiedManifest::new();
+        mv.set_location(location);
+        mv.set_digest(digest);
+        mv.set_content_type(manifest.get_media_type().to_string());
+        let f = sink
+            .success(mv)
+            .map_err(move |e| warn!("failed to reply! {:?}", e));
+        ctx.spawn(f);
     }
 }

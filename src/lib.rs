@@ -44,7 +44,6 @@ use std::fs;
 
 use rocket::fairing;
 
-pub mod manifest;
 pub mod response;
 mod client_interface;
 mod routes;

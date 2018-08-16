@@ -1,10 +1,6 @@
 use failure::Error;
-use rocket::http::{Header, Status};
-use rocket::request::Request;
-use rocket::response::{Responder, Response};
 use serde_json::{self, Value};
 use std;
-use std::io::Cursor;
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self, Error>
@@ -134,6 +130,13 @@ impl Manifest {
             }
         }
     }
+
+    pub fn get_media_type(&self) -> &str {
+        match *self {
+            Manifest::V1(_) => "application/vnd.docker.distribution.manifest.v1+json", //TODO: Different for signed!
+            Manifest::V2(ref m2) => &m2.media_type,
+        }
+    }
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -240,31 +243,6 @@ pub struct EmptyStruct {}
 impl FromJson for EmptyStruct {
     fn from_json(_: &Value) -> Result<Self, Error> {
         Ok(EmptyStruct {})
-    }
-}
-
-impl<'a> Responder<'a> for Manifest {
-    fn respond_to(self, _: &Request) -> Result<Response<'a>, Status> {
-        match self {
-            Manifest::V1(_) => {
-                //TODO: Sign
-                let ct = Header::new(
-                    "Content-Type",
-                    "application/vnd.docker.distribution.manifest.v1+prettyjws",
-                );
-                Response::build().header(ct).ok()
-            }
-            Manifest::V2(m2) => {
-                let ct = Header::new(
-                    "Content-Type",
-                    "application/vnd.docker.distribution.manifest.v2+json",
-                );
-                Response::build()
-                    .header(ct)
-                    .sized_body(Cursor::new(serde_json::to_vec(&m2).unwrap()))
-                    .ok()
-            }
-        }
     }
 }
 

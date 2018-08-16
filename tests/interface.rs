@@ -6,6 +6,7 @@ extern crate rand;
 extern crate reqwest;
 extern crate serde_json;
 extern crate trow;
+extern crate trow_server;
 
 #[cfg(test)]
 mod interface_tests {
@@ -26,7 +27,7 @@ mod interface_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use trow::manifest;
+    use trow_server::manifest;
 
     const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 

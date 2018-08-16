@@ -1,26 +1,14 @@
-use std::fs;
-use std::io::Write;
-use std::path::Path;
 use std::str;
 
 use client_interface::ClientInterface;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
-use manifest::{self, FromJson, Manifest};
 use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
 use response::manifest_upload::ManifestUpload;
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
-use rocket::response::NamedFile;
 use rocket::{self, Outcome};
-use serde_json;
-use types::{AcceptedUpload, create_upload_info};
-
-static DATA_DIR: &'static str = "data";
-static MANIFESTS_DIR: &'static str = "manifests";
-static LAYERS_DIR: &'static str = "layers";
+use types::{create_upload_info, AcceptedUpload, BlobReader, ManifestReader};
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -108,44 +96,23 @@ Accept: manifest-version
 404 - manifest not known to the registry
  */
 #[get("/v2/<onename>/manifests/<reference>")]
-fn get_manifest(onename: String, reference: String) -> Option<Manifest> {
-    let path = format!("{}/{}/{}/{}", DATA_DIR, MANIFESTS_DIR, onename, reference);
-    info!("Path: {}", path);
-    let path = Path::new(&path);
-
-    //Parse the manifest to get the response type
-    //We could do this faster by storing in appropriate folder and streaming file
-    //directly
-    if path.exists() {
-        return match fs::File::open(path) {
-            Ok(f) => serde_json::from_reader(f).ok(),
-            Err(_) => None,
-        };
-    }
-
-    None
+fn get_manifest(
+    ci: rocket::State<ClientInterface>,
+    onename: String,
+    reference: String,
+) -> Option<ManifestReader> {
+    //Need to handle error
+    ci.get_reader_for_manifest(&onename, &reference).ok()
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
-fn get_manifest_2level(user: String, repo: String, reference: String) -> Option<Manifest> {
-    let path = format!(
-        "{}/{}/{}/{}/{}",
-        DATA_DIR, MANIFESTS_DIR, user, repo, reference
-    );
-    info!("Path: {}", path);
-    let path = Path::new(&path);
-
-    //Parse the manifest to get the response type
-    //We could do this faster by storing in appropriate folder and streaming file
-    //directly
-    if path.exists() {
-        return match fs::File::open(path) {
-            Ok(f) => serde_json::from_reader(f).ok(),
-            Err(_) => None,
-        };
-    }
-
-    None
+fn get_manifest_2level(
+    ci: rocket::State<ClientInterface>,
+    user: String,
+    repo: String,
+    reference: String,
+) -> Option<ManifestReader> {
+    ci.get_reader_for_manifest(&format!("{}/{}", user, repo), &reference).ok()
 }
 
 /*
@@ -153,29 +120,13 @@ fn get_manifest_2level(user: String, repo: String, reference: String) -> Option<
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(
+    ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
     reference: String,
-) -> Option<Manifest> {
-    let path = format!(
-        "{}/{}/{}/{}/{}/{}",
-        DATA_DIR, MANIFESTS_DIR, org, user, repo, reference
-    );
-    info!("Path: {}", path);
-    let path = Path::new(&path);
-
-    //Parse the manifest to get the response type
-    //We could do this faster by storing in appropriate folder and streaming file
-    //directly
-    if path.exists() {
-        return match fs::File::open(path) {
-            Ok(f) => serde_json::from_reader(f).ok(),
-            Err(_) => None,
-        };
-    }
-
-    None
+) -> Option<ManifestReader> {
+    ci.get_reader_for_manifest(&format!("{}/{}/{}", org, user, repo), &reference).ok()
 }
 
 /*
@@ -191,16 +142,13 @@ digest - unique identifier for the blob to be downoaded
  */
 
 #[get("/v2/<name_repo>/blobs/<digest>")]
-fn get_blob(name_repo: String, digest: String, _auth_user: AuthorisedUser) -> Option<NamedFile> {
-    let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, name_repo, digest);
-    info!("Path: {}", path);
-    let path = Path::new(&path);
-
-    if path.exists() {
-        NamedFile::open(path).ok()
-    } else {
-        None
-    }
+fn get_blob(
+    ci: rocket::State<ClientInterface>,
+    name_repo: String,
+    digest: String,
+    _auth_user: AuthorisedUser,
+) -> Option<BlobReader> {
+    ci.get_reader_for_blob(&name_repo, &digest).ok()
 }
 /*
  * Parse 2 level <repo>/<name> style path and pass it to get_blob
@@ -208,12 +156,13 @@ fn get_blob(name_repo: String, digest: String, _auth_user: AuthorisedUser) -> Op
 
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
 fn get_blob_qualified(
+    ci: rocket::State<ClientInterface>,
     name: String,
     repo: String,
     digest: String,
     auth_user: AuthorisedUser,
-) -> Option<NamedFile> {
-    get_blob(format!("{}/{}", name, repo), digest, auth_user)
+) -> Option<BlobReader> {
+    get_blob(ci, format!("{}/{}", name, repo), digest, auth_user)
 }
 
 /*
@@ -221,13 +170,14 @@ fn get_blob_qualified(
  */
 #[get("/v2/<org>/<name>/<repo>/blobs/<digest>")]
 fn get_blob_qualified_3level(
+    ci: rocket::State<ClientInterface>,
     org: String,
     name: String,
     repo: String,
     digest: String,
     auth_user: AuthorisedUser,
-) -> Option<NamedFile> {
-    get_blob(format!("{}/{}/{}", org, name, repo), digest, auth_user)
+) -> Option<BlobReader> {
+    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest, auth_user)
 }
 /*
 ---
@@ -267,8 +217,8 @@ fn put_blob(
     uuid: String,
     query: UploadQuery,
 ) -> Result<AcceptedUpload, Error> {
-
-    ci.complete_upload(&repo_name, &uuid, &query.digest).map_err(|_| Error::InternalError)
+    ci.complete_upload(&repo_name, &uuid, &query.digest)
+        .map_err(|_| Error::InternalError)
 }
 
 /*
@@ -435,53 +385,26 @@ Content-Type: <manifest media type>
  */
 #[put("/v2/<repo_name>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest(
+    ci: rocket::State<ClientInterface>,
     repo_name: String,
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<ManifestUpload, Error> {
-    let mut manifest_bytes = Vec::new();
-    //TODO From this point on, should stream to backend
-    //Note that back end will need to have manifest, user, repo, ref
-    //and possibly some sort of auth token
-    //Needs to return digest & location or error
-    //Just do this synchronous, let grpc deal with timeouts
-    chunk.stream_to(&mut manifest_bytes).unwrap();
-    // TODO: wouldn't shadowing be better here?
-    let raw_manifest = str::from_utf8(&manifest_bytes).unwrap();
-    let manifest_json: serde_json::Value = serde_json::from_str(raw_manifest).unwrap();
-    let manifest = match manifest::Manifest::from_json(&manifest_json) {
-        Ok(x) => x,
-        Err(_) => return Err(Error::ManifestInvalid),
-    };
+    /*
+    ci.get_write_sink_for_manifest();
+    write_to_sink
+    ci.verify_manifest()
 
-    for digest in manifest.get_asset_digests() {
-        let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, repo_name, digest);
-        info!("Path: {}", path);
-        let path = Path::new(&path);
+    */
+    
+    let mut sink = ci
+        .get_write_sink_for_manifest(&repo_name, &reference)
+        .unwrap();
+    chunk.stream_to(&mut sink).unwrap();
+    let vm = ci.verify_manifest(&repo_name, &reference).unwrap();
 
-        if !path.exists() {
-            warn!("Layer does not exist in repo");
-            return Err(Error::ManifestInvalid);
-        }
-    }
-
-    // TODO: check signature and names are correct on v1 manifests
-
-    // save manifest file
-
-    let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, repo_name);
-    let manifest_path = format!("{}/{}", manifest_directory, reference);
-    fs::create_dir_all(manifest_directory).unwrap();
-    let mut file = fs::File::create(manifest_path).unwrap();
-    file.write_all(raw_manifest.as_bytes()).unwrap();
-
-    let digest = gen_digest(raw_manifest.as_bytes());
-    let location = format!(
-        "http://localhost:5000/v2/{}/manifests/{}",
-        repo_name, digest
-    );
-
-    Ok(ManifestUpload { digest, location })
+    //return Err(Error::ManifestInvalid);
+    Ok(ManifestUpload { digest: vm.digest().to_string(), location: vm.location().to_string() })
 }
 
 /*
@@ -489,12 +412,13 @@ fn put_image_manifest(
  */
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest_qualified(
+    ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<ManifestUpload, Error> {
-    put_image_manifest(format!("{}/{}", user, repo), reference, chunk)
+    put_image_manifest(ci, format!("{}/{}", user, repo), reference, chunk)
 }
 
 /*
@@ -505,18 +429,14 @@ fn put_image_manifest_qualified(
     data = "<chunk>"
 )]
 fn put_image_manifest_qualified_3level(
+    ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<ManifestUpload, Error> {
-    put_image_manifest(format!("{}/{}/{}", org, user, repo), reference, chunk)
-}
-fn gen_digest(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.input(bytes);
-    format!("sha256:{}", hasher.result_str())
+    put_image_manifest(ci, format!("{}/{}/{}", org, user, repo), reference, chunk)
 }
 
 /*

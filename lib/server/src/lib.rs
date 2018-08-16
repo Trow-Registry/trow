@@ -1,8 +1,13 @@
 extern crate failure;
+#[macro_use] extern crate failure_derive;
 extern crate futures;
 extern crate grpcio;
 extern crate protobuf;
 extern crate uuid;
+#[macro_use] extern crate serde_derive;
+extern crate serde_json;
+extern crate rustc_serialize;
+extern crate crypto;
 
 #[macro_use(log, warn, info, debug)]
 extern crate log;
@@ -10,6 +15,7 @@ extern crate trow_protobuf;
 
 mod peer;
 mod server;
+pub mod manifest;
 use std::thread;
 use peer::PeerService;
 use server::BackendService;
