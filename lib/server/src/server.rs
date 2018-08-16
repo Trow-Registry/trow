@@ -83,6 +83,59 @@ fn save_layer(repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Erro
     Ok(())
 }
 
+fn create_verified_manifest(
+    repo_name: String,
+    reference: String,
+    do_verification: bool,
+) -> Result<VerifiedManifest, Error> {
+    let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, repo_name);
+    let manifest_path = format!("{}/{}", manifest_directory, reference);
+
+    let manifest_bytes = std::fs::read(&manifest_path)?;
+    let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
+    let manifest = Manifest::from_json(&manifest_json)?;
+
+    if do_verification {
+        //TODO: Need to make sure we find things indexed by digest or tag
+        for digest in manifest.get_asset_digests() {
+            let path = format!(
+                "{}/{}/{}/{}",
+                DATA_DIR,
+                LAYERS_DIR,
+                repo_name,
+                digest
+            );
+            info!("Path: {}", path);
+            let path = Path::new(&path);
+
+            if !path.exists() {
+                return Err(format_err!(
+                    "Failed to find {} in {}",
+                    digest,
+                    repo_name
+                ));
+            }
+        }
+
+        // TODO: check signature and names are correct on v1 manifests
+    }
+
+    let mut vm = VerifiedManifest::new();
+    //TODO: Shouldn't this be the URL?!
+    vm.set_location(manifest_path);
+    /*
+            let location = format!(
+            "http://localhost:5000/v2/{}/manifests/{}",
+            mr.get_repo_name(),
+            digest
+        );
+        */
+    //TODO: Only generate if verification is on, otherwise copy from somewhere
+    vm.set_digest(gen_digest(&manifest_bytes));
+    vm.set_content_type(manifest.get_media_type().to_string());
+    Ok(vm)
+}
+
 impl trow_protobuf::server_grpc::Backend for BackendService {
     fn get_write_location_for_blob(
         &self,
@@ -90,6 +143,9 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         blob_ref: BlobRef,
         sink: grpcio::UnarySink<WriteLocation>,
     ) {
+        // Apparently unwrap() is correct here. From the docs:
+        // "We unwrap() the return value to assert that we are not expecting
+        // threads to ever fail while holding the lock."
         let set = self.uploads.lock().unwrap();
         //LAYER MUST DIE!
         let layer = Layer {
@@ -184,21 +240,24 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         mr: ManifestRef,
         sink: grpcio::UnarySink<VerifiedManifest>,
     ) {
-        let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, mr.get_repo_name());
-        let manifest_path = format!("{}/{}", manifest_directory, mr.get_reference());
-
-        let manifest_bytes = std::fs::read(&manifest_path).unwrap();
-        let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
-        let manifest = Manifest::from_json(&manifest_json).unwrap();
-
-        let mut vm = VerifiedManifest::new();
-        vm.set_location(manifest_path);
-        vm.set_digest(gen_digest(&manifest_bytes));
-        vm.set_content_type(manifest.get_media_type().to_string());
-        let f = sink
-            .success(vm)
-            .map_err(move |e| warn!("Failed sending to client {:?}", e));
-        ctx.spawn(f);
+        //Don't actually need to verify here; could set to false
+        match create_verified_manifest(mr.repo_name, mr.reference, true) {
+            Ok(vm) => {
+                let f = sink
+                    .success(vm)
+                    .map_err(move |e| warn!("Failed sending to client {:?}", e));
+                ctx.spawn(f);
+            }
+            Err(e) => {
+                warn!("Internal error with manifest {:?}", e);
+                let f = sink
+                    .fail(RpcStatus::new(
+                        RpcStatusCode::Internal,
+                        Some("Internal error finding manifest".to_string()),
+                    )).map_err(|e| warn!("Failed to send error message to client {:?}", e));
+                ctx.spawn(f);
+            }
+        }
     }
 
     fn request_upload(
@@ -265,50 +324,22 @@ impl trow_protobuf::server_grpc::Backend for BackendService {
         mr: ManifestRef,
         sink: grpcio::UnarySink<VerifiedManifest>,
     ) {
-        // TODO: wouldn't shadowing be better here?
-        let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, mr.get_repo_name());
-        let manifest_path = format!("{}/{}", manifest_directory, mr.get_reference());
-        //let mut file = File::open(manifest_path).unwrap();
-        let manifest_bytes = std::fs::read(manifest_path).unwrap();
-        let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
-        let manifest = Manifest::from_json(&manifest_json).unwrap();
-
-        //TODO: Need to make sure we find things indexed by digest or tag
-        for digest in manifest.get_asset_digests() {
-            let path = format!(
-                "{}/{}/{}/{}",
-                DATA_DIR,
-                LAYERS_DIR,
-                mr.get_repo_name(),
-                digest
-            );
-            info!("Path: {}", path);
-            let path = Path::new(&path);
-
-            if !path.exists() {
-                warn!("Layer does not exist in repo");
-                //TODO: Error out here
+        match create_verified_manifest(mr.get_repo_name().to_string(), mr.get_reference().to_string(), true) {
+            Ok(vm) => {
+                let f = sink
+                    .success(vm)
+                    .map_err(move |e| warn!("failed to reply! {:?}", e));
+                ctx.spawn(f);
+            }
+            Err(e) => {
+                warn!("Error verifying manifest {:?}", e);
+                let f = sink
+                    .fail(RpcStatus::new(
+                        RpcStatusCode::Internal,
+                        Some("Problem verifying manifest".to_string()),
+                    )).map_err(|e| warn!("Internal error saving file {:?}", e));
+                ctx.spawn(f);
             }
         }
-
-        // TODO: check signature and names are correct on v1 manifests
-
-        // save manifest file
-
-        let digest = gen_digest(&manifest_bytes);
-        let location = format!(
-            "http://localhost:5000/v2/{}/manifests/{}",
-            mr.get_repo_name(),
-            digest
-        );
-
-        let mut mv = VerifiedManifest::new();
-        mv.set_location(location);
-        mv.set_digest(digest);
-        mv.set_content_type(manifest.get_media_type().to_string());
-        let f = sink
-            .success(mv)
-            .map_err(move |e| warn!("failed to reply! {:?}", e));
-        ctx.spawn(f);
     }
 }
