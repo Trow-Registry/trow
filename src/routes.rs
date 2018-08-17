@@ -18,20 +18,20 @@ pub fn routes() -> Vec<rocket::Route> {
         get_manifest_2level,
         get_manifest_3level,
         get_blob,
-        get_blob_qualified,
-        put_blob_qualified_3level,
-        get_blob_qualified_3level,
-        patch_blob_qualified_3level,
+        get_blob_2level,
+        get_blob_3level,
         put_blob,
-        put_blob_qualified,
+        put_blob_2level,
+        put_blob_3level,
         patch_blob,
-        patch_blob_qualified,
+        patch_blob_2level,
+        patch_blob_3level,
         post_blob_upload,
+        post_blob_upload_2level,
         post_blob_upload_3level,
-        post_blob_upload_onename,
         put_image_manifest,
-        put_image_manifest_qualified,
-        put_image_manifest_qualified_3level,
+        put_image_manifest_2level,
+        put_image_manifest_3level,
         delete_image_manifest,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
@@ -157,7 +157,7 @@ fn get_blob(
  */
 
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
-fn get_blob_qualified(
+fn get_blob_2level(
     ci: rocket::State<ClientInterface>,
     name: String,
     repo: String,
@@ -171,7 +171,7 @@ fn get_blob_qualified(
  * Parse 3 level <org>/<repo>/<name> style path and pass it to get_blob
  */
 #[get("/v2/<org>/<name>/<repo>/blobs/<digest>")]
-fn get_blob_qualified_3level(
+fn get_blob_3level(
     ci: rocket::State<ClientInterface>,
     org: String,
     name: String,
@@ -227,7 +227,7 @@ fn put_blob(
  * Parse 2 level <repo>/<name> style path and pass it to put_blob
  */
 #[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
-fn put_blob_qualified(
+fn put_blob_2level(
     config: rocket::State<ClientInterface>,
     repo: String,
     name: String,
@@ -241,7 +241,7 @@ fn put_blob_qualified(
  * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
  */
 #[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
-fn put_blob_qualified_3level(
+fn put_blob_3level(
     config: rocket::State<ClientInterface>,
     org: String,
     repo: String,
@@ -295,7 +295,7 @@ fn patch_blob(
  * Parse 2 level <repo>/<name> style path and pass it to patch_blob
  */
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
-fn patch_blob_qualified(
+fn patch_blob_2level(
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
@@ -312,7 +312,7 @@ fn patch_blob_qualified(
     "/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>",
     data = "<chunk>"
 )]
-fn patch_blob_qualified_3level(
+fn patch_blob_3level(
     handler: rocket::State<ClientInterface>,
     org: String,
     repo: String,
@@ -330,7 +330,7 @@ fn patch_blob_qualified_3level(
   No data is being transferred yet.
  */
 #[post("/v2/<repo_name>/blobs/uploads")]
-fn post_blob_upload_onename(
+fn post_blob_upload(
     ci: rocket::State<ClientInterface>,
     repo_name: String,
 ) -> Result<UploadInfo, Error> {
@@ -354,13 +354,13 @@ fn post_blob_upload_onename(
  * Parse 2 level <repo>/<name> style path and pass it to put_blob_upload_onename
  */
 #[post("/v2/<repo>/<name>/blobs/uploads")]
-fn post_blob_upload(
+fn post_blob_upload_2level(
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload {}/{}", repo, name);
-    post_blob_upload_onename(ci, format!("{}/{}", repo, name))
+    post_blob_upload(ci, format!("{}/{}", repo, name))
 }
 
 /*
@@ -374,7 +374,7 @@ fn post_blob_upload_3level(
     name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload 3 way {}/{}/{}", org, repo, name);
-    post_blob_upload_onename(ci, format!("{}/{}/{}", org, repo, name))
+    post_blob_upload(ci, format!("{}/{}/{}", org, repo, name))
 }
 
 /*
@@ -411,7 +411,7 @@ fn put_image_manifest(
  * Parse 2 level <user>/<repo> style path and pass it to put_image_manifest
  */
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
-fn put_image_manifest_qualified(
+fn put_image_manifest_2level(
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
@@ -428,7 +428,7 @@ fn put_image_manifest_qualified(
     "/v2/<org>/<user>/<repo>/manifests/<reference>",
     data = "<chunk>"
 )]
-fn put_image_manifest_qualified_3level(
+fn put_image_manifest_3level(
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
