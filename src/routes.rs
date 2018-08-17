@@ -112,7 +112,8 @@ fn get_manifest_2level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-    ci.get_reader_for_manifest(&format!("{}/{}", user, repo), &reference).ok()
+    ci.get_reader_for_manifest(&format!("{}/{}", user, repo), &reference)
+        .ok()
 }
 
 /*
@@ -126,7 +127,8 @@ fn get_manifest_3level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-    ci.get_reader_for_manifest(&format!("{}/{}/{}", org, user, repo), &reference).ok()
+    ci.get_reader_for_manifest(&format!("{}/{}/{}", org, user, repo), &reference)
+        .ok()
 }
 
 /*
@@ -197,7 +199,6 @@ Content-Type: application/octet-stream
 
 <Layer Chunk Binary Data>
  */
-
 
 #[derive(FromForm)]
 struct UploadQuery {
@@ -391,21 +392,19 @@ fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<ManifestUpload, Error> {
-    /*
-    ci.get_write_sink_for_manifest();
-    write_to_sink
-    ci.verify_manifest()
-
-    */
-    
-    let mut sink = ci
+    match ci
         .get_write_sink_for_manifest(&repo_name, &reference)
-        .unwrap();
-    chunk.stream_to(&mut sink).unwrap();
-    let vm = ci.verify_manifest(&repo_name, &reference).unwrap();
-
-    //return Err(Error::ManifestInvalid);
-    Ok(ManifestUpload { digest: vm.digest().to_string(), location: vm.location().to_string() })
+        .map(|mut sink| chunk.stream_to(&mut sink))
+    {
+        Ok(_) => match ci.verify_manifest(&repo_name, &reference) {
+            Ok(vm) => Ok(ManifestUpload {
+                digest: vm.digest().to_string(),
+                location: vm.location().to_string(),
+            }),
+            Err(_) => Err(Error::ManifestInvalid),
+        },
+        Err(_) => Err(Error::InternalError)
+    }
 }
 
 /*
