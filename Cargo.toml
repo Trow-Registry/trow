@@ -7,6 +7,7 @@ authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchi
 rust-crypto = "^0.2"
 jwt = "^0.4"
 rustc-serialize = "^0.3"
+proc-macro2 = "=0.4.12"
 
 #rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "b0f86dcba0629e1ab402c35e1ac2602348aad0d7", features = ["tls"] }
 #rocket_codegen = { git = "https://github.com/SergioBenitez/Rocket", rev = "b0f86dcba0629e1ab402c35e1ac2602348aad0d7" }
@@ -38,6 +39,7 @@ failure_derive = "^0.1"
 
 trow-protobuf = { path = "./lib/protobuf" }
 trow-server = { path = "./lib/server" }
+
 
 #This is a rocket dependency, but we need a newer version with the p>q bugfix
 ring ="^0.13"

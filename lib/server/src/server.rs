@@ -32,13 +32,13 @@ static LAYERS_DIR: &'static str = "layers";
 ///
 /// _uploads_: a HashSet of all uuids that are currently being tracked
 #[derive(Clone)]
-pub struct BackendService {
+pub struct TrowService {
     uploads: Arc<Mutex<std::collections::HashSet<Layer>>>,
 }
 
-impl BackendService {
+impl TrowService {
     pub fn new() -> Self {
-        BackendService {
+        TrowService {
             uploads: Arc::new(Mutex::new(std::collections::HashSet::new())),
         }
     }
@@ -136,7 +136,7 @@ fn create_verified_manifest(
     Ok(vm)
 }
 
-impl trow_protobuf::server_grpc::Backend for BackendService {
+impl trow_protobuf::server_grpc::Backend for TrowService {
     fn get_write_location_for_blob(
         &self,
         ctx: grpcio::RpcContext,

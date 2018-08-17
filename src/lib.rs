@@ -81,16 +81,17 @@ struct TlsConfig {
     key_file: String,
 }
 
-fn init_grpc(
+fn init_trow_server(
+    data_path: String,
     listen_host: String,
     listen_port: u16,
     bootstrap_host: String,
     bootstrap_port: u16,
 ) -> Result<std::thread::JoinHandle<()>, Error> {
-    debug!("Setting up RPC Server");
+    debug!("Starting Trow server");
 
     Ok(thread::spawn(move || {
-        trow_server::server(&listen_host, listen_port, &bootstrap_host, bootstrap_port);
+        trow_server::start_server(&data_path, &listen_host, listen_port);
     }))
 }
 
@@ -162,9 +163,9 @@ impl TrowBuilder {
 
     pub fn start(&self) -> Result<(), Error> {
         init_logger()?;
-        create_data_dirs(Path::new(&self.data_dir))?;
         // GRPC Backend thread.
-        let _grpc_thread = init_grpc(
+        let _grpc_thread = init_trow_server(
+            self.data_dir.clone(),
             self.grpc.listen.host.clone(),
             self.grpc.listen.port,
             self.grpc.bootstrap.host.clone(),
