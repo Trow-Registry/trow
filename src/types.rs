@@ -1,16 +1,16 @@
 use std::io::Read;
 
-pub type Digest = String;
+pub struct Uuid(String);
 
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
-    uuid: String,
+    uuid: Uuid,
     repo_name: String,
     range: (u32, u32),
 }
 
 impl UploadInfo {
-    pub fn uuid(&self) -> &str {
+    pub fn uuid(&self) -> &Uuid {
         &self.uuid
     }
 
@@ -23,7 +23,7 @@ impl UploadInfo {
     }
 }
 
-pub fn create_upload_info(uuid: String, repo_name: String, range: (u32, u32)) -> UploadInfo {
+pub fn create_upload_info(uuid: Uuid, repo_name: String, range: (u32, u32)) -> UploadInfo {
     UploadInfo {
         uuid,
         repo_name,
@@ -116,12 +116,4 @@ impl BlobReader {
 
 pub fn create_blob_reader(reader: Box<Read>, digest: String) -> BlobReader {
     BlobReader { reader, digest }
-}
-
-
-//DIE MOFO
-#[derive(Debug, Clone)]
-pub struct Layer {
-    pub digest: Digest,
-    pub repo_name: String,
 }
