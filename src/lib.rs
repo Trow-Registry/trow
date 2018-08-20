@@ -38,8 +38,6 @@ extern crate quickcheck;
 
 use failure::Error;
 use std::env;
-use std::fs;
-use std::path::Path;
 use std::thread;
 
 use rocket::fairing;
@@ -50,9 +48,6 @@ mod routes;
 mod types;
 
 use client_interface::ClientInterface;
-
-static SCRATCH_DIR: &'static str = "scratch";
-static LAYERS_DIR: &'static str = "layers";
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -73,7 +68,6 @@ pub struct TrowBuilder {
 
 struct GrpcConfig {
     listen: NetAddr,
-    bootstrap: NetAddr,
 }
 
 struct TlsConfig {
@@ -85,8 +79,6 @@ fn init_trow_server(
     data_path: String,
     listen_host: String,
     listen_port: u16,
-    bootstrap_host: String,
-    bootstrap_port: u16,
 ) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Starting Trow server");
 
@@ -110,33 +102,19 @@ fn init_logger() -> Result<(), SetLoggerError> {
     builder.init()
 }
 
-fn create_data_dirs(data_path: &Path) -> Result<(), Error> {
-    fn setup_path(path: std::path::PathBuf) -> Result<(), Error> {
-        if !path.exists() {
-            fs::create_dir_all(&path)?;
-        }
-        Ok(())
-    }
 
-    let scratch_path = data_path.join(SCRATCH_DIR);
-    let layers_path = data_path.join(LAYERS_DIR);
-    setup_path(scratch_path)
-        .and(setup_path(layers_path))
-        .map_err(|_| ConfigError {}.into())
-}
 
 impl TrowBuilder {
     pub fn new(
         data_dir: String,
         addr: NetAddr,
-        listen: NetAddr,
-        bootstrap: NetAddr,
+        listen: NetAddr
     ) -> TrowBuilder {
         TrowBuilder {
             data_dir,
             addr,
             tls: None,
-            grpc: GrpcConfig { listen, bootstrap },
+            grpc: GrpcConfig { listen },
         }
     }
 
@@ -168,8 +146,6 @@ impl TrowBuilder {
             self.data_dir.clone(),
             self.grpc.listen.host.clone(),
             self.grpc.listen.port,
-            self.grpc.bootstrap.host.clone(),
-            self.grpc.bootstrap.port,
         )?;
 
         //TODO: shouldn't need to clone rocket config

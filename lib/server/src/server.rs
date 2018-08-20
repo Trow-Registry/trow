@@ -18,6 +18,8 @@ use crypto::sha2::Sha256;
 static DATA_DIR: &'static str = "data";
 static MANIFESTS_DIR: &'static str = "manifests";
 static LAYERS_DIR: &'static str = "layers";
+static SCRATCH_DIR: &'static str = "scratch";
+
 
 /*
  * TODO: figure out what needs to be stored in the backend
@@ -34,14 +36,34 @@ static LAYERS_DIR: &'static str = "layers";
 #[derive(Clone)]
 pub struct TrowService {
     uploads: Arc<Mutex<std::collections::HashSet<Layer>>>,
+    data_path: String
 }
 
 impl TrowService {
-    pub fn new() -> Self {
-        TrowService {
+    pub fn new(data_path: &str) -> Result<Self, Error> {
+        let svc = TrowService {
             uploads: Arc::new(Mutex::new(std::collections::HashSet::new())),
-        }
+            data_path: data_path.to_owned()
+        };
+        create_data_dirs(&svc.data_path)?;
+        Ok(svc)
     }
+}
+
+fn create_data_dirs(data_path: &str) -> Result<(), Error> {
+    fn setup_path(path: std::path::PathBuf) -> Result<(), Error> {
+        if !path.exists() {
+            fs::create_dir_all(&path)?;
+        }
+        Ok(())
+    }
+
+    let data_path = Path::new(data_path);
+    let scratch_path = data_path.join(SCRATCH_DIR);
+    let layers_path = data_path.join(LAYERS_DIR);
+    setup_path(scratch_path)
+        .and(setup_path(layers_path))?;
+    Ok(())
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]

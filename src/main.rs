@@ -88,11 +88,7 @@ fn main() {
         host: "127.0.0.1".to_owned(),
         port: 51000,
     };
-    let grpc_boot = NetAddr {
-        host: "127.0.0.1".to_owned(),
-        port: 3117,
-    };
-    let mut builder = TrowBuilder::new(data_path.to_string(), addr, grpc_listen, grpc_boot);
+    let mut builder = TrowBuilder::new(data_path.to_string(), addr, grpc_listen);
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
     }
