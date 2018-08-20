@@ -17,6 +17,7 @@ extern crate rustc_serialize;
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
+#[macro_use] extern crate display_derive;
 
 extern crate trow_protobuf;
 extern crate trow_server;

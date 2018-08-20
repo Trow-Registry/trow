@@ -8,7 +8,7 @@ use response::manifest_upload::ManifestUpload;
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
-use types::{create_upload_info, AcceptedUpload, BlobReader, ManifestReader};
+use types::{create_upload_info, AcceptedUpload, BlobReader, ManifestReader, Uuid, RepoName, Digest};
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -102,7 +102,7 @@ fn get_manifest(
     reference: String,
 ) -> Option<ManifestReader> {
     //Need to handle error
-    ci.get_reader_for_manifest(&onename, &reference).ok()
+    ci.get_reader_for_manifest(&RepoName(onename), &reference).ok()
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
@@ -112,7 +112,7 @@ fn get_manifest_2level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-    ci.get_reader_for_manifest(&format!("{}/{}", user, repo), &reference)
+    ci.get_reader_for_manifest(&RepoName(format!("{}/{}", user, repo)), &reference)
         .ok()
 }
 
@@ -127,7 +127,7 @@ fn get_manifest_3level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-    ci.get_reader_for_manifest(&format!("{}/{}/{}", org, user, repo), &reference)
+    ci.get_reader_for_manifest(&RepoName(format!("{}/{}/{}", org, user, repo)), &reference)
         .ok()
 }
 
@@ -150,7 +150,7 @@ fn get_blob(
     digest: String,
     _auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    ci.get_reader_for_blob(&name_repo, &digest).ok()
+    ci.get_reader_for_blob(&RepoName(name_repo), &Digest(digest)).ok()
 }
 /*
  * Parse 2 level <repo>/<name> style path and pass it to get_blob
@@ -219,7 +219,7 @@ fn put_blob(
     uuid: String,
     query: UploadQuery,
 ) -> Result<AcceptedUpload, Error> {
-    ci.complete_upload(&repo_name, &uuid, &query.digest)
+    ci.complete_upload(&RepoName(repo_name), &Uuid(uuid), &Digest(query.digest))
         .map_err(|_| Error::InternalError)
 }
 
@@ -266,7 +266,10 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    let sink = ci.get_write_sink_for_upload(&repo_name, &uuid);
+
+    let repo = RepoName(repo_name);
+    let uuid = Uuid(uuid);
+    let sink = ci.get_write_sink_for_upload(&repo, &uuid);
 
     match sink {
         Ok(mut sink) => {
@@ -276,7 +279,7 @@ fn patch_blob(
             let len = chunk.stream_to(&mut sink);
             match len {
                 //TODO: For chunked upload this should be start pos to end pos
-                Ok(len) => Ok(create_upload_info(uuid, repo_name, (0, len as u32))),
+                Ok(len) => Ok(create_upload_info(uuid, repo, (0, len as u32))),
                 Err(_) => Err(Error::InternalError),
             }
         }
@@ -344,7 +347,7 @@ fn post_blob_upload(
     and tell the backend what the UUID is. This is a potential
     optimisation, but is arguably less flexible.
     */
-    ci.request_upload(&repo_name).map_err(|e| {
+    ci.request_upload(&RepoName(repo_name)).map_err(|e| {
         warn!("Error getting ref from backend: {}", e);
         Error::InternalError
     })
@@ -392,11 +395,13 @@ fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<ManifestUpload, Error> {
+
+    let repo = RepoName(repo_name);
     match ci
-        .get_write_sink_for_manifest(&repo_name, &reference)
+        .get_write_sink_for_manifest(&repo, &reference)
         .map(|mut sink| chunk.stream_to(&mut sink))
     {
-        Ok(_) => match ci.verify_manifest(&repo_name, &reference) {
+        Ok(_) => match ci.verify_manifest(&repo, &reference) {
             Ok(vm) => Ok(ManifestUpload {
                 digest: vm.digest().to_string(),
                 location: vm.location().to_string(),

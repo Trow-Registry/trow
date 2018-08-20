@@ -25,6 +25,7 @@ log = "^0.3"
 env_logger = "^0.4"
 ctrlc = { version = "^3.0", features = ["termination"] }
 hostname = "^0.1"
+display_derive = "^0.0"
 
 grpcio = "=0.2.3"
 protobuf = "=1.4.5"

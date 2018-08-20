@@ -13,7 +13,7 @@ impl<'r> Responder<'r> for UploadInfo {
             self.uuid()
         );
         let (left, right) = self.range();
-        let upload_uuid = Header::new("Docker-Upload-UUID", self.uuid().to_owned());
+        let upload_uuid = Header::new("Docker-Upload-UUID", self.uuid().0.clone());
         let range = Header::new("Range", format!("{}-{}", left, right));
         let length = Header::new("X-Content-Length", format!("{}", right - left));
         let location = Header::new("Location", location_url);
@@ -34,10 +34,11 @@ impl<'r> Responder<'r> for UploadInfo {
 mod test {
     use response::upload_info::{UploadInfo, create_upload_info};
     use rocket::http::Status;
+    use types::{RepoName, Uuid};
 
     use response::test_helper::test_route;
     fn build_response() -> UploadInfo {
-        create_upload_info(String::from("whatever"), String::from("moredhel/test"), (0, 0))
+        create_upload_info(Uuid("whatever".to_owned()), RepoName("moredhel/test".to_owned()), (0, 0))
     }
 
     #[test]

@@ -23,40 +23,40 @@ impl ClientInterface {
      * just changing this file...
      **/
 
-    pub fn request_upload(&self, repo_name: &str) -> Result<UploadInfo, Error> {
+    pub fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
         let mut req = UploadRequest::new();
-        req.set_repo_name(repo_name.to_owned());
+        req.set_repo_name(repo_name.0.clone());
 
         let response = self.backend.request_upload(&req)?;
 
         Ok(create_upload_info(
-            response.get_uuid().to_owned(),
-            repo_name.to_string(),
+            types::Uuid(response.get_uuid().to_owned()),
+            repo_name.clone(),
             (0, 0),
         ))
     }
 
-    pub fn complete_upload(&self, repo_name: &str, uuid: &str, digest: &str) -> Result<AcceptedUpload, Error> {
+    pub fn complete_upload(&self, repo_name: &RepoName, uuid: &Uuid, digest: &Digest) -> Result<AcceptedUpload, Error> {
 
         let mut req = CompleteRequest::new();
-        req.set_repo_name(repo_name.to_string());
-        req.set_uuid(uuid.to_string());
-        req.set_user_digest(digest.to_string());
+        req.set_repo_name(repo_name.0.clone());
+        req.set_uuid(uuid.0.clone());
+        req.set_user_digest(digest.0.clone());
         let resp = self.backend.complete_upload(&req)?;
 
-        Ok(create_accepted_upload(resp.digest.to_owned(), repo_name.to_owned()))
+        Ok(create_accepted_upload(Digest(resp.digest.to_owned()), repo_name.clone()))
    
     }
 
     pub fn get_write_sink_for_upload (
         &self,
-        repo_name: &str,
-        uuid: &str,
+        repo_name: &RepoName,
+        uuid: &Uuid,
     ) -> Result<impl Write, Error> {
 
         let mut br = BlobRef::new();
-        br.set_uuid(uuid.to_owned());
-        br.set_repo_name(repo_name.to_owned());
+        br.set_uuid(uuid.0.clone());
+        br.set_repo_name(repo_name.0.clone());
 
         let resp = self.backend.get_write_location_for_blob(&br)?;
         
@@ -67,13 +67,13 @@ impl ClientInterface {
     
     pub fn get_write_sink_for_manifest (
         &self,
-        repo_name: &str,
+        repo_name: &RepoName,
         reference: &str,
     ) -> Result<impl Write, Error> {
 
         let mut mr = ManifestRef::new();
         mr.set_reference(reference.to_owned());
-        mr.set_repo_name(repo_name.to_owned());
+        mr.set_repo_name(repo_name.0.clone());
 
         let resp = self.backend.get_write_location_for_manifest(&mr)?;
         
@@ -85,54 +85,54 @@ impl ClientInterface {
 
     pub fn get_reader_for_manifest (
         &self,
-        repo_name: &str,
+        repo_name: &RepoName,
         reference: &str,
     ) -> Result<ManifestReader, Error> {
 
         let mut mr = ManifestRef::new();
         mr.set_reference(reference.to_owned());
-        mr.set_repo_name(repo_name.to_owned());
+        mr.set_repo_name(repo_name.0.clone());
 
         let resp = self.backend.get_read_location_for_manifest(&mr)?;
         
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.location)?;
-        let mr = create_manifest_reader(Box::new(file), resp.content_type, resp.digest);
+        let mr = create_manifest_reader(Box::new(file), resp.content_type, Digest(resp.digest.to_owned()));
         Ok(mr)
 
     }
 
     pub fn get_reader_for_blob (
         &self,
-        repo_name: &str,
-        digest: &str,
+        repo_name: &RepoName,
+        digest: &Digest,
     ) -> Result<BlobReader, Error> {
 
         let mut dr = DownloadRef::new();
-        dr.set_digest(digest.to_owned());
-        dr.set_repo_name(repo_name.to_owned());
+        dr.set_digest(digest.0.clone());
+        dr.set_repo_name(repo_name.0.clone());
 
         let resp = self.backend.get_read_location_for_blob(&dr)?;
         
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let br = create_blob_reader(Box::new(file), digest.to_string());
+        let br = create_blob_reader(Box::new(file), digest.clone());
         Ok(br)
     }
 
     pub fn verify_manifest (
         &self,
-        repo_name: &str,
+        repo_name: &RepoName,
         reference: &str,
     ) -> Result<types::VerifiedManifest, Error> {
 
         let mut mr = ManifestRef::new();
         mr.set_reference(reference.to_owned());
-        mr.set_repo_name(repo_name.to_owned());
+        mr.set_repo_name(repo_name.0.clone());
 
         let resp = self.backend.verify_manifest(&mr)?;
         
-        let vm = create_verified_manifest(resp.get_location().to_string(), resp.get_digest().to_string(), resp.get_content_type().to_string());
+        let vm = create_verified_manifest(resp.get_location().to_string(), Digest(resp.get_digest().to_string()), resp.get_content_type().to_string());
         Ok(vm)
     }
 }

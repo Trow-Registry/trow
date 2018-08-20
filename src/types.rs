@@ -1,11 +1,21 @@
 use std::io::Read;
 
-pub struct Uuid(String);
+#[derive(Clone, Debug, Display, Serialize)]
+#[display(fmt = "{}", _0)]
+pub struct Uuid(pub String);
+
+#[derive(Clone, Debug, Display, Serialize)]
+#[display(fmt = "{}", _0)]
+pub struct RepoName(pub String);
+
+#[derive(Clone, Debug, Display, Serialize)]
+#[display(fmt = "{}", _0)]
+pub struct Digest(pub String);
 
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
     uuid: Uuid,
-    repo_name: String,
+    repo_name: RepoName,
     range: (u32, u32),
 }
 
@@ -14,7 +24,7 @@ impl UploadInfo {
         &self.uuid
     }
 
-    pub fn repo_name(&self) -> &str {
+    pub fn repo_name(&self) -> &RepoName {
         &self.repo_name
     }
 
@@ -23,7 +33,7 @@ impl UploadInfo {
     }
 }
 
-pub fn create_upload_info(uuid: Uuid, repo_name: String, range: (u32, u32)) -> UploadInfo {
+pub fn create_upload_info(uuid: Uuid, repo_name: RepoName, range: (u32, u32)) -> UploadInfo {
     UploadInfo {
         uuid,
         repo_name,
@@ -33,11 +43,11 @@ pub fn create_upload_info(uuid: Uuid, repo_name: String, range: (u32, u32)) -> U
 
 #[derive(Debug, Serialize)]
 pub struct AcceptedUpload {
-    digest: String,
-    repo_name: String,
+    digest: Digest,
+    repo_name: RepoName,
 }
 
-pub fn create_accepted_upload(digest: String, repo_name: String) -> AcceptedUpload {
+pub fn create_accepted_upload(digest: Digest, repo_name: RepoName) -> AcceptedUpload {
     AcceptedUpload {
         digest,
         repo_name,
@@ -45,11 +55,11 @@ pub fn create_accepted_upload(digest: String, repo_name: String) -> AcceptedUplo
 }
 impl AcceptedUpload {
 
-    pub fn digest(&self) -> &str {
+    pub fn digest(&self) -> &Digest {
         &self.digest
     }
 
-    pub fn repo_name(&self) -> &str {
+    pub fn repo_name(&self) -> &RepoName {
         &self.repo_name
     }
 }
@@ -57,12 +67,12 @@ impl AcceptedUpload {
 #[derive(Debug, Serialize)]
 pub struct VerifiedManifest {
     location: String,
-    digest: String,
+    digest: Digest,
     content_type: String
 }
 
 impl VerifiedManifest {
-    pub fn digest(&self) -> &str {
+    pub fn digest(&self) -> &Digest {
         &self.digest
     }
 
@@ -71,13 +81,13 @@ impl VerifiedManifest {
     }
 }
 
-pub fn create_verified_manifest(location: String, digest: String, content_type: String) -> VerifiedManifest {
+pub fn create_verified_manifest(location: String, digest: Digest, content_type: String) -> VerifiedManifest {
     VerifiedManifest { location, digest, content_type }
 }
 
 pub struct ManifestReader {
     content_type: String,
-    digest: String,
+    digest: Digest,
     reader: Box<Read>,
 }
 
@@ -90,17 +100,17 @@ impl ManifestReader {
         &self.content_type
     }
 
-    pub fn digest(&self) -> &str {
+    pub fn digest(&self) -> &Digest {
         &self.digest
     }
 }
 
-pub fn create_manifest_reader(reader: Box<Read>, content_type: String, digest: String) -> ManifestReader {
+pub fn create_manifest_reader(reader: Box<Read>, content_type: String, digest: Digest) -> ManifestReader {
     ManifestReader { reader, content_type, digest }
 }
 
 pub struct BlobReader {
-    digest: String,
+    digest: Digest,
     reader: Box<Read>,
 }
 
@@ -109,11 +119,11 @@ impl BlobReader {
         self.reader
     }
 
-    pub fn digest(&self) -> &str {
+    pub fn digest(&self) -> &Digest {
         &self.digest
     }
 }
 
-pub fn create_blob_reader(reader: Box<Read>, digest: String) -> BlobReader {
+pub fn create_blob_reader(reader: Box<Read>, digest: Digest) -> BlobReader {
     BlobReader { reader, digest }
 }

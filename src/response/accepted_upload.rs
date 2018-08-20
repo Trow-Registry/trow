@@ -10,7 +10,7 @@ impl<'r> Responder<'r> for AcceptedUpload {
 
         let location = format!("{}/v2/{}/blobs/{}", get_base_url(req), self.repo_name(), self.digest());
         let location_header = Header::new("Location", location);
-        let digest_header = Header::new("Docker-Content-Digest", self.digest().to_owned());
+        let digest_header = Header::new("Docker-Content-Digest", self.digest().0.clone());
         Response::build()
             .status(Status::Created)
             .header(location_header)
@@ -23,12 +23,13 @@ impl<'r> Responder<'r> for AcceptedUpload {
 mod test {
     use response::upload_info::{create_upload_info, UploadInfo};
     use rocket::http::Status;
+    use types::{Uuid, RepoName};
 
     use response::test_helper::test_route;
     fn build_response() -> UploadInfo {
         create_upload_info(
-            String::from("whatever"),
-            String::from("moredhel/test"),
+            Uuid("whatever".to_owned()),
+            RepoName("moredhel/test".to_owned()),
             (0, 0),
         )
     }
