@@ -7,7 +7,7 @@ use grpcio::{self, RpcStatus, RpcStatusCode};
 use manifest::{FromJson, Manifest};
 use serde_json;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use trow_protobuf;
 use trow_protobuf::server::*;
 use uuid::Uuid;
@@ -20,7 +20,6 @@ static MANIFESTS_DIR: &'static str = "manifests";
 static LAYERS_DIR: &'static str = "layers";
 static SCRATCH_DIR: &'static str = "scratch";
 
-
 /*
  * TODO: figure out what needs to be stored in the backend
  * and what it's keyed on
@@ -29,55 +28,57 @@ static SCRATCH_DIR: &'static str = "scratch";
  * remember will probably want to split out metadata for search
  *
  */
-/// Struct implementing callbacks for the Frontend
-///
-/// _uploads_: a HashSet of all uuids that are currently being tracked
-/// Really not sure how this works with async
-/// Assume there is only a single instance, even with multiple queues
-/// Not sure about this mutex.
-/// Should be rwlock. 
+/* Struct implementing callbacks for the Frontend
+ *
+ * _uploads_: a HashSet of all uuids that are currently being tracked
+ *
+ * Each "route" gets a clone of this struct.
+ * The Arc makes sure they all point to the same data.
+ */
 #[derive(Clone)]
 pub struct TrowService {
     uploads: Arc<RwLock<std::collections::HashSet<Layer>>>,
-    data_path: String
+    manifests_path: PathBuf,
+    layers_path: PathBuf,
+    scratch_path: PathBuf,
 }
 
 impl TrowService {
     pub fn new(data_path: &str) -> Result<Self, Error> {
+        let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
+        let scratch_path = create_path(data_path, SCRATCH_DIR)?;
+        let layers_path = create_path(data_path, LAYERS_DIR)?;
         let svc = TrowService {
             uploads: Arc::new(RwLock::new(std::collections::HashSet::new())),
-            data_path: data_path.to_owned()
+            manifests_path,
+            layers_path,
+            scratch_path,
         };
-        create_data_dirs(&svc.data_path)?;
         Ok(svc)
+    }
+
+    fn get_path_for_blob_upload(&self, uuid: &str) -> String {
+        self.scratch_path
+            .join(uuid)
+            .to_str()
+            .unwrap_or("THIS_SHOULDNT_BE_POSSIBLE")
+            .to_string()
     }
 }
 
-fn create_data_dirs(data_path: &str) -> Result<(), Error> {
-    fn setup_path(path: std::path::PathBuf) -> Result<(), Error> {
-        if !path.exists() {
-            fs::create_dir_all(&path)?;
-        }
-        Ok(())
-    }
-
+fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, Error> {
     let data_path = Path::new(data_path);
-    let scratch_path = data_path.join(SCRATCH_DIR);
-    let layers_path = data_path.join(LAYERS_DIR);
-    setup_path(scratch_path)
-        .and(setup_path(layers_path))?;
-    Ok(())
+    let dir_path = data_path.join(dir);
+    if !dir_path.exists() {
+        fs::create_dir_all(&dir_path)?;
+    }
+    Ok(dir_path)
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 struct Layer {
     repo_name: String,
     digest: String,
-}
-
-//TODO: fix
-fn get_path_for_uuid(uuid: &str) -> String {
-    format!("data/scratch/{}", uuid)
 }
 
 fn gen_digest(bytes: &[u8]) -> String {
@@ -123,22 +124,12 @@ fn create_verified_manifest(
     if do_verification {
         //TODO: Need to make sure we find things indexed by digest or tag
         for digest in manifest.get_asset_digests() {
-            let path = format!(
-                "{}/{}/{}/{}",
-                DATA_DIR,
-                LAYERS_DIR,
-                repo_name,
-                digest
-            );
+            let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, repo_name, digest);
             info!("Path: {}", path);
             let path = Path::new(&path);
 
             if !path.exists() {
-                return Err(format_err!(
-                    "Failed to find {} in {}",
-                    digest,
-                    repo_name
-                ));
+                return Err(format_err!("Failed to find {} in {}", digest, repo_name));
             }
         }
 
@@ -179,7 +170,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         };
 
         if set.contains(&layer) {
-            let path = get_path_for_uuid(blob_ref.get_uuid());
+            let path = self.get_path_for_blob_upload(blob_ref.get_uuid());
             let mut w = WriteLocation::new();
             w.set_path(path);
             let f = sink
@@ -349,7 +340,11 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         mr: ManifestRef,
         sink: grpcio::UnarySink<VerifiedManifest>,
     ) {
-        match create_verified_manifest(mr.get_repo_name().to_string(), mr.get_reference().to_string(), true) {
+        match create_verified_manifest(
+            mr.get_repo_name().to_string(),
+            mr.get_reference().to_string(),
+            true,
+        ) {
             Ok(vm) => {
                 let f = sink
                     .success(vm)
