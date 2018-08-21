@@ -1,5 +1,5 @@
 use std;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use failure::Error;
 use futures::Future;
@@ -28,21 +28,24 @@ static SCRATCH_DIR: &'static str = "scratch";
  *
  * remember will probably want to split out metadata for search
  *
- * Accepted Upload is borked atm
  */
 /// Struct implementing callbacks for the Frontend
 ///
 /// _uploads_: a HashSet of all uuids that are currently being tracked
+/// Really not sure how this works with async
+/// Assume there is only a single instance, even with multiple queues
+/// Not sure about this mutex.
+/// Should be rwlock. 
 #[derive(Clone)]
 pub struct TrowService {
-    uploads: Arc<Mutex<std::collections::HashSet<Layer>>>,
+    uploads: Arc<RwLock<std::collections::HashSet<Layer>>>,
     data_path: String
 }
 
 impl TrowService {
     pub fn new(data_path: &str) -> Result<Self, Error> {
         let svc = TrowService {
-            uploads: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            uploads: Arc::new(RwLock::new(std::collections::HashSet::new())),
             data_path: data_path.to_owned()
         };
         create_data_dirs(&svc.data_path)?;
@@ -168,7 +171,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         // Apparently unwrap() is correct here. From the docs:
         // "We unwrap() the return value to assert that we are not expecting
         // threads to ever fail while holding the lock."
-        let set = self.uploads.lock().unwrap();
+        let set = self.uploads.read().unwrap();
         //LAYER MUST DIE!
         let layer = Layer {
             repo_name: blob_ref.get_repo_name().to_owned(),
@@ -295,7 +298,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
             digest: Uuid::new_v4().to_string(),
         };
         {
-            self.uploads.lock().unwrap().insert(layer.clone());
+            self.uploads.write().unwrap().insert(layer.clone());
             debug!("Hash Table: {:?}", self.uploads);
         }
         resp.set_uuid(layer.digest.to_owned());
@@ -336,7 +339,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
             digest: cr.get_user_digest().to_string(),
         };
 
-        let mut set = self.uploads.lock().unwrap();
+        let mut set = self.uploads.write().unwrap();
         set.remove(&layer);
     }
 
