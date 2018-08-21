@@ -15,7 +15,6 @@ use uuid::Uuid;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
-static DATA_DIR: &'static str = "data";
 static MANIFESTS_DIR: &'static str = "manifests";
 static LAYERS_DIR: &'static str = "layers";
 static SCRATCH_DIR: &'static str = "scratch";
@@ -57,12 +56,66 @@ impl TrowService {
         Ok(svc)
     }
 
-    fn get_path_for_blob_upload(&self, uuid: &str) -> String {
+    fn get_path_for_blob_upload(&self, uuid: &str) -> PathBuf {
         self.scratch_path
             .join(uuid)
-            .to_str()
-            .unwrap_or("THIS_SHOULDNT_BE_POSSIBLE")
-            .to_string()
+    }
+
+    /**
+     * TODO: needs to handle either tag or digest as reference.
+     */
+    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> PathBuf {
+        self.manifests_path
+            .join(repo_name)
+            .join(reference)
+    }
+
+    fn get_path_for_layer(&self, repo_name: &str, digest: &str) -> PathBuf {
+        self.layers_path
+            .join(repo_name)
+            .join(digest)
+    }
+
+    fn create_verified_manifest(
+        &self,
+        repo_name: String,
+        reference: String,
+        do_verification: bool,
+    ) -> Result<VerifiedManifest, Error> {
+        let manifest_path = self.get_path_for_manifest(&repo_name, &reference);
+
+        let manifest_bytes = std::fs::read(&manifest_path)?;
+        let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
+        let manifest = Manifest::from_json(&manifest_json)?;
+
+        if do_verification {
+            //TODO: Need to make sure we find things indexed by digest or tag
+            for digest in manifest.get_asset_digests() {
+                let path = self.get_path_for_layer(&repo_name, &digest);
+                info!("Path: {:?}", path);
+
+                if !path.exists() {
+                    return Err(format_err!("Failed to find {} in {}", digest, repo_name));
+                }
+            }
+
+            // TODO: check signature and names are correct on v1 manifests
+        }
+
+        let mut vm = VerifiedManifest::new();
+        //TODO: Shouldn't this be the URL?!
+        vm.set_location(manifest_path.to_string_lossy().to_string());
+        /*
+            let location = format!(
+            "http://localhost:5000/v2/{}/manifests/{}",
+            mr.get_repo_name(),
+            digest
+        );
+        */
+        //TODO: Only generate if verification is on, otherwise copy from somewhere
+        vm.set_digest(gen_digest(&manifest_bytes));
+        vm.set_content_type(manifest.get_media_type().to_string());
+        Ok(vm)
     }
 }
 
@@ -109,49 +162,6 @@ fn save_layer(repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Erro
     Ok(())
 }
 
-fn create_verified_manifest(
-    repo_name: String,
-    reference: String,
-    do_verification: bool,
-) -> Result<VerifiedManifest, Error> {
-    let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, repo_name);
-    let manifest_path = format!("{}/{}", manifest_directory, reference);
-
-    let manifest_bytes = std::fs::read(&manifest_path)?;
-    let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
-    let manifest = Manifest::from_json(&manifest_json)?;
-
-    if do_verification {
-        //TODO: Need to make sure we find things indexed by digest or tag
-        for digest in manifest.get_asset_digests() {
-            let path = format!("{}/{}/{}/{}", DATA_DIR, LAYERS_DIR, repo_name, digest);
-            info!("Path: {}", path);
-            let path = Path::new(&path);
-
-            if !path.exists() {
-                return Err(format_err!("Failed to find {} in {}", digest, repo_name));
-            }
-        }
-
-        // TODO: check signature and names are correct on v1 manifests
-    }
-
-    let mut vm = VerifiedManifest::new();
-    //TODO: Shouldn't this be the URL?!
-    vm.set_location(manifest_path);
-    /*
-            let location = format!(
-            "http://localhost:5000/v2/{}/manifests/{}",
-            mr.get_repo_name(),
-            digest
-        );
-        */
-    //TODO: Only generate if verification is on, otherwise copy from somewhere
-    vm.set_digest(gen_digest(&manifest_bytes));
-    vm.set_content_type(manifest.get_media_type().to_string());
-    Ok(vm)
-}
-
 impl trow_protobuf::server_grpc::Backend for TrowService {
     fn get_write_location_for_blob(
         &self,
@@ -172,7 +182,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         if set.contains(&layer) {
             let path = self.get_path_for_blob_upload(blob_ref.get_uuid());
             let mut w = WriteLocation::new();
-            w.set_path(path);
+            w.set_path(path.to_string_lossy().to_string());
             let f = sink
                 .success(w)
                 .map_err(move |e| warn!("Failed sending to client {:?}", e));
@@ -195,14 +205,9 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
     ) {
         //TODO: test that it exists
 
-        let path = format!(
-            "{}/{}/{}/{}",
-            DATA_DIR,
-            LAYERS_DIR,
-            dr.get_repo_name(),
-            dr.get_digest()
-        );
-        if !Path::new(&path).exists() {
+        let path = self.get_path_for_layer(dr.get_repo_name(), dr.get_digest());
+       
+        if !path.exists() {
             let f = sink
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,
@@ -211,7 +216,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
             ctx.spawn(f);
         } else {
             let mut r = ReadLocation::new();
-            r.set_path(path);
+            r.set_path(path.to_string_lossy().to_string());
             let f = sink
                 .success(r)
                 .map_err(move |e| warn!("Failed sending to client {:?}", e));
@@ -226,13 +231,14 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         sink: grpcio::UnarySink<super::server::WriteLocation>,
     ) {
         //TODO: First save to temporary file and copy over after verify
-        let manifest_directory = format!("{}/{}/{}/", DATA_DIR, MANIFESTS_DIR, mr.get_repo_name());
-        let manifest_path = format!("{}/{}", manifest_directory, mr.get_reference());
 
-        match fs::create_dir_all(manifest_directory) {
+        let manifest_path = self.get_path_for_manifest(mr.get_repo_name(), mr.get_reference());
+        let manifest_dir = manifest_path.parent().unwrap(); 
+
+        match fs::create_dir_all(manifest_dir) {
             Ok(_) => {
                 let mut w = WriteLocation::new();
-                w.set_path(manifest_path);
+                w.set_path(manifest_path.to_string_lossy().to_string());
                 let f = sink
                     .success(w)
                     .map_err(move |e| warn!("Failed sending to client {:?}", e));
@@ -257,7 +263,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         sink: grpcio::UnarySink<VerifiedManifest>,
     ) {
         //Don't actually need to verify here; could set to false
-        match create_verified_manifest(mr.repo_name, mr.reference, true) {
+        match self.create_verified_manifest(mr.repo_name, mr.reference, true) {
             Ok(vm) => {
                 let f = sink
                     .success(vm)
@@ -340,7 +346,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         mr: ManifestRef,
         sink: grpcio::UnarySink<VerifiedManifest>,
     ) {
-        match create_verified_manifest(
+        match self.create_verified_manifest(
             mr.get_repo_name().to_string(),
             mr.get_reference().to_string(),
             true,
