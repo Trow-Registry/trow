@@ -1,7 +1,7 @@
 use std;
 use std::sync::{Arc, RwLock};
 
-use failure::Error;
+use failure::{self, Error};
 use futures::Future;
 use grpcio::{self, RpcStatus, RpcStatusCode};
 use manifest::{FromJson, Manifest};
@@ -29,17 +29,23 @@ static SCRATCH_DIR: &'static str = "scratch";
  */
 /* Struct implementing callbacks for the Frontend
  *
- * _uploads_: a HashSet of all uuids that are currently being tracked
+ * _active_uploads_: a HashSet of all uuids that are currently being tracked
  *
  * Each "route" gets a clone of this struct.
  * The Arc makes sure they all point to the same data.
  */
 #[derive(Clone)]
 pub struct TrowService {
-    uploads: Arc<RwLock<std::collections::HashSet<Layer>>>,
+    active_uploads: Arc<RwLock<std::collections::HashSet<Upload>>>,
     manifests_path: PathBuf,
     layers_path: PathBuf,
     scratch_path: PathBuf,
+}
+
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
+struct Upload {
+    repo_name: String,
+    uuid: String,
 }
 
 impl TrowService {
@@ -48,7 +54,7 @@ impl TrowService {
         let scratch_path = create_path(data_path, SCRATCH_DIR)?;
         let layers_path = create_path(data_path, LAYERS_DIR)?;
         let svc = TrowService {
-            uploads: Arc::new(RwLock::new(std::collections::HashSet::new())),
+            active_uploads: Arc::new(RwLock::new(std::collections::HashSet::new())),
             manifests_path,
             layers_path,
             scratch_path,
@@ -57,23 +63,22 @@ impl TrowService {
     }
 
     fn get_path_for_blob_upload(&self, uuid: &str) -> PathBuf {
-        self.scratch_path
-            .join(uuid)
+        self.scratch_path.join(uuid)
     }
 
     /**
      * TODO: needs to handle either tag or digest as reference.
      */
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> PathBuf {
-        self.manifests_path
-            .join(repo_name)
-            .join(reference)
+        self.manifests_path.join(repo_name).join(reference)
     }
 
     fn get_path_for_layer(&self, repo_name: &str, digest: &str) -> PathBuf {
-        self.layers_path
-            .join(repo_name)
-            .join(digest)
+        self.layers_path.join(repo_name).join(digest)
+    }
+
+    fn get_scratch_path_for_uuid(&self, uuid: &str) -> PathBuf {
+        self.scratch_path.join(uuid).join(uuid)
     }
 
     fn create_verified_manifest(
@@ -112,10 +117,34 @@ impl TrowService {
             digest
         );
         */
-        //TODO: Only generate if verification is on, otherwise copy from somewhere
+        //TODO: For performance, only generate if verification is on, otherwise copy from somewhere
         vm.set_digest(gen_digest(&manifest_bytes));
         vm.set_content_type(manifest.get_media_type().to_string());
         Ok(vm)
+    }
+
+    fn save_layer(&self, repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
+        debug!("Saving layer {}", user_digest);
+
+        //TODO: This is wrong; user digest needs to be verified and potentially changed to our own digest
+        //if we want to use consistent compression alg
+
+        let digest_path = self.get_path_for_layer(repo_name, user_digest);
+        let repo_path = digest_path.parent().ok_or(failure::err_msg("Error finding repository path"))?;
+
+        if !repo_path.exists() {
+            fs::create_dir_all(repo_path)?;
+        }
+
+        let scratch_path = self.get_scratch_path_for_uuid(uuid);
+
+        fs::copy(&scratch_path, &digest_path)?;
+
+        //Not an error, even if it's not great
+        fs::remove_file(&scratch_path)
+            .unwrap_or_else(|e| warn!("Error deleting file {} {:?}", &scratch_path.to_string_lossy(), e));
+
+        Ok(())
     }
 }
 
@@ -128,38 +157,10 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, Error> {
     Ok(dir_path)
 }
 
-#[derive(Eq, PartialEq, Hash, Debug, Clone)]
-struct Layer {
-    repo_name: String,
-    digest: String,
-}
-
 fn gen_digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.input(bytes);
     format!("sha256:{}", hasher.result_str())
-}
-
-fn save_layer(repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
-    debug!("Saving layer {}", user_digest);
-
-    //TODO: This is wrong; user digest needs to be verified and potentially changed to our own digest
-    //if we want to use consistent compression alg
-    let digest_path = format!("data/layers/{}/{}", repo_name, user_digest);
-    let path = format!("data/layers/{}", repo_name);
-    let scratch_path = format!("data/scratch/{}", uuid);
-
-    if !Path::new(&path).exists() {
-        fs::create_dir_all(path)?;
-    }
-
-    fs::copy(&scratch_path, digest_path)?;
-
-    //Not an error, even if it's not great
-    fs::remove_file(&scratch_path)
-        .unwrap_or_else(|e| warn!("Error deleting file {} {:?}", &scratch_path, e));
-
-    Ok(())
 }
 
 impl trow_protobuf::server_grpc::Backend for TrowService {
@@ -169,17 +170,17 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         blob_ref: BlobRef,
         sink: grpcio::UnarySink<WriteLocation>,
     ) {
+        let upload = Upload {
+            repo_name: blob_ref.get_repo_name().to_owned(),
+            uuid: blob_ref.get_uuid().to_owned(),
+        };
+
         // Apparently unwrap() is correct here. From the docs:
         // "We unwrap() the return value to assert that we are not expecting
         // threads to ever fail while holding the lock."
-        let set = self.uploads.read().unwrap();
-        //LAYER MUST DIE!
-        let layer = Layer {
-            repo_name: blob_ref.get_repo_name().to_owned(),
-            digest: blob_ref.get_uuid().to_owned(),
-        };
 
-        if set.contains(&layer) {
+        let set = self.active_uploads.read().unwrap();
+        if set.contains(&upload) {
             let path = self.get_path_for_blob_upload(blob_ref.get_uuid());
             let mut w = WriteLocation::new();
             w.set_path(path.to_string_lossy().to_string());
@@ -206,7 +207,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         //TODO: test that it exists
 
         let path = self.get_path_for_layer(dr.get_repo_name(), dr.get_digest());
-       
+
         if !path.exists() {
             let f = sink
                 .fail(RpcStatus::new(
@@ -233,7 +234,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         //TODO: First save to temporary file and copy over after verify
 
         let manifest_path = self.get_path_for_manifest(mr.get_repo_name(), mr.get_reference());
-        let manifest_dir = manifest_path.parent().unwrap(); 
+        let manifest_dir = manifest_path.parent().unwrap();
 
         match fs::create_dir_all(manifest_dir) {
             Ok(_) => {
@@ -289,16 +290,19 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         sink: grpcio::UnarySink<UploadDetails>,
     ) {
         let mut resp = UploadDetails::new();
-        let layer = Layer {
+
+        let uuid = Uuid::new_v4().to_string();
+        resp.set_uuid(uuid.clone());
+
+        let upload = Upload {
             repo_name: req.get_repo_name().to_owned(),
-            //WTF?!
-            digest: Uuid::new_v4().to_string(),
+            uuid,
         };
         {
-            self.uploads.write().unwrap().insert(layer.clone());
-            debug!("Hash Table: {:?}", self.uploads);
+            self.active_uploads.write().unwrap().insert(upload);
+            debug!("Hash Table: {:?}", self.active_uploads);
         }
-        resp.set_uuid(layer.digest.to_owned());
+
         let f = sink
             .success(resp)
             .map_err(|e| warn!("failed to reply! {:?}", e));
@@ -311,7 +315,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         cr: CompleteRequest,
         sink: grpcio::UnarySink<CompletedUpload>,
     ) {
-        match save_layer(cr.get_repo_name(), cr.get_user_digest(), cr.get_uuid()) {
+        match self.save_layer(cr.get_repo_name(), cr.get_user_digest(), cr.get_uuid()) {
             Ok(_) => {
                 let mut cu = CompletedUpload::new();
                 cu.set_digest(cr.get_user_digest().to_string());
@@ -331,13 +335,15 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         }
 
         //delete uuid from uploads tracking
-        let layer = Layer {
+        let upload = Upload {
             repo_name: cr.get_repo_name().to_string(),
-            digest: cr.get_user_digest().to_string(),
+            uuid: cr.get_uuid().to_string(),
         };
 
-        let mut set = self.uploads.write().unwrap();
-        set.remove(&layer);
+        let mut set = self.active_uploads.write().unwrap();
+        if !set.remove(&upload) {
+            warn!("Upload {:?} not found when deleting", upload);
+        }
     }
 
     fn verify_manifest(
