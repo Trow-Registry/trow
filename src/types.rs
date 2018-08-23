@@ -48,13 +48,9 @@ pub struct AcceptedUpload {
 }
 
 pub fn create_accepted_upload(digest: Digest, repo_name: RepoName) -> AcceptedUpload {
-    AcceptedUpload {
-        digest,
-        repo_name,
-    }
+    AcceptedUpload { digest, repo_name }
 }
 impl AcceptedUpload {
-
     pub fn digest(&self) -> &Digest {
         &self.digest
     }
@@ -66,9 +62,10 @@ impl AcceptedUpload {
 
 #[derive(Debug, Serialize)]
 pub struct VerifiedManifest {
-    location: String,
+    repo_name: RepoName,
     digest: Digest,
-    content_type: String
+    tag: String,
+    content_type: String,
 }
 
 impl VerifiedManifest {
@@ -76,13 +73,31 @@ impl VerifiedManifest {
         &self.digest
     }
 
-    pub fn location(&self) -> &str {
-        &self.location
+    pub fn tag(&self) -> &str {
+        &self.tag
+    }
+
+    pub fn repo_name(&self) -> &RepoName {
+        &self.repo_name
+    }
+
+    pub fn content_type(&self) -> &str {
+        &self.content_type
     }
 }
 
-pub fn create_verified_manifest(location: String, digest: Digest, content_type: String) -> VerifiedManifest {
-    VerifiedManifest { location, digest, content_type }
+pub fn create_verified_manifest(
+    repo_name: RepoName,
+    digest: Digest,
+    tag: String,
+    content_type: String,
+) -> VerifiedManifest {
+    VerifiedManifest {
+        repo_name,
+        digest,
+        tag,
+        content_type,
+    }
 }
 
 pub struct ManifestReader {
@@ -105,8 +120,16 @@ impl ManifestReader {
     }
 }
 
-pub fn create_manifest_reader(reader: Box<Read>, content_type: String, digest: Digest) -> ManifestReader {
-    ManifestReader { reader, content_type, digest }
+pub fn create_manifest_reader(
+    reader: Box<Read>,
+    content_type: String,
+    digest: Digest,
+) -> ManifestReader {
+    ManifestReader {
+        reader,
+        content_type,
+        digest,
+    }
 }
 
 pub struct BlobReader {

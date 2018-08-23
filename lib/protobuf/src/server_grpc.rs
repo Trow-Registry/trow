@@ -32,7 +32,7 @@ const METHOD_BACKEND_GET_WRITE_LOCATION_FOR_BLOB: ::grpcio::Method<super::server
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
-const METHOD_BACKEND_GET_READ_LOCATION_FOR_BLOB: ::grpcio::Method<super::server::DownloadRef, super::server::ReadLocation> = ::grpcio::Method {
+const METHOD_BACKEND_GET_READ_LOCATION_FOR_BLOB: ::grpcio::Method<super::server::DownloadRef, super::server::BlobReadLocation> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/lycaon.Backend/GetReadLocationForBlob",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
@@ -46,7 +46,7 @@ const METHOD_BACKEND_GET_WRITE_LOCATION_FOR_MANIFEST: ::grpcio::Method<super::se
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
-const METHOD_BACKEND_GET_READ_LOCATION_FOR_MANIFEST: ::grpcio::Method<super::server::ManifestRef, super::server::VerifiedManifest> = ::grpcio::Method {
+const METHOD_BACKEND_GET_READ_LOCATION_FOR_MANIFEST: ::grpcio::Method<super::server::ManifestRef, super::server::ManifestReadLocation> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/lycaon.Backend/GetReadLocationForManifest",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
@@ -110,19 +110,19 @@ impl BackendClient {
         self.get_write_location_for_blob_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_read_location_for_blob_opt(&self, req: &super::server::DownloadRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::server::ReadLocation> {
+    pub fn get_read_location_for_blob_opt(&self, req: &super::server::DownloadRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::server::BlobReadLocation> {
         self.client.unary_call(&METHOD_BACKEND_GET_READ_LOCATION_FOR_BLOB, req, opt)
     }
 
-    pub fn get_read_location_for_blob(&self, req: &super::server::DownloadRef) -> ::grpcio::Result<super::server::ReadLocation> {
+    pub fn get_read_location_for_blob(&self, req: &super::server::DownloadRef) -> ::grpcio::Result<super::server::BlobReadLocation> {
         self.get_read_location_for_blob_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_read_location_for_blob_async_opt(&self, req: &super::server::DownloadRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::ReadLocation>> {
+    pub fn get_read_location_for_blob_async_opt(&self, req: &super::server::DownloadRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::BlobReadLocation>> {
         self.client.unary_call_async(&METHOD_BACKEND_GET_READ_LOCATION_FOR_BLOB, req, opt)
     }
 
-    pub fn get_read_location_for_blob_async(&self, req: &super::server::DownloadRef) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::ReadLocation>> {
+    pub fn get_read_location_for_blob_async(&self, req: &super::server::DownloadRef) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::BlobReadLocation>> {
         self.get_read_location_for_blob_async_opt(req, ::grpcio::CallOption::default())
     }
 
@@ -142,19 +142,19 @@ impl BackendClient {
         self.get_write_location_for_manifest_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_read_location_for_manifest_opt(&self, req: &super::server::ManifestRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::server::VerifiedManifest> {
+    pub fn get_read_location_for_manifest_opt(&self, req: &super::server::ManifestRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::server::ManifestReadLocation> {
         self.client.unary_call(&METHOD_BACKEND_GET_READ_LOCATION_FOR_MANIFEST, req, opt)
     }
 
-    pub fn get_read_location_for_manifest(&self, req: &super::server::ManifestRef) -> ::grpcio::Result<super::server::VerifiedManifest> {
+    pub fn get_read_location_for_manifest(&self, req: &super::server::ManifestRef) -> ::grpcio::Result<super::server::ManifestReadLocation> {
         self.get_read_location_for_manifest_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_read_location_for_manifest_async_opt(&self, req: &super::server::ManifestRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::VerifiedManifest>> {
+    pub fn get_read_location_for_manifest_async_opt(&self, req: &super::server::ManifestRef, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::ManifestReadLocation>> {
         self.client.unary_call_async(&METHOD_BACKEND_GET_READ_LOCATION_FOR_MANIFEST, req, opt)
     }
 
-    pub fn get_read_location_for_manifest_async(&self, req: &super::server::ManifestRef) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::VerifiedManifest>> {
+    pub fn get_read_location_for_manifest_async(&self, req: &super::server::ManifestRef) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::ManifestReadLocation>> {
         self.get_read_location_for_manifest_async_opt(req, ::grpcio::CallOption::default())
     }
 
@@ -197,9 +197,9 @@ impl BackendClient {
 pub trait Backend {
     fn request_upload(&self, ctx: ::grpcio::RpcContext, req: super::server::UploadRequest, sink: ::grpcio::UnarySink<super::server::UploadDetails>);
     fn get_write_location_for_blob(&self, ctx: ::grpcio::RpcContext, req: super::server::BlobRef, sink: ::grpcio::UnarySink<super::server::WriteLocation>);
-    fn get_read_location_for_blob(&self, ctx: ::grpcio::RpcContext, req: super::server::DownloadRef, sink: ::grpcio::UnarySink<super::server::ReadLocation>);
+    fn get_read_location_for_blob(&self, ctx: ::grpcio::RpcContext, req: super::server::DownloadRef, sink: ::grpcio::UnarySink<super::server::BlobReadLocation>);
     fn get_write_location_for_manifest(&self, ctx: ::grpcio::RpcContext, req: super::server::ManifestRef, sink: ::grpcio::UnarySink<super::server::WriteLocation>);
-    fn get_read_location_for_manifest(&self, ctx: ::grpcio::RpcContext, req: super::server::ManifestRef, sink: ::grpcio::UnarySink<super::server::VerifiedManifest>);
+    fn get_read_location_for_manifest(&self, ctx: ::grpcio::RpcContext, req: super::server::ManifestRef, sink: ::grpcio::UnarySink<super::server::ManifestReadLocation>);
     fn verify_manifest(&self, ctx: ::grpcio::RpcContext, req: super::server::ManifestRef, sink: ::grpcio::UnarySink<super::server::VerifiedManifest>);
     fn complete_upload(&self, ctx: ::grpcio::RpcContext, req: super::server::CompleteRequest, sink: ::grpcio::UnarySink<super::server::CompletedUpload>);
 }

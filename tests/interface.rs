@@ -186,11 +186,14 @@ mod interface_tests {
             config,
             layers,
         };
-        let resp = cl.put(&format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name))
+        let manifest_addr=format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name);
+        let resp = cl.put(&manifest_addr)
             .json(&mani)
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
+        let location = resp.headers().get::<Location>().unwrap().to_string();
+        assert_eq!(&location, &manifest_addr);
     }
 
     fn get_manifest(cl: &reqwest::Client, name: &str) {

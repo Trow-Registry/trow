@@ -19,17 +19,12 @@ static MANIFESTS_DIR: &'static str = "manifests";
 static LAYERS_DIR: &'static str = "layers";
 static SCRATCH_DIR: &'static str = "scratch";
 
-/*
- * TODO: figure out what needs to be stored in the backend
- * and what it's keyed on
- * probably need a path
- *
- * remember will probably want to split out metadata for search
- *
- */
 /* Struct implementing callbacks for the Frontend
  *
  * _active_uploads_: a HashSet of all uuids that are currently being tracked
+ * _manifests_path_: path to where the manifests are
+ * _layers_path_: path to where blobs are stored
+ * _scratch_path_: path to temporary storage for uploads
  *
  * Each "route" gets a clone of this struct.
  * The Arc makes sure they all point to the same data.
@@ -78,7 +73,7 @@ impl TrowService {
     }
 
     fn get_scratch_path_for_uuid(&self, uuid: &str) -> PathBuf {
-        self.scratch_path.join(uuid).join(uuid)
+        self.scratch_path.join(uuid)
     }
 
     fn create_verified_manifest(
@@ -108,19 +103,28 @@ impl TrowService {
         }
 
         let mut vm = VerifiedManifest::new();
-        //TODO: Shouldn't this be the URL?!
-        vm.set_location(manifest_path.to_string_lossy().to_string());
-        /*
-            let location = format!(
-            "http://localhost:5000/v2/{}/manifests/{}",
-            mr.get_repo_name(),
-            digest
-        );
-        */
-        //TODO: For performance, only generate if verification is on, otherwise copy from somewhere
+
+        //For performance, could generate only if verification is on, otherwise copy from somewhere
         vm.set_digest(gen_digest(&manifest_bytes));
         vm.set_content_type(manifest.get_media_type().to_string());
         Ok(vm)
+    }
+
+    fn create_manifest_read_location(
+        &self,
+        repo_name: String,
+        reference: String,
+        do_verification: bool,
+    ) -> Result<ManifestReadLocation, Error> {
+    
+        //This isn't optimal
+        let path = self.get_path_for_manifest(&repo_name, &reference);
+        let vm = self.create_verified_manifest(repo_name, reference, do_verification)?;
+        let mut mrl = ManifestReadLocation::new();
+        mrl.set_content_type(vm.get_content_type().to_string());
+        mrl.set_digest(vm.get_digest().to_string());
+        mrl.set_path(path.to_string_lossy().to_string());
+        Ok(mrl)
     }
 
     fn save_layer(&self, repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
@@ -130,19 +134,25 @@ impl TrowService {
         //if we want to use consistent compression alg
 
         let digest_path = self.get_path_for_layer(repo_name, user_digest);
-        let repo_path = digest_path.parent().ok_or(failure::err_msg("Error finding repository path"))?;
+        let repo_path = digest_path
+            .parent()
+            .ok_or(failure::err_msg("Error finding repository path"))?;
 
         if !repo_path.exists() {
             fs::create_dir_all(repo_path)?;
         }
 
         let scratch_path = self.get_scratch_path_for_uuid(uuid);
-
         fs::copy(&scratch_path, &digest_path)?;
 
         //Not an error, even if it's not great
-        fs::remove_file(&scratch_path)
-            .unwrap_or_else(|e| warn!("Error deleting file {} {:?}", &scratch_path.to_string_lossy(), e));
+        fs::remove_file(&scratch_path).unwrap_or_else(|e| {
+            warn!(
+                "Error deleting file {} {:?}",
+                &scratch_path.to_string_lossy(),
+                e
+            )
+        });
 
         Ok(())
     }
@@ -189,11 +199,12 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
                 .map_err(move |e| warn!("Failed sending to client {:?}", e));
             ctx.spawn(f);
         } else {
+            warn!("Request for write location for unknown upload");
             let f = sink
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,
                     Some("UUID Not Known".to_string()),
-                )).map_err(|e| warn!("Received request for unknown UUID {:?}", e));
+                )).map_err(|e| warn!("Failure sending error to client {:?}", e));
             ctx.spawn(f);
         }
     }
@@ -202,21 +213,22 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         &self,
         ctx: grpcio::RpcContext,
         dr: DownloadRef,
-        sink: grpcio::UnarySink<ReadLocation>,
+        sink: grpcio::UnarySink<BlobReadLocation>,
     ) {
         //TODO: test that it exists
 
         let path = self.get_path_for_layer(dr.get_repo_name(), dr.get_digest());
 
         if !path.exists() {
+            warn!("Request for unknown blob");
             let f = sink
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,
                     Some("Blob Not Known".to_string()),
-                )).map_err(|e| warn!("Received request for unknown blob {:?}", e));
+                )).map_err(|e| warn!("Failure sending error to client {:?}", e));
             ctx.spawn(f);
         } else {
-            let mut r = ReadLocation::new();
+            let mut r = BlobReadLocation::new();
             r.set_path(path.to_string_lossy().to_string());
             let f = sink
                 .success(r)
@@ -261,10 +273,11 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         &self,
         ctx: grpcio::RpcContext,
         mr: ManifestRef,
-        sink: grpcio::UnarySink<VerifiedManifest>,
+        sink: grpcio::UnarySink<ManifestReadLocation>,
     ) {
         //Don't actually need to verify here; could set to false
-        match self.create_verified_manifest(mr.repo_name, mr.reference, true) {
+
+        match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
             Ok(vm) => {
                 let f = sink
                     .success(vm)
@@ -324,7 +337,8 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
                     .map_err(move |e| warn!("failed to reply! {:?}", e));
                 ctx.spawn(f);
             }
-            Err(_) => {
+            Err(e) => {
+                warn!("Failure when saving layer: {:?}", e);
                 let f = sink
                     .fail(RpcStatus::new(
                         RpcStatusCode::Internal,

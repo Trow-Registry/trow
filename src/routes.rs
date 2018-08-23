@@ -4,11 +4,13 @@ use client_interface::ClientInterface;
 use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
-use response::manifest_upload::ManifestUpload;
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
-use types::{create_upload_info, AcceptedUpload, BlobReader, ManifestReader, Uuid, RepoName, Digest};
+use types::{
+    create_upload_info, AcceptedUpload, BlobReader, Digest,
+    ManifestReader, RepoName, Uuid, VerifiedManifest,
+};
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -102,7 +104,8 @@ fn get_manifest(
     reference: String,
 ) -> Option<ManifestReader> {
     //Need to handle error
-    ci.get_reader_for_manifest(&RepoName(onename), &reference).ok()
+    ci.get_reader_for_manifest(&RepoName(onename), &reference)
+        .ok()
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
@@ -150,7 +153,8 @@ fn get_blob(
     digest: String,
     _auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    ci.get_reader_for_blob(&RepoName(name_repo), &Digest(digest)).ok()
+    ci.get_reader_for_blob(&RepoName(name_repo), &Digest(digest))
+        .ok()
 }
 /*
  * Parse 2 level <repo>/<name> style path and pass it to get_blob
@@ -266,7 +270,6 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-
     let repo = RepoName(repo_name);
     let uuid = Uuid(uuid);
     let sink = ci.get_write_sink_for_upload(&repo, &uuid);
@@ -394,21 +397,20 @@ fn put_image_manifest(
     repo_name: String,
     reference: String,
     chunk: rocket::data::Data,
-) -> Result<ManifestUpload, Error> {
-
+) -> Result<VerifiedManifest, Error> {
     let repo = RepoName(repo_name);
     match ci
         .get_write_sink_for_manifest(&repo, &reference)
         .map(|mut sink| chunk.stream_to(&mut sink))
     {
-        Ok(_) => match ci.verify_manifest(&repo, &reference) {
-            Ok(vm) => Ok(ManifestUpload {
-                digest: vm.digest().to_string(),
-                location: vm.location().to_string(),
-            }),
-            Err(_) => Err(Error::ManifestInvalid),
+        Ok(_) => {
+            //This can probably be moved to responder
+            match ci.verify_manifest(&repo, &reference) {
+                Ok(vm) => Ok(vm),
+                Err(_) => Err(Error::ManifestInvalid),
+            }
         },
-        Err(_) => Err(Error::InternalError)
+        Err(_) => Err(Error::InternalError),
     }
 }
 
@@ -422,7 +424,7 @@ fn put_image_manifest_2level(
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
-) -> Result<ManifestUpload, Error> {
+) -> Result<VerifiedManifest, Error> {
     put_image_manifest(ci, format!("{}/{}", user, repo), reference, chunk)
 }
 
@@ -440,7 +442,7 @@ fn put_image_manifest_3level(
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
-) -> Result<ManifestUpload, Error> {
+) -> Result<VerifiedManifest, Error> {
     put_image_manifest(ci, format!("{}/{}/{}", org, user, repo), reference, chunk)
 }
 

@@ -30,7 +30,7 @@ message WriteLocation {
 }
 
 //Could have a single "Location", but this allows divergence in the future
-message ReadLocation {
+message BlobReadLocation {
   string path = 1;
 }
 
@@ -53,8 +53,14 @@ message ManifestRef {
 
 message VerifiedManifest {
   string digest = 1;
+  //Version of manifest, used for media type return
+  string content_type = 2;
+}
+
+message ManifestReadLocation {
+  string digest = 1;
   //For the moment path to file
-  string location = 2;
+  string path = 2;
   //Version of manifest, used for media type return
   string content_type = 3;
 }
@@ -70,13 +76,13 @@ service Backend {
   rpc GetWriteLocationForBlob (BlobRef) returns (WriteLocation) {}
 
   //Given a digest and repo, get the download
-  rpc GetReadLocationForBlob (DownloadRef) returns (ReadLocation) {}
+  rpc GetReadLocationForBlob (DownloadRef) returns (BlobReadLocation) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
   rpc GetWriteLocationForManifest (ManifestRef) returns (WriteLocation) {}
 
-  rpc GetReadLocationForManifest (ManifestRef) returns (VerifiedManifest) {}
+  rpc GetReadLocationForManifest (ManifestRef) returns (ManifestReadLocation) {}
   
   //Check the blobs exist and the digest is correct etc
   rpc VerifyManifest (ManifestRef) returns (VerifiedManifest) {}

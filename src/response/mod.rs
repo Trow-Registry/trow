@@ -7,7 +7,7 @@ use hostname;
 pub mod empty;
 pub mod errors;
 pub mod html;
-pub mod manifest_upload;
+pub mod verified_manifest;
 pub mod manifest_reader;
 pub mod blob_reader;
 mod test_helper;
