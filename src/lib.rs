@@ -1,6 +1,5 @@
 #![feature(decl_macro)]
 #![feature(plugin)]
-#![feature(use_extern_macros)]
 #![plugin(rocket_codegen)]
 
 extern crate crypto;
