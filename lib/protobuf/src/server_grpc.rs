@@ -67,6 +67,13 @@ const METHOD_BACKEND_COMPLETE_UPLOAD: ::grpcio::Method<super::server::CompleteRe
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
+const METHOD_BACKEND_GET_CATALOG: ::grpcio::Method<super::server::CatalogRequest, super::server::Catalog> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::Unary,
+    name: "/lycaon.Backend/GetCatalog",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
 pub struct BackendClient {
     client: ::grpcio::Client,
 }
@@ -189,6 +196,22 @@ impl BackendClient {
     pub fn complete_upload_async(&self, req: &super::server::CompleteRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::CompletedUpload>> {
         self.complete_upload_async_opt(req, ::grpcio::CallOption::default())
     }
+
+    pub fn get_catalog_opt(&self, req: &super::server::CatalogRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::server::Catalog> {
+        self.client.unary_call(&METHOD_BACKEND_GET_CATALOG, req, opt)
+    }
+
+    pub fn get_catalog(&self, req: &super::server::CatalogRequest) -> ::grpcio::Result<super::server::Catalog> {
+        self.get_catalog_opt(req, ::grpcio::CallOption::default())
+    }
+
+    pub fn get_catalog_async_opt(&self, req: &super::server::CatalogRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::Catalog>> {
+        self.client.unary_call_async(&METHOD_BACKEND_GET_CATALOG, req, opt)
+    }
+
+    pub fn get_catalog_async(&self, req: &super::server::CatalogRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::server::Catalog>> {
+        self.get_catalog_async_opt(req, ::grpcio::CallOption::default())
+    }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
         self.client.spawn(f)
     }
@@ -202,6 +225,7 @@ pub trait Backend {
     fn get_read_location_for_manifest(&self, ctx: ::grpcio::RpcContext, req: super::server::ManifestRef, sink: ::grpcio::UnarySink<super::server::ManifestReadLocation>);
     fn verify_manifest(&self, ctx: ::grpcio::RpcContext, req: super::server::ManifestRef, sink: ::grpcio::UnarySink<super::server::VerifiedManifest>);
     fn complete_upload(&self, ctx: ::grpcio::RpcContext, req: super::server::CompleteRequest, sink: ::grpcio::UnarySink<super::server::CompletedUpload>);
+    fn get_catalog(&self, ctx: ::grpcio::RpcContext, req: super::server::CatalogRequest, sink: ::grpcio::UnarySink<super::server::Catalog>);
 }
 
 pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
@@ -233,6 +257,10 @@ pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Se
     let instance = s.clone();
     builder = builder.add_unary_handler(&METHOD_BACKEND_COMPLETE_UPLOAD, move |ctx, req, resp| {
         instance.complete_upload(ctx, req, resp)
+    });
+    let instance = s.clone();
+    builder = builder.add_unary_handler(&METHOD_BACKEND_GET_CATALOG, move |ctx, req, resp| {
+        instance.get_catalog(ctx, req, resp)
     });
     builder.build()
 }

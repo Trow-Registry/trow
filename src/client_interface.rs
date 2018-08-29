@@ -150,4 +150,12 @@ impl ClientInterface {
         );
         Ok(vm)
     }
+
+    pub fn get_catalog(&self) -> Result<RepositoryCatalog, Error> {
+
+        let catalog = self.backend.get_catalog();
+        Ok(catalog)
+
+    }
+    
 }

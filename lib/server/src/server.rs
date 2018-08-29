@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use failure::{self, Error};
 use futures::Future;
-use grpcio::{self, RpcStatus, RpcStatusCode};
+use grpcio::{self, RpcStatus, RpcStatusCode, WriteFlags};
 use manifest::{FromJson, Manifest};
 use serde_json;
 use std::fs;
@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use trow_protobuf;
 use trow_protobuf::server::*;
 use uuid::Uuid;
+use std::collections::HashSet;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -31,7 +32,7 @@ static SCRATCH_DIR: &'static str = "scratch";
  */
 #[derive(Clone)]
 pub struct TrowService {
-    active_uploads: Arc<RwLock<std::collections::HashSet<Upload>>>,
+    active_uploads: Arc<RwLock<HashSet<Upload>>>,
     manifests_path: PathBuf,
     layers_path: PathBuf,
     scratch_path: PathBuf,
@@ -49,7 +50,7 @@ impl TrowService {
         let scratch_path = create_path(data_path, SCRATCH_DIR)?;
         let layers_path = create_path(data_path, LAYERS_DIR)?;
         let svc = TrowService {
-            active_uploads: Arc::new(RwLock::new(std::collections::HashSet::new())),
+            active_uploads: Arc::new(RwLock::new(HashSet::new())),
             manifests_path,
             layers_path,
             scratch_path,
@@ -156,6 +157,21 @@ impl TrowService {
 
         Ok(())
     }
+}
+
+fn visit_dirs(dir: &Path, repos: &mut HashSet<String>) -> Result<(), Error> {
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit_dirs(&path, repos)?;
+            } else {
+                repos.push(path.to_string_lossy())
+            }
+        }
+    }
+    Ok(())
 }
 
 fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, Error> {
@@ -388,4 +404,27 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
             }
         }
     }
+
+
+    //TODO: change to streaming
+    fn get_catalog(
+        &self,
+        ctx: grpcio::RpcContext,
+        req: CatalogRequest,
+        sink: grpcio::ServerStreamingSink<String>,
+    ) {
+      
+            let mut repos = HashSet::new();
+            visit_dirs(self.manifests_path, &mut repos);
+            let res = repos.into_iter()
+                .map(|repo| (repo, 
+                                WriteFlags::default()))
+                .collect();
+            let f = sink.send_all(res)
+                .map(|_| ())
+                .map_err(|e| warn!("Error sending catalog {:?}", e));
+            ctx.spawn(f);
+      
+    }
+
 }

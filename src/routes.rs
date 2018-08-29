@@ -16,9 +16,15 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
+        
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
+        put_image_manifest,
+        put_image_manifest_2level,
+        put_image_manifest_3level,
+        delete_image_manifest,
+
         get_blob,
         get_blob_2level,
         get_blob_3level,
@@ -31,10 +37,8 @@ pub fn routes() -> Vec<rocket::Route> {
         post_blob_upload,
         post_blob_upload_2level,
         post_blob_upload_3level,
-        put_image_manifest,
-        put_image_manifest_2level,
-        put_image_manifest_3level,
-        delete_image_manifest,
+
+        get_catalog,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
@@ -456,3 +460,15 @@ DELETE /v2/<name>/manifests/<reference>
 fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
     Err(Error::Unsupported)
 }
+
+#[get("/v2/_catalog")]
+fn get_catalog(
+    ci: rocket::State<ClientInterface>,
+    name_repo: String,
+    digest: String,
+    _auth_user: AuthorisedUser,
+) -> Result<RepositoryCatalog, Error> {
+    ci.get_repository_catalog()
+}
+
+//Also see list image tags
