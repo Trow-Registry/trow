@@ -2483,67 +2483,68 @@ impl ::protobuf::reflect::ProtobufValue for CatalogRequest {
 }
 
 #[derive(PartialEq,Clone,Default)]
-pub struct Catalog {
+pub struct CatalogEntry {
     // message fields
-    pub repo_names: ::protobuf::RepeatedField<::std::string::String>,
+    pub repo_name: ::std::string::String,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
     cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
-unsafe impl ::std::marker::Sync for Catalog {}
+unsafe impl ::std::marker::Sync for CatalogEntry {}
 
-impl Catalog {
-    pub fn new() -> Catalog {
+impl CatalogEntry {
+    pub fn new() -> CatalogEntry {
         ::std::default::Default::default()
     }
 
-    pub fn default_instance() -> &'static Catalog {
-        static mut instance: ::protobuf::lazy::Lazy<Catalog> = ::protobuf::lazy::Lazy {
+    pub fn default_instance() -> &'static CatalogEntry {
+        static mut instance: ::protobuf::lazy::Lazy<CatalogEntry> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const Catalog,
+            ptr: 0 as *const CatalogEntry,
         };
         unsafe {
-            instance.get(Catalog::new)
+            instance.get(CatalogEntry::new)
         }
     }
 
-    // repeated string repo_names = 1;
+    // string repo_name = 1;
 
-    pub fn clear_repo_names(&mut self) {
-        self.repo_names.clear();
+    pub fn clear_repo_name(&mut self) {
+        self.repo_name.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_repo_names(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
-        self.repo_names = v;
+    pub fn set_repo_name(&mut self, v: ::std::string::String) {
+        self.repo_name = v;
     }
 
     // Mutable pointer to the field.
-    pub fn mut_repo_names(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
-        &mut self.repo_names
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_repo_name(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
     }
 
     // Take field
-    pub fn take_repo_names(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
-        ::std::mem::replace(&mut self.repo_names, ::protobuf::RepeatedField::new())
+    pub fn take_repo_name(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.repo_name, ::std::string::String::new())
     }
 
-    pub fn get_repo_names(&self) -> &[::std::string::String] {
-        &self.repo_names
+    pub fn get_repo_name(&self) -> &str {
+        &self.repo_name
     }
 
-    fn get_repo_names_for_reflect(&self) -> &::protobuf::RepeatedField<::std::string::String> {
-        &self.repo_names
+    fn get_repo_name_for_reflect(&self) -> &::std::string::String {
+        &self.repo_name
     }
 
-    fn mut_repo_names_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
-        &mut self.repo_names
+    fn mut_repo_name_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.repo_name
     }
 }
 
-impl ::protobuf::Message for Catalog {
+impl ::protobuf::Message for CatalogEntry {
     fn is_initialized(&self) -> bool {
         true
     }
@@ -2553,7 +2554,7 @@ impl ::protobuf::Message for Catalog {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.repo_names)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.repo_name)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -2567,18 +2568,18 @@ impl ::protobuf::Message for Catalog {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.repo_names {
-            my_size += ::protobuf::rt::string_size(1, &value);
-        };
+        if !self.repo_name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.repo_name);
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        for v in &self.repo_names {
-            os.write_string(1, &v)?;
-        };
+        if !self.repo_name.is_empty() {
+            os.write_string(1, &self.repo_name)?;
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -2610,12 +2611,12 @@ impl ::protobuf::Message for Catalog {
     }
 }
 
-impl ::protobuf::MessageStatic for Catalog {
-    fn new() -> Catalog {
-        Catalog::new()
+impl ::protobuf::MessageStatic for CatalogEntry {
+    fn new() -> CatalogEntry {
+        CatalogEntry::new()
     }
 
-    fn descriptor_static(_: ::std::option::Option<Catalog>) -> &'static ::protobuf::reflect::MessageDescriptor {
+    fn descriptor_static(_: ::std::option::Option<CatalogEntry>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
@@ -2623,13 +2624,13 @@ impl ::protobuf::MessageStatic for Catalog {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "repo_names",
-                    Catalog::get_repo_names_for_reflect,
-                    Catalog::mut_repo_names_for_reflect,
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "repo_name",
+                    CatalogEntry::get_repo_name_for_reflect,
+                    CatalogEntry::mut_repo_name_for_reflect,
                 ));
-                ::protobuf::reflect::MessageDescriptor::new::<Catalog>(
-                    "Catalog",
+                ::protobuf::reflect::MessageDescriptor::new::<CatalogEntry>(
+                    "CatalogEntry",
                     fields,
                     file_descriptor_proto()
                 )
@@ -2638,20 +2639,20 @@ impl ::protobuf::MessageStatic for Catalog {
     }
 }
 
-impl ::protobuf::Clear for Catalog {
+impl ::protobuf::Clear for CatalogEntry {
     fn clear(&mut self) {
-        self.clear_repo_names();
+        self.clear_repo_name();
         self.unknown_fields.clear();
     }
 }
 
-impl ::std::fmt::Debug for Catalog {
+impl ::std::fmt::Debug for CatalogEntry {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-impl ::protobuf::reflect::ProtobufValue for Catalog {
+impl ::protobuf::reflect::ProtobufValue for CatalogEntry {
     fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
         ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
@@ -2675,19 +2676,19 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     est\x12!\n\x0ccontent_type\x18\x02\x20\x01(\tR\x0bcontentType\"e\n\x14Ma\
     nifestReadLocation\x12\x16\n\x06digest\x18\x01\x20\x01(\tR\x06digest\x12\
     \x12\n\x04path\x18\x02\x20\x01(\tR\x04path\x12!\n\x0ccontent_type\x18\
-    \x03\x20\x01(\tR\x0bcontentType\"\x10\n\x0eCatalogRequest\"(\n\x07Catalo\
-    g\x12\x1d\n\nrepo_names\x18\x01\x20\x03(\tR\trepoNames2\xbc\x04\n\x07Bac\
-    kend\x12?\n\rRequestUpload\x12\x15.lycaon.UploadRequest\x1a\x15.lycaon.U\
-    ploadDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\x0f.lycaon.BlobRe\
-    f\x1a\x15.lycaon.WriteLocation\"\0\x12I\n\x16GetReadLocationForBlob\x12\
-    \x13.lycaon.DownloadRef\x1a\x18.lycaon.BlobReadLocation\"\0\x12K\n\x1bGe\
-    tWriteLocationForManifest\x12\x13.lycaon.ManifestRef\x1a\x15.lycaon.Writ\
-    eLocation\"\0\x12Q\n\x1aGetReadLocationForManifest\x12\x13.lycaon.Manife\
-    stRef\x1a\x1c.lycaon.ManifestReadLocation\"\0\x12A\n\x0eVerifyManifest\
-    \x12\x13.lycaon.ManifestRef\x1a\x18.lycaon.VerifiedManifest\"\0\x12D\n\
-    \x0eCompleteUpload\x12\x17.lycaon.CompleteRequest\x1a\x17.lycaon.Complet\
-    edUpload\"\0\x127\n\nGetCatalog\x12\x16.lycaon.CatalogRequest\x1a\x0f.ly\
-    caon.Catalog\"\0b\x06proto3\
+    \x03\x20\x01(\tR\x0bcontentType\"\x10\n\x0eCatalogRequest\"+\n\x0cCatalo\
+    gEntry\x12\x1b\n\trepo_name\x18\x01\x20\x01(\tR\x08repoName2\xc3\x04\n\
+    \x07Backend\x12?\n\rRequestUpload\x12\x15.lycaon.UploadRequest\x1a\x15.l\
+    ycaon.UploadDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\x0f.lycaon\
+    .BlobRef\x1a\x15.lycaon.WriteLocation\"\0\x12I\n\x16GetReadLocationForBl\
+    ob\x12\x13.lycaon.DownloadRef\x1a\x18.lycaon.BlobReadLocation\"\0\x12K\n\
+    \x1bGetWriteLocationForManifest\x12\x13.lycaon.ManifestRef\x1a\x15.lycao\
+    n.WriteLocation\"\0\x12Q\n\x1aGetReadLocationForManifest\x12\x13.lycaon.\
+    ManifestRef\x1a\x1c.lycaon.ManifestReadLocation\"\0\x12A\n\x0eVerifyMani\
+    fest\x12\x13.lycaon.ManifestRef\x1a\x18.lycaon.VerifiedManifest\"\0\x12D\
+    \n\x0eCompleteUpload\x12\x17.lycaon.CompleteRequest\x1a\x17.lycaon.Compl\
+    etedUpload\"\0\x12>\n\nGetCatalog\x12\x16.lycaon.CatalogRequest\x1a\x14.\
+    lycaon.CatalogEntry\"\00\x01b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

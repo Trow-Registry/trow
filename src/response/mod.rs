@@ -13,6 +13,7 @@ pub mod blob_reader;
 mod test_helper;
 pub mod upload_info;
 pub mod accepted_upload;
+pub mod repo_catalog;
 
 pub fn json_response<T: serde::Serialize>(
     req: &Request,

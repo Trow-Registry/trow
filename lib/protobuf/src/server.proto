@@ -70,8 +70,8 @@ message CatalogRequest {
   //Currently empty, could ask for subset, auth will be necessary later
 }
 
-message Catalog {
-  repeated string repo_names = 1;
+message CatalogEntry {
+  string repo_name = 1;
 }
 
 service Backend {
@@ -100,6 +100,6 @@ service Backend {
   // Returns _server_ digest, which may differ to the _user_ digest (due to compression alg)
   rpc CompleteUpload (CompleteRequest) returns (CompletedUpload) {}
 
-  rpc GetCatalog (CatalogRequest) returns (Catalog) {}
+  rpc GetCatalog (CatalogRequest) returns (stream CatalogEntry) {}
 
 }

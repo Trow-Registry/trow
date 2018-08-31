@@ -16,17 +16,19 @@ mod interface_tests {
 
     use environment::Environment;
 
-    use hyper::StatusCode;
     use hyper::header::Location;
+    use hyper::StatusCode;
     use rand;
     use rand::Rng;
     use reqwest;
-    use std::fs::File;
+    use serde_json;
+    use std::fs::{self, File};
     use std::io::Read;
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
+    use trow::types::{RepoCatalog, RepoName};
     use trow_server::manifest;
 
     const LYCAON_ADDRESS: &str = "https://trow.test:8443";
@@ -101,7 +103,8 @@ mod interface_tests {
         );
 
         //All v2 registries should respond with a 200 to this
-        let resp = cl.get(&(LYCAON_ADDRESS.to_owned() + "/v2/"))
+        let resp = cl
+            .get(&(LYCAON_ADDRESS.to_owned() + "/v2/"))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
@@ -112,7 +115,8 @@ mod interface_tests {
     }
 
     fn get_non_existent_blob(cl: &reqwest::Client) {
-        let resp = cl.get(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"))
+        let resp = cl
+            .get(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NotFound);
@@ -120,7 +124,8 @@ mod interface_tests {
 
     fn unsupported(cl: &reqwest::Client) {
         //Delete currently unimplemented
-        let resp = cl.delete(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
+        let resp = cl
+            .delete(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
@@ -128,7 +133,8 @@ mod interface_tests {
 
     fn upload_layer(cl: &reqwest::Client, name: &str) {
         //Should support both image/test and imagetest, only former working currently
-        let resp = cl.post(&format!("{}/v2/{}/blobs/uploads/", LYCAON_ADDRESS, name))
+        let resp = cl
+            .post(&format!("{}/v2/{}/blobs/uploads/", LYCAON_ADDRESS, name))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Accepted);
@@ -137,7 +143,8 @@ mod interface_tests {
 
         //Upload file. Start uploading blob with patch then digest with put
         let blob = gen_rand_blob(100);
-        let resp = cl.patch(location.as_str())
+        let resp = cl
+            .patch(location.as_str())
             .body(blob.clone())
             .send()
             .unwrap();
@@ -146,18 +153,18 @@ mod interface_tests {
         let mut hasher = Sha256::new();
         hasher.input(&blob);
         let digest = hasher.result_str();
-        let resp = cl.put(&format!(
-            "{}/v2/{}/blobs/uploads/{}?digest={}",
-            LYCAON_ADDRESS, name, uuid, digest
-        )).send()
+        let resp = cl
+            .put(&format!(
+                "{}/v2/{}/blobs/uploads/{}?digest={}",
+                LYCAON_ADDRESS, name, uuid, digest
+            )).send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
 
         //Finally get it back again
-        let mut resp = cl.get(&format!(
-            "{}/v2/{}/blobs/{}",
-            LYCAON_ADDRESS, name, digest
-        )).send()
+        let mut resp = cl
+            .get(&format!("{}/v2/{}/blobs/{}", LYCAON_ADDRESS, name, digest))
+            .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
 
@@ -186,11 +193,8 @@ mod interface_tests {
             config,
             layers,
         };
-        let manifest_addr=format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name);
-        let resp = cl.put(&manifest_addr)
-            .json(&mani)
-            .send()
-            .unwrap();
+        let manifest_addr = format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name);
+        let resp = cl.put(&manifest_addr).json(&mani).send().unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
         let location = resp.headers().get::<Location>().unwrap().to_string();
         assert_eq!(&location, &manifest_addr);
@@ -199,7 +203,8 @@ mod interface_tests {
     fn get_manifest(cl: &reqwest::Client, name: &str) {
         //Previous test should have upload image/test:test manifest
         //Might need accept headers here
-        let mut resp = cl.get(&format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name))
+        let mut resp = cl
+            .get(&format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
@@ -207,8 +212,20 @@ mod interface_tests {
         assert_eq!(mani.schema_version, 2);
     }
 
+    fn check_repo_catalog(cl: &reqwest::Client, rc: &RepoCatalog) {
+        let mut resp = cl
+            .get(&format!("{}/v2/_catalog", LYCAON_ADDRESS))
+            .send()
+            .unwrap();
+        let rc_resp: RepoCatalog = serde_json::from_str(&resp.text().unwrap()).unwrap();
+        assert_eq!(rc, &rc_resp);
+    }
+
     #[test]
     fn test_runner() {
+        //Need to start with empty repo
+        fs::remove_dir_all("./data").unwrap_or(());
+
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
         let _trow = start_trow();
@@ -243,6 +260,13 @@ mod interface_tests {
         get_manifest(&client, "image/test");
         println!("Running get_manifest(repo/image/test)");
         get_manifest(&client, "repo/image/test");
+
+        let mut rc = RepoCatalog::new();
+        rc.insert(RepoName("repo/image/test".to_string()));
+        rc.insert(RepoName("image/test".to_string()));
+        rc.insert(RepoName("onename".to_string()));
+
+        check_repo_catalog(&client, &rc);
     }
 
 }

@@ -1,9 +1,10 @@
-use failure::Error;
+use failure::{Error, format_err};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use trow_protobuf::server::*;
 use trow_protobuf::server_grpc::BackendClient;
 use types::{self, *};
+use futures::{Future, Stream};
 
 pub struct ClientInterface {
     backend: BackendClient,
@@ -151,11 +152,25 @@ impl ClientInterface {
         Ok(vm)
     }
 
-    pub fn get_catalog(&self) -> Result<RepositoryCatalog, Error> {
+    pub fn get_catalog(&self) -> Result<RepoCatalog, Error> {
 
-        let catalog = self.backend.get_catalog();
+        let cr = CatalogRequest::new();
+        let mut repo_stream = self.backend.get_catalog(&cr)?;
+        let mut catalog = RepoCatalog::new();
+        
+        loop {
+            let f = repo_stream.into_future();
+            match f.wait() {
+                Ok((Some(ce), s)) => {
+                    repo_stream = s;
+                    catalog.insert(RepoName(ce.get_repo_name().to_string()));
+                },
+                Ok((None, _)) => break,
+                Err((e, _)) => return Err(format_err!("Failure streaming from server {:?}", e)),
+            }
+        }
+        
         Ok(catalog)
-
     }
     
 }

@@ -5,18 +5,21 @@
 extern crate crypto;
 extern crate ctrlc;
 extern crate failure;
+extern crate futures;
 extern crate grpcio;
 extern crate hostname;
 extern crate jwt;
 extern crate orset;
 extern crate protobuf;
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 extern crate rocket_contrib;
 extern crate rustc_serialize;
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
-#[macro_use] extern crate display_derive;
+#[macro_use]
+extern crate display_derive;
 
 extern crate trow_protobuf;
 extern crate trow_server;
@@ -45,7 +48,7 @@ use rocket::fairing;
 mod client_interface;
 pub mod response;
 mod routes;
-mod types;
+pub mod types;
 
 use client_interface::ClientInterface;
 
@@ -102,14 +105,8 @@ fn init_logger() -> Result<(), SetLoggerError> {
     builder.init()
 }
 
-
-
 impl TrowBuilder {
-    pub fn new(
-        data_dir: String,
-        addr: NetAddr,
-        listen: NetAddr
-    ) -> TrowBuilder {
+    pub fn new(data_dir: String, addr: NetAddr, listen: NetAddr) -> TrowBuilder {
         TrowBuilder {
             data_dir,
             addr,
@@ -154,21 +151,19 @@ impl TrowBuilder {
             .manage(build_handlers(
                 &self.grpc.listen.host,
                 self.grpc.listen.port,
-            ))
-            .attach(fairing::AdHoc::on_attach(
+            )).attach(fairing::AdHoc::on_attach(
                 "SIGTERM handler",
                 |r| match attach_sigterm() {
                     Ok(_) => Ok(r),
                     Err(_) => Err(r),
                 },
-            ))
-            .attach(
-                fairing::AdHoc::on_response(
-                    "Set API Version Header", |_, resp| {
-                //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
-                resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
-            }))
-            .mount("/", routes::routes())
+            )).attach(fairing::AdHoc::on_response(
+                "Set API Version Header",
+                |_, resp| {
+                    //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
+                    resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
+                },
+            )).mount("/", routes::routes())
             .launch();
         Ok(())
     }

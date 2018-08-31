@@ -2,16 +2,16 @@ use std;
 use std::sync::{Arc, RwLock};
 
 use failure::{self, Error};
-use futures::Future;
+use futures::{stream, Future, Sink};
 use grpcio::{self, RpcStatus, RpcStatusCode, WriteFlags};
 use manifest::{FromJson, Manifest};
 use serde_json;
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use trow_protobuf;
 use trow_protobuf::server::*;
 use uuid::Uuid;
-use std::collections::HashSet;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -117,7 +117,6 @@ impl TrowService {
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
-    
         //This isn't optimal
         let path = self.get_path_for_manifest(&repo_name, &reference);
         let vm = self.create_verified_manifest(repo_name, reference, do_verification)?;
@@ -159,15 +158,27 @@ impl TrowService {
     }
 }
 
-fn visit_dirs(dir: &Path, repos: &mut HashSet<String>) -> Result<(), Error> {
+/**
+ * Visits each subdir and adds path to set if there are files in the directory.
+ *
+ * Could be made more generic by taking a function argument.
+ */
+fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<(), Error> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
-                visit_dirs(&path, repos)?;
+                visit_dirs(&path, base, repos)?;
             } else {
-                repos.push(path.to_string_lossy())
+                let dir = path.parent();
+                match dir {
+                    Some(d) => {
+                        let repo = d.strip_prefix(base)?;
+                        repos.insert(repo.to_string_lossy().to_string());
+                    }
+                    None => (),
+                }
             }
         }
     }
@@ -405,26 +416,37 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
         }
     }
 
-
-    //TODO: change to streaming
     fn get_catalog(
         &self,
         ctx: grpcio::RpcContext,
-        req: CatalogRequest,
-        sink: grpcio::ServerStreamingSink<String>,
+        _: CatalogRequest,
+        sink: grpcio::ServerStreamingSink<CatalogEntry>,
     ) {
-      
-            let mut repos = HashSet::new();
-            visit_dirs(self.manifests_path, &mut repos);
-            let res = repos.into_iter()
-                .map(|repo| (repo, 
-                                WriteFlags::default()))
-                .collect();
-            let f = sink.send_all(res)
-                .map(|_| ())
-                .map_err(|e| warn!("Error sending catalog {:?}", e));
-            ctx.spawn(f);
-      
+        let mut repos = HashSet::new();
+        match visit_dirs(&self.manifests_path, &self.manifests_path, &mut repos) {
+            Ok(_) => {
+                let repo_list: Vec<_> = repos
+                    .iter()
+                    .map(|r| {
+                        let mut ce = CatalogEntry::new();
+                        ce.set_repo_name(r.to_string());
+                        (ce, WriteFlags::default())
+                    }).collect();
+                let f = sink
+                    .send_all(stream::iter_ok::<_, grpcio::Error>(repo_list))
+                    .map(|_| {})
+                    .map_err(|e| warn!("failed to handle listfeatures request: {:?}", e));
+                ctx.spawn(f)
+            }
+            Err(e) => {
+                warn!("Error retreiving repository catalog {:?}", e);
+                let f = sink
+                    .fail(RpcStatus::new(
+                        RpcStatusCode::Internal,
+                        Some("Problem retrieving catalog".to_string()),
+                    )).map_err(|e| warn!("Internal error sending response {:?}", e));
+                ctx.spawn(f);
+            }
+        }
     }
-
 }

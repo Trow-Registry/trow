@@ -1,10 +1,11 @@
+use std::collections::HashSet;
 use std::io::Read;
 
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]
 pub struct Uuid(pub String);
 
-#[derive(Clone, Debug, Display, Serialize)]
+#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[display(fmt = "{}", _0)]
 pub struct RepoName(pub String);
 
@@ -149,4 +150,26 @@ impl BlobReader {
 
 pub fn create_blob_reader(reader: Box<Read>, digest: Digest) -> BlobReader {
     BlobReader { reader, digest }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct RepoCatalog {
+    #[serde(rename = "repositories")]
+    catalog: HashSet<RepoName>,
+}
+
+impl RepoCatalog {
+    pub fn new() -> RepoCatalog {
+        RepoCatalog {
+            catalog: HashSet::new(),
+        }
+    }
+
+    pub fn insert(&mut self, rn: RepoName) {
+        self.catalog.insert(rn);
+    }
+
+    pub fn catalog(&self) -> &HashSet<RepoName> {
+        &self.catalog
+    }
 }

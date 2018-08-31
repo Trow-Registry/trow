@@ -7,10 +7,7 @@ use response::html::HTML;
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
-use types::{
-    create_upload_info, AcceptedUpload, BlobReader, Digest,
-    ManifestReader, RepoName, Uuid, VerifiedManifest,
-};
+use types::*;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -464,11 +461,11 @@ fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Re
 #[get("/v2/_catalog")]
 fn get_catalog(
     ci: rocket::State<ClientInterface>,
-    name_repo: String,
-    digest: String,
-    _auth_user: AuthorisedUser,
-) -> Result<RepositoryCatalog, Error> {
-    ci.get_repository_catalog()
+) -> Result<RepoCatalog, Error> {
+    match ci.get_catalog() {
+        Ok(c) => Ok(c),
+        Err(_) => Err(Error::InternalError),
+    }
 }
 
 //Also see list image tags
