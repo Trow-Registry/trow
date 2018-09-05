@@ -1,19 +1,20 @@
+use hostname;
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 use serde;
-use hostname;
 
+pub mod accepted_upload;
+pub mod blob_reader;
 pub mod empty;
 pub mod errors;
 pub mod html;
-pub mod verified_manifest;
 pub mod manifest_reader;
-pub mod blob_reader;
+pub mod repo_catalog;
+pub mod tag_list;
 mod test_helper;
 pub mod upload_info;
-pub mod accepted_upload;
-pub mod repo_catalog;
+pub mod verified_manifest;
 
 pub fn json_response<T: serde::Serialize>(
     req: &Request,

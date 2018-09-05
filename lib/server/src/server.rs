@@ -435,7 +435,7 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
                 let f = sink
                     .send_all(stream::iter_ok::<_, grpcio::Error>(repo_list))
                     .map(|_| {})
-                    .map_err(|e| warn!("failed to handle listfeatures request: {:?}", e));
+                    .map_err(|e| warn!("Failed to handle catalog request: {:?}", e));
                 ctx.spawn(f)
             }
             Err(e) => {
@@ -448,5 +448,37 @@ impl trow_protobuf::server_grpc::Backend for TrowService {
                 ctx.spawn(f);
             }
         }
+    }
+
+    fn list_tags(
+        &self,
+        ctx: grpcio::RpcContext,
+        ce: CatalogEntry,
+        sink: grpcio::ServerStreamingSink<Tag>,
+    ) {
+        let mut tags = Vec::new();
+        let mut path = PathBuf::from(&self.manifests_path);
+        path.push(ce.get_repo_name());
+
+        if let Ok(files) = fs::read_dir(path) {
+            for entry in files {
+                if let Ok(en) = entry {
+                    let en_path = en.path();
+                    if en_path.is_file() {
+                        if let Some(tag_str) = en_path.file_name() {
+                            let mut tag = Tag::new();
+                            tag.set_tag(tag_str.to_string_lossy().to_string());
+                            tags.push((tag, WriteFlags::default()));
+                        }
+                    }
+                }
+            }
+        }
+
+        let f = sink
+            .send_all(stream::iter_ok::<_, grpcio::Error>(tags))
+            .map(|_| {})
+            .map_err(|e| warn!("Failed to respond to ListTags request: {:?}", e));
+        ctx.spawn(f);
     }
 }

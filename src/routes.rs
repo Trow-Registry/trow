@@ -13,7 +13,6 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
-        
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -21,7 +20,6 @@ pub fn routes() -> Vec<rocket::Route> {
         put_image_manifest_2level,
         put_image_manifest_3level,
         delete_image_manifest,
-
         get_blob,
         get_blob_2level,
         get_blob_3level,
@@ -34,7 +32,9 @@ pub fn routes() -> Vec<rocket::Route> {
         post_blob_upload,
         post_blob_upload_2level,
         post_blob_upload_3level,
-
+        list_tags,
+        list_tags_2level,
+        list_tags_3level,
         get_catalog,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
@@ -42,7 +42,6 @@ pub fn routes() -> Vec<rocket::Route> {
           get_upload_progress,
           delete_upload,
           delete_blob,
-          get_catalog,
           get_image_tags,
           admin routes,
           admin_get_uuids
@@ -410,7 +409,7 @@ fn put_image_manifest(
                 Ok(vm) => Ok(vm),
                 Err(_) => Err(Error::ManifestInvalid),
             }
-        },
+        }
         Err(_) => Err(Error::InternalError),
     }
 }
@@ -459,13 +458,36 @@ fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Re
 }
 
 #[get("/v2/_catalog")]
-fn get_catalog(
-    ci: rocket::State<ClientInterface>,
-) -> Result<RepoCatalog, Error> {
+fn get_catalog(ci: rocket::State<ClientInterface>) -> Result<RepoCatalog, Error> {
     match ci.get_catalog() {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }
 }
 
-//Also see list image tags
+#[get("/v2/<repo_name>/tags/list")]
+fn list_tags(ci: rocket::State<ClientInterface>, repo_name: String) -> Result<TagList, Error> {
+    match ci.list_tags(&RepoName(repo_name)) {
+        Ok(c) => Ok(c),
+        Err(_) => Err(Error::InternalError),
+    }
+}
+
+#[get("/v2/<user>/<repo>/tags/list")]
+fn list_tags_2level(
+    ci: rocket::State<ClientInterface>,
+    user: String,
+    repo: String,
+) -> Result<TagList, Error> {
+    list_tags(ci, format!("{}/{}", user, repo))
+}
+
+#[get("/v2/<org>/<user>/<repo>/tags/list")]
+fn list_tags_3level(
+    ci: rocket::State<ClientInterface>,
+    org: String,
+    user: String,
+    repo: String,
+) -> Result<TagList, Error> {
+    list_tags(ci, format!("{}/{}/{}", org, user, repo))
+}

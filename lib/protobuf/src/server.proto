@@ -74,6 +74,10 @@ message CatalogEntry {
   string repo_name = 1;
 }
 
+message Tag {
+  string tag = 1;
+}
+
 service Backend {
 
   //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
@@ -101,5 +105,7 @@ service Backend {
   rpc CompleteUpload (CompleteRequest) returns (CompletedUpload) {}
 
   rpc GetCatalog (CatalogRequest) returns (stream CatalogEntry) {}
+
+  rpc ListTags (CatalogEntry) returns (stream Tag) {}
 
 }

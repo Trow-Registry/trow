@@ -74,6 +74,13 @@ const METHOD_BACKEND_GET_CATALOG: ::grpcio::Method<super::server::CatalogRequest
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
+const METHOD_BACKEND_LIST_TAGS: ::grpcio::Method<super::server::CatalogEntry, super::server::Tag> = ::grpcio::Method {
+    ty: ::grpcio::MethodType::ServerStreaming,
+    name: "/lycaon.Backend/ListTags",
+    req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+    resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
+};
+
 pub struct BackendClient {
     client: ::grpcio::Client,
 }
@@ -204,6 +211,14 @@ impl BackendClient {
     pub fn get_catalog(&self, req: &super::server::CatalogRequest) -> ::grpcio::Result<::grpcio::ClientSStreamReceiver<super::server::CatalogEntry>> {
         self.get_catalog_opt(req, ::grpcio::CallOption::default())
     }
+
+    pub fn list_tags_opt(&self, req: &super::server::CatalogEntry, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientSStreamReceiver<super::server::Tag>> {
+        self.client.server_streaming(&METHOD_BACKEND_LIST_TAGS, req, opt)
+    }
+
+    pub fn list_tags(&self, req: &super::server::CatalogEntry) -> ::grpcio::Result<::grpcio::ClientSStreamReceiver<super::server::Tag>> {
+        self.list_tags_opt(req, ::grpcio::CallOption::default())
+    }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
         self.client.spawn(f)
     }
@@ -218,6 +233,7 @@ pub trait Backend {
     fn verify_manifest(&self, ctx: ::grpcio::RpcContext, req: super::server::ManifestRef, sink: ::grpcio::UnarySink<super::server::VerifiedManifest>);
     fn complete_upload(&self, ctx: ::grpcio::RpcContext, req: super::server::CompleteRequest, sink: ::grpcio::UnarySink<super::server::CompletedUpload>);
     fn get_catalog(&self, ctx: ::grpcio::RpcContext, req: super::server::CatalogRequest, sink: ::grpcio::ServerStreamingSink<super::server::CatalogEntry>);
+    fn list_tags(&self, ctx: ::grpcio::RpcContext, req: super::server::CatalogEntry, sink: ::grpcio::ServerStreamingSink<super::server::Tag>);
 }
 
 pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Service {
@@ -253,6 +269,10 @@ pub fn create_backend<S: Backend + Send + Clone + 'static>(s: S) -> ::grpcio::Se
     let instance = s.clone();
     builder = builder.add_server_streaming_handler(&METHOD_BACKEND_GET_CATALOG, move |ctx, req, resp| {
         instance.get_catalog(ctx, req, resp)
+    });
+    let instance = s.clone();
+    builder = builder.add_server_streaming_handler(&METHOD_BACKEND_LIST_TAGS, move |ctx, req, resp| {
+        instance.list_tags(ctx, req, resp)
     });
     builder.build()
 }

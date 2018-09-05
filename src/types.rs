@@ -173,3 +173,32 @@ impl RepoCatalog {
         &self.catalog
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct TagList {
+    #[serde(rename = "name")]
+    repo: RepoName,
+    #[serde(rename = "tags")]
+    list: HashSet<String>,
+}
+
+impl TagList {
+    pub fn new(repo_name: RepoName) -> TagList {
+        TagList {
+            repo: repo_name,
+            list: HashSet::new(),
+        }
+    }
+
+    pub fn insert(&mut self, tag: String) {
+        self.list.insert(tag);
+    }
+
+    pub fn repo_name(&self) -> &RepoName {
+        &self.repo
+    }
+
+    pub fn list(&self) -> &HashSet<String> {
+        &self.list
+    }
+}

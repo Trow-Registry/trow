@@ -28,7 +28,7 @@ mod interface_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use trow::types::{RepoCatalog, RepoName};
+    use trow::types::{RepoCatalog, RepoName, TagList};
     use trow_server::manifest;
 
     const LYCAON_ADDRESS: &str = "https://trow.test:8443";
@@ -131,7 +131,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
     }
 
-    fn upload_layer(cl: &reqwest::Client, name: &str) {
+    fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         //Should support both image/test and imagetest, only former working currently
         let resp = cl
             .post(&format!("{}/v2/{}/blobs/uploads/", LYCAON_ADDRESS, name))
@@ -193,18 +193,17 @@ mod interface_tests {
             config,
             layers,
         };
-        let manifest_addr = format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name);
+        let manifest_addr = format!("{}/v2/{}/manifests/{}", LYCAON_ADDRESS, name, tag);
         let resp = cl.put(&manifest_addr).json(&mani).send().unwrap();
         assert_eq!(resp.status(), StatusCode::Created);
         let location = resp.headers().get::<Location>().unwrap().to_string();
         assert_eq!(&location, &manifest_addr);
     }
 
-    fn get_manifest(cl: &reqwest::Client, name: &str) {
-        //Previous test should have upload image/test:test manifest
+    fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
         //Might need accept headers here
         let mut resp = cl
-            .get(&format!("{}/v2/{}/manifests/test", LYCAON_ADDRESS, name))
+            .get(&format!("{}/v2/{}/manifests/{}", LYCAON_ADDRESS, name, tag))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::Ok);
@@ -219,6 +218,18 @@ mod interface_tests {
             .unwrap();
         let rc_resp: RepoCatalog = serde_json::from_str(&resp.text().unwrap()).unwrap();
         assert_eq!(rc, &rc_resp);
+    }
+
+    fn check_tag_list(cl: &reqwest::Client, tl: &TagList) {
+        let mut resp = cl
+            .get(&format!(
+                "{}/v2/{}/tags/list",
+                LYCAON_ADDRESS,
+                tl.repo_name()
+            )).send()
+            .unwrap();
+        let tl_resp: TagList = serde_json::from_str(&resp.text().unwrap()).unwrap();
+        assert_eq!(tl, &tl_resp);
     }
 
     #[test]
@@ -248,18 +259,20 @@ mod interface_tests {
         get_non_existent_blob(&client);
         println!("Running unsupported()");
         unsupported(&client);
-        println!("Running upload_layer(repo/image/test)");
-        upload_layer(&client, "repo/image/test");
-        println!("Running upload_layer(image/test)");
-        upload_layer(&client, "image/test");
-        println!("Running upload_layer(onename)");
-        upload_layer(&client, "onename");
-        println!("Running get_manifest(onename)");
-        get_manifest(&client, "onename");
-        println!("Running get_manifest(image/test)");
-        get_manifest(&client, "image/test");
-        println!("Running get_manifest(repo/image/test)");
-        get_manifest(&client, "repo/image/test");
+        println!("Running upload_layer(repo/image/test:tag)");
+        upload_layer(&client, "repo/image/test", "tag");
+        println!("Running upload_layer(image/test:latest)");
+        upload_layer(&client, "image/test", "latest");
+        println!("Running upload_layer(onename:tag)");
+        upload_layer(&client, "onename", "tag");
+        println!("Running upload_layer(onename:latest)");
+        upload_layer(&client, "onename", "latest");
+        println!("Running get_manifest(onename:tag)");
+        get_manifest(&client, "onename", "tag");
+        println!("Running get_manifest(image/test:latest)");
+        get_manifest(&client, "image/test", "latest");
+        println!("Running get_manifest(repo/image/test:tag)");
+        get_manifest(&client, "repo/image/test", "tag");
 
         let mut rc = RepoCatalog::new();
         rc.insert(RepoName("repo/image/test".to_string()));
@@ -267,6 +280,15 @@ mod interface_tests {
         rc.insert(RepoName("onename".to_string()));
 
         check_repo_catalog(&client, &rc);
+
+        let mut tl = TagList::new(RepoName("repo/image/test".to_string()));
+        tl.insert("tag".to_string());
+        check_tag_list(&client, &tl);
+
+        let mut tl2 = TagList::new(RepoName("onename".to_string()));
+        tl2.insert("tag".to_string());
+        tl2.insert("latest".to_string());
+        check_tag_list(&client, &tl2);
     }
 
 }

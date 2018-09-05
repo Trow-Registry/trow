@@ -1,10 +1,10 @@
-use failure::{Error, format_err};
+use failure::{format_err, Error};
+use futures::{Future, Stream};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use trow_protobuf::server::*;
 use trow_protobuf::server_grpc::BackendClient;
 use types::{self, *};
-use futures::{Future, Stream};
 
 pub struct ClientInterface {
     backend: BackendClient,
@@ -153,24 +153,44 @@ impl ClientInterface {
     }
 
     pub fn get_catalog(&self) -> Result<RepoCatalog, Error> {
-
         let cr = CatalogRequest::new();
         let mut repo_stream = self.backend.get_catalog(&cr)?;
         let mut catalog = RepoCatalog::new();
-        
+
         loop {
             let f = repo_stream.into_future();
             match f.wait() {
                 Ok((Some(ce), s)) => {
                     repo_stream = s;
                     catalog.insert(RepoName(ce.get_repo_name().to_string()));
-                },
+                }
                 Ok((None, _)) => break,
                 Err((e, _)) => return Err(format_err!("Failure streaming from server {:?}", e)),
             }
         }
-        
+
         Ok(catalog)
     }
-    
+
+    pub fn list_tags(&self, repo_name: &RepoName) -> Result<TagList, Error> {
+        let mut ce = CatalogEntry::new();
+        ce.set_repo_name(repo_name.0.clone());
+
+        let mut tag_stream = self.backend.list_tags(&ce)?;
+        let mut list = TagList::new(repo_name.clone());
+
+        loop {
+            let f = tag_stream.into_future();
+            match f.wait() {
+                Ok((Some(tag), s)) => {
+                    tag_stream = s;
+                    list.insert(tag.get_tag().to_string());
+                }
+                Ok((None, _)) => break,
+                Err((e, _)) => return Err(format_err!("Failure streaming from server {:?}", e)),
+            }
+        }
+
+        Ok(list)
+    }
 }
