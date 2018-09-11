@@ -31,10 +31,10 @@ COPY Cargo.lock .
 RUN mkdir src/
 RUN echo "fn main() {}" > src/main.rs
 
-# trow-backend
-COPY lib/backend/Cargo.toml lib/backend/
-RUN mkdir -p lib/backend/src
-RUN touch lib/backend/src/lib.rs
+# trow-server
+COPY lib/server/Cargo.toml lib/server/
+RUN mkdir -p lib/server/src
+RUN touch lib/server/src/lib.rs
 
 # trow-protobuf
 COPY lib/protobuf/Cargo.toml lib/protobuf/
