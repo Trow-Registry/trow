@@ -21,7 +21,9 @@ cat << EOF | cfssl genkey - | cfssljson -bare trow
 {
   "hosts": [
     "trow.$POD_NAMESPACE.svc.cluster.local",
+    "trow.$POD_NAMESPACE.svc",
     "$POD_NAME.$POD_NAMESPACE.pod.cluster.local",
+    "trow.$POD_NAMESPACE.svc",
     "trow.$POD_NAMESPACE",
     "$POD_IP",
     "$SERVICE_IP"

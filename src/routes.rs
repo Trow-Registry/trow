@@ -36,13 +36,13 @@ pub fn routes() -> Vec<rocket::Route> {
         list_tags_2level,
         list_tags_3level,
         get_catalog,
+        validate_image
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
           get_upload_progress,
           delete_upload,
           delete_blob,
-          get_image_tags,
           admin routes,
           admin_get_uuids
 
@@ -328,6 +328,7 @@ fn patch_blob_3level(
 ) -> Result<UploadInfo, Error> {
     patch_blob(handler, format!("{}/{}/{}", org, repo, name), uuid, chunk)
 }
+
 /*
   Starting point for an uploading a new image or new version of an image.
 
@@ -490,4 +491,14 @@ fn list_tags_3level(
     repo: String,
 ) -> Result<TagList, Error> {
     list_tags(ci, format!("{}/{}/{}", org, user, repo))
+}
+
+//Might want to move this stuff somewhere else
+//Kubernetes webhooks for admitting images
+//Update to use rocket_contrib::Json
+//Just using String for debugging
+#[post("/validate-image", data = "<image_data>")]
+fn validate_image(_ci: rocket::State<ClientInterface>, image_data: String) -> &str {
+    warn!("Recieved {:?}", image_data);
+    "done"
 }

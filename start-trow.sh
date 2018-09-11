@@ -12,5 +12,5 @@ if [[ $@ != *"--no-tls"* && ! -f ./certs/domain.key && ! -f ./certs/ca.crt ]]; t
 fi
 echo "Running /trow $@"
 
-exec /trow "$@"
+exec env RUST_LOG="warn" /trow "$@"
 

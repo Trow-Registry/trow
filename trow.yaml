@@ -136,3 +136,23 @@ spec:
     port: 443
     targetPort: 8443
     nodePort: 31000
+
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: trow-validator
+webhooks:
+  - name: trow.io
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+        resources:
+          - pods
+    failurePolicy: Fail
+    clientConfig:
+      url: "https://trow/validateImage"
