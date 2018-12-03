@@ -72,14 +72,14 @@ fn main() {
 
     let no_tls = matches.is_present("no-tls");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
-    let default_port = if no_tls {8000} else {8443};
+    let default_port = if no_tls { 8000 } else { 8443 };
     let port: u16 = matches
         .value_of("port")
         .map_or(default_port, |x| x.parse().unwrap());
     let cert_path = matches.value_of("cert").unwrap_or("./certs/ca.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
-    
+
     let addr = NetAddr {
         host: host.to_string(),
         port: port,

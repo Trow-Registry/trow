@@ -1,6 +1,5 @@
-#![feature(decl_macro)]
+#![feature(proc_macro_hygiene, decl_macro)]
 #![feature(plugin)]
-#![plugin(rocket_codegen)]
 
 extern crate crypto;
 extern crate ctrlc;
@@ -24,8 +23,6 @@ extern crate display_derive;
 extern crate trow_protobuf;
 extern crate trow_server;
 
-use trow_protobuf::server_grpc::BackendClient;
-
 extern crate env_logger;
 
 use log::{LogLevelFilter, LogRecord, SetLoggerError};
@@ -43,14 +40,16 @@ use failure::Error;
 use std::env;
 use std::thread;
 
+use grpcio::{ChannelBuilder, EnvBuilder};
 use rocket::fairing;
+use std::sync::Arc;
 
 mod client_interface;
 pub mod response;
 mod routes;
 pub mod types;
 
-use client_interface::ClientInterface;
+use client_interface::{BackendClient, ClientInterface};
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -147,6 +146,7 @@ impl TrowBuilder {
 
         //TODO: shouldn't need to clone rocket config
         let rocket_config = &self.build_rocket_config()?;
+        println!("Starting trow on {}:{}", self.addr.host, self.addr.port);
         rocket::custom(rocket_config.clone())
             .manage(build_handlers(
                 &self.grpc.listen.host,
@@ -177,9 +177,6 @@ fn attach_sigterm() -> Result<(), Error> {
 }
 
 pub fn build_handlers(listen_host: &str, listen_port: u16) -> ClientInterface {
-    use grpcio::{ChannelBuilder, EnvBuilder};
-    use std::sync::Arc;
-
     debug!("Connecting to backend: {}:{}", listen_host, listen_port);
     let env = Arc::new(EnvBuilder::new().build());
     let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", listen_host, listen_port));

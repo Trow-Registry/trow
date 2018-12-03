@@ -78,7 +78,7 @@ message Tag {
   string tag = 1;
 }
 
-service Backend {
+service Registry {
 
   //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
   //Assigns a "UUID" to a Upload that is then used to track it
@@ -107,5 +107,28 @@ service Backend {
   rpc GetCatalog (CatalogRequest) returns (stream CatalogEntry) {}
 
   rpc ListTags (CatalogEntry) returns (stream Tag) {}
+
+}
+
+message AdmissionRequest {
+  string api_version = 1;
+  string uid = 2;
+  string image = 3;
+  string namespace = 4;
+  //TODO: should be enum
+  string operation = 5;
+}
+
+message AdmissionResponse {
+  bool valid = 1;
+  //Reason blank if valid
+  string reason = 2;
+}
+
+service AdmissionController{
+
+  rpc ValidateAdmission (AdmissionRequest) returns (AdmissionResponse) {}
+  //TODO mutating admission controller to pin digests
+  //rpc MutateAdmission (AdmissionRequest) returns (AdmissionResponse) {}
 
 }

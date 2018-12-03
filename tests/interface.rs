@@ -232,6 +232,121 @@ mod interface_tests {
         assert_eq!(tl, &tl_resp);
     }
 
+    fn validate_image(cl: &reqwest::Client) {
+        
+        let review = r#"{
+  "kind": "AdmissionReview",
+  "apiVersion": "admission.k8s.io/v1beta1",
+  "request": {
+    "uid": "0b4ab323-b607-11e8-a555-42010a8002a3",
+    "kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+    },
+    "resource": {
+      "group": "",
+      "version": "v1",
+      "resource": "pods"
+    },
+    "namespace": "default",
+    "operation": "CREATE",
+    "userInfo": {
+      "username": "system:serviceaccount:kube-system:replicaset-controller",
+      "uid": "fc3f24b4-b5e2-11e8-a555-42010a8002a3",
+      "groups": [
+        "system:serviceaccounts",
+        "system:serviceaccounts:kube-system",
+        "system:authenticated"
+      ]
+    },
+    "object": {
+      "metadata": {
+        "name": "test3-88c6d6597-rll2c",
+        "generateName": "test3-88c6d6597-",
+        "namespace": "default",
+        "uid": "0b4aae46-b607-11e8-a555-42010a8002a3",
+        "creationTimestamp": "2018-09-11T21:10:00Z",
+        "labels": {
+          "pod-template-hash": "447282153",
+          "run": "test3"
+        },
+        "annotations": {
+          "kubernetes.io/limit-ranger": "LimitRanger plugin set: cpu request for container test3"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "ReplicaSet",
+            "name": "test3-88c6d6597",
+            "uid": "0b4790c2-b607-11e8-a555-42010a8002a3",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ]
+      },
+      "spec": {
+        "volumes": [
+          {
+            "name": "default-token-6swbv",
+            "secret": {
+              "secretName": "default-token-6swbv"
+            }
+          }
+        ],
+        "containers": [
+          {
+            "name": "test3",
+            "image": "nginx",
+            "resources": {
+              "requests": {
+                "cpu": "100m"
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "default-token-6swbv",
+                "readOnly": true,
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+              }
+            ],
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "imagePullPolicy": "Always"
+          }
+        ],
+        "restartPolicy": "Always",
+        "terminationGracePeriodSeconds": 30,
+        "dnsPolicy": "ClusterFirst",
+        "serviceAccountName": "default",
+        "serviceAccount": "default",
+        "securityContext": {},
+        "schedulerName": "default-scheduler",
+        "tolerations": [
+          {
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "effect": "NoExecute",
+            "tolerationSeconds": 300
+          },
+          {
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "effect": "NoExecute",
+            "tolerationSeconds": 300
+          }
+        ]
+      },
+      "status": {
+        "phase": "Pending",
+        "qosClass": "Burstable"
+      }
+    },
+    "oldObject": null
+  }
+}"#;
+    }
+
     #[test]
     fn test_runner() {
         //Need to start with empty repo

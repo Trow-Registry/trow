@@ -200,7 +200,7 @@ fn gen_digest(bytes: &[u8]) -> String {
     format!("sha256:{}", hasher.result_str())
 }
 
-impl trow_protobuf::server_grpc::Backend for TrowService {
+impl trow_protobuf::server_grpc::Registry for TrowService {
     fn get_write_location_for_blob(
         &self,
         ctx: grpcio::RpcContext,

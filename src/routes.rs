@@ -7,6 +7,8 @@ use response::html::HTML;
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
+use rocket_contrib::json::Json;
+use serde_json::Value;
 use types::*;
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -204,56 +206,50 @@ Content-Type: application/octet-stream
 <Layer Chunk Binary Data>
  */
 
-#[derive(FromForm)]
-struct UploadQuery {
-    _query: bool,
-    digest: String,
-}
-
 /**
  * Completes the upload.
  *
  * TODO: allow uploading of final data
  * TODO: add other failure states
  */
-#[put("/v2/<repo_name>/blobs/uploads/<uuid>?<query>")]
+#[put("/v2/<repo_name>/blobs/uploads/<uuid>?<digest>")]
 fn put_blob(
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
-    query: UploadQuery,
+    digest: String,
 ) -> Result<AcceptedUpload, Error> {
-    ci.complete_upload(&RepoName(repo_name), &Uuid(uuid), &Digest(query.digest))
+    ci.complete_upload(&RepoName(repo_name), &Uuid(uuid), &Digest(digest))
         .map_err(|_| Error::InternalError)
 }
 
 /*
  * Parse 2 level <repo>/<name> style path and pass it to put_blob
  */
-#[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
+#[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<digest>")]
 fn put_blob_2level(
     config: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
-    query: UploadQuery,
+    digest: String,
 ) -> Result<AcceptedUpload, Error> {
-    put_blob(config, format!("{}/{}", repo, name), uuid, query)
+    put_blob(config, format!("{}/{}", repo, name), uuid, digest)
 }
 
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
  */
-#[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<query>")]
+#[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>")]
 fn put_blob_3level(
     config: rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
     uuid: String,
-    query: UploadQuery,
+    digest: String,
 ) -> Result<AcceptedUpload, Error> {
-    put_blob(config, format!("{}/{}/{}", org, repo, name), uuid, query)
+    put_blob(config, format!("{}/{}/{}", org, repo, name), uuid, digest)
 }
 
 /*
@@ -314,10 +310,7 @@ fn patch_blob_2level(
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to patch_blob
  */
-#[patch(
-    "/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>",
-    data = "<chunk>"
-)]
+#[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_3level(
     handler: rocket::State<ClientInterface>,
     org: String,
@@ -330,12 +323,12 @@ fn patch_blob_3level(
 }
 
 /*
-  Starting point for an uploading a new image or new version of an image.
+ Starting point for an uploading a new image or new version of an image.
 
-  We respond with details of location and UUID to upload to with patch/put.
+ We respond with details of location and UUID to upload to with patch/put.
 
-  No data is being transferred yet.
- */
+ No data is being transferred yet.
+*/
 #[post("/v2/<repo_name>/blobs/uploads")]
 fn post_blob_upload(
     ci: rocket::State<ClientInterface>,
@@ -432,10 +425,7 @@ fn put_image_manifest_2level(
 /*
  * Parse 3 level <org>/<user>/<repo> style path and pass it to put_image_manifest
  */
-#[put(
-    "/v2/<org>/<user>/<repo>/manifests/<reference>",
-    data = "<chunk>"
-)]
+#[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest_3level(
     ci: rocket::State<ClientInterface>,
     org: String,
@@ -498,7 +488,30 @@ fn list_tags_3level(
 //Update to use rocket_contrib::Json
 //Just using String for debugging
 #[post("/validate-image", data = "<image_data>")]
-fn validate_image(_ci: rocket::State<ClientInterface>, image_data: String) -> &str {
+fn validate_image(_ci: rocket::State<ClientInterface>, image_data: Json<Value>) -> String {
+    //TODO: Use proper deserialization
+    //For the moment just cherrypicking interesting data
     warn!("Recieved {:?}", image_data);
-    "done"
+    let api_version = image_data["apiVersion"].to_string();
+    let uid = image_data["request"]["uid"].to_string();
+    let image = image_data["request"]["object"]["spec"]["containers"][0]["image"].to_string();
+    let namespace = image_data["request"]["namespace"].to_string();
+    let operation = image_data["request"]["operation"].to_string();
+
+    let ar = AdmissionReview {
+        api_version,
+        uid,
+        image,
+        namespace,
+        operation,
+    };
+
+    //We need to return an AdmissionResponse, presumably in JSON
+    //https://github.com/kubernetes/kubernetes/blob/5a16163c87fe2a90916a51b52771a668bcaf2a0d/pkg/apis/admission/types.go#L84
+
+    //ci.validate_image(ar);
+
+    //
+
+    format!("To review {:?}", ar)
 }

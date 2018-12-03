@@ -202,3 +202,14 @@ impl TagList {
         &self.list
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct AdmissionReview {
+    //TODO: Get rid of stringly typing
+    pub api_version: String,
+    pub uid: String,
+    pub image: String,
+    pub namespace: String,
+    pub operation: String, //CREATE, UPDATE, DELETE, CONNECT
+    //probably want user info as well, but normally it's the service account :(
+}

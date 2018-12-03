@@ -1,18 +1,31 @@
 use failure::{format_err, Error};
 use futures::{Future, Stream};
+use grpcio::Channel;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use trow_protobuf::server::*;
-use trow_protobuf::server_grpc::BackendClient;
+use trow_protobuf::server_grpc::RegistryClient;
 use types::{self, *};
 
+/* Will move to server grpc */
+pub struct BackendClient {
+    chan: Channel,
+}
+
+impl BackendClient {
+    pub fn new(chan: Channel) -> BackendClient {
+        BackendClient { chan }
+    }
+}
+
 pub struct ClientInterface {
-    backend: BackendClient,
+    rc: RegistryClient,
 }
 
 impl ClientInterface {
     pub fn new(backend: BackendClient) -> Self {
-        ClientInterface { backend }
+        let rc = RegistryClient::new(backend.chan);
+        ClientInterface { rc }
     }
 
     /**
@@ -28,7 +41,7 @@ impl ClientInterface {
         let mut req = UploadRequest::new();
         req.set_repo_name(repo_name.0.clone());
 
-        let response = self.backend.request_upload(&req)?;
+        let response = self.rc.request_upload(&req)?;
 
         Ok(create_upload_info(
             types::Uuid(response.get_uuid().to_owned()),
@@ -47,7 +60,7 @@ impl ClientInterface {
         req.set_repo_name(repo_name.0.clone());
         req.set_uuid(uuid.0.clone());
         req.set_user_digest(digest.0.clone());
-        let resp = self.backend.complete_upload(&req)?;
+        let resp = self.rc.complete_upload(&req)?;
 
         Ok(create_accepted_upload(
             Digest(resp.digest.to_owned()),
@@ -64,7 +77,7 @@ impl ClientInterface {
         br.set_uuid(uuid.0.clone());
         br.set_repo_name(repo_name.0.clone());
 
-        let resp = self.backend.get_write_location_for_blob(&br)?;
+        let resp = self.rc.get_write_location_for_blob(&br)?;
 
         //For the moment we know it's a file location
         let file = OpenOptions::new()
@@ -83,7 +96,7 @@ impl ClientInterface {
         mr.set_reference(reference.to_owned());
         mr.set_repo_name(repo_name.0.clone());
 
-        let resp = self.backend.get_write_location_for_manifest(&mr)?;
+        let resp = self.rc.get_write_location_for_manifest(&mr)?;
 
         //For the moment we know it's a file location
         //Manifests don't append; just overwrite
@@ -103,7 +116,7 @@ impl ClientInterface {
         mr.set_reference(reference.to_owned());
         mr.set_repo_name(repo_name.0.clone());
 
-        let resp = self.backend.get_read_location_for_manifest(&mr)?;
+        let resp = self.rc.get_read_location_for_manifest(&mr)?;
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
@@ -124,7 +137,7 @@ impl ClientInterface {
         dr.set_digest(digest.0.clone());
         dr.set_repo_name(repo_name.0.clone());
 
-        let resp = self.backend.get_read_location_for_blob(&dr)?;
+        let resp = self.rc.get_read_location_for_blob(&dr)?;
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
@@ -141,7 +154,7 @@ impl ClientInterface {
         mr.set_reference(reference.to_owned());
         mr.set_repo_name(repo_name.0.clone());
 
-        let resp = self.backend.verify_manifest(&mr)?;
+        let resp = self.rc.verify_manifest(&mr)?;
 
         let vm = create_verified_manifest(
             repo_name.clone(),
@@ -154,7 +167,7 @@ impl ClientInterface {
 
     pub fn get_catalog(&self) -> Result<RepoCatalog, Error> {
         let cr = CatalogRequest::new();
-        let mut repo_stream = self.backend.get_catalog(&cr)?;
+        let mut repo_stream = self.rc.get_catalog(&cr)?;
         let mut catalog = RepoCatalog::new();
 
         loop {
@@ -176,7 +189,7 @@ impl ClientInterface {
         let mut ce = CatalogEntry::new();
         ce.set_repo_name(repo_name.0.clone());
 
-        let mut tag_stream = self.backend.list_tags(&ce)?;
+        let mut tag_stream = self.rc.list_tags(&ce)?;
         let mut list = TagList::new(repo_name.clone());
 
         loop {
@@ -192,5 +205,9 @@ impl ClientInterface {
         }
 
         Ok(list)
+    }
+
+    pub fn validate_admission(&self, _ar: &AdmissionRequest) -> Result<AdmissionResponse, Error> {
+        Err(format_err!("Validator not implemented yet"))
     }
 }

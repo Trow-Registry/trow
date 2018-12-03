@@ -36,6 +36,10 @@ RUN cargo build
 
 FROM debian:stable-slim
 
+ARG VCS_REF
+LABEL org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.source="https://github.com/ContainerSolutions/trow"
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends openssl \
  && apt-get clean \

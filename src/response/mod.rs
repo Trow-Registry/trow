@@ -1,8 +1,5 @@
 use hostname;
-use rocket::http::Status;
 use rocket::request::Request;
-use rocket::response::{Responder, Response};
-use serde;
 
 pub mod accepted_upload;
 pub mod blob_reader;
@@ -15,14 +12,6 @@ pub mod tag_list;
 mod test_helper;
 pub mod upload_info;
 pub mod verified_manifest;
-
-pub fn json_response<T: serde::Serialize>(
-    req: &Request,
-    var: &T,
-) -> Result<Response<'static>, Status> {
-    use rocket_contrib;
-    rocket_contrib::Json(var).respond_to(req)
-}
 
 /// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
 /// Falls back to hostname if it doesn't exist.
