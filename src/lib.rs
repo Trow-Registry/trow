@@ -12,6 +12,7 @@ extern crate orset;
 extern crate protobuf;
 #[macro_use]
 extern crate rocket;
+#[macro_use]
 extern crate rocket_contrib;
 extern crate rustc_serialize;
 extern crate serde;
@@ -95,7 +96,8 @@ fn init_logger() -> Result<(), SetLoggerError> {
     builder
         .format(|record: &LogRecord| {
             format!("{}[{}] {}", record.target(), record.level(), record.args(),)
-        }).filter(None, LogLevelFilter::Error);
+        })
+        .filter(None, LogLevelFilter::Error);
 
     if env::var("RUST_LOG").is_ok() {
         builder.parse(&env::var("RUST_LOG").unwrap());
@@ -151,19 +153,22 @@ impl TrowBuilder {
             .manage(build_handlers(
                 &self.grpc.listen.host,
                 self.grpc.listen.port,
-            )).attach(fairing::AdHoc::on_attach(
+            ))
+            .attach(fairing::AdHoc::on_attach(
                 "SIGTERM handler",
                 |r| match attach_sigterm() {
                     Ok(_) => Ok(r),
                     Err(_) => Err(r),
                 },
-            )).attach(fairing::AdHoc::on_response(
+            ))
+            .attach(fairing::AdHoc::on_response(
                 "Set API Version Header",
                 |_, resp| {
                     //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
                     resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
                 },
-            )).mount("/", routes::routes())
+            ))
+            .mount("/", routes::routes())
             .launch();
         Ok(())
     }
@@ -173,7 +178,8 @@ fn attach_sigterm() -> Result<(), Error> {
     ctrlc::set_handler(|| {
         info!("SIGTERM caught, shutting down...");
         std::process::exit(0);
-    }).map_err(|e| e.into())
+    })
+    .map_err(|e| e.into())
 }
 
 pub fn build_handlers(listen_host: &str, listen_port: u16) -> ClientInterface {

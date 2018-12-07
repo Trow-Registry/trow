@@ -1,7 +1,12 @@
-#Not a big fan of using nightly, but such is our lot currently
-FROM rustlang/rust:nightly as builder
+#Not a big fan of using nightly, but such is our lot currently.
+#TODO Use same Dockerfile for release and debug
+FROM rust:latest as builder
 
-RUN apt-get update && apt-get install -y cmake golang
+RUN rustup update nightly && rustup default nightly;
+
+RUN apt-get update && apt-get install -y cmake golang unzip
+#Add checksum or GPG checking
+RUN cd /usr/local && curl -o protoc.zip -sSL https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip && unzip protoc.zip
 
 WORKDIR /usr/src/trow
 

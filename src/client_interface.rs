@@ -5,6 +5,7 @@ use std::fs::OpenOptions;
 use std::io::prelude::*;
 use trow_protobuf::server::*;
 use trow_protobuf::server_grpc::RegistryClient;
+use trow_protobuf::server_grpc::AdmissionControllerClient;
 use types::{self, *};
 
 /* Will move to server grpc */
@@ -20,12 +21,16 @@ impl BackendClient {
 
 pub struct ClientInterface {
     rc: RegistryClient,
+    ac: AdmissionControllerClient
 }
 
 impl ClientInterface {
     pub fn new(backend: BackendClient) -> Self {
-        let rc = RegistryClient::new(backend.chan);
-        ClientInterface { rc }
+
+        //Not sure if there's a reason we can't pass a reference to a channel
+        let rc = RegistryClient::new(backend.chan.clone());
+        let ac = AdmissionControllerClient::new(backend.chan);
+        ClientInterface { rc, ac }
     }
 
     /**
@@ -207,7 +212,25 @@ impl ClientInterface {
         Ok(list)
     }
 
-    pub fn validate_admission(&self, _ar: &AdmissionRequest) -> Result<AdmissionResponse, Error> {
-        Err(format_err!("Validator not implemented yet"))
+    /**
+     * Ok result indicates admission was validated.
+     */
+    pub fn validate_admission(&self, a_rev: &AdmissionReview) 
+    -> Result<(), Error> {
+        
+        //Should be able to write something to convert automatically
+        let mut a_req = AdmissionRequest::new();
+        a_req.set_api_version(a_rev.api_version.clone());
+        a_req.set_uid(a_rev.uid.clone());
+        a_req.set_image(a_rev.image.clone());
+        a_req.set_namespace(a_rev.namespace.clone());
+        a_req.set_operation(a_rev.operation.clone());
+
+        let resp = self.ac.validate_admission(&a_req)?;
+
+        if !resp.valid {
+            return Err(format_err!("Failed validation: {}", resp.reason));
+        }
+        Ok(())
     }
 }

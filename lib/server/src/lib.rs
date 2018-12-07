@@ -49,10 +49,15 @@ pub fn server_async(
     debug!("Setting up Trow server");
     let env = Arc::new(Environment::new(1));
 
-    let trow_service = trow_protobuf::server_grpc::create_registry(TrowService::new(data_path)?);
+    //It's a bit weird but cloning the service should be fine
+    //Internally it uses Arcs to point to the communal data
+    let ts = TrowService::new(data_path)?;
+    let registry_service = trow_protobuf::server_grpc::create_registry(ts.clone());
+    let admission_service = trow_protobuf::server_grpc::create_admission_controller(ts);
 
     let mut server = ServerBuilder::new(env)
-        .register_service(trow_service)
+        .register_service(registry_service)
+        .register_service(admission_service)
         .bind(listen_addr, listen_port)
         .build()?;
     server.start();
