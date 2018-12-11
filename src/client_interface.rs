@@ -4,8 +4,8 @@ use grpcio::Channel;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use trow_protobuf::server::*;
-use trow_protobuf::server_grpc::RegistryClient;
 use trow_protobuf::server_grpc::AdmissionControllerClient;
+use trow_protobuf::server_grpc::RegistryClient;
 use types::{self, *};
 
 /* Will move to server grpc */
@@ -21,12 +21,11 @@ impl BackendClient {
 
 pub struct ClientInterface {
     rc: RegistryClient,
-    ac: AdmissionControllerClient
+    ac: AdmissionControllerClient,
 }
 
 impl ClientInterface {
     pub fn new(backend: BackendClient) -> Self {
-
         //Not sure if there's a reason we can't pass a reference to a channel
         let rc = RegistryClient::new(backend.chan.clone());
         let ac = AdmissionControllerClient::new(backend.chan);
@@ -213,24 +212,39 @@ impl ClientInterface {
     }
 
     /**
-     * Ok result indicates admission was validated.
+     * Returns an AdmissionReview object with the AdmissionResponse completed with details of vaildation.
      */
-    pub fn validate_admission(&self, a_rev: &AdmissionReview) 
-    -> Result<(), Error> {
-        
-        //Should be able to write something to convert automatically
-        let mut a_req = AdmissionRequest::new();
-        a_req.set_api_version(a_rev.api_version.clone());
-        a_req.set_uid(a_rev.uid.clone());
-        a_req.set_image(a_rev.image.clone());
-        a_req.set_namespace(a_rev.namespace.clone());
-        a_req.set_operation(a_rev.operation.clone());
+    pub fn validate_admission(
+        &self,
+        in_req: &types::AdmissionRequest,
+    ) -> Result<types::AdmissionResponse, Error> {
+        //TODO: write something to convert automatically (into())
+        let mut a_req = trow_protobuf::server::AdmissionRequest::new();
+        a_req.set_image(in_req.image.clone());
+        a_req.set_namespace(in_req.namespace.clone());
+        a_req.set_operation(in_req.operation.clone());
 
         let resp = self.ac.validate_admission(&a_req)?;
 
-        if !resp.valid {
-            return Err(format_err!("Failed validation: {}", resp.reason));
-        }
-        Ok(())
+        //TODO: again, this should be an automatic conversion
+        let st = if resp.get_is_allowed() {
+            types::Status {
+                status: "Success".to_owned(),
+                message: None,
+                code: None,
+            }
+        } else {
+            //Not sure "Failure is correct"
+            types::Status {
+                status: "Failure".to_owned(),
+                message: Some(resp.get_reason().to_string()),
+                code: None,
+            }
+        };
+        Ok(types::AdmissionResponse {
+            uid: in_req.uid.clone(),
+            allowed: resp.get_is_allowed(),
+            status: Some(st),
+        })
     }
 }

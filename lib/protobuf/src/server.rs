@@ -2837,8 +2837,6 @@ impl ::protobuf::reflect::ProtobufValue for Tag {
 #[derive(PartialEq,Clone,Default)]
 pub struct AdmissionRequest {
     // message fields
-    pub api_version: ::std::string::String,
-    pub uid: ::std::string::String,
     pub image: ::std::string::String,
     pub namespace: ::std::string::String,
     pub operation: ::std::string::String,
@@ -2865,75 +2863,7 @@ impl AdmissionRequest {
         }
     }
 
-    // string api_version = 1;
-
-    pub fn clear_api_version(&mut self) {
-        self.api_version.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_api_version(&mut self, v: ::std::string::String) {
-        self.api_version = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_api_version(&mut self) -> &mut ::std::string::String {
-        &mut self.api_version
-    }
-
-    // Take field
-    pub fn take_api_version(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.api_version, ::std::string::String::new())
-    }
-
-    pub fn get_api_version(&self) -> &str {
-        &self.api_version
-    }
-
-    fn get_api_version_for_reflect(&self) -> &::std::string::String {
-        &self.api_version
-    }
-
-    fn mut_api_version_for_reflect(&mut self) -> &mut ::std::string::String {
-        &mut self.api_version
-    }
-
-    // string uid = 2;
-
-    pub fn clear_uid(&mut self) {
-        self.uid.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_uid(&mut self, v: ::std::string::String) {
-        self.uid = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_uid(&mut self) -> &mut ::std::string::String {
-        &mut self.uid
-    }
-
-    // Take field
-    pub fn take_uid(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.uid, ::std::string::String::new())
-    }
-
-    pub fn get_uid(&self) -> &str {
-        &self.uid
-    }
-
-    fn get_uid_for_reflect(&self) -> &::std::string::String {
-        &self.uid
-    }
-
-    fn mut_uid_for_reflect(&mut self) -> &mut ::std::string::String {
-        &mut self.uid
-    }
-
-    // string image = 3;
+    // string image = 1;
 
     pub fn clear_image(&mut self) {
         self.image.clear();
@@ -2967,7 +2897,7 @@ impl AdmissionRequest {
         &mut self.image
     }
 
-    // string namespace = 4;
+    // string namespace = 2;
 
     pub fn clear_namespace(&mut self) {
         self.namespace.clear();
@@ -3001,7 +2931,7 @@ impl AdmissionRequest {
         &mut self.namespace
     }
 
-    // string operation = 5;
+    // string operation = 3;
 
     pub fn clear_operation(&mut self) {
         self.operation.clear();
@@ -3046,18 +2976,12 @@ impl ::protobuf::Message for AdmissionRequest {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.api_version)?;
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.uid)?;
-                },
-                3 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.image)?;
                 },
-                4 => {
+                2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.namespace)?;
                 },
-                5 => {
+                3 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.operation)?;
                 },
                 _ => {
@@ -3072,20 +2996,14 @@ impl ::protobuf::Message for AdmissionRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.api_version.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.api_version);
-        }
-        if !self.uid.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.uid);
-        }
         if !self.image.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.image);
+            my_size += ::protobuf::rt::string_size(1, &self.image);
         }
         if !self.namespace.is_empty() {
-            my_size += ::protobuf::rt::string_size(4, &self.namespace);
+            my_size += ::protobuf::rt::string_size(2, &self.namespace);
         }
         if !self.operation.is_empty() {
-            my_size += ::protobuf::rt::string_size(5, &self.operation);
+            my_size += ::protobuf::rt::string_size(3, &self.operation);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -3093,20 +3011,14 @@ impl ::protobuf::Message for AdmissionRequest {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if !self.api_version.is_empty() {
-            os.write_string(1, &self.api_version)?;
-        }
-        if !self.uid.is_empty() {
-            os.write_string(2, &self.uid)?;
-        }
         if !self.image.is_empty() {
-            os.write_string(3, &self.image)?;
+            os.write_string(1, &self.image)?;
         }
         if !self.namespace.is_empty() {
-            os.write_string(4, &self.namespace)?;
+            os.write_string(2, &self.namespace)?;
         }
         if !self.operation.is_empty() {
-            os.write_string(5, &self.operation)?;
+            os.write_string(3, &self.operation)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -3153,16 +3065,6 @@ impl ::protobuf::MessageStatic for AdmissionRequest {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "api_version",
-                    AdmissionRequest::get_api_version_for_reflect,
-                    AdmissionRequest::mut_api_version_for_reflect,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "uid",
-                    AdmissionRequest::get_uid_for_reflect,
-                    AdmissionRequest::mut_uid_for_reflect,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "image",
                     AdmissionRequest::get_image_for_reflect,
                     AdmissionRequest::mut_image_for_reflect,
@@ -3189,8 +3091,6 @@ impl ::protobuf::MessageStatic for AdmissionRequest {
 
 impl ::protobuf::Clear for AdmissionRequest {
     fn clear(&mut self) {
-        self.clear_api_version();
-        self.clear_uid();
         self.clear_image();
         self.clear_namespace();
         self.clear_operation();
@@ -3213,7 +3113,7 @@ impl ::protobuf::reflect::ProtobufValue for AdmissionRequest {
 #[derive(PartialEq,Clone,Default)]
 pub struct AdmissionResponse {
     // message fields
-    pub valid: bool,
+    pub is_allowed: bool,
     pub reason: ::std::string::String,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
@@ -3238,27 +3138,27 @@ impl AdmissionResponse {
         }
     }
 
-    // bool valid = 1;
+    // bool is_allowed = 1;
 
-    pub fn clear_valid(&mut self) {
-        self.valid = false;
+    pub fn clear_is_allowed(&mut self) {
+        self.is_allowed = false;
     }
 
     // Param is passed by value, moved
-    pub fn set_valid(&mut self, v: bool) {
-        self.valid = v;
+    pub fn set_is_allowed(&mut self, v: bool) {
+        self.is_allowed = v;
     }
 
-    pub fn get_valid(&self) -> bool {
-        self.valid
+    pub fn get_is_allowed(&self) -> bool {
+        self.is_allowed
     }
 
-    fn get_valid_for_reflect(&self) -> &bool {
-        &self.valid
+    fn get_is_allowed_for_reflect(&self) -> &bool {
+        &self.is_allowed
     }
 
-    fn mut_valid_for_reflect(&mut self) -> &mut bool {
-        &mut self.valid
+    fn mut_is_allowed_for_reflect(&mut self) -> &mut bool {
+        &mut self.is_allowed
     }
 
     // string reason = 2;
@@ -3310,7 +3210,7 @@ impl ::protobuf::Message for AdmissionResponse {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_bool()?;
-                    self.valid = tmp;
+                    self.is_allowed = tmp;
                 },
                 2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.reason)?;
@@ -3327,7 +3227,7 @@ impl ::protobuf::Message for AdmissionResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.valid != false {
+        if self.is_allowed != false {
             my_size += 2;
         }
         if !self.reason.is_empty() {
@@ -3339,8 +3239,8 @@ impl ::protobuf::Message for AdmissionResponse {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if self.valid != false {
-            os.write_bool(1, self.valid)?;
+        if self.is_allowed != false {
+            os.write_bool(1, self.is_allowed)?;
         }
         if !self.reason.is_empty() {
             os.write_string(2, &self.reason)?;
@@ -3390,9 +3290,9 @@ impl ::protobuf::MessageStatic for AdmissionResponse {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
-                    "valid",
-                    AdmissionResponse::get_valid_for_reflect,
-                    AdmissionResponse::mut_valid_for_reflect,
+                    "is_allowed",
+                    AdmissionResponse::get_is_allowed_for_reflect,
+                    AdmissionResponse::mut_is_allowed_for_reflect,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "reason",
@@ -3411,7 +3311,7 @@ impl ::protobuf::MessageStatic for AdmissionResponse {
 
 impl ::protobuf::Clear for AdmissionResponse {
     fn clear(&mut self) {
-        self.clear_valid();
+        self.clear_is_allowed();
         self.clear_reason();
         self.unknown_fields.clear();
     }
@@ -3449,26 +3349,25 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x12\n\x04path\x18\x02\x20\x01(\tR\x04path\x12!\n\x0ccontent_type\x18\
     \x03\x20\x01(\tR\x0bcontentType\"\x10\n\x0eCatalogRequest\"+\n\x0cCatalo\
     gEntry\x12\x1b\n\trepo_name\x18\x01\x20\x01(\tR\x08repoName\"\x17\n\x03T\
-    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"\x97\x01\n\x10AdmissionR\
-    equest\x12\x1f\n\x0bapi_version\x18\x01\x20\x01(\tR\napiVersion\x12\x10\
-    \n\x03uid\x18\x02\x20\x01(\tR\x03uid\x12\x14\n\x05image\x18\x03\x20\x01(\
-    \tR\x05image\x12\x1c\n\tnamespace\x18\x04\x20\x01(\tR\tnamespace\x12\x1c\
-    \n\toperation\x18\x05\x20\x01(\tR\toperation\"A\n\x11AdmissionResponse\
-    \x12\x14\n\x05valid\x18\x01\x20\x01(\x08R\x05valid\x12\x16\n\x06reason\
-    \x18\x02\x20\x01(\tR\x06reason2\xf7\x04\n\x08Registry\x12?\n\rRequestUpl\
-    oad\x12\x15.lycaon.UploadRequest\x1a\x15.lycaon.UploadDetails\"\0\x12C\n\
-    \x17GetWriteLocationForBlob\x12\x0f.lycaon.BlobRef\x1a\x15.lycaon.WriteL\
-    ocation\"\0\x12I\n\x16GetReadLocationForBlob\x12\x13.lycaon.DownloadRef\
-    \x1a\x18.lycaon.BlobReadLocation\"\0\x12K\n\x1bGetWriteLocationForManife\
-    st\x12\x13.lycaon.ManifestRef\x1a\x15.lycaon.WriteLocation\"\0\x12Q\n\
-    \x1aGetReadLocationForManifest\x12\x13.lycaon.ManifestRef\x1a\x1c.lycaon\
-    .ManifestReadLocation\"\0\x12A\n\x0eVerifyManifest\x12\x13.lycaon.Manife\
-    stRef\x1a\x18.lycaon.VerifiedManifest\"\0\x12D\n\x0eCompleteUpload\x12\
-    \x17.lycaon.CompleteRequest\x1a\x17.lycaon.CompletedUpload\"\0\x12>\n\nG\
-    etCatalog\x12\x16.lycaon.CatalogRequest\x1a\x14.lycaon.CatalogEntry\"\00\
-    \x01\x121\n\x08ListTags\x12\x14.lycaon.CatalogEntry\x1a\x0b.lycaon.Tag\"\
-    \00\x012a\n\x13AdmissionController\x12J\n\x11ValidateAdmission\x12\x18.l\
-    ycaon.AdmissionRequest\x1a\x19.lycaon.AdmissionResponse\"\0b\x06proto3\
+    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"d\n\x10AdmissionRequest\
+    \x12\x14\n\x05image\x18\x01\x20\x01(\tR\x05image\x12\x1c\n\tnamespace\
+    \x18\x02\x20\x01(\tR\tnamespace\x12\x1c\n\toperation\x18\x03\x20\x01(\tR\
+    \toperation\"J\n\x11AdmissionResponse\x12\x1d\n\nis_allowed\x18\x01\x20\
+    \x01(\x08R\tisAllowed\x12\x16\n\x06reason\x18\x02\x20\x01(\tR\x06reason2\
+    \xf7\x04\n\x08Registry\x12?\n\rRequestUpload\x12\x15.lycaon.UploadReques\
+    t\x1a\x15.lycaon.UploadDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\
+    \x0f.lycaon.BlobRef\x1a\x15.lycaon.WriteLocation\"\0\x12I\n\x16GetReadLo\
+    cationForBlob\x12\x13.lycaon.DownloadRef\x1a\x18.lycaon.BlobReadLocation\
+    \"\0\x12K\n\x1bGetWriteLocationForManifest\x12\x13.lycaon.ManifestRef\
+    \x1a\x15.lycaon.WriteLocation\"\0\x12Q\n\x1aGetReadLocationForManifest\
+    \x12\x13.lycaon.ManifestRef\x1a\x1c.lycaon.ManifestReadLocation\"\0\x12A\
+    \n\x0eVerifyManifest\x12\x13.lycaon.ManifestRef\x1a\x18.lycaon.VerifiedM\
+    anifest\"\0\x12D\n\x0eCompleteUpload\x12\x17.lycaon.CompleteRequest\x1a\
+    \x17.lycaon.CompletedUpload\"\0\x12>\n\nGetCatalog\x12\x16.lycaon.Catalo\
+    gRequest\x1a\x14.lycaon.CatalogEntry\"\00\x01\x121\n\x08ListTags\x12\x14\
+    .lycaon.CatalogEntry\x1a\x0b.lycaon.Tag\"\00\x012a\n\x13AdmissionControl\
+    ler\x12J\n\x11ValidateAdmission\x12\x18.lycaon.AdmissionRequest\x1a\x19.\
+    lycaon.AdmissionResponse\"\0b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

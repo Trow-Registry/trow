@@ -110,17 +110,19 @@ service Registry {
 
 }
 
+/* These types are stripped down versions of the Kubernetes types.
+ * In future, we could directly use k8s types, but I'd rather leave that to a higher level.
+ */
 message AdmissionRequest {
-  string api_version = 1;
-  string uid = 2;
-  string image = 3;
-  string namespace = 4;
+  string image = 1;
+  string namespace = 2;
   //TODO: should be enum
-  string operation = 5;
+  string operation = 3;
 }
 
+//Mutate will require patch or equivalent
 message AdmissionResponse {
-  bool valid = 1;
+  bool is_allowed = 1;
   //Reason blank if valid
   string reason = 2;
 }

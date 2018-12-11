@@ -489,46 +489,53 @@ fn list_tags_3level(
 //Update to use rocket_contrib::Json
 //Just using String for debugging
 #[post("/validate-image", data = "<image_data>")]
-fn validate_image(ci: rocket::State<ClientInterface>, image_data: Json<Value>) -> JsonValue {
-    //TODO: Use proper deserialization
-    //For the moment just cherrypicking interesting data
-    //warn!("Recieved {:?}", image_data);
+fn validate_image(
+    ci: rocket::State<ClientInterface>,
+    image_data: Json<AdmissionReview>,
+) -> Json<AdmissionReview> {
+    warn!("Recieved {:?}", image_data);
     warn!("Called validate webhook");
-    let api_version = image_data["apiVersion"].to_string();
-    let uid = image_data["request"]["uid"].to_string();
-    let ret_uid = uid.clone();
-    let image = image_data["request"]["object"]["spec"]["containers"][0]["image"].to_string();
-    let namespace = image_data["request"]["namespace"].to_string();
-    let operation = image_data["request"]["operation"].to_string();
 
-    let ar = AdmissionReview {
-        api_version,
-        uid,
-        image,
-        namespace,
-        operation,
-    };
+    /**
+     * The return type is a little complicated. Always return a 200 including for disallowed images. The JSON is an
+     * AdmissionReview object with an AdmissionResponse entry. The object sent to this endpoint can be reused, or
+     * a new created with the same UID.
+     *
+     * The docs on this stuff is a bit lacking, it's easiest to refer to the Go code in kubernetes/api.
+     */
+    let mut resp_data = image_data.clone();
+    match image_data.0.request {
+        Some(req) => match ci.validate_admission(&req) {
+            Ok(res) => {
+                resp_data.response = Some(res);
+                Json(resp_data)
+            }
+            Err(e) => {
+                resp_data.response = Some(AdmissionResponse {
+                    uid: req.uid.clone(),
+                    allowed: false,
+                    status: Some(Status {
+                        status: "Failure".to_owned(),
+                        message: Some(format!("Internal Error {:?}", e).to_owned()),
+                        code: None,
+                    }),
+                });
+                Json(resp_data)
+            }
+        },
 
-    //We need to return an AdmissionResponse, presumably in JSON
-    //https://github.com/kubernetes/kubernetes/blob/5a16163c87fe2a90916a51b52771a668bcaf2a0d/pkg/apis/admission/types.go#L84
+        None => {
+            resp_data.response = Some(AdmissionResponse {
+                uid: "UNKNOWN".to_string(),
+                allowed: false,
+                status: Some(Status {
+                    status: "Failure".to_owned(),
+                    message: Some("No request found in review object".to_owned()),
+                    code: None,
+                }),
+            });
 
-    let res = ci.validate_admission(&ar);
-
-    let mut base = json!(
-                   {"kind": "AdmissionReview","apiVersion": "admission.k8s.io/v1beta1",
-                    "response": {"uid": format!("{}", &ret_uid)}});
-
-    match res {
-        Ok(_) => {
-            warn!("Allowed image");
-            base["response"]["allowed"] = serde_json::Value::Bool(true);
-            base
-        }
-        Err(reason) => {
-            warn!("Disallowed image");
-            base["response"]["allowed"] = serde_json::Value::Bool(false);
-            base["response"]["status"] = json!({ "message": format!("{}", reason) }).into();
-            base
+            Json(resp_data)
         }
     }
 }

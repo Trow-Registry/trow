@@ -14,7 +14,7 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         sink: grpcio::UnarySink<AdmissionResponse>,
     ) {
         let mut resp = AdmissionResponse::new();
-        resp.set_valid(false);
+        resp.set_is_allowed(false);
         resp.set_reason("It smells of elderberries".to_string());
 
         let f = sink

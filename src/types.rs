@@ -203,13 +203,39 @@ impl TagList {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct AdmissionReview {
-    //TODO: Get rid of stringly typing
-    pub api_version: String,
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Status {
+    pub status: String,          //"Success" or "Failure". TODO: use proper type.
+    pub message: Option<String>, //Human readable description. Shown in kubectl output.
+    /*
+    pub reason: String, //Machine readable description of "failure". Not sure where this goes.
+    pub details: ?, // Data associated with reason field
+    */
+    pub code: Option<i32>, // Suggested http return code, 0 if not set
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AdmissionRequest {
     pub uid: String,
     pub image: String,
     pub namespace: String,
     pub operation: String, //CREATE, UPDATE, DELETE, CONNECT
-    //probably want user info as well, but normally it's the service account :(
+                           //probably want user info as well, but normally it's the service account :(
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AdmissionResponse {
+    pub uid: String,
+    pub allowed: bool,
+    pub status: Option<Status>,
+    /* Not yet implemented, Patch, PatchType & AuditAnnotations. */
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AdmissionReview {
+    //TODO: Get rid of stringly typing
+    pub api_version: String,
+    pub kind: String,
+    pub request: Option<AdmissionRequest>,
+    pub response: Option<AdmissionResponse>,
 }
