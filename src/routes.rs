@@ -67,8 +67,12 @@ Registry root.
 Returns 200.
 */
 #[get("/v2")]
-fn get_v2root() -> Empty {
-    Empty
+/*fn get_v2root() -> Empty {*/
+fn get_v2root() -> Result<Empty,Error> {
+    println!("get v2 rooting");
+    Err(Error::Unauthorized)
+    //        Empty
+    //    }
 }
 
 #[get("/")]

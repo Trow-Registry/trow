@@ -15,6 +15,7 @@ impl<'r> Responder<'r> for Authenticate {
         Response::build()
             .status(Status::Unauthorized)
             .header("Www-Authenticate")
+            .header(ContentType::JSON);
             .header("Bearer")
             .header("realm=trow.test")
             .ok()

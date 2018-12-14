@@ -12,7 +12,36 @@ pub struct RepoName(pub String);
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]
 pub struct Digest(pub String);
+/* *
+#[derive(Debug, Serialize)]
+pub struct Authenticate {
+    uuid: Uuid,
+    repo_name: RepoName,
+    range: (u32, u32),
+}
 
+impl Authenticate {
+    pub fn uuid(&self) -> &Uuid {
+        &self.uuid
+    }
+
+    pub fn repo_name(&self) -> &RepoName {
+        &self.repo_name
+    }
+
+    pub fn range(&self) -> (u32, u32) {
+        self.range
+    }
+}
+
+pub fn create_authenticate(uuid: Uuid, repo_name: RepoName, range: (u32, u32)) -> Authenticate {
+    Authenticate {
+        uuid,
+        repo_name,
+        range,
+    }
+}
+* */
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
     uuid: Uuid,
