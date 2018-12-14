@@ -10,8 +10,8 @@ integrated with Kubernetes, including support for auditing and RBAC.
 ### Why "Trow"
 
 "Trow" is a word with multiple, divergent meanings. In Shetland folklore a trow
-is a small, mischevious creature, similar to the Scandanavian troll. In England,
-it is a old sytle of cargo boat that transported goods on rivers. Finally, it is
+is a small, mischievous creature, similar to the Scandanavian troll. In England,
+it is a old style of cargo boat that transported goods on rivers. Finally, it is
 an archaic word meaning "to think, believe, or trust". The reader is free to
 choose which interpretation they like most, but it should be pronounced to rhyme
 with "brow".
