@@ -1,6 +1,8 @@
 use failure::{format_err, Error};
 use futures::{Future, Stream};
 use grpcio::Channel;
+use protobuf::repeated::RepeatedField;
+use serde_json::Value;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use trow_protobuf::server::*;
@@ -22,6 +24,35 @@ impl BackendClient {
 pub struct ClientInterface {
     rc: RegistryClient,
     ac: AdmissionControllerClient,
+}
+
+/**
+ * This is really bad way to do things on several levels, but it works for the moment.
+ *
+ * The major problem is Rust doesn't have TCO so we could be DOS'd by a malicious request.
+ */
+fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<String> {
+    match blob {
+        Value::Array(vals) => {
+            for v in vals {
+                extract_images(v, images);
+            }
+        }
+        Value::Object(m) => {
+            for (k, v) in m {
+                if k == "image" {
+                    match v {
+                        Value::String(image) => images.push(image.to_owned()),
+                        _ => (),
+                    }
+                } else {
+                    extract_images(v, images);
+                }
+            }
+        }
+        _ => (),
+    }
+    images
 }
 
 impl ClientInterface {
@@ -220,7 +251,15 @@ impl ClientInterface {
     ) -> Result<types::AdmissionResponse, Error> {
         //TODO: write something to convert automatically (into())
         let mut a_req = trow_protobuf::server::AdmissionRequest::new();
-        a_req.set_image(in_req.image.clone());
+
+        // TODO: we should really be sending the full object to the backend.
+        // Revisit this when we have proper rust bindings
+        let mut images = Vec::new();
+        extract_images(&in_req.object, &mut images);
+
+        //The conversion here will be easier when we can upgrade the protobuf stuff
+        a_req.set_images(RepeatedField::from_vec(images.clone().into()));
+
         a_req.set_namespace(in_req.namespace.clone());
         a_req.set_operation(in_req.operation.clone());
 

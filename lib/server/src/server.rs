@@ -231,7 +231,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,
                     Some("UUID Not Known".to_string()),
-                )).map_err(|e| warn!("Failure sending error to client {:?}", e));
+                ))
+                .map_err(|e| warn!("Failure sending error to client {:?}", e));
             ctx.spawn(f);
         }
     }
@@ -252,7 +253,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,
                     Some("Blob Not Known".to_string()),
-                )).map_err(|e| warn!("Failure sending error to client {:?}", e));
+                ))
+                .map_err(|e| warn!("Failure sending error to client {:?}", e));
             ctx.spawn(f);
         } else {
             let mut r = BlobReadLocation::new();
@@ -290,7 +292,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                     .fail(RpcStatus::new(
                         RpcStatusCode::Internal,
                         Some("Internal error creating directory".to_string()),
-                    )).map_err(|e| warn!("Failed to send error message to client {:?}", e));
+                    ))
+                    .map_err(|e| warn!("Failed to send error message to client {:?}", e));
                 ctx.spawn(f);
             }
         }
@@ -317,7 +320,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                     .fail(RpcStatus::new(
                         RpcStatusCode::Internal,
                         Some("Internal error finding manifest".to_string()),
-                    )).map_err(|e| warn!("Failed to send error message to client {:?}", e));
+                    ))
+                    .map_err(|e| warn!("Failed to send error message to client {:?}", e));
                 ctx.spawn(f);
             }
         }
@@ -370,7 +374,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                     .fail(RpcStatus::new(
                         RpcStatusCode::Internal,
                         Some("Internal error saving file".to_string()),
-                    )).map_err(|e| warn!("Internal error saving file {:?}", e));
+                    ))
+                    .map_err(|e| warn!("Internal error saving file {:?}", e));
                 ctx.spawn(f);
             }
         }
@@ -410,7 +415,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                     .fail(RpcStatus::new(
                         RpcStatusCode::Internal,
                         Some("Problem verifying manifest".to_string()),
-                    )).map_err(|e| warn!("Internal error saving file {:?}", e));
+                    ))
+                    .map_err(|e| warn!("Internal error saving file {:?}", e));
                 ctx.spawn(f);
             }
         }
@@ -431,7 +437,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                         let mut ce = CatalogEntry::new();
                         ce.set_repo_name(r.to_string());
                         (ce, WriteFlags::default())
-                    }).collect();
+                    })
+                    .collect();
                 let f = sink
                     .send_all(stream::iter_ok::<_, grpcio::Error>(repo_list))
                     .map(|_| {})
@@ -444,7 +451,8 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
                     .fail(RpcStatus::new(
                         RpcStatusCode::Internal,
                         Some("Problem retrieving catalog".to_string()),
-                    )).map_err(|e| warn!("Internal error sending response {:?}", e));
+                    ))
+                    .map_err(|e| warn!("Internal error sending response {:?}", e));
                 ctx.spawn(f);
             }
         }

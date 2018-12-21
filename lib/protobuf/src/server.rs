@@ -2837,7 +2837,7 @@ impl ::protobuf::reflect::ProtobufValue for Tag {
 #[derive(PartialEq,Clone,Default)]
 pub struct AdmissionRequest {
     // message fields
-    pub image: ::std::string::String,
+    pub images: ::protobuf::RepeatedField<::std::string::String>,
     pub namespace: ::std::string::String,
     pub operation: ::std::string::String,
     // special fields
@@ -2863,38 +2863,37 @@ impl AdmissionRequest {
         }
     }
 
-    // string image = 1;
+    // repeated string images = 1;
 
-    pub fn clear_image(&mut self) {
-        self.image.clear();
+    pub fn clear_images(&mut self) {
+        self.images.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_image(&mut self, v: ::std::string::String) {
-        self.image = v;
+    pub fn set_images(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
+        self.images = v;
     }
 
     // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_image(&mut self) -> &mut ::std::string::String {
-        &mut self.image
+    pub fn mut_images(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.images
     }
 
     // Take field
-    pub fn take_image(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.image, ::std::string::String::new())
+    pub fn take_images(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
+        ::std::mem::replace(&mut self.images, ::protobuf::RepeatedField::new())
     }
 
-    pub fn get_image(&self) -> &str {
-        &self.image
+    pub fn get_images(&self) -> &[::std::string::String] {
+        &self.images
     }
 
-    fn get_image_for_reflect(&self) -> &::std::string::String {
-        &self.image
+    fn get_images_for_reflect(&self) -> &::protobuf::RepeatedField<::std::string::String> {
+        &self.images
     }
 
-    fn mut_image_for_reflect(&mut self) -> &mut ::std::string::String {
-        &mut self.image
+    fn mut_images_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.images
     }
 
     // string namespace = 2;
@@ -2976,7 +2975,7 @@ impl ::protobuf::Message for AdmissionRequest {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.image)?;
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.images)?;
                 },
                 2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.namespace)?;
@@ -2996,9 +2995,9 @@ impl ::protobuf::Message for AdmissionRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.image.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.image);
-        }
+        for value in &self.images {
+            my_size += ::protobuf::rt::string_size(1, &value);
+        };
         if !self.namespace.is_empty() {
             my_size += ::protobuf::rt::string_size(2, &self.namespace);
         }
@@ -3011,9 +3010,9 @@ impl ::protobuf::Message for AdmissionRequest {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if !self.image.is_empty() {
-            os.write_string(1, &self.image)?;
-        }
+        for v in &self.images {
+            os.write_string(1, &v)?;
+        };
         if !self.namespace.is_empty() {
             os.write_string(2, &self.namespace)?;
         }
@@ -3064,10 +3063,10 @@ impl ::protobuf::MessageStatic for AdmissionRequest {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "image",
-                    AdmissionRequest::get_image_for_reflect,
-                    AdmissionRequest::mut_image_for_reflect,
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "images",
+                    AdmissionRequest::get_images_for_reflect,
+                    AdmissionRequest::mut_images_for_reflect,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "namespace",
@@ -3091,7 +3090,7 @@ impl ::protobuf::MessageStatic for AdmissionRequest {
 
 impl ::protobuf::Clear for AdmissionRequest {
     fn clear(&mut self) {
-        self.clear_image();
+        self.clear_images();
         self.clear_namespace();
         self.clear_operation();
         self.unknown_fields.clear();
@@ -3349,8 +3348,8 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x12\n\x04path\x18\x02\x20\x01(\tR\x04path\x12!\n\x0ccontent_type\x18\
     \x03\x20\x01(\tR\x0bcontentType\"\x10\n\x0eCatalogRequest\"+\n\x0cCatalo\
     gEntry\x12\x1b\n\trepo_name\x18\x01\x20\x01(\tR\x08repoName\"\x17\n\x03T\
-    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"d\n\x10AdmissionRequest\
-    \x12\x14\n\x05image\x18\x01\x20\x01(\tR\x05image\x12\x1c\n\tnamespace\
+    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"f\n\x10AdmissionRequest\
+    \x12\x16\n\x06images\x18\x01\x20\x03(\tR\x06images\x12\x1c\n\tnamespace\
     \x18\x02\x20\x01(\tR\tnamespace\x12\x1c\n\toperation\x18\x03\x20\x01(\tR\
     \toperation\"J\n\x11AdmissionResponse\x12\x1d\n\nis_allowed\x18\x01\x20\
     \x01(\x08R\tisAllowed\x12\x16\n\x06reason\x18\x02\x20\x01(\tR\x06reason2\

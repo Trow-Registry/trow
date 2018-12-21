@@ -217,7 +217,7 @@ pub struct Status {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AdmissionRequest {
     pub uid: String,
-    pub image: String,
+    pub object: serde_json::Value,
     pub namespace: String,
     pub operation: String, //CREATE, UPDATE, DELETE, CONNECT
                            //probably want user info as well, but normally it's the service account :(
@@ -232,6 +232,7 @@ pub struct AdmissionResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct AdmissionReview {
     //TODO: Get rid of stringly typing
     pub api_version: String,

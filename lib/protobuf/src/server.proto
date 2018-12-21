@@ -114,7 +114,9 @@ service Registry {
  * In future, we could directly use k8s types, but I'd rather leave that to a higher level.
  */
 message AdmissionRequest {
-  string image = 1;
+  //When grpcio supports version 2.2 of protobuf, we can uncomment following and simplify code in client
+  //option rustproto.repeated_field_vec = true;
+  repeated string images = 1;
   string namespace = 2;
   //TODO: should be enum
   string operation = 3;
