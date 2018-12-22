@@ -23,6 +23,9 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         ctx.spawn(f);
 
         /*
+        Start with check that the image exists in this registry. This has slight problem
+        in that it assumes we know the address of this registry. 
+
         if enforce image exists && image doesn't exist {
             //TODO: add check that enforce exists is on
             fail
