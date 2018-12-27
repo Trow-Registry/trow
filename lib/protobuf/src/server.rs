@@ -2840,6 +2840,7 @@ pub struct AdmissionRequest {
     pub images: ::protobuf::RepeatedField<::std::string::String>,
     pub namespace: ::std::string::String,
     pub operation: ::std::string::String,
+    pub registry_name: ::std::string::String,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
     cached_size: ::protobuf::CachedSize,
@@ -2963,6 +2964,40 @@ impl AdmissionRequest {
     fn mut_operation_for_reflect(&mut self) -> &mut ::std::string::String {
         &mut self.operation
     }
+
+    // string registry_name = 4;
+
+    pub fn clear_registry_name(&mut self) {
+        self.registry_name.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_registry_name(&mut self, v: ::std::string::String) {
+        self.registry_name = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_registry_name(&mut self) -> &mut ::std::string::String {
+        &mut self.registry_name
+    }
+
+    // Take field
+    pub fn take_registry_name(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.registry_name, ::std::string::String::new())
+    }
+
+    pub fn get_registry_name(&self) -> &str {
+        &self.registry_name
+    }
+
+    fn get_registry_name_for_reflect(&self) -> &::std::string::String {
+        &self.registry_name
+    }
+
+    fn mut_registry_name_for_reflect(&mut self) -> &mut ::std::string::String {
+        &mut self.registry_name
+    }
 }
 
 impl ::protobuf::Message for AdmissionRequest {
@@ -2982,6 +3017,9 @@ impl ::protobuf::Message for AdmissionRequest {
                 },
                 3 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.operation)?;
+                },
+                4 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.registry_name)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -3004,6 +3042,9 @@ impl ::protobuf::Message for AdmissionRequest {
         if !self.operation.is_empty() {
             my_size += ::protobuf::rt::string_size(3, &self.operation);
         }
+        if !self.registry_name.is_empty() {
+            my_size += ::protobuf::rt::string_size(4, &self.registry_name);
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -3018,6 +3059,9 @@ impl ::protobuf::Message for AdmissionRequest {
         }
         if !self.operation.is_empty() {
             os.write_string(3, &self.operation)?;
+        }
+        if !self.registry_name.is_empty() {
+            os.write_string(4, &self.registry_name)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -3078,6 +3122,11 @@ impl ::protobuf::MessageStatic for AdmissionRequest {
                     AdmissionRequest::get_operation_for_reflect,
                     AdmissionRequest::mut_operation_for_reflect,
                 ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "registry_name",
+                    AdmissionRequest::get_registry_name_for_reflect,
+                    AdmissionRequest::mut_registry_name_for_reflect,
+                ));
                 ::protobuf::reflect::MessageDescriptor::new::<AdmissionRequest>(
                     "AdmissionRequest",
                     fields,
@@ -3093,6 +3142,7 @@ impl ::protobuf::Clear for AdmissionRequest {
         self.clear_images();
         self.clear_namespace();
         self.clear_operation();
+        self.clear_registry_name();
         self.unknown_fields.clear();
     }
 }
@@ -3348,13 +3398,14 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x12\n\x04path\x18\x02\x20\x01(\tR\x04path\x12!\n\x0ccontent_type\x18\
     \x03\x20\x01(\tR\x0bcontentType\"\x10\n\x0eCatalogRequest\"+\n\x0cCatalo\
     gEntry\x12\x1b\n\trepo_name\x18\x01\x20\x01(\tR\x08repoName\"\x17\n\x03T\
-    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"f\n\x10AdmissionRequest\
-    \x12\x16\n\x06images\x18\x01\x20\x03(\tR\x06images\x12\x1c\n\tnamespace\
-    \x18\x02\x20\x01(\tR\tnamespace\x12\x1c\n\toperation\x18\x03\x20\x01(\tR\
-    \toperation\"J\n\x11AdmissionResponse\x12\x1d\n\nis_allowed\x18\x01\x20\
-    \x01(\x08R\tisAllowed\x12\x16\n\x06reason\x18\x02\x20\x01(\tR\x06reason2\
-    \xf7\x04\n\x08Registry\x12?\n\rRequestUpload\x12\x15.lycaon.UploadReques\
-    t\x1a\x15.lycaon.UploadDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\
+    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"\x8b\x01\n\x10AdmissionR\
+    equest\x12\x16\n\x06images\x18\x01\x20\x03(\tR\x06images\x12\x1c\n\tname\
+    space\x18\x02\x20\x01(\tR\tnamespace\x12\x1c\n\toperation\x18\x03\x20\
+    \x01(\tR\toperation\x12#\n\rregistry_name\x18\x04\x20\x01(\tR\x0cregistr\
+    yName\"J\n\x11AdmissionResponse\x12\x1d\n\nis_allowed\x18\x01\x20\x01(\
+    \x08R\tisAllowed\x12\x16\n\x06reason\x18\x02\x20\x01(\tR\x06reason2\xf7\
+    \x04\n\x08Registry\x12?\n\rRequestUpload\x12\x15.lycaon.UploadRequest\
+    \x1a\x15.lycaon.UploadDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\
     \x0f.lycaon.BlobRef\x1a\x15.lycaon.WriteLocation\"\0\x12I\n\x16GetReadLo\
     cationForBlob\x12\x13.lycaon.DownloadRef\x1a\x18.lycaon.BlobReadLocation\
     \"\0\x12K\n\x1bGetWriteLocationForManifest\x12\x13.lycaon.ManifestRef\

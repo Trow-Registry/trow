@@ -110,7 +110,7 @@ service Registry {
 
 }
 
-/* These types are stripped down versions of the Kubernetes types.
+/* These types are largely stripped down versions of the Kubernetes types.
  * In future, we could directly use k8s types, but I'd rather leave that to a higher level.
  */
 message AdmissionRequest {
@@ -120,6 +120,10 @@ message AdmissionRequest {
   string namespace = 2;
   //TODO: should be enum
   string operation = 3;
+  //The name of this registry; required for figuring out whether images are stored here
+  //This may need to become "repeated". Also note this has security implications, need to
+  //be careful we aren't tricked into believing we are the different registry.
+  string registry_name = 4;
 }
 
 //Mutate will require patch or equivalent

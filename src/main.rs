@@ -64,7 +64,21 @@ fn parse_args<'a>() -> ArgMatches<'a> {
                 .help("Directory to store images and metadata in.")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("names")
+            .short("n")
+            .long("names")
+            .value_name("names")
+            .help("Host names for registry. Used in validation callbacks. Separate with comma or use quotes and spaces")
+            .takes_value(true),
+        )
         .get_matches()
+}
+
+fn parse_host_names(names: &str) -> Vec<String> {
+    //split on , or whitespace
+    let ret_str = names.replace(",", " ");
+    ret_str.split_whitespace().map(|x| x.to_owned()).collect()
 }
 
 fn main() {
@@ -79,6 +93,8 @@ fn main() {
     let cert_path = matches.value_of("cert").unwrap_or("./certs/ca.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
+    let host_names_str = matches.value_of("names").unwrap_or(host);
+    let host_names = parse_host_names(&host_names_str);
 
     let addr = NetAddr {
         host: host.to_string(),
@@ -88,7 +104,7 @@ fn main() {
         host: "127.0.0.1".to_owned(),
         port: 51000,
     };
-    let mut builder = TrowBuilder::new(data_path.to_string(), addr, grpc_listen);
+    let mut builder = TrowBuilder::new(data_path.to_string(), addr, grpc_listen, host_names);
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
     }

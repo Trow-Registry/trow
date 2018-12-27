@@ -12,7 +12,6 @@ extern crate orset;
 extern crate protobuf;
 #[macro_use]
 extern crate rocket;
-#[macro_use]
 extern crate rocket_contrib;
 extern crate rustc_serialize;
 extern crate serde;
@@ -57,22 +56,31 @@ use client_interface::{BackendClient, ClientInterface};
 #[fail(display = "invalid data directory")]
 pub struct ConfigError {}
 
+#[derive(Clone, Debug)]
 pub struct NetAddr {
     pub host: String,
     pub port: u16,
 }
 
-pub struct TrowBuilder {
+/*
+ * Configuration for Trow. This isn't direct fields on the builder so that we can pass it
+ * to Rocket to manage.
+ */
+#[derive(Clone, Debug)]
+pub struct TrowConfig {
     data_dir: String,
     addr: NetAddr,
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
+    host_names: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 struct GrpcConfig {
     listen: NetAddr,
 }
 
+#[derive(Clone, Debug)]
 struct TlsConfig {
     cert_file: String,
     key_file: String,
@@ -106,14 +114,25 @@ fn init_logger() -> Result<(), SetLoggerError> {
     builder.init()
 }
 
+pub struct TrowBuilder {
+    config: TrowConfig,
+}
+
 impl TrowBuilder {
-    pub fn new(data_dir: String, addr: NetAddr, listen: NetAddr) -> TrowBuilder {
-        TrowBuilder {
+    pub fn new(
+        data_dir: String,
+        addr: NetAddr,
+        listen: NetAddr,
+        host_names: Vec<String>,
+    ) -> TrowBuilder {
+        let config = TrowConfig {
             data_dir,
             addr,
             tls: None,
             grpc: GrpcConfig { listen },
-        }
+            host_names,
+        };
+        TrowBuilder { config }
     }
 
     pub fn with_tls(&mut self, cert_file: String, key_file: String) -> &mut TrowBuilder {
@@ -121,16 +140,16 @@ impl TrowBuilder {
             cert_file,
             key_file,
         };
-        self.tls = Some(cfg);
+        self.config.tls = Some(cfg);
         self
     }
 
     fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
         let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
-            .address(self.addr.host.clone())
-            .port(self.addr.port);
+            .address(self.config.addr.host.clone())
+            .port(self.config.addr.port);
 
-        if let Some(ref tls) = self.tls {
+        if let Some(ref tls) = self.config.tls {
             cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
         }
         let cfg = cfg.finalize()?;
@@ -141,19 +160,23 @@ impl TrowBuilder {
         init_logger()?;
         // GRPC Backend thread.
         let _grpc_thread = init_trow_server(
-            self.data_dir.clone(),
-            self.grpc.listen.host.clone(),
-            self.grpc.listen.port,
+            self.config.data_dir.clone(),
+            self.config.grpc.listen.host.clone(),
+            self.config.grpc.listen.port,
         )?;
 
         //TODO: shouldn't need to clone rocket config
         let rocket_config = &self.build_rocket_config()?;
-        println!("Starting trow on {}:{}", self.addr.host, self.addr.port);
+        println!(
+            "Starting trow on {}:{}",
+            self.config.addr.host, self.config.addr.port
+        );
         rocket::custom(rocket_config.clone())
             .manage(build_handlers(
-                &self.grpc.listen.host,
-                self.grpc.listen.port,
+                &self.config.grpc.listen.host,
+                self.config.grpc.listen.port,
             ))
+            .manage(self.config.clone())
             .attach(fairing::AdHoc::on_attach(
                 "SIGTERM handler",
                 |r| match attach_sigterm() {
