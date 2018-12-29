@@ -72,6 +72,13 @@ fn parse_args<'a>() -> ArgMatches<'a> {
             .help("Host names for registry. Used in validation callbacks. Separate with comma or use quotes and spaces")
             .takes_value(true),
         )
+        .arg(
+            Arg::with_name("dry-run")
+            .long("dry-run")
+            .value_name("dry_run")
+            .help("Don't acutally run Trow, just validate arguments. For testing purposes.")
+            .takes_value(false),
+        )
         .get_matches()
 }
 
@@ -95,6 +102,7 @@ fn main() {
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
     let host_names_str = matches.value_of("names").unwrap_or(host);
     let host_names = parse_host_names(&host_names_str);
+    let dry_run = matches.is_present("dry-run");
 
     let addr = NetAddr {
         host: host.to_string(),
@@ -104,7 +112,13 @@ fn main() {
         host: "127.0.0.1".to_owned(),
         port: 51000,
     };
-    let mut builder = TrowBuilder::new(data_path.to_string(), addr, grpc_listen, host_names);
+    let mut builder = TrowBuilder::new(
+        data_path.to_string(),
+        addr,
+        grpc_listen,
+        host_names,
+        dry_run,
+    );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
     }

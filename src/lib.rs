@@ -73,6 +73,7 @@ pub struct TrowConfig {
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
     host_names: Vec<String>,
+    dry_run: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -124,6 +125,7 @@ impl TrowBuilder {
         addr: NetAddr,
         listen: NetAddr,
         host_names: Vec<String>,
+        dry_run: bool,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -131,6 +133,7 @@ impl TrowBuilder {
             tls: None,
             grpc: GrpcConfig { listen },
             host_names,
+            dry_run,
         };
         TrowBuilder { config }
     }
@@ -171,6 +174,14 @@ impl TrowBuilder {
             "Starting trow on {}:{}",
             self.config.addr.host, self.config.addr.port
         );
+        println!(
+            "These host names will considered local for any Kubernetes validation callbacks: {:?}",
+            self.config.host_names
+        );
+        if self.config.dry_run {
+            println!("Dry run, exiting");
+            std::process::exit(0);
+        }
         rocket::custom(rocket_config.clone())
             .manage(build_handlers(
                 &self.config.grpc.listen.host,

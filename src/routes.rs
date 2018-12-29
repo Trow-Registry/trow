@@ -7,8 +7,8 @@ use response::html::HTML;
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
-use rocket_contrib::json::{Json, JsonValue};
-use serde_json::Value;
+use rocket_contrib::json::Json;
+use TrowConfig;
 
 use types::*;
 
@@ -491,6 +491,7 @@ fn list_tags_3level(
 #[post("/validate-image", data = "<image_data>")]
 fn validate_image(
     ci: rocket::State<ClientInterface>,
+    tc: rocket::State<TrowConfig>,
     image_data: Json<AdmissionReview>,
 ) -> Json<AdmissionReview> {
     warn!("Recieved {:?}", image_data);
@@ -505,7 +506,7 @@ fn validate_image(
      */
     let mut resp_data = image_data.clone();
     match image_data.0.request {
-        Some(req) => match ci.validate_admission(&req) {
+        Some(req) => match ci.validate_admission(&req, &tc.host_names) {
             Ok(res) => {
                 resp_data.response = Some(res);
                 Json(resp_data)

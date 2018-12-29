@@ -2841,6 +2841,7 @@ pub struct AdmissionRequest {
     pub namespace: ::std::string::String,
     pub operation: ::std::string::String,
     pub registry_name: ::std::string::String,
+    pub host_names: ::protobuf::RepeatedField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
     cached_size: ::protobuf::CachedSize,
@@ -2998,6 +2999,39 @@ impl AdmissionRequest {
     fn mut_registry_name_for_reflect(&mut self) -> &mut ::std::string::String {
         &mut self.registry_name
     }
+
+    // repeated string host_names = 5;
+
+    pub fn clear_host_names(&mut self) {
+        self.host_names.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_host_names(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
+        self.host_names = v;
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_host_names(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.host_names
+    }
+
+    // Take field
+    pub fn take_host_names(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
+        ::std::mem::replace(&mut self.host_names, ::protobuf::RepeatedField::new())
+    }
+
+    pub fn get_host_names(&self) -> &[::std::string::String] {
+        &self.host_names
+    }
+
+    fn get_host_names_for_reflect(&self) -> &::protobuf::RepeatedField<::std::string::String> {
+        &self.host_names
+    }
+
+    fn mut_host_names_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.host_names
+    }
 }
 
 impl ::protobuf::Message for AdmissionRequest {
@@ -3020,6 +3054,9 @@ impl ::protobuf::Message for AdmissionRequest {
                 },
                 4 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.registry_name)?;
+                },
+                5 => {
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.host_names)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -3045,6 +3082,9 @@ impl ::protobuf::Message for AdmissionRequest {
         if !self.registry_name.is_empty() {
             my_size += ::protobuf::rt::string_size(4, &self.registry_name);
         }
+        for value in &self.host_names {
+            my_size += ::protobuf::rt::string_size(5, &value);
+        };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -3063,6 +3103,9 @@ impl ::protobuf::Message for AdmissionRequest {
         if !self.registry_name.is_empty() {
             os.write_string(4, &self.registry_name)?;
         }
+        for v in &self.host_names {
+            os.write_string(5, &v)?;
+        };
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -3127,6 +3170,11 @@ impl ::protobuf::MessageStatic for AdmissionRequest {
                     AdmissionRequest::get_registry_name_for_reflect,
                     AdmissionRequest::mut_registry_name_for_reflect,
                 ));
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "host_names",
+                    AdmissionRequest::get_host_names_for_reflect,
+                    AdmissionRequest::mut_host_names_for_reflect,
+                ));
                 ::protobuf::reflect::MessageDescriptor::new::<AdmissionRequest>(
                     "AdmissionRequest",
                     fields,
@@ -3143,6 +3191,7 @@ impl ::protobuf::Clear for AdmissionRequest {
         self.clear_namespace();
         self.clear_operation();
         self.clear_registry_name();
+        self.clear_host_names();
         self.unknown_fields.clear();
     }
 }
@@ -3398,26 +3447,27 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x12\n\x04path\x18\x02\x20\x01(\tR\x04path\x12!\n\x0ccontent_type\x18\
     \x03\x20\x01(\tR\x0bcontentType\"\x10\n\x0eCatalogRequest\"+\n\x0cCatalo\
     gEntry\x12\x1b\n\trepo_name\x18\x01\x20\x01(\tR\x08repoName\"\x17\n\x03T\
-    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"\x8b\x01\n\x10AdmissionR\
+    ag\x12\x10\n\x03tag\x18\x01\x20\x01(\tR\x03tag\"\xaa\x01\n\x10AdmissionR\
     equest\x12\x16\n\x06images\x18\x01\x20\x03(\tR\x06images\x12\x1c\n\tname\
     space\x18\x02\x20\x01(\tR\tnamespace\x12\x1c\n\toperation\x18\x03\x20\
     \x01(\tR\toperation\x12#\n\rregistry_name\x18\x04\x20\x01(\tR\x0cregistr\
-    yName\"J\n\x11AdmissionResponse\x12\x1d\n\nis_allowed\x18\x01\x20\x01(\
-    \x08R\tisAllowed\x12\x16\n\x06reason\x18\x02\x20\x01(\tR\x06reason2\xf7\
-    \x04\n\x08Registry\x12?\n\rRequestUpload\x12\x15.lycaon.UploadRequest\
-    \x1a\x15.lycaon.UploadDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\
-    \x0f.lycaon.BlobRef\x1a\x15.lycaon.WriteLocation\"\0\x12I\n\x16GetReadLo\
-    cationForBlob\x12\x13.lycaon.DownloadRef\x1a\x18.lycaon.BlobReadLocation\
-    \"\0\x12K\n\x1bGetWriteLocationForManifest\x12\x13.lycaon.ManifestRef\
-    \x1a\x15.lycaon.WriteLocation\"\0\x12Q\n\x1aGetReadLocationForManifest\
-    \x12\x13.lycaon.ManifestRef\x1a\x1c.lycaon.ManifestReadLocation\"\0\x12A\
-    \n\x0eVerifyManifest\x12\x13.lycaon.ManifestRef\x1a\x18.lycaon.VerifiedM\
-    anifest\"\0\x12D\n\x0eCompleteUpload\x12\x17.lycaon.CompleteRequest\x1a\
-    \x17.lycaon.CompletedUpload\"\0\x12>\n\nGetCatalog\x12\x16.lycaon.Catalo\
-    gRequest\x1a\x14.lycaon.CatalogEntry\"\00\x01\x121\n\x08ListTags\x12\x14\
-    .lycaon.CatalogEntry\x1a\x0b.lycaon.Tag\"\00\x012a\n\x13AdmissionControl\
-    ler\x12J\n\x11ValidateAdmission\x12\x18.lycaon.AdmissionRequest\x1a\x19.\
-    lycaon.AdmissionResponse\"\0b\x06proto3\
+    yName\x12\x1d\n\nhost_names\x18\x05\x20\x03(\tR\thostNames\"J\n\x11Admis\
+    sionResponse\x12\x1d\n\nis_allowed\x18\x01\x20\x01(\x08R\tisAllowed\x12\
+    \x16\n\x06reason\x18\x02\x20\x01(\tR\x06reason2\xf7\x04\n\x08Registry\
+    \x12?\n\rRequestUpload\x12\x15.lycaon.UploadRequest\x1a\x15.lycaon.Uploa\
+    dDetails\"\0\x12C\n\x17GetWriteLocationForBlob\x12\x0f.lycaon.BlobRef\
+    \x1a\x15.lycaon.WriteLocation\"\0\x12I\n\x16GetReadLocationForBlob\x12\
+    \x13.lycaon.DownloadRef\x1a\x18.lycaon.BlobReadLocation\"\0\x12K\n\x1bGe\
+    tWriteLocationForManifest\x12\x13.lycaon.ManifestRef\x1a\x15.lycaon.Writ\
+    eLocation\"\0\x12Q\n\x1aGetReadLocationForManifest\x12\x13.lycaon.Manife\
+    stRef\x1a\x1c.lycaon.ManifestReadLocation\"\0\x12A\n\x0eVerifyManifest\
+    \x12\x13.lycaon.ManifestRef\x1a\x18.lycaon.VerifiedManifest\"\0\x12D\n\
+    \x0eCompleteUpload\x12\x17.lycaon.CompleteRequest\x1a\x17.lycaon.Complet\
+    edUpload\"\0\x12>\n\nGetCatalog\x12\x16.lycaon.CatalogRequest\x1a\x14.ly\
+    caon.CatalogEntry\"\00\x01\x121\n\x08ListTags\x12\x14.lycaon.CatalogEntr\
+    y\x1a\x0b.lycaon.Tag\"\00\x012a\n\x13AdmissionController\x12J\n\x11Valid\
+    ateAdmission\x12\x18.lycaon.AdmissionRequest\x1a\x19.lycaon.AdmissionRes\
+    ponse\"\0b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

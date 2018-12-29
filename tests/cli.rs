@@ -26,4 +26,31 @@ mod cli {
             .unwrap();
     }
 
+    #[test]
+    fn host_name_parsing() {
+        assert_cli::Assert::main_binary()
+            .with_args(&["-n myhost.com", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("[\"myhost.com\"]")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["-n myhost.com second", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("[\"myhost.com\", \"second\"]")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["-n port.io:3833 second", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("[\"port.io:3833\", \"second\"]")
+            .unwrap();
+    }
+
 }

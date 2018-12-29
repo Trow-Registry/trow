@@ -124,6 +124,10 @@ message AdmissionRequest {
   //This may need to become "repeated". Also note this has security implications, need to
   //be careful we aren't tricked into believing we are the different registry.
   string registry_name = 4;
+  //Host names that the Trow should consider "local" for figuring out if we host the given
+  //images. As there might be upstream proxies etc it seemed wise to allow this to be
+  //configured, but be aware that there are security implications.
+  repeated string host_names = 5;
 }
 
 //Mutate will require patch or equivalent

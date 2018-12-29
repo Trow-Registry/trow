@@ -248,6 +248,7 @@ impl ClientInterface {
     pub fn validate_admission(
         &self,
         in_req: &types::AdmissionRequest,
+        host_names: &Vec<String>,
     ) -> Result<types::AdmissionResponse, Error> {
         //TODO: write something to convert automatically (into())
         let mut a_req = trow_protobuf::server::AdmissionRequest::new();
@@ -262,6 +263,7 @@ impl ClientInterface {
 
         a_req.set_namespace(in_req.namespace.clone());
         a_req.set_operation(in_req.operation.clone());
+        a_req.set_host_names(RepeatedField::from_vec(host_names.clone().into()));
 
         let resp = self.ac.validate_admission(&a_req)?;
 
