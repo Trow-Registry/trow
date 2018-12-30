@@ -8,6 +8,7 @@ use futures::{stream, Future, Sink};
 
 const DOCKER_HUB_HOSTNAME: &str = "docker.io";
 
+#[derive(Clone, Debug, PartialEq)]
 struct Image {
     host: String,
     repo: String,
@@ -24,6 +25,8 @@ struct Image {
  *
  * Docker hub images have host set to docker.io and official images have the "library" repo.
  *
+ * TODO; should we resolve latest as well?
+ *
  * The tests should clarify a bit.
  */
 fn parse_image(image_str: &str) -> Image {
@@ -34,14 +37,13 @@ fn parse_image(image_str: &str) -> Image {
 
     match image_str.find("/") {
         Some(i) => {
-            if !(image_str.contains(".") || image_str.contains(":"))
-                && !image_str.starts_with("localhost")
-            {
+            let left = image_str.get(..i).unwrap();
+            if !(left.contains(".") || left.contains(":")) && !left.starts_with("localhost") {
                 host = DOCKER_HUB_HOSTNAME;
                 after_host = image_str;
             } else {
-                host = image_str.get(..i).unwrap();
-                after_host = image_str.get(i..).unwrap();
+                host = left;
+                after_host = image_str.get((i + 1)..).unwrap();
             }
         }
         None => {
@@ -62,7 +64,7 @@ fn parse_image(image_str: &str) -> Image {
         }
         Some(i) => {
             repo_dir = after_host.get(..i).unwrap();
-            image_name = after_host.get(i..).unwrap();
+            image_name = after_host.get((i + 1)..).unwrap();
         }
     }
 
@@ -130,4 +132,72 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         }
         */
     }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::parse_image;
+    use super::Image;
+
+    #[test]
+    fn test_parse() {
+        let mut ret = parse_image("debian");
+        assert_eq!(
+            ret,
+            Image {
+                host: "docker.io".to_string(),
+                repo: "library".to_string(),
+                name: "debian".to_string(),
+            }
+        );
+        ret = parse_image("amouat/network-utils");
+        assert_eq!(
+            ret,
+            Image {
+                host: "docker.io".to_string(),
+                repo: "amouat".to_string(),
+                name: "network-utils".to_string(),
+            }
+        );
+        ret = parse_image("amouat/network-utils:latest");
+        assert_eq!(
+            ret,
+            Image {
+                host: "docker.io".to_string(),
+                repo: "amouat".to_string(),
+                name: "network-utils:latest".to_string(),
+            }
+        );
+
+        ret = parse_image("localhost:8080/myimage:test");
+        assert_eq!(
+            ret,
+            Image {
+                host: "localhost:8080".to_string(),
+                repo: "".to_string(),
+                name: "myimage:test".to_string(),
+            }
+        );
+        ret = parse_image("localhost:8080/mydir/myimage:test");
+        assert_eq!(
+            ret,
+            Image {
+                host: "localhost:8080".to_string(),
+                repo: "mydir".to_string(),
+                name: "myimage:test".to_string(),
+            }
+        );
+
+        ret = parse_image("quay.io/mydir/another/myimage:test");
+        assert_eq!(
+            ret,
+            Image {
+                host: "quay.io".to_string(),
+                repo: "mydir/another".to_string(),
+                name: "myimage:test".to_string(),
+            }
+        );
+    }
+
 }
