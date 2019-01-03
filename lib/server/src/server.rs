@@ -44,6 +44,13 @@ struct Upload {
     uuid: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Image {
+    pub host: String,
+    pub repo: String,
+    pub name: String, //Including any tag?
+}
+
 impl TrowService {
     pub fn new(data_path: &str) -> Result<Self, Error> {
         let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
@@ -75,6 +82,11 @@ impl TrowService {
 
     fn get_scratch_path_for_uuid(&self, uuid: &str) -> PathBuf {
         self.scratch_path.join(uuid)
+    }
+
+    pub fn image_exists(&self, image: &Image) -> bool {
+        self.get_path_for_manifest(&image.repo, &image.name)
+            .exists()
     }
 
     fn create_verified_manifest(

@@ -1,19 +1,13 @@
 use grpcio::{self, RpcStatus, RpcStatusCode, WriteFlags};
 use server::TrowService;
 
+use server::Image;
 use trow_protobuf;
 use trow_protobuf::server::*;
 
 use futures::{stream, Future, Sink};
 
 const DOCKER_HUB_HOSTNAME: &str = "docker.io";
-
-#[derive(Clone, Debug, PartialEq)]
-struct Image {
-    host: String,
-    repo: String,
-    name: String, //Including any tag?
-}
 
 /*
  * Current function is based on old Docker code to parse image names. There is a newer
@@ -73,22 +67,6 @@ fn parse_image(image_str: &str) -> Image {
         repo: repo_dir.to_string(),
         name: image_name.to_string(),
     }
-
-    /*
-    i := strings.IndexRune(name, '/')
-    if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost") {
-        hostname, remoteName = DefaultHostname, name
-    } else {
-        hostname, remoteName = name[:i], name[i+1:]
-    }
-    if hostname == LegacyDefaultHostname {
-        hostname = DefaultHostname
-    }
-    if hostname == DefaultHostname && !strings.ContainsRune(remoteName, '/') {
-        remoteName = DefaultRepoPrefix + remoteName
-    }
-    return
-    */
 }
 
 impl trow_protobuf::server_grpc::AdmissionController for TrowService {
@@ -99,38 +77,46 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         sink: grpcio::UnarySink<AdmissionResponse>,
     ) {
         let mut resp = AdmissionResponse::new();
-        resp.set_is_allowed(false);
-        resp.set_reason("It smells of elderberries".to_string());
+
+        /*
+        Start with check that the image exists in this registry. We are sent the hostnames
+        to consider local, which has security implications.
+        */
+
+        //TODO: Put enforce local images as cmd switch (maybe allow-repos or something)
+
+        let mut valid = true;
+        let mut reason = "".to_string();
+
+        for image in ar.images.into_vec() {
+            let image = parse_image(&image);
+
+            if !ar.host_names.contains(&image.host) {
+                valid = false;
+                reason = "Image refers to another registry".to_string();
+            } else if !self.image_exists(&image) {
+                valid = false;
+                reason = "Image does not exist in this registry".to_string();
+            }
+            /*
+            if not allowed registry {
+                //only makes sense if enforce exists isn't enabled
+                fail
+            }
+
+            if not allowed image {
+                fail
+            }
+            */
+        }
+
+        resp.set_is_allowed(valid);
+        resp.set_reason(reason);
 
         let f = sink
             .success(resp)
             .map_err(|e| warn!("failed to reply! {:?}", e));
         ctx.spawn(f);
-
-        //set up tests for parse
-
-        /*
-        Start with check that the image exists in this registry. We are sent the hostnames
-        to consider local, which has security implications.
-
-        for image in ar.images {
-
-        if enforce image exists && image doesn't exist {
-            //TODO: add check that enforce exists is on
-            fail
-        }
-
-
-
-        if not allowed registry {
-            //only makes sense if enforce exists isn't enabled
-            fail
-        }
-
-        if not allowed image {
-            fail
-        }
-        */
     }
 }
 
