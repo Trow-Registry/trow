@@ -88,12 +88,12 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         let mut valid = true;
         let mut reason = "".to_string();
 
-        for image in ar.images.into_vec() {
-            let image = parse_image(&image);
+        for image_raw in ar.images.into_vec() {
+            let image = parse_image(&image_raw);
 
             if !ar.host_names.contains(&image.host) {
                 valid = false;
-                reason = "Image refers to another registry".to_string();
+                reason = format!("Image {} refers to an untrusted registry: {}", &image_raw, &image.host);
             } else if !self.image_exists(&image) {
                 valid = false;
                 reason = "Image does not exist in this registry".to_string();
