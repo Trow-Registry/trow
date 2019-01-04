@@ -26,8 +26,8 @@ const DOCKER_HUB_HOSTNAME: &str = "docker.io";
 fn parse_image(image_str: &str) -> Image {
     let host;
     let after_host;
-    let image_name;
-    let repo_dir;
+    let repo;
+    let tag;
 
     match image_str.find("/") {
         Some(i) => {
@@ -45,27 +45,22 @@ fn parse_image(image_str: &str) -> Image {
             after_host = image_str;
         }
     }
-    match after_host.rfind("/") {
+
+    match after_host.find(":") {
         None => {
-            if host == DOCKER_HUB_HOSTNAME {
-                repo_dir = "library";
-                image_name = after_host;
-            } else {
-                //Probably invalid, might want to return err
-                repo_dir = "";
-                image_name = after_host;
-            }
+            repo = after_host;
+            tag = "latest";
         }
         Some(i) => {
-            repo_dir = after_host.get(..i).unwrap();
-            image_name = after_host.get((i + 1)..).unwrap();
+            repo = after_host.get(..i).unwrap();
+            tag = after_host.get((i + 1)..).unwrap();
         }
     }
 
     Image {
         host: host.to_string(),
-        repo: repo_dir.to_string(),
-        name: image_name.to_string(),
+        repo: repo.to_string(),
+        tag: tag.to_string(),
     }
 }
 
@@ -93,7 +88,10 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
 
             if !ar.host_names.contains(&image.host) {
                 valid = false;
-                reason = format!("Image {} refers to an untrusted registry: {}", &image_raw, &image.host);
+                reason = format!(
+                    "Image {} refers to an untrusted registry: {}",
+                    &image_raw, &image.host
+                );
             } else if !self.image_exists(&image) {
                 valid = false;
                 reason = "Image does not exist in this registry".to_string();
@@ -133,8 +131,8 @@ mod test {
             ret,
             Image {
                 host: "docker.io".to_string(),
-                repo: "library".to_string(),
-                name: "debian".to_string(),
+                repo: "debian".to_string(),
+                tag: "latest".to_string(),
             }
         );
         ret = parse_image("amouat/network-utils");
@@ -142,17 +140,17 @@ mod test {
             ret,
             Image {
                 host: "docker.io".to_string(),
-                repo: "amouat".to_string(),
-                name: "network-utils".to_string(),
+                repo: "amouat/network-utils".to_string(),
+                tag: "latest".to_string(),
             }
         );
-        ret = parse_image("amouat/network-utils:latest");
+        ret = parse_image("amouat/network-utils:beta");
         assert_eq!(
             ret,
             Image {
                 host: "docker.io".to_string(),
-                repo: "amouat".to_string(),
-                name: "network-utils:latest".to_string(),
+                repo: "amouat/network-utils".to_string(),
+                tag: "beta".to_string(),
             }
         );
 
@@ -161,8 +159,8 @@ mod test {
             ret,
             Image {
                 host: "localhost:8080".to_string(),
-                repo: "".to_string(),
-                name: "myimage:test".to_string(),
+                repo: "myimage".to_string(),
+                tag: "test".to_string(),
             }
         );
         ret = parse_image("localhost:8080/mydir/myimage:test");
@@ -170,8 +168,8 @@ mod test {
             ret,
             Image {
                 host: "localhost:8080".to_string(),
-                repo: "mydir".to_string(),
-                name: "myimage:test".to_string(),
+                repo: "mydir/myimage".to_string(),
+                tag: "test".to_string(),
             }
         );
 
@@ -180,8 +178,8 @@ mod test {
             ret,
             Image {
                 host: "quay.io".to_string(),
-                repo: "mydir/another".to_string(),
-                name: "myimage:test".to_string(),
+                repo: "mydir/another/myimage".to_string(),
+                tag: "test".to_string(),
             }
         );
     }

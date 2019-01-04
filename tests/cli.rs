@@ -24,6 +24,14 @@ mod cli {
             .stdout()
             .contains("Trow")
             .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--help"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Trow")
+            .unwrap();
     }
 
     #[test]
@@ -34,6 +42,14 @@ mod cli {
             .and()
             .stdout()
             .contains("[\"myhost.com\"]")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--names", "trow.test", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("[\"trow.test\"]")
             .unwrap();
 
         assert_cli::Assert::main_binary()

@@ -1,11 +1,14 @@
 extern crate crypto;
 extern crate environment;
+#[macro_use]
 extern crate hyper;
 extern crate rand;
 extern crate reqwest;
 extern crate serde_json;
 extern crate trow;
 extern crate trow_server;
+
+mod common;
 
 #[cfg(test)]
 mod validation_tests {
@@ -18,6 +21,7 @@ mod validation_tests {
     use std::thread;
     use std::time::Duration;
     use std::io::Read;
+    use common;
 
     const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 
@@ -29,10 +33,11 @@ mod validation_tests {
 
     fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
-            //.current_dir("../../")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
+            .arg("--")
+            .arg("--names").arg("trow.test")
             .spawn()
             .expect("failed to start");
 
@@ -197,6 +202,77 @@ mod validation_tests {
         assert!(txt.contains("Image nginx refers to an untrusted registry"));
     }
 
+    fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
+
+        let start = r#"{
+  "kind": "AdmissionReview",
+  "apiVersion": "admission.k8s.io/v1beta1",
+  "request": {
+    "uid": "0b4ab323-b607-11e8-a555-42010a8002b4",
+    "kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+    },
+    "resource": {
+      "group": "",
+      "version": "v1",
+      "resource": "pods"
+    },
+    "namespace": "default",
+    "operation": "CREATE",
+    "userInfo": {
+      "username": "system:serviceaccount:kube-system:replicaset-controller",
+      "uid": "fc3f24b4-b5e2-11e8-a555-42010a8002b4",
+      "groups": [
+        "system:serviceaccounts",
+        "system:serviceaccounts:kube-system",
+        "system:authenticated"
+      ]
+    },
+    "object": {
+      "metadata": {
+        "name": "test3-88c6d6597-rll2c",
+        "generateName": "test3-88c6d6597-",
+        "namespace": "default",
+        "uid": "0b4aae46-b607-11e8-a555-42010a8002b4",
+        "creationTimestamp": "2018-09-11T21:10:00Z",
+        "labels": {
+          "pod-template-hash": "447282153",
+          "run": "test3"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "test3",
+            "image": ""#;
+    let end = r#""
+          }
+        ]
+      }
+    }
+  }
+}"#;
+        let review = format!("{}{}{}", start, image_string, end);
+
+        let mut resp = cl
+            .post(&format!("{}/validate-image", LYCAON_ADDRESS))
+            .body(review)
+            .send()
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::Ok);
+        //should deny by default
+        let txt = resp.text().unwrap();
+        if is_allowed {
+            println!("out {}", txt);
+            assert!(txt.contains("\"allowed\":true"));
+        } else {
+            assert!(txt.contains("\"allowed\":false"));
+        }
+    }
+
    #[test]
     fn test_runner() {
         
@@ -219,5 +295,9 @@ mod validation_tests {
         //It might be possible to improve things with a thread_local
         let _trow = start_trow();
         validate_example(&client);
+        test_image(&client, "trow.test/am/test:tag", false);
+        //push image and test again
+        common::upload_layer(&client, "am/test", "tag");
+        test_image(&client, "trow.test/am/test:tag", true);
     }
 }

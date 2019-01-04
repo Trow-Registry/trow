@@ -46,9 +46,9 @@ struct Upload {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Image {
-    pub host: String,
-    pub repo: String,
-    pub name: String, //Including any tag?
+    pub host: String, //Including port, docker.io by default
+    pub repo: String, //Between host and : including any /s
+    pub tag: String,  //Bit after the :, latest by default
 }
 
 impl TrowService {
@@ -85,8 +85,7 @@ impl TrowService {
     }
 
     pub fn image_exists(&self, image: &Image) -> bool {
-        self.get_path_for_manifest(&image.repo, &image.name)
-            .exists()
+        self.get_path_for_manifest(&image.repo, &image.tag).exists()
     }
 
     fn create_verified_manifest(
