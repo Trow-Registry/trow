@@ -11,6 +11,7 @@ impl<'r> Responder<'r> for RepoCatalog {
     fn respond_to(self, _req: &Request) -> response::Result<'r> {
 
         let json = serde_json::to_string(&self).unwrap();
+        debug!("repo catalog response"); 
 
         Response::build()
             .header(ContentType::JSON)

@@ -1,7 +1,7 @@
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-//pub use types::Authenticate;
+use types::Authenticate;
 /*
 WWW-Authenticate: Basic
 
@@ -12,12 +12,12 @@ pub struct Authenticate;
 
 impl<'r> Responder<'r> for Authenticate {
     fn respond_to(self, _req: &Request) -> response::Result<'r> {
+        debug!("authenticate response"); 
         Response::build()
+            let authenticate_header = Header::new("Www-Authenticate: Bearer realm=https://0.0.0.0:8080/tokens")
             .status(Status::Unauthorized)
-            .header("Www-Authenticate")
-            .header(ContentType::JSON);
-            .header("Bearer")
-            .header("realm=trow.test")
+            .header(authenticate_header)
+            .header(ContentType::JSON)
             .ok()
     }
 }

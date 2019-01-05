@@ -8,6 +8,7 @@ pub struct HTML<'a>(pub &'a str);
 
 impl<'a> Responder<'a> for HTML<'a> {
     fn respond_to(self, _: &Request) -> Result<Response<'a>, Status> {
+        debug!("html response"); 
         Response::build()
             .header(ContentType::HTML)
             .sized_body(Cursor::new(self.0))
