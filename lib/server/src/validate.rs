@@ -64,6 +64,14 @@ fn parse_image(image_str: &str) -> Image {
     }
 }
 
+fn on_allow_list(image: &Image) -> bool {
+    false
+}
+
+fn on_deny_list(image: &Image) -> bool {
+    false
+}
+
 impl trow_protobuf::server_grpc::AdmissionController for TrowService {
     fn validate_admission(
         &self,
@@ -80,32 +88,56 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
 
         //TODO: Put enforce local images as cmd switch (maybe allow-repos or something)
 
+        //Parse initial rules into allow deny lists. That way don't need to worry about
+        //local/remote
+
         let mut valid = true;
         let mut reason = "".to_string();
 
         for image_raw in ar.images.into_vec() {
             let image = parse_image(&image_raw);
 
-            if !ar.host_names.contains(&image.host) {
-                valid = false;
-                reason = format!(
-                    "Image {} refers to an untrusted registry: {}",
-                    &image_raw, &image.host
-                );
-            } else if !self.image_exists(&image) {
-                valid = false;
-                reason = "Image does not exist in this registry".to_string();
+            if ar.host_names.contains(&image.host) {
+                //local image
+                if self.image_exists(&image) {
+                    if on_deny_list(&image) {
+                        valid = false;
+                        reason = format!("Local image {} on deny list", &image_raw);
+                        break;
+                    } else {
+                        info!("Image {} allowed as local image", &image_raw);
+                        continue;
+                    }
+                } else {
+                    if on_allow_list(&image) {
+                        info!(
+                            "Local image {} on allow list (but not in registry)",
+                            &image_raw
+                        );
+                        continue;
+                    } else {
+                        valid = false;
+                        reason = format!(
+                            "Local image {} not contained in this registry and not in allow list",
+                            &image_raw
+                        );
+                        break;
+                    }
+                }
+            } else {
+                // remote image
+                if on_allow_list(&image) {
+                    info!("Remote image {} on allow list", &image_raw);
+                    continue;
+                } else {
+                    valid = false;
+                    reason = format!(
+                        "Remote image {} not contained in this registry and not in allow list",
+                        &image_raw
+                    );
+                    break;
+                }
             }
-            /*
-            if not allowed registry {
-                //only makes sense if enforce exists isn't enabled
-                fail
-            }
-
-            if not allowed image {
-                fail
-            }
-            */
         }
 
         resp.set_is_allowed(valid);
