@@ -142,7 +142,7 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         let mut reason = "".to_string();
 
         for image_raw in ar.images.into_vec() {
-            //let local_exists = ;
+            //Using a closure here is inefficient but makes it easier to test check_image
             let (v, r) = check_image(&image_raw, ar.host_names.to_vec(), &|image| {
                 self.image_exists(image)
             });
@@ -166,8 +166,8 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
 #[cfg(test)]
 mod test {
 
-    use super::parse_image;
     use super::Image;
+    use super::{check_image, parse_image};
 
     #[test]
     fn test_parse() {
@@ -227,6 +227,16 @@ mod test {
                 tag: "test".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn test_check() {
+        let (v, _) = check_image(
+            "localhost:8080/mydir/myimage:test",
+            vec!["localhost".to_owned()],
+            &|_| false,
+        );
+        assert!(!v);
     }
 
 }
