@@ -72,6 +72,53 @@ fn on_deny_list(image: &Image) -> bool {
     false
 }
 
+fn check_image(
+    image_raw: &str,
+    local_hosts: Vec<String>,
+    image_exists: &Fn(&Image) -> bool,
+) -> (bool, String) {
+    let image = parse_image(&image_raw);
+    if local_hosts.contains(&image.host) {
+        //local image
+        if image_exists(&image) {
+            if on_deny_list(&image) {
+                return (false, format!("Local image {} on deny list", &image_raw));
+            } else {
+                let reason = format!("Image {} allowed as local image", &image_raw);
+                info!("{}", reason);
+                return (true, "".to_owned());
+            }
+        } else {
+            if on_allow_list(&image) {
+                info!(
+                    "Local image {} allowed as on allow list (but not in registry)",
+                    &image_raw
+                );
+                return (true, "".to_owned());
+            } else {
+                let reason = format!(
+                    "Local image {} disallowed as not contained in this registry and not in allow list",
+                    &image_raw
+                );
+                info!("{}", reason);
+                return (false, reason);
+            }
+        }
+    } else {
+        // remote image
+        if on_allow_list(&image) {
+            info!("Remote image {} allowed as on allow list", &image_raw);
+            return (true, "".to_owned());
+        } else {
+            let reason = format!(
+                "Remote image {} disallowed as not contained in this registry and not in allow list",
+                &image_raw
+            );
+            return (false, reason);
+        }
+    }
+}
+
 impl trow_protobuf::server_grpc::AdmissionController for TrowService {
     fn validate_admission(
         &self,
@@ -95,48 +142,14 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         let mut reason = "".to_string();
 
         for image_raw in ar.images.into_vec() {
-            let image = parse_image(&image_raw);
-
-            if ar.host_names.contains(&image.host) {
-                //local image
-                if self.image_exists(&image) {
-                    if on_deny_list(&image) {
-                        valid = false;
-                        reason = format!("Local image {} on deny list", &image_raw);
-                        break;
-                    } else {
-                        info!("Image {} allowed as local image", &image_raw);
-                        continue;
-                    }
-                } else {
-                    if on_allow_list(&image) {
-                        info!(
-                            "Local image {} on allow list (but not in registry)",
-                            &image_raw
-                        );
-                        continue;
-                    } else {
-                        valid = false;
-                        reason = format!(
-                            "Local image {} not contained in this registry and not in allow list",
-                            &image_raw
-                        );
-                        break;
-                    }
-                }
-            } else {
-                // remote image
-                if on_allow_list(&image) {
-                    info!("Remote image {} on allow list", &image_raw);
-                    continue;
-                } else {
-                    valid = false;
-                    reason = format!(
-                        "Remote image {} not contained in this registry and not in allow list",
-                        &image_raw
-                    );
-                    break;
-                }
+            //let local_exists = ;
+            let (v, r) = check_image(&image_raw, ar.host_names.to_vec(), &|image| {
+                self.image_exists(image)
+            });
+            if !v {
+                valid = false;
+                reason = r;
+                break;
             }
         }
 

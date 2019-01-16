@@ -199,7 +199,7 @@ mod validation_tests {
         //should deny by default
         let txt = resp.text().unwrap();
         assert!(txt.contains("\"allowed\":false"));
-        assert!(txt.contains("Remote image nginx not contained in this registry and not in allow list"));
+        assert!(txt.contains("Remote image nginx disallowed as not contained in this registry and not in allow list"));
     }
 
     fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
