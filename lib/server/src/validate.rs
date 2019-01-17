@@ -64,24 +64,18 @@ fn parse_image(image_str: &str) -> Image {
     }
 }
 
-fn on_allow_list(image: &Image) -> bool {
-    false
-}
-
-fn on_deny_list(image: &Image) -> bool {
-    false
-}
-
 fn check_image(
     image_raw: &str,
     local_hosts: Vec<String>,
     image_exists: &Fn(&Image) -> bool,
+    deny_list: &Vec<Image>,
+    allow_list: &Vec<Image>,
 ) -> (bool, String) {
     let image = parse_image(&image_raw);
     if local_hosts.contains(&image.host) {
         //local image
         if image_exists(&image) {
-            if on_deny_list(&image) {
+            if deny_list.contains(&image) {
                 return (false, format!("Local image {} on deny list", &image_raw));
             } else {
                 let reason = format!("Image {} allowed as local image", &image_raw);
@@ -89,7 +83,7 @@ fn check_image(
                 return (true, "".to_owned());
             }
         } else {
-            if on_allow_list(&image) {
+            if allow_list.contains(&image) {
                 info!(
                     "Local image {} allowed as on allow list (but not in registry)",
                     &image_raw
@@ -106,7 +100,7 @@ fn check_image(
         }
     } else {
         // remote image
-        if on_allow_list(&image) {
+        if allow_list.contains(&image) {
             info!("Remote image {} allowed as on allow list", &image_raw);
             return (true, "".to_owned());
         } else {
@@ -143,9 +137,13 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
 
         for image_raw in ar.images.into_vec() {
             //Using a closure here is inefficient but makes it easier to test check_image
-            let (v, r) = check_image(&image_raw, ar.host_names.to_vec(), &|image| {
-                self.image_exists(image)
-            });
+            let (v, r) = check_image(
+                &image_raw,
+                ar.host_names.to_vec(),
+                &|image| self.image_exists(image),
+                &vec![],
+                &vec![],
+            );
             if !v {
                 valid = false;
                 reason = r;
@@ -231,12 +229,77 @@ mod test {
 
     #[test]
     fn test_check() {
+        //Image hosted in this registry, should be ok
         let (v, _) = check_image(
             "localhost:8080/mydir/myimage:test",
-            vec!["localhost".to_owned()],
-            &|_| false,
+            vec!["localhost:8080".to_owned()],
+            &|_| true, //determines if in this registry
+            &vec![],
+            &vec![],
         );
-        assert!(!v);
+        assert_eq!(true, v); //Easier to read than assert!(!v)
+
+        //Image refers to this registry but not present in registry (so deny)
+        let (v, r) = check_image(
+            "localhost:8080/mydir/myimage:test",
+            vec!["localhost:8080".to_owned()],
+            &|_| false,
+            &vec![],
+            &vec![],
+        );
+        assert_eq!(false, v);
+
+        //Image refers to this registry & not present but is in allow list (so allow)
+        let (v, r) = check_image(
+            "localhost:8080/mydir/myimage:test",
+            vec!["localhost:8080".to_owned()],
+            &|_| false, //determines if in this registry
+            &vec![],
+            &vec![Image {
+                host: "localhost:8080".to_string(),
+                repo: "mydir/myimage".to_string(),
+                tag: "test".to_string(),
+            }],
+        );
+        assert_eq!(true, v);
+
+        //Image local and present but on deny list
+        let (v, _) = check_image(
+            "localhost:8080/mydir/myimage:test",
+            vec!["localhost:8080".to_owned()],
+            &|_| true, //determines if in this registry
+            &vec![Image {
+                host: "localhost:8080".to_string(),
+                repo: "mydir/myimage".to_string(),
+                tag: "test".to_string(),
+            }],
+            &vec![],
+        );
+        assert_eq!(false, v);
+
+        //Image remote and not on allow list (deny)
+        let (v, _) = check_image(
+            "quay.io/mydir/myimage:test",
+            vec!["localhost:8080".to_owned()],
+            &|_| true, //determines if in this registry
+            &vec![],
+            &vec![],
+        );
+        assert_eq!(false, v);
+
+        //Image remote and on allow list (deny)
+        let (v, _) = check_image(
+            "quay.io/mydir/myimage:test",
+            vec!["localhost:8080".to_owned()],
+            &|_| true, //determines if in this registry
+            &vec![],
+            &vec![Image {
+                host: "quay.io".to_string(),
+                repo: "mydir/myimage".to_string(),
+                tag: "test".to_string(),
+            }],
+        );
+        assert_eq!(true, v);
     }
 
 }
