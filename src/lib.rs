@@ -73,6 +73,10 @@ pub struct TrowConfig {
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
     host_names: Vec<String>,
+    allow_prefixes: Vec<String>,
+    allow_images: Vec<String>,
+    deny_prefixes: Vec<String>,
+    deny_images: Vec<String>,
     dry_run: bool,
 }
 
@@ -125,6 +129,10 @@ impl TrowBuilder {
         addr: NetAddr,
         listen: NetAddr,
         host_names: Vec<String>,
+        allow_prefixes: Vec<String>,
+        allow_images: Vec<String>,
+        deny_prefixes: Vec<String>,
+        deny_images: Vec<String>,
         dry_run: bool,
     ) -> TrowBuilder {
         let config = TrowConfig {
@@ -133,6 +141,10 @@ impl TrowBuilder {
             tls: None,
             grpc: GrpcConfig { listen },
             host_names,
+            allow_prefixes,
+            allow_images,
+            deny_prefixes,
+            deny_images,
             dry_run,
         };
         TrowBuilder { config }
@@ -177,6 +189,25 @@ impl TrowBuilder {
         println!(
             "These host names will considered local for any Kubernetes validation callbacks: {:?}",
             self.config.host_names
+        );
+        println!("Validation callback configuration:");
+        println!("  By default all remote images are denied,");
+        println!("  and all local images present in the repository are allowed");
+        println!(
+            "  Prefixes explicitly allowed: {:?}",
+            self.config.allow_prefixes
+        );
+        println!(
+            "  Image names explicitly allowed: {:?}",
+            self.config.allow_images
+        );
+        println!(
+            "  Local prefixes explicitly denied: {:?}",
+            self.config.deny_prefixes
+        );
+        println!(
+            "  Local images explicitly denied: {:?}",
+            self.config.deny_images
         );
         if self.config.dry_run {
             println!("Dry run, exiting");

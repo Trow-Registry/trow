@@ -79,10 +79,61 @@ fn parse_args<'a>() -> ArgMatches<'a> {
             .help("Don't acutally run Trow, just validate arguments. For testing purposes.")
             .takes_value(false),
         )
+        .arg(
+            Arg::with_name("allow-docker-official")
+            .long("allow-docker-official")
+            .value_name("allow_docker_official")
+            .help("Docker official images (e.g. the debian base image) will be allowed in validation callbacks.")
+            .takes_value(false)
+        )
+        .arg(
+            Arg::with_name("deny-k8s-defaults")
+            .long("deny-k8s-defaults")
+            .value_name("deny_k8s_defaults")
+            .help("By default, validation callbacks will allow various Kubernetes system images by default.
+            This option will deny those images; be careful as this may disable cluster installation and updates.")
+            .takes_value(false)
+        )
+        .arg(
+            Arg::with_name("allow-prefixes")
+            .long("allow-prefixes")
+            .value_name("allow_prefixes")
+            .help("Images that begin with any of the listed prefixes will be allowed in validation callbaks. 
+            Separate with a comma or use quotes and spaces. 
+            For example 'quay.io/coreos,myhost.com/' will match quay.io/coreos/etcd and myhost.com/myimage/myrepo:tag. 
+            Use docker.io as the hostname for the Docker Hub.")
+            .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("allow-images")
+            .long("allow-images")
+            .value_name("allow_images")
+            .help("Images that match a full name in the list will be allowed in validation callbacks. 
+            Separate with a comma or use quotes and spaces. Include the hostname. 
+            For example 'quay.io/coreos/etcd:latest'. Use docker.io as the hostname for the Docker Hub.")
+            .takes_value(true)
+        )
+
+        .arg(
+            Arg::with_name("disallow-local-prefixes")
+            .long("disallow-local-prefixes")
+            .value_name("disallow_local_prefixes")
+            .help("Disallow local images that match the prefix _not_ including any host name.  
+            For example 'beta' will match myhost.com/beta/myapp assuming myhost.com is the name of this registry.")
+            .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("disallow-local-images")
+            .long("disallow-local-images")
+            .value_name("disallow_local_images")
+            .help("Disallow local images that match the full name _not_ including any host name.  
+            For example 'beta/myapp:tag' will match myhost.com/beta/myapp:tag assuming myhost.com is the name of this registry.")
+            .takes_value(true)
+        )        
         .get_matches()
 }
 
-fn parse_host_names(names: &str) -> Vec<String> {
+fn parse_list(names: &str) -> Vec<String> {
     //split on , or whitespace
     let ret_str = names.replace(",", " ");
     ret_str.split_whitespace().map(|x| x.to_owned()).collect()
@@ -101,8 +152,20 @@ fn main() {
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
     let host_names_str = matches.value_of("names").unwrap_or(host);
-    let host_names = parse_host_names(&host_names_str);
+    let host_names = parse_list(&host_names_str);
     let dry_run = matches.is_present("dry-run");
+
+
+    let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
+    if matches.is_present("allow-docker-offical") {
+        allow_prefixes.push("docker.io/".to_owned());
+    }
+    if !matches.is_present("deny-k8s-defaults") {
+        allow_prefixes.push("k8s.gcr.io/".to_owned());
+    }
+    let allow_images = parse_list(matches.value_of("allow-images").unwrap_or(""));
+    let deny_prefixes = parse_list(matches.value_of("disallow-local-prefixes").unwrap_or(""));
+    let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
 
     let addr = NetAddr {
         host: host.to_string(),
@@ -117,6 +180,10 @@ fn main() {
         addr,
         grpc_listen,
         host_names,
+        allow_prefixes,
+        allow_images,
+        deny_prefixes,
+        deny_images,
         dry_run,
     );
     if !no_tls {
