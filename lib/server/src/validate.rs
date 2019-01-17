@@ -68,14 +68,14 @@ fn check_image(
     image_raw: &str,
     local_hosts: Vec<String>,
     image_exists: &Fn(&Image) -> bool,
-    deny_list: &Vec<Image>,
-    allow_list: &Vec<Image>,
+    deny: &Fn(&Image) -> bool,
+    allow: &Fn(&Image) -> bool,
 ) -> (bool, String) {
     let image = parse_image(&image_raw);
     if local_hosts.contains(&image.host) {
         //local image
         if image_exists(&image) {
-            if deny_list.contains(&image) {
+            if deny(&image) {
                 return (false, format!("Local image {} on deny list", &image_raw));
             } else {
                 let reason = format!("Image {} allowed as local image", &image_raw);
@@ -83,7 +83,7 @@ fn check_image(
                 return (true, "".to_owned());
             }
         } else {
-            if allow_list.contains(&image) {
+            if allow(&image) {
                 info!(
                     "Local image {} allowed as on allow list (but not in registry)",
                     &image_raw
@@ -100,7 +100,7 @@ fn check_image(
         }
     } else {
         // remote image
-        if allow_list.contains(&image) {
+        if allow(&image) {
             info!("Remote image {} allowed as on allow list", &image_raw);
             return (true, "".to_owned());
         } else {
@@ -141,8 +141,8 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
                 &image_raw,
                 ar.host_names.to_vec(),
                 &|image| self.image_exists(image),
-                &vec![],
-                &vec![],
+                &|_| false,
+                &|_| false,
             );
             if !v {
                 valid = false;
@@ -234,8 +234,8 @@ mod test {
             "localhost:8080/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
-            &vec![],
-            &vec![],
+            &|_| false,
+            &|_| false,
         );
         assert_eq!(true, v); //Easier to read than assert!(!v)
 
@@ -244,8 +244,8 @@ mod test {
             "localhost:8080/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| false,
-            &vec![],
-            &vec![],
+            &|_| false,
+            &|_| false,
         );
         assert_eq!(false, v);
 
@@ -254,12 +254,8 @@ mod test {
             "localhost:8080/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| false, //determines if in this registry
-            &vec![],
-            &vec![Image {
-                host: "localhost:8080".to_string(),
-                repo: "mydir/myimage".to_string(),
-                tag: "test".to_string(),
-            }],
+            &|_| false,
+            &|_| true,
         );
         assert_eq!(true, v);
 
@@ -268,12 +264,8 @@ mod test {
             "localhost:8080/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
-            &vec![Image {
-                host: "localhost:8080".to_string(),
-                repo: "mydir/myimage".to_string(),
-                tag: "test".to_string(),
-            }],
-            &vec![],
+            &|_| true,
+            &|_| false,
         );
         assert_eq!(false, v);
 
@@ -282,22 +274,18 @@ mod test {
             "quay.io/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
-            &vec![],
-            &vec![],
+            &|_| false,
+            &|_| false,
         );
         assert_eq!(false, v);
 
-        //Image remote and on allow list (deny)
+        //Image remote and on allow list (allow)
         let (v, _) = check_image(
             "quay.io/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
-            &vec![],
-            &vec![Image {
-                host: "quay.io".to_string(),
-                repo: "mydir/myimage".to_string(),
-                tag: "test".to_string(),
-            }],
+            &|_| false,
+            &|_| true,
         );
         assert_eq!(true, v);
     }
