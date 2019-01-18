@@ -186,31 +186,32 @@ impl TrowBuilder {
             "Starting trow on {}:{}",
             self.config.addr.host, self.config.addr.port
         );
+        println!("\n**Validation callback configuration\n");
+
+        println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
+
         println!(
-            "These host names will considered local for any Kubernetes validation callbacks: {:?}",
+            "  These host names will considered local (refer to this regsitry): {:?}",
             self.config.host_names
         );
-        println!("Validation callback configuration:");
-        println!("  By default all remote images are denied,");
-        println!("  and all local images present in the repository are allowed");
         println!(
-            "  Prefixes explicitly allowed: {:?}",
+            "  Images with these prefixes are explicitly allowed: {:?}",
             self.config.allow_prefixes
         );
         println!(
-            "  Image names explicitly allowed: {:?}",
+            "  Images with these names are explicitly allowed: {:?}",
             self.config.allow_images
         );
         println!(
-            "  Local prefixes explicitly denied: {:?}",
+            "  Local images with these prefixes are explicitly denied: {:?}",
             self.config.deny_prefixes
         );
         println!(
-            "  Local images explicitly denied: {:?}",
+            "  Local images with these names are explicitly denied: {:?}\n",
             self.config.deny_images
         );
         if self.config.dry_run {
-            println!("Dry run, exiting");
+            println!("Dry run, exiting.");
             std::process::exit(0);
         }
         rocket::custom(rocket_config.clone())
