@@ -1,21 +1,26 @@
+extern crate base64;
 use std::str;
 
 use client_interface::ClientInterface;
 use response::empty::Empty;
+use response::authenticate::Authenticate;
+use response::token::Token;
 use response::errors::Error;
 use response::html::HTML;
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
 use rocket_contrib::json::{Json, JsonValue};
+//use rocket::http::Status;
 use serde_json::Value;
-
+//use base64;
 use types::*;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
+        get_token,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -54,13 +59,121 @@ pub fn routes() -> Vec<rocket::Route> {
     */
 }
 
+struct TestAuth(String);
+impl<'a, 'r> FromRequest<'a, 'r> for TestAuth {
+    type Error = ();
+    fn from_request(_req: &'a Request<'r>) -> request::Outcome<TestAuth, ()> {
+    // Result<TestAuth, Error> {
+        println!("*************************** unauthorized user ********************");
+        let keys: Vec<_> = _req.headers().get("Authorization").collect();
+        if keys.len()!=1 {
+            debug!("no keys");
+//            return Outcome::Failure((Error))
+            //            return Outcome::Failure((Status::Unauthorized))
+        };
+        for i in 0..keys.len() {
+            debug!("The key at {} is {:?}", i, keys[i]);
+        }
+        let auth_strings: Vec<String>=keys[0].to_string().split_whitespace().map(String::from).collect();
+        if auth_strings.len()!=2 {
+            debug!("wrong number of strings");
+ //           return Outcome::Failure((Error))
+        }
+        debug!("String 1 is {}", auth_strings[0]);
+        debug!("String 2 is {}", auth_strings[1]);
+//        let bytes=base64::decode(&auth_strings[1].to_string()).unwrap();
+//        debug!("decoded string is {:?}", bytes);
+//        let decoded=base64::decode(&auth_strings[1])
+        match base64::decode(&auth_strings[1].to_string()) {
+            Ok(decoded) => {
+                debug!("decoded is {:?}", decoded);
+                debug!("undecoded string is {:?}", str::from_utf8(&decoded));
+                for z in 0..decoded.len() {
+                    debug!("print value at {} which is {} converts to {}", z, decoded[z], char::from(decoded[z]));
+                }
+                let mut count=0;
+                let mut username = String::new();
+                let mut password = String::new();
+                while char::from(decoded[count])!=':' {
+                    username.push(char::from(decoded[count]));
+                    count += 1;
+                }
+                count+=1;
+                while char::from(decoded[count])!='\n' {
+                    password.push(char::from(decoded[count]));
+                    count += 1;
+                }
+                debug!("username is {} and password is {}", username, password)
+            }
+            DecodeError => {
+                debug!("base64 decode error");
+//                debug!("decoded is {:?}", decoded);
+            }
+        }
+//           let hello = b"hello rustaceans";
+//    let encoded = encode(hello);
+ //   let decoded = decode(&encoded)?;
+
+  //  debug!("origin: {}", str::from_utf8(hello)?);
+ //   debug!("base64 encoded: {}", encoded);
+ 
+        /*
+        let header_map = _req.headers();
+        debug!("so we have a header {:?}", header_map.get_one("Authorization"));
+        debug!("header some value is {}", header_map.get_one("Authorization").is_some());
+        debug!("header none value is {}", header_map.get_one("Authorization").is_none());
+        let auth_string = header_map.get_one("Authorization");
+        debug!("auth string is {:?}", auth_string);
+*/
+        //        debug!("header expect is {}", assert_eq!(header_map.getone("Authorization".expect)))
+//       let astring=get_auth_string(_req);
+        /*
+        match (header_map.get_one("Authorization")) {
+            None => debug!("No Authorization String"),
+            Some (value)
+        }
+        */
+        Outcome::Success(TestAuth("test".to_owned()))
+     }
+    /*
+    fn auth_string(req: &Request) -> Result<String, Error>{
+        match req.headers().get_one("Authorization") {
+            None => Err(Error::InternalError),
+            Some(authstr) => authstr,
+        }
+    }
+    */
+}
+
 struct AuthorisedUser(String);
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
     fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
+        println!("*************************** authorized user ********************");
         Outcome::Success(AuthorisedUser("test".to_owned()))
     }
 }
+/*
+fn get_auth_string(req: &Request) -> Result<String, Error>{
+    match req.headers().get_one("Authorization") {
+        None => Err(Error::InternalError),
+        Some(authstr) => authstr,
+    }
+}
+*/
+/*
+fn check_authentication() -> bool {
+    let mut authenticated = false;
+    if authenticated {
+        println!("authenticated is true");
+        return authenticated;
+    } else {
+        println!("authenticated is false");
+        authenticated = true;
+        return false;
+    }
+}
+*/
 /*
 Registry root.
 
@@ -68,8 +181,9 @@ Returns 200.
  */
 
 #[get("/v2")]
-fn get_v2root() -> Empty {
-    Empty
+fn get_v2root() -> Authenticate {
+//    check_authentication();
+    Authenticate
 }
 /*
 #[get("/v2")]
@@ -82,13 +196,90 @@ fn get_v2root() -> Result<Empty,Error> {
 */
 #[get("/")]
 fn get_homepage<'a>() -> HTML<'a> {
+//    check_authentication();
     const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
 <h1>Welcome to Trow, the cluster registry</h1>
 </body></html>";
 
     HTML(ROOT_RESPONSE)
 }
-
+/*
+#[get("/tokens")]
+fn get_tokens() -> Token {
+    debug!("Tokens!");
+    Toke n
+}
+*/
+// #[get("/?scope=<scope>:<url>:push.pull&service=<service>")]
+//#[get("/?<scope>&<service>")]
+/*
+#[get("/token?<scope>&<service>")]
+fn get_token( 
+    scope: String,
+    service: String
+) -> Token {
+    debug!("Scope this out");
+    debug!("scope is {}", scope);
+//    debug!("url is {}", url);
+    debug!("service is {}", service);
+    debug!("Got a token");
+    Token
+}
+*/
+/* works
+#[get("/token?<account>&<scope>&<service>")]
+fn get_token( 
+    account: String,
+    scope: String,
+    service: String
+) -> Token {
+    debug!("account is {}", account);
+    debug!("scope is {}", scope);
+    //    debug!("url is {}", url);
+    debug!("service is {}", service);
+    debug!("Got a token");
+    Token
+}
+*/
+/* overrides all token called on login and push */
+#[get("/token")]
+fn get_token(test_auth: TestAuth) 
+{
+    //debug!("Authorization string is {:?}", test_auth);
+    debug!("get_token");
+    debug!("Authorization string is {}", test_auth.0);
+    //debug!("Authorization string is {:?}", test_auth)
+}
+/*
+#[get("/token?<account>&<scope>&<service>&<Authorization>")]
+fn get_login( 
+    account: String,
+    Authorization: String,
+    scope: String,
+    service: String
+) -> Token {
+    debug!("Scope this out");
+    debug!("account is {}", account);
+    debug!("Authorization is {}", Authorization);
+    debug!("scope is {}", scope);
+    //    debug!("url is {}", url);
+    debug!("service is {}", service);
+    debug!("Got a token");
+    Token
+}
+#[get("/basic?<scope>&<service>")]
+fn get_basic( 
+    scope: String,
+    service: String
+) -> Token {
+    debug!("BASIC AUTHO");
+    debug!("scope is {}", scope);
+    //    debug!("url is {}", url);
+    debug!("service is {}", service);
+    debug!("Got a token");
+    Token
+}
+*/
 /*
 ---
 Pulling an image

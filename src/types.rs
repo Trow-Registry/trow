@@ -231,7 +231,24 @@ impl TagList {
         &self.list
     }
 }
+/*
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct Token {
+    pub token: String,
+}
 
+impl Token {
+    pub fn new(gen_token: Token) -> Token {
+        Token {
+            token: gen_token,
+        }
+    }
+
+    pub fn token(&self) -> String {
+        &self.token
+    }
+}
+*/
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct AdmissionReview {
     //TODO: Get rid of stringly typing

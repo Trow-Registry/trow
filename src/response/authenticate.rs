@@ -1,7 +1,7 @@
-use rocket::http::Status;
+use rocket::http::{Header, Status};
+use rocket::http::{ContentType};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-use types::Authenticate;
 /*
 WWW-Authenticate: Basic
 
@@ -11,10 +11,12 @@ WWW-Authenticate: Basic realm="Access to the staging site", charset="UTF-8"
 pub struct Authenticate;
 
 impl<'r> Responder<'r> for Authenticate {
-    fn respond_to(self, _req: &Request) -> response::Result<'r> {
-        debug!("authenticate response"); 
+    fn respond_to(self, _: &Request)  -> Result<Response<'r>, Status> {
+        println!("   ");
+        debug!("www-authenticate response"); 
+        println!("-----------------------------------------------------------------------------");
+        let authenticate_header = Header::new("www-authenticate","Bearer realm=\"https://0.0.0.0:8443/token\",service=\"trow_registry\",scope=\"unused\"");
         Response::build()
-            let authenticate_header = Header::new("Www-Authenticate: Bearer realm=https://0.0.0.0:8080/tokens")
             .status(Status::Unauthorized)
             .header(authenticate_header)
             .header(ContentType::JSON)
@@ -35,14 +37,14 @@ impl Responder<'static> for String {
 
 #[cfg(test)]
 mod test {
-    use response::empty::Empty;
+    use response::token::Token;
     use rocket::http::Status;
 
     use response::test_helper::test_route;
 
     #[test]
-    fn empty_ok() {
-        let response = test_route(Empty);
+    fn authenticate_ok() {
+        let response = test_route(Token);
         assert_eq!(response.status(), Status::Unauthorized);
     }
 }
