@@ -69,4 +69,44 @@ mod cli {
             .unwrap();
     }
 
+    #[test]
+    fn image_validation() {
+        assert_cli::Assert::main_binary()
+            .with_args(&[
+                "--deny-k8s-images",
+                "--allow-prefixes",
+                "myreg.com/",
+                "--dry-run",
+            ])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Images with these prefixes are explicitly allowed: [\"myreg.com/\"]")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--allow-images", "myreg.com/myimage:1.2", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Images with these names are explicitly allowed: [\"myreg.com/myimage:1.2\"]")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--disallow-local-images", "myimage:1.2", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Local images with these names are explicitly denied: [\"myimage:1.2\"]")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--disallow-local-prefixes", "beta/", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Local images with these prefixes are explicitly denied: [\"beta/\"]")
+            .unwrap();
+    }
+
 }
