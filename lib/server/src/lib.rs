@@ -25,8 +25,16 @@ use grpcio::{Environment, ServerBuilder};
 use server::TrowService;
 use std::thread;
 
-pub fn start_server(data_path: &str, listen_addr: &str, listen_port: u16) {
-    match server_async(data_path, listen_addr, listen_port) {
+pub fn start_server(data_path: &str, listen_addr: &str, listen_port: u16, allow_prefixes: Vec<String>, allow_images: Vec<String>, deny_prefixes: Vec<String>, deny_images: Vec<String>) {
+    match server_async(
+        data_path,
+        listen_addr,
+        listen_port,
+        allow_prefixes,
+        allow_images,
+        deny_prefixes,
+        deny_images,
+    ) {
         Ok(mut server) => {
             thread::park();
             let _ = server.shutdown().wait();
@@ -43,6 +51,10 @@ pub fn server_async(
     data_path: &str,
     listen_addr: &str,
     listen_port: u16,
+    allow_prefixes: Vec<String>,
+    allow_images: Vec<String>,
+    deny_prefixes: Vec<String>,
+    deny_images: Vec<String>,
 ) -> Result<grpcio::Server, Error> {
     use std::sync::Arc;
 
@@ -51,7 +63,13 @@ pub fn server_async(
 
     //It's a bit weird but cloning the service should be fine
     //Internally it uses Arcs to point to the communal data
-    let ts = TrowService::new(data_path)?;
+    let ts = TrowService::new(
+        data_path,
+        allow_prefixes,
+        allow_images,
+        deny_prefixes,
+        deny_images,
+    )?;
     let registry_service = trow_protobuf::server_grpc::create_registry(ts.clone());
     let admission_service = trow_protobuf::server_grpc::create_admission_controller(ts);
 

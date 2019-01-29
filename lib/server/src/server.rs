@@ -7,6 +7,7 @@ use grpcio::{self, RpcStatus, RpcStatusCode, WriteFlags};
 use manifest::{FromJson, Manifest};
 use serde_json;
 use std::collections::HashSet;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use trow_protobuf;
@@ -36,6 +37,10 @@ pub struct TrowService {
     manifests_path: PathBuf,
     layers_path: PathBuf,
     scratch_path: PathBuf,
+    allow_prefixes: Vec<String>,
+    allow_images: Vec<String>,
+    deny_local_prefixes: Vec<String>,
+    deny_local_images: Vec<String>,
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
@@ -51,8 +56,20 @@ pub struct Image {
     pub tag: String,  //Bit after the :, latest by default
 }
 
+impl fmt::Display for Image {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}:{}", self.host, self.repo, self.tag)
+    }
+}
+
 impl TrowService {
-    pub fn new(data_path: &str) -> Result<Self, Error> {
+    pub fn new(
+        data_path: &str,
+        allow_prefixes: Vec<String>,
+        allow_images: Vec<String>,
+        deny_local_prefixes: Vec<String>,
+        deny_local_images: Vec<String>,
+    ) -> Result<Self, Error> {
         let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
         let scratch_path = create_path(data_path, SCRATCH_DIR)?;
         let layers_path = create_path(data_path, LAYERS_DIR)?;
@@ -61,6 +78,10 @@ impl TrowService {
             manifests_path,
             layers_path,
             scratch_path,
+            allow_prefixes,
+            allow_images,
+            deny_local_prefixes,
+            deny_local_images,
         };
         Ok(svc)
     }
@@ -166,6 +187,50 @@ impl TrowService {
         });
 
         Ok(())
+    }
+
+    pub fn is_local_denied(&self, image: &Image) -> bool {
+        //Try matching both with and without host name
+        //Deny images are expected without host as always local
+        let full_name = format!("{}", image);
+        let name_without_host = format!("{}:{}", image.repo, image.tag);
+
+        for prefix in &self.deny_local_prefixes {
+            if full_name.starts_with(prefix) || name_without_host.starts_with(prefix) {
+                info!("Image {} matches prefix {} on deny list", image, prefix);
+                return true;
+            }
+        }
+
+        for name in &self.deny_local_images {
+            if &full_name == name || &name_without_host == name {
+                info!("Image {} matches image {} on deny list", image, name);
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn is_allowed(&self, image: &Image) -> bool {
+        //Have full names with host here
+        let name = format!("{}", image);
+
+        for prefix in &self.allow_prefixes {
+            if name.starts_with(prefix) {
+                info!("Image {} matches prefix {} on allow list", name, prefix);
+                return true;
+            }
+        }
+
+        for a_name in &self.allow_images {
+            if &name == a_name {
+                info!("Image {} matches image {} on allow list", name, a_name);
+                return true;
+            }
+        }
+
+        false
     }
 }
 

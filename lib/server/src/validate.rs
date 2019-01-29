@@ -141,8 +141,8 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
                 &image_raw,
                 ar.host_names.to_vec(),
                 &|image| self.image_exists(image),
-                &|_| false,
-                &|_| false,
+                &|i| self.is_local_denied(i),
+                &|i| self.is_allowed(i),
             );
             if !v {
                 valid = false;

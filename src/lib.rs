@@ -91,16 +91,23 @@ struct TlsConfig {
     key_file: String,
 }
 
-fn init_trow_server(
-    data_path: String,
-    listen_host: String,
-    listen_port: u16,
-) -> Result<std::thread::JoinHandle<()>, Error> {
+fn init_trow_server(config: TrowConfig) -> std::thread::JoinHandle<()> {
     debug!("Starting Trow server");
 
-    Ok(thread::spawn(move || {
-        trow_server::start_server(&data_path, &listen_host, listen_port);
-    }))
+    //Could pass full config here.
+    //Pros: less work, new args added automatically
+    //-s: ties frontend to backend, some uneeded/unwanted vars
+    thread::spawn(move || {
+        trow_server::start_server(
+            &config.data_dir,
+            &config.grpc.listen.host,
+            config.grpc.listen.port,
+            config.allow_prefixes,
+            config.allow_images,
+            config.deny_prefixes,
+            config.deny_images,
+        );
+    })
 }
 
 /// Build the logging agent with formatting.
@@ -174,11 +181,7 @@ impl TrowBuilder {
     pub fn start(&self) -> Result<(), Error> {
         init_logger()?;
         // GRPC Backend thread.
-        let _grpc_thread = init_trow_server(
-            self.config.data_dir.clone(),
-            self.config.grpc.listen.host.clone(),
-            self.config.grpc.listen.port,
-        )?;
+        let _grpc_thread = init_trow_server(self.config.clone());
 
         //TODO: shouldn't need to clone rocket config
         let rocket_config = &self.build_rocket_config()?;
