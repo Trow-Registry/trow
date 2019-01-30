@@ -1,11 +1,10 @@
-use grpcio::{self, RpcStatus, RpcStatusCode, WriteFlags};
 use server::TrowService;
 
 use server::Image;
 use trow_protobuf;
 use trow_protobuf::server::*;
 
-use futures::{stream, Future, Sink};
+use futures::Future;
 
 const DOCKER_HUB_HOSTNAME: &str = "docker.io";
 
@@ -29,10 +28,10 @@ fn parse_image(image_str: &str) -> Image {
     let repo;
     let tag;
 
-    match image_str.find("/") {
+    match image_str.find('/') {
         Some(i) => {
             let left = image_str.get(..i).unwrap();
-            if !(left.contains(".") || left.contains(":")) && !left.starts_with("localhost") {
+            if !(left.starts_with("localhost") || left.contains(':') || left.contains('.')) {
                 host = DOCKER_HUB_HOSTNAME;
                 after_host = image_str;
             } else {
@@ -46,7 +45,7 @@ fn parse_image(image_str: &str) -> Image {
         }
     }
 
-    match after_host.find(":") {
+    match after_host.find(':') {
         None => {
             repo = after_host;
             tag = "latest";
@@ -82,34 +81,29 @@ fn check_image(
                 info!("{}", reason);
                 return (true, "".to_owned());
             }
-        } else {
-            if allow(&image) {
-                info!(
-                    "Local image {} allowed as on allow list (but not in registry)",
-                    &image_raw
-                );
-                return (true, "".to_owned());
-            } else {
-                let reason = format!(
-                    "Local image {} disallowed as not contained in this registry and not in allow list",
-                    &image_raw
-                );
-                info!("{}", reason);
-                return (false, reason);
-            }
-        }
-    } else {
-        // remote image
-        if allow(&image) {
-            info!("Remote image {} allowed as on allow list", &image_raw);
+        } else if allow(&image) {
+            info!(
+                "Local image {} allowed as on allow list (but not in registry)",
+                &image_raw
+            );
             return (true, "".to_owned());
         } else {
             let reason = format!(
-                "Remote image {} disallowed as not contained in this registry and not in allow list",
+                "Local image {} disallowed as not contained in this registry and not in allow list",
                 &image_raw
             );
+            info!("{}", reason);
             return (false, reason);
         }
+    } else if allow(&image) {
+        info!("Remote image {} allowed as on allow list", &image_raw);
+        return (true, "".to_owned());
+    } else {
+        let reason = format!(
+            "Remote image {} disallowed as not contained in this registry and not in allow list",
+            &image_raw
+        );
+        return (false, reason);
     }
 }
 
@@ -121,16 +115,6 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
         sink: grpcio::UnarySink<AdmissionResponse>,
     ) {
         let mut resp = AdmissionResponse::new();
-
-        /*
-        Start with check that the image exists in this registry. We are sent the hostnames
-        to consider local, which has security implications.
-        */
-
-        //TODO: Put enforce local images as cmd switch (maybe allow-repos or something)
-
-        //Parse initial rules into allow deny lists. That way don't need to worry about
-        //local/remote
 
         let mut valid = true;
         let mut reason = "".to_string();

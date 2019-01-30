@@ -41,9 +41,8 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
         Value::Object(m) => {
             for (k, v) in m {
                 if k == "image" {
-                    match v {
-                        Value::String(image) => images.push(image.to_owned()),
-                        _ => (),
+                    if let Value::String(image) = v {
+                        images.push(image.to_owned())
                     }
                 } else {
                     extract_images(v, images);
@@ -248,7 +247,7 @@ impl ClientInterface {
     pub fn validate_admission(
         &self,
         in_req: &types::AdmissionRequest,
-        host_names: &Vec<String>,
+        host_names: &[String],
     ) -> Result<types::AdmissionResponse, Error> {
         //TODO: write something to convert automatically (into())
         let mut a_req = trow_protobuf::server::AdmissionRequest::new();
@@ -259,11 +258,11 @@ impl ClientInterface {
         extract_images(&in_req.object, &mut images);
 
         //The conversion here will be easier when we can upgrade the protobuf stuff
-        a_req.set_images(RepeatedField::from_vec(images.clone().into()));
+        a_req.set_images(RepeatedField::from_vec(images.clone()));
 
         a_req.set_namespace(in_req.namespace.clone());
         a_req.set_operation(in_req.operation.clone());
-        a_req.set_host_names(RepeatedField::from_vec(host_names.clone().into()));
+        a_req.set_host_names(RepeatedField::from_vec(host_names.to_vec()));
 
         let resp = self.ac.validate_admission(&a_req)?;
 

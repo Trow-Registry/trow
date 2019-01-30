@@ -169,7 +169,7 @@ fn main() {
 
     let addr = NetAddr {
         host: host.to_string(),
-        port: port,
+        port,
     };
     let grpc_listen = NetAddr {
         host: "127.0.0.1".to_owned(),

@@ -168,7 +168,7 @@ impl TrowService {
         let digest_path = self.get_path_for_layer(repo_name, user_digest);
         let repo_path = digest_path
             .parent()
-            .ok_or(failure::err_msg("Error finding repository path"))?;
+            .ok_or_else(|| failure::err_msg("Error finding repository path"))?;
 
         if !repo_path.exists() {
             fs::create_dir_all(repo_path)?;
@@ -247,13 +247,9 @@ fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<()
             if path.is_dir() {
                 visit_dirs(&path, base, repos)?;
             } else {
-                let dir = path.parent();
-                match dir {
-                    Some(d) => {
-                        let repo = d.strip_prefix(base)?;
-                        repos.insert(repo.to_string_lossy().to_string());
-                    }
-                    None => (),
+                if let Some(d) = path.parent() {
+                    let repo = d.strip_prefix(base)?;
+                    repos.insert(repo.to_string_lossy().to_string());
                 }
             }
         }
