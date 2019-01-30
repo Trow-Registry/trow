@@ -13,71 +13,80 @@ mod common;
 #[cfg(test)]
 mod validation_tests {
 
-    use environment::Environment;
-    use std::fs::{self, File};
-    use std::process::Child;
-    use std::process::Command;
-    use hyper::StatusCode;
-    use std::thread;
-    use std::time::Duration;
-    use std::io::Read;
-    use common;
+  use common;
+  use environment::Environment;
+  use hyper::StatusCode;
+  use std::fs::{self, File};
+  use std::io::Read;
+  use std::process::Child;
+  use std::process::Command;
+  use std::thread;
+  use std::time::Duration;
 
-    const LYCAON_ADDRESS: &str = "https://trow.test:8443";
+  const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 
-    struct TrowInstance {
-        pid: Child,
+  struct TrowInstance {
+    pid: Child,
+  }
+  /// Call out to cargo to start trow.
+  /// Seriously considering moving to docker run.
+
+  fn start_trow() -> TrowInstance {
+    let mut child = Command::new("cargo")
+      .arg("run")
+      .env_clear()
+      .envs(Environment::inherit().compile())
+      .arg("--")
+      .arg("--names")
+      .arg("trow.test")
+      .arg("--allow-prefixes")
+      .arg("docker.io/amouat/")
+      .arg("--allow-images")
+      .arg("docker.io/debian:latest,quay.io/coreos/etcd:3.4")
+      .arg("--disallow-local-prefixes")
+      .arg("bla/, testy")
+      .arg("--disallow-local-images")
+      .arg("not:me, or/this:one")
+      .spawn()
+      .expect("failed to start");
+
+    let mut timeout = 20;
+
+    let mut buf = Vec::new();
+    File::open("./certs/ca.crt")
+      .unwrap()
+      .read_to_end(&mut buf)
+      .unwrap();
+    let cert = reqwest::Certificate::from_pem(&buf).unwrap();
+    // get a client builder
+    let client = reqwest::Client::builder()
+      .add_root_certificate(cert)
+      .build()
+      .unwrap();
+
+    let mut response = client.get(LYCAON_ADDRESS).send();
+    while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::Ok)) {
+      thread::sleep(Duration::from_millis(100));
+      response = client.get(LYCAON_ADDRESS).send();
+      timeout -= 1;
     }
-    /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.
-
-    fn start_trow() -> TrowInstance {
-        let mut child = Command::new("cargo")
-            .arg("run")
-            .env_clear()
-            .envs(Environment::inherit().compile())
-            .arg("--")
-            .arg("--names").arg("trow.test")
-            .spawn()
-            .expect("failed to start");
-
-        let mut timeout = 20;
-
-        let mut buf = Vec::new();
-        File::open("./certs/ca.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .build()
-            .unwrap();
-
-        let mut response = client.get(LYCAON_ADDRESS).send();
-        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::Ok)) {
-            thread::sleep(Duration::from_millis(100));
-            response = client.get(LYCAON_ADDRESS).send();
-            timeout -= 1;
-        }
-        if timeout == 0 {
-            child.kill().unwrap();
-            panic!("Failed to start Trow");
-        }
-        TrowInstance { pid: child }
+    if timeout == 0 {
+      child.kill().unwrap();
+      panic!("Failed to start Trow");
     }
+    TrowInstance { pid: child }
+  }
 
-    impl Drop for TrowInstance {
-        fn drop(&mut self) {
-            //Y U NO HV STOP?
-            self.pid.kill().unwrap();
-        }
+  impl Drop for TrowInstance {
+    fn drop(&mut self) {
+      //Y U NO HV STOP?
+      self.pid.kill().unwrap();
     }
+  }
 
-    /* Uses a copy of an actual AdmissionReview to test. */
-    fn validate_example(cl: &reqwest::Client) {
-        let review = r#"{
+  /* Uses a copy of an actual AdmissionReview to test. */
+  fn validate_example(cl: &reqwest::Client) {
+    let review = r#"{
   "kind": "AdmissionReview",
   "apiVersion": "admission.k8s.io/v1beta1",
   "request": {
@@ -189,22 +198,23 @@ mod validation_tests {
   }
 }"#;
 
-        let mut resp = cl
-            .post(&format!("{}/validate-image", LYCAON_ADDRESS))
-            .body(review)
-            .send()
-            .unwrap();
+    let mut resp = cl
+      .post(&format!("{}/validate-image", LYCAON_ADDRESS))
+      .body(review)
+      .send()
+      .unwrap();
 
-        assert_eq!(resp.status(), StatusCode::Ok);
-        //should deny by default
-        let txt = resp.text().unwrap();
-        assert!(txt.contains("\"allowed\":false"));
-        assert!(txt.contains("Remote image nginx disallowed as not contained in this registry and not in allow list"));
-    }
+    assert_eq!(resp.status(), StatusCode::Ok);
+    //should deny by default
+    let txt = resp.text().unwrap();
+    assert!(txt.contains("\"allowed\":false"));
+    assert!(txt.contains(
+      "Remote image nginx disallowed as not contained in this registry and not in allow list"
+    ));
+  }
 
-    fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
-
-        let start = r#"{
+  fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
+    let start = r#"{
   "kind": "AdmissionReview",
   "apiVersion": "admission.k8s.io/v1beta1",
   "request": {
@@ -254,50 +264,79 @@ mod validation_tests {
     }
   }
 }"#;
-        let review = format!("{}{}{}", start, image_string, end);
+    let review = format!("{}{}{}", start, image_string, end);
 
-        let mut resp = cl
-            .post(&format!("{}/validate-image", LYCAON_ADDRESS))
-            .body(review)
-            .send()
-            .unwrap();
+    let mut resp = cl
+      .post(&format!("{}/validate-image", LYCAON_ADDRESS))
+      .body(review)
+      .send()
+      .unwrap();
 
-        assert_eq!(resp.status(), StatusCode::Ok);
-        //should deny by default
-        let txt = resp.text().unwrap();
-        if is_allowed {
-            println!("out {}", txt);
-            assert!(txt.contains("\"allowed\":true"));
-        } else {
-            assert!(txt.contains("\"allowed\":false"));
-        }
+    assert_eq!(resp.status(), StatusCode::Ok);
+    //should deny by default
+    let txt = resp.text().unwrap();
+    if is_allowed {
+      println!("out {}", txt);
+      assert!(txt.contains("\"allowed\":true"));
+    } else {
+      assert!(txt.contains("\"allowed\":false"));
     }
+  }
 
-   #[test]
-    fn test_runner() {
-        
-        //Need to start with empty repo
-        fs::remove_dir_all("./data").unwrap_or(());
+  #[test]
+  fn test_runner() {
+    //Need to start with empty repo
+    fs::remove_dir_all("./data").unwrap_or(());
 
-        let mut buf = Vec::new();
-        File::open("./certs/ca.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .build()
-            .unwrap();
+    let mut buf = Vec::new();
+    File::open("./certs/ca.crt")
+      .unwrap()
+      .read_to_end(&mut buf)
+      .unwrap();
+    let cert = reqwest::Certificate::from_pem(&buf).unwrap();
+    // get a client builder
+    let client = reqwest::Client::builder()
+      .add_root_certificate(cert)
+      .build()
+      .unwrap();
 
-        //Had issues with stopping and starting trow causing test fails.
-        //It might be possible to improve things with a thread_local
-        let _trow = start_trow();
-        validate_example(&client);
-        test_image(&client, "trow.test/am/test:tag", false);
-        //push image and test again
-        common::upload_layer(&client, "am/test", "tag");
-        test_image(&client, "trow.test/am/test:tag", true);
-    }
+    //Had issues with stopping and starting trow causing test fails.
+    //It might be possible to improve things with a thread_local
+    let _trow = start_trow();
+    validate_example(&client);
+    test_image(&client, "trow.test/am/test:tag", false);
+    //push image and test again
+    common::upload_layer(&client, "am/test", "tag");
+    test_image(&client, "trow.test/am/test:tag", true);
+
+    //k8s images should be allowed by default
+    test_image(&client, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true);
+
+    //allow prefix example
+    test_image(&client, "docker.io/amouat/myimage:test", true);
+    test_image(&client, "amouat/myimage:test", true);
+    test_image(&client, "docker.io/someone/myimage:test", false);
+
+    //allow image example
+    test_image(&client, "docker.io/debian:latest", true);
+    test_image(&client, "debian", true);
+    test_image(&client, "quay.io/coreos/etcd:3.4", true);
+    test_image(&client, "quay.io/coreos/etcd:3.4.2", false);
+
+    //deny prefix example
+    common::upload_layer(&client, "bla/test", "tag");
+    common::upload_layer(&client, "blatest", "tag");
+    test_image(&client, "trow.test/bla/test:tag", false);
+    test_image(&client, "trow.test/blatest:tag", true);
+    common::upload_layer(&client, "testy/test", "tag");
+    common::upload_layer(&client, "testytest", "tag");
+    test_image(&client, "trow.test/testy/test:tag", false);
+    test_image(&client, "trow.test/testytest:tag", false);
+
+    //deny image example
+    common::upload_layer(&client, "not", "me");
+    common::upload_layer(&client, "or/this", "one");
+    test_image(&client, "trow.test/not:me", false);
+    test_image(&client, "trow.test/or/this:one", false);
+  }
 }
