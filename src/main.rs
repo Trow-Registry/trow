@@ -190,7 +190,7 @@ fn main() {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
     }
     builder.start().unwrap_or_else(|e| {
-        eprintln!("Error launching Trow {}", e);
+        eprintln!("Error launching Trow:\n\n{}", e);
         std::process::exit(1);
     });
 }

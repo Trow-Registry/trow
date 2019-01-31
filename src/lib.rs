@@ -1,8 +1,8 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 #![feature(plugin)]
 
-extern crate crypto;
 extern crate ctrlc;
+#[macro_use]
 extern crate failure;
 extern crate futures;
 extern crate grpcio;
@@ -39,6 +39,7 @@ extern crate quickcheck;
 use failure::Error;
 use std::env;
 use std::thread;
+use std::path::Path;
 
 use grpcio::{ChannelBuilder, EnvBuilder};
 use rocket::fairing;
@@ -172,6 +173,9 @@ impl TrowBuilder {
             .port(self.config.addr.port);
 
         if let Some(ref tls) = self.config.tls {
+            if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
+                return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
+            } 
             cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
         }
         let cfg = cfg.finalize()?;
@@ -236,7 +240,11 @@ impl TrowBuilder {
                     //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
                     resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
                 },
-            ))
+            )).attach(fairing::AdHoc::on_launch(
+                "Launch Message", 
+                |_| {
+                    println!("Trow is up and running!");
+                }))
             .mount("/", routes::routes())
             .launch();
         Ok(())
