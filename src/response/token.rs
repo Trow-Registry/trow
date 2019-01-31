@@ -1,3 +1,4 @@
+use std::io::Cursor;
 //use rocket::http::Status;
 //use rocket::request::Request;
 //use rocket::response::{Responder, Response};
@@ -6,11 +7,7 @@ use rocket::http::{Header, Status};
 use rocket::http::{ContentType};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-/*
-WWW-Authenticate: Basic
 
-WWW-Authenticate: Basic realm="Access to the staging site", charset="UTF-8"
-*/
 #[derive(Debug, Serialize)]
 pub struct Token;
 /*
@@ -25,12 +22,12 @@ impl<'r> Responder<'r> for Token {
         debug!("token response"); 
         println!("-----------------------------------------------------------------------------");
         let token_header = Header::new(
-            "www-authenticate",
-            "Basic realm=\"http://0.0.0.0:8443/basic\",service=\"trow_registry\",scope=\"registry:catalog:*\"");
+            "Authorization","Bearer randomtokenstring1234567890");
         Response::build()
-            .status(Status::Unauthorized)
+            .status(Status::Ok)
             .header(token_header)
             .header(ContentType::JSON)
+            .sized_body(Cursor::new("{\"token\":\"randomtokenstring09876543210960987654321\",\"expires_in\":300,\"issued_at\":\"2019-01-31T09:05:33.678171359Z\"}/n"))
             .ok()
     }
 }

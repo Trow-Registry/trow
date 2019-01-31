@@ -11,7 +11,6 @@ use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
 use rocket_contrib::json::{Json, JsonValue};
-use rocket::http::Status;
 use serde_json::Value;
 use types::*;
 
@@ -139,10 +138,11 @@ fn get_homepage<'a>() -> HTML<'a> {
  * this is where client will attempt to login
  */
 #[get("/token")]
-fn get_token(test_auth: TestAuth) 
+fn get_token(test_auth: TestAuth) -> Token
 {
     //debug!("Authorization string is {:?}", test_auth);
     debug!("get_token");
+    Token
 //    debug!("Authorization string is {}", test_auth.0); //test
     //debug!("Authorization string is {:?}", test_auth)
 }

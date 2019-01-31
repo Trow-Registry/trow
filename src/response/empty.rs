@@ -1,6 +1,4 @@
-//use rocket::http::Status;
-use rocket::http::{Header, Status};
-use rocket::http::{ContentType};
+use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
@@ -9,18 +7,7 @@ pub struct Empty;
 
 impl<'r> Responder<'r> for Empty {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
-//        Response::build().ok()
-        debug!("hijacked empty response");
-//        let authenticate_header = Header::new("www-authenticate:","Bearer realm=https://0.0.0.0:8080/token");
-
-//        let authenticate_header = Header::new("www-authenticate","Bearer realm=\"http://0.0.0.0:8080/token\",service=\"demo_registry\",scope=\"registry:catalog:*\"");
-        let authenticate_header = Header::new("www-authenticate","Basic realm=\"https://0.0.0.0:8443/token\",service=\"trow_registry\",scope=\"wanker\"");
-        
-        Response::build()
-            .status(Status::Unauthorized)
-            .header(authenticate_header)
-            .header(ContentType::JSON)
-            .ok()
+        Response::build().ok()
     }
 }
 
