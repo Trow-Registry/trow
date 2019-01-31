@@ -246,11 +246,9 @@ fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<()
             let path = entry.path();
             if path.is_dir() {
                 visit_dirs(&path, base, repos)?;
-            } else {
-                if let Some(d) = path.parent() {
+            } else if let Some(d) = path.parent() {
                     let repo = d.strip_prefix(base)?;
                     repos.insert(repo.to_string_lossy().to_string());
-                }
             }
         }
     }

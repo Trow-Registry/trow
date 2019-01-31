@@ -152,7 +152,7 @@ pub fn create_blob_reader(reader: Box<Read>, digest: Digest) -> BlobReader {
     BlobReader { reader, digest }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RepoCatalog {
     #[serde(rename = "repositories")]
     catalog: HashSet<RepoName>,

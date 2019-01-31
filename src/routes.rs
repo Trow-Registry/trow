@@ -497,7 +497,7 @@ fn validate_image(
     warn!("Recieved {:?}", image_data);
     warn!("Called validate webhook");
 
-    /**
+    /*
      * The return type is a little complicated. Always return a 200 including for disallowed images. The JSON is an
      * AdmissionReview object with an AdmissionResponse entry. The object sent to this endpoint can be reused, or
      * a new created with the same UID.
