@@ -54,6 +54,10 @@ pub fn routes() -> Vec<rocket::Route> {
     */
 }
 
+pub fn catchers() -> Vec<rocket::Catcher> {
+    catchers![not_found]
+}
+
 struct AuthorisedUser(String);
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
@@ -78,6 +82,12 @@ fn get_homepage<'a>() -> HTML<'a> {
 </body></html>";
 
     HTML(ROOT_RESPONSE)
+}
+
+// Want non HTML return for 404 for docker client
+#[catch(404)]
+fn not_found(_: &Request) -> Json<String> {
+    Json("404 page not found".to_string())
 }
 
 /*
@@ -105,10 +115,9 @@ fn get_manifest(
     ci: rocket::State<ClientInterface>,
     onename: String,
     reference: String,
-) -> Option<ManifestReader> {
-    //Need to handle error
+) -> Result<ManifestReader, Error> {
     ci.get_reader_for_manifest(&RepoName(onename), &reference)
-        .ok()
+        .map_err(|_| Error::ManifestUnknown(reference))
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]

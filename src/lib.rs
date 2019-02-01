@@ -1,7 +1,6 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 #![feature(plugin)]
 
-extern crate ctrlc;
 #[macro_use]
 extern crate failure;
 extern crate futures;
@@ -246,6 +245,7 @@ impl TrowBuilder {
                     println!("Trow is up and running!");
                 }))
             .mount("/", routes::routes())
+            .register(routes::catchers())
             .launch();
         Ok(())
     }
