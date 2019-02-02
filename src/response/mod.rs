@@ -1,5 +1,6 @@
 use hostname;
 use rocket::request::Request;
+use TrowConfig;
 
 pub mod accepted_upload;
 pub mod blob_reader;
@@ -25,6 +26,10 @@ fn get_base_url(req: &Request) -> String {
         Some(shost) => shost.to_string(),
     };
 
-    //TODO: Dynamically figure out whether to use http or https
-    format!("https://{}", host)
+    //TODO: Set to https unless --no-tls is set
+    let config = req.guard::<rocket::State<TrowConfig>>().unwrap();
+    match config.tls {
+        None => format!("http://{}", host),
+        Some(_) => format!("https://{}", host),
+    }
 }
