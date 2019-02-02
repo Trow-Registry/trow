@@ -3,7 +3,7 @@ use std::str;
 use client_interface::ClientInterface;
 use response::empty::Empty;
 use response::authenticate::Authenticate;
-use response::trowlogin::TrowLogin;
+use response::trowtoken::TrowToken;
 use response::errors::Error;
 use response::html::HTML;
 use response::upload_info::UploadInfo;
@@ -129,11 +129,11 @@ fn get_homepage<'a>() -> HTML<'a> {
  * this is where client will attempt to login
  */
 #[get("/login")]
-fn get_login(auth_user: AuthorisedUser) -> TrowLogin
+fn get_login(auth_user: AuthorisedUser) -> TrowToken
 {
     //debug!("Authorization string is {:?}", auth_user);
     debug!("get_login");
-    TrowLogin
+    TrowToken
 //    debug!("Authorization string is {}", auth_user.0); //test
     //debug!("Authorization string is {:?}", auth_user)
 }
