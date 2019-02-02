@@ -1,10 +1,9 @@
-extern crate base64;
 use std::str;
 
 use client_interface::ClientInterface;
 use response::empty::Empty;
 use response::authenticate::Authenticate;
-use response::token::Token;
+use response::trowlogin::TrowLogin;
 use response::errors::Error;
 use response::html::HTML;
 use response::upload_info::UploadInfo;
@@ -18,7 +17,7 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
-        get_token,
+        get_login,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -57,17 +56,17 @@ pub fn routes() -> Vec<rocket::Route> {
     */
 }
 
-struct TestAuth(String);
-impl<'a, 'r> FromRequest<'a, 'r> for TestAuth {
+struct AuthorisedUser(String);
+impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
-    fn from_request(_req: &'a Request<'r>) -> request::Outcome<TestAuth, ()> {
+    fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
         // Look in headers for an Authorization header
         let keys: Vec<_> = _req.headers().get("Authorization").collect();
         if keys.len()!=1 {
             debug!("no keys");
             //            return (Status::Unauthorized, Error::Unauthorized);
         //    Outcome::Failure((Status::Unauthorized, Status::Unauthorized))
-            return Outcome::Success(TestAuth("failure".to_owned()));
+            return Outcome::Success(AuthorisedUser("failure".to_owned()));
         }
         for i in 0..keys.len() {
             debug!("The key at {} is {:?}", i, keys[i]);
@@ -103,18 +102,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for TestAuth {
                 debug!("base64 decode error");
             }
         }
-        Outcome::Success(TestAuth("test".to_owned()))
+        Outcome::Success(AuthorisedUser("test".to_owned()))
      }
 }
 
-struct AuthorisedUser(String);
-impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
-    type Error = ();
-    fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
-        println!("*************************** authorized user ********************");
-        Outcome::Success(AuthorisedUser("test".to_owned()))
-    }
-}
 /*
 Registry root.
 
@@ -134,17 +125,17 @@ fn get_homepage<'a>() -> HTML<'a> {
 
     HTML(ROOT_RESPONSE)
 }
-/* token should it be /v2/token?
+/* login should it be /v2/login?
  * this is where client will attempt to login
  */
-#[get("/token")]
-fn get_token(test_auth: TestAuth) -> Token
+#[get("/login")]
+fn get_login(auth_user: AuthorisedUser) -> TrowLogin
 {
-    //debug!("Authorization string is {:?}", test_auth);
-    debug!("get_token");
-    Token
-//    debug!("Authorization string is {}", test_auth.0); //test
-    //debug!("Authorization string is {:?}", test_auth)
+    //debug!("Authorization string is {:?}", auth_user);
+    debug!("get_login");
+    TrowLogin
+//    debug!("Authorization string is {}", auth_user.0); //test
+    //debug!("Authorization string is {:?}", auth_user)
 }
 /*
 ---

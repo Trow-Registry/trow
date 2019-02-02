@@ -10,6 +10,7 @@ extern crate hostname;
 extern crate jwt;
 extern crate orset;
 extern crate protobuf;
+extern crate base64;
 #[macro_use]
 extern crate rocket;
 #[macro_use]
