@@ -8,7 +8,8 @@ futures = "^0.1"
 #failure = { git = 'https://github.com/withoutboats/failure', rev = "ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"}
 failure = "^0.1"
 failure_derive = "^0.1"
-grpcio = "=0.2.3"
+#really want to upadte and add features = secure to below, but it breaks stuff
+grpcio = { version = "=0.2.3"}
 protobuf = "=1.4.5"
 rust-crypto = "^0.2"
 rustc-serialize = "^0.3"

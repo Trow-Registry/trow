@@ -37,8 +37,9 @@ extern crate quickcheck;
 
 use failure::Error;
 use std::env;
-use std::thread;
+use std::fs;
 use std::path::Path;
+use std::thread;
 
 use grpcio::{ChannelBuilder, EnvBuilder};
 use rocket::fairing;
@@ -91,23 +92,32 @@ struct TlsConfig {
     key_file: String,
 }
 
-fn init_trow_server(config: TrowConfig) -> std::thread::JoinHandle<()> {
+fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Starting Trow server");
 
     //Could pass full config here.
     //Pros: less work, new args added automatically
     //-s: ties frontend to backend, some uneeded/unwanted vars
-    thread::spawn(move || {
-        trow_server::start_server(
-            &config.data_dir,
-            &config.grpc.listen.host,
-            config.grpc.listen.port,
-            config.allow_prefixes,
-            config.allow_images,
-            config.deny_prefixes,
-            config.deny_images,
-        );
-    })
+
+    let ts = trow_server::build_server(
+        &config.data_dir,
+        &config.grpc.listen.host,
+        config.grpc.listen.port,
+        config.allow_prefixes,
+        config.allow_images,
+        config.deny_prefixes,
+        config.deny_images,
+    );
+    //TODO: probably shouldn't be reusing this cert
+    let ts = if let Some(tls) = config.tls {
+        ts.add_tls(fs::read(tls.cert_file)?, fs::read(tls.key_file)?)
+    } else {
+        ts
+    };
+
+    Ok(thread::spawn(move || {
+        ts.start_sync();
+    }))
 }
 
 /// Build the logging agent with formatting.
@@ -174,7 +184,7 @@ impl TrowBuilder {
         if let Some(ref tls) = self.config.tls {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
                 return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
-            } 
+            }
             cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
         }
         let cfg = cfg.finalize()?;
@@ -184,7 +194,7 @@ impl TrowBuilder {
     pub fn start(&self) -> Result<(), Error> {
         init_logger()?;
         // GRPC Backend thread.
-        let _grpc_thread = init_trow_server(self.config.clone());
+        let _grpc_thread = init_trow_server(self.config.clone())?;
 
         //TODO: shouldn't need to clone rocket config
         let rocket_config = &self.build_rocket_config()?;
@@ -239,11 +249,10 @@ impl TrowBuilder {
                     //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
                     resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
                 },
-            )).attach(fairing::AdHoc::on_launch(
-                "Launch Message", 
-                |_| {
-                    println!("Trow is up and running!");
-                }))
+            ))
+            .attach(fairing::AdHoc::on_launch("Launch Message", |_| {
+                println!("Trow is up and running!");
+            }))
             .mount("/", routes::routes())
             .register(routes::catchers())
             .launch();
