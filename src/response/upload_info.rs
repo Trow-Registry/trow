@@ -20,25 +20,29 @@ impl<'r> Responder<'r> for UploadInfo {
 
         debug!("Range: {}-{}, Length: {}", left, right, right - left);
         Response::build()
-                    .header(upload_uuid)
-                    .header(location)
-                    .header(range)
-                    .header(length)
-                    // TODO: move into the type so it is better encoded?...
-                    .status(Status::Accepted)
-                    .ok()
+            .header(upload_uuid)
+            .header(location)
+            .header(range)
+            .header(length)
+            // TODO: move into the type so it is better encoded?...
+            .status(Status::Accepted)
+            .ok()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use response::upload_info::{UploadInfo, create_upload_info};
+    use response::upload_info::{create_upload_info, UploadInfo};
     use rocket::http::Status;
     use types::{RepoName, Uuid};
 
     use response::test_helper::test_route;
     fn build_response() -> UploadInfo {
-        create_upload_info(Uuid("whatever".to_owned()), RepoName("moredhel/test".to_owned()), (0, 0))
+        create_upload_info(
+            Uuid("whatever".to_owned()),
+            RepoName("moredhel/test".to_owned()),
+            (0, 0),
+        )
     }
 
     #[test]

@@ -26,7 +26,6 @@ fn get_base_url(req: &Request) -> String {
         Some(shost) => shost.to_string(),
     };
 
-    //TODO: Set to https unless --no-tls is set
     let config = req.guard::<rocket::State<TrowConfig>>().unwrap();
     match config.tls {
         None => format!("http://{}", host),
