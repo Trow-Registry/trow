@@ -10,7 +10,7 @@ certificate signed by the Kubernetes CA. They have been tested on both minikube
 (with the KVM2 driver on Linux) and GKE.
 
  - If you're running on GKE or have RBAC configured you may need to expand your
-   rights to be able to create the needed service-account:
+   rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
 ```
 $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
 ```
