@@ -48,7 +48,7 @@ solution in the future, but it may require changes to Kubernetes.
    which you can do with:
 
 ```
-$ sudo ./configure_host.sh --add-hosts
+$ sudo ./configure-host.sh --add-hosts
 ```
 
 This will copy Trow's cert into Docker and also add an entry to /etc/hosts for
