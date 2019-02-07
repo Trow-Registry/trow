@@ -78,12 +78,6 @@ If you get an error when pushing, check the logs for the Trow pod e.g:
 $ kubectl logs trow-deploy-5cf9bccdcc-g28vq -n kube-public
 ```
 
-If there is a message about a malformed PEM file, you have probably hit a [bug
-in the underlying crypto
-libraries](https://github.com/briansmith/ring/issues/220). To fix this, delete
-the deployment (`kubectl delete deploy trow-deploy -n kube-public`) and rerun
-the above steps.
-
 ## Install without TLS
 
 Trow can be run with the `--no-tls` flag to serve over HTTP only. This can be
