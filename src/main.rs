@@ -162,6 +162,7 @@ fn main() {
     }
     if !matches.is_present("deny-k8s-images") {
         allow_prefixes.push("k8s.gcr.io/".to_owned());
+        allow_prefixes.push("docker.io/containersol/trow".to_owned());
     }
     let allow_images = parse_list(matches.value_of("allow-images").unwrap_or(""));
     let deny_prefixes = parse_list(matches.value_of("disallow-local-prefixes").unwrap_or(""));
