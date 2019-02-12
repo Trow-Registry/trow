@@ -17,7 +17,7 @@ $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-
  - Run the main k8s yaml:
 
 ```
-$ kubectl create -f trow.yaml
+$ kubectl apply -f trow.yaml
 ```
 
  - This will create a service for Trow that includes a NodePort for external
