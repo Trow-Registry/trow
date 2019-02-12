@@ -30,6 +30,8 @@ by:
 $ kubectl certificate approve trow.kube-public
 ```
 
+ - If you get the error "No resources found" wait a moment and try again. In some
+cases it takes a few minutes for the request to appear in k8s. 
  - Trow should now be up and running, but we still need to make the nodes trust
    the certificate if we want them to be able to pull. The easy way is by
 running the following script, but be aware that this will modify files on the
