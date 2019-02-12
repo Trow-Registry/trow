@@ -65,7 +65,7 @@ $ docker push trow.kube-public:31000/test/nginx:alpine
 If the push seems to hang, check if port 31000 is blocked (in GKE it normally is
 by default).
 
-And test we can pull in Kubernetes:
+The Kubernetes cluster should now be able to pull and run the image:
 
 ```
 $ kubectl run trow-test --image=trow.kube-public:31000/test/nginx:alpine
