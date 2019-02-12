@@ -71,6 +71,44 @@ The Kubernetes cluster should now be able to pull and run the image:
 $ kubectl run trow-test --image=trow.kube-public:31000/test/nginx:alpine
 $ kubectl get deploy trow-test
 ```
+### Enable Validation
+
+One of the major features of Trow is the ability to control the images that run in
+the cluster. To achieve this, we need to set-up an [Admission Webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) in the Kubernetes cluster
+that will ask Trow everytime a resource is created or updated.
+
+The default policy will allow all images local to the Trow registry to be used, plus
+Kubernetes system images and the Trow images themselves. All other images are denied by
+default, including Docker Hub images.
+
+To enable validation run (from the `install` directory):
+
+```
+$ ./validate.sh 
+Setting up trow as a validating webhook
+WARNING: This will limit what images can run in your cluster
+
+validatingwebhookconfiguration.admissionregistration.k8s.io "trow-validator" configured
+```
+Now try running a Docker Hub image, which should be denied:
+
+```
+$ kubectl run proxy --image=docker.io/nginx
+deployment.apps "proxy" created
+$ kubectl get deployment proxy
+NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+proxy     1         0         0            0           13s
+$ kubectl describe rs proxy-744d6db965
+...
+  Warning  FailedCreate  16s (x13 over 57s)  replicaset-controller  Error creating: admission webhook "validator.trow.io" denied the request: Remote image docker.io/nginx disallowed as not contained in this registry and not in allow list
+```
+But local images still run:
+
+```
+
+```
+
+If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
 
 ### Troubleshooting
 
