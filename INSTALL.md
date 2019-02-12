@@ -105,7 +105,11 @@ $ kubectl describe rs proxy-744d6db965
 But local images still run:
 
 ```
-
+$ kubectl run local-proxy --image=trow.kube-public:31000/test/nginx:alpine
+deployment.apps "local-proxy" created
+$ kubectl get deploy local-proxy
+NAME          DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+local-proxy   1         1         1            1           16s
 ```
 
 If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
