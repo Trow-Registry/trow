@@ -135,11 +135,20 @@ fn encode_token() -> Result<String, Error> {
     /*
     Some(Some("eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJ1c2VySWQiOiJhZG1pbiIsImNsaWVudElkIjoiZG9ja2VyIiwic2NvcGUiOiJwdXNoL3B1bGwiLCJpYXQiOjIzNDUyMzQ1NiwiZXhwIjozNjAwfQ.MKDAir42OCVyHOlC7fH1f9iVnvz7e3/IzCiV1gBVUzY"))
     */
+    let mut return_token = String::new();
     match token_string {
-        Some(token_string) => Ok(token_string),
+        Some(token_string) => return_token = token_string,
 //        Some(token_string) => println!("token string is {}", token_string),
-        _ => Err(Error::InternalError)
-    }
+//        Some(token_string) => println!("token string is {}", token_string),
+//        Some(token_string) => dbg!(token_string),
+//        _ => Err(Error::InternalError) 
+//            _ => Ok("test".to_string())
+//            _ => println!("Error here")
+//            _ => dbg!(username.to_string()),
+        _ => (),
+    };
+    println!("return string is {}", return_token);
+    Ok(return_token)
     /*
     trow::response::trowtoken[DEBUG] token response
 -----------------------------------------------------------------------------
@@ -160,7 +169,7 @@ trow::response::trowtoken[DEBUG] self TrowToken
     };
     return Ok(token_string);
     */
-    Ok("test".to_string())
+//    Ok("test".to_string())
     /*
   const CREDENTIAL_LEN: usize = digest::SHA512_OUTPUT_LEN;
   const N_ITER: u32 = 100_000;
@@ -213,16 +222,28 @@ impl<'r> Responder<'r> for TrowToken {
         debug!("token response"); 
         println!("-----------------------------------------------------------------------------");
         let current_time = SystemTime::now();
+        let expiry_time=3600;
         let token_string = encode_token();
         debug!("current time is {:?}", current_time);
         debug!("self {:?}", self);
+        println!("token string is {:?}", token_string);
 //        debug!("Request {:?}", Request);
-        Response::build()
-            .status(Status::Ok)
-//            .header(token_header)
-            .header(ContentType::JSON)
-            .sized_body(token_body)
-            .ok()
+//        let header_string = String::new;
+//        let formatted_string = format!("test {}", token_string)
+        match token_string {
+            Ok(token_string) => {
+                let formatted_string=format!("{{\"token\":\"{}\",\"expires_in\":{},\"issued_at\":\"2019-01-31T09:05:33.678171359Z\"}}/n", token_string, expiry_time);
+//                token_body = Cursor::new("{\"token\":\"\",\"expires_in\":300,\"issued_at\":\"2019-01-31T09:05:33.678171359Z\"}/n");
+                let formatted_body = Cursor::new(formatted_string);
+                Response::build()
+                    .status(Status::Ok)
+                //            .header(token_header)
+                    .header(ContentType::JSON)
+                    .sized_body(formatted_body)
+                    .ok()
+            }
+            _ => Response::build().status(Status::Unauthorized).ok()
+        }
     }
 }
 
