@@ -19,21 +19,24 @@ use rocket::response::{Responder, Response};
 
 #[derive(Debug, Serialize)]
 pub struct TrowToken;
+#[derive(Debug, Serialize, RustcEncodable, RustcDecodable)]
+pub struct TroutToken {
+    userId: String,
+    clientId: String,
+    scope: String,
+    iat: u64,
+    exp: u64,
+}
+static AUTHORISATION_SECRET: &'static str = "Bob Marley Rastafaria";
 /*
-example token
-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IklQNU06RDM0UDpXSURROkVJWkw6RzVZRzpKRlhFOkVUTTM6TFlYMjpTWk1WOk5UNks6V1NGTTpZTFM2In0A.eyJzdWIiOiIiLCJpc3MiOiJkZW1vX29hdXRoIiwiYWNjZXNzIjpbeyJ0eXBlIjoicmVnaXN0cnkiLCJuYW1lIjoiY2F0YWxvZyIsImFjdGlvbnMiOlsiKiJdfV0sImV4cCI6MTU0Njg2Njg0NiwiaWF0IjoxNTQ2ODYzMjQ2LCJuYmYiOjE1NDY4NjMyMTYsImF1ZCI6ImRlbW9fcmVnaXN0cnkifQ.pi-Ua_P6bH6zur0Czsqv-_1_kgl7uVkM1aw2HSpu04P1Q6OMeob4eqh_koktpMlS9rcLgl7EAiPIBlkgBrD5OIVOHbIodPk1YuqrO3ZfVB2pkrwYi6ZttI6t3ehLBsk6e5p8Deam_EhYux7wtcwWwMU11_qj94_-vbBO215JsjkJlCuui3Vv_zpeH3j_tN4XfBtyRKMNjfMsCCRmTdHRYt5I8ZqN_XwlXtSyK-wfvM1__a6R7HgOMlBaTaEtAAHO64u7iPlMTOsA-lQahE-T5sb4N4I1YWg1-aLLWpsYN
-n7cQZF1jDskZZNZhotlPp7Uc3PL7eFL3t2y7hEAg4Bzxg
-
-*/
-/*
-token fields;
+example token fields;
 access_token: token_string
 token_type: bearer
 expires_in: expiry_time
 refresh_token: refresh_token
 scope: scope
 
-token headers:
+example token headers:
 Cache-Control: no-store
 Pragma: no-cache
 
@@ -87,7 +90,7 @@ concatenate all three strings together separated by periods
 */
 
 /*
-encode in toekn
+encode in token
 
 user_id
 client_id
@@ -96,22 +99,68 @@ iat
 exp
 scope
 */
-fn encode_token() -> Result<(), Error> {
-    /*
+fn encode_token() -> Result<String, Error> {
+    use crypto::sha2::Sha256;
     use jwt::{Header, Token};
-    let claims = SigningManifest {
-        fsLayers: vec!(BlobSummary { blobSum: digest.to_owned() }),
-        ..Default::default()
-    };
 
-    let manifest = Manifest::from_signing_manifest(&claims);
+    let username = "admin";
+    let client_id = "docker";
+    let scope = "push/pull";
+    let now = SystemTime::now();
+    let current_time = now.duration_since(UNIX_EPOCH);
+    let expiry_time = 3600;
+
+    let claims = TroutToken {
+        userId: username.to_string(),
+        clientId: client_id.to_string(),
+        scope: scope.to_string(),
+        iat: 234523456, // now.as_secs(),
+        exp: expiry_time,
+    };
+    let header: Header = Default::default();
     let token = Token::new(header, claims);
 
 
-    println!("{:?}", manifest);
-    let signed = token.signed(b"secret_key", Sha256::new()).ok();
-    println!("{:?}", signed);
-*/
+    println!("{:?}", token);
+    /*
+    Token { raw: None, header: Header { typ: Some(JWT), kid: None, alg: HS256 }, claims: TroutToken { userId: "admin", clientId: "docker", scope: "push/pull", iat: 234523456, exp: 3600 } }
+    */
+    // let signed =
+    let token_string = token.signed(AUTHORISATION_SECRET.as_bytes(), Sha256::new()).ok();
+//    println!("{:?}", token_string);
+    /*
+    Some("eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJ1c2VySWQiOiJhZG1pbiIsImNsaWVudElkIjoiZG9ja2VyIiwic2NvcGUiOiJwdXNoL3B1bGwiLCJpYXQiOjIzNDUyMzQ1NiwiZXhwIjozNjAwfQ.MKDAir42OCVyHOlC7fH1f9iVnvz7e3/IzCiV1gBVUzY")
+    */
+//    println!("{:?}", Some(token_string));
+    /*
+    Some(Some("eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJ1c2VySWQiOiJhZG1pbiIsImNsaWVudElkIjoiZG9ja2VyIiwic2NvcGUiOiJwdXNoL3B1bGwiLCJpYXQiOjIzNDUyMzQ1NiwiZXhwIjozNjAwfQ.MKDAir42OCVyHOlC7fH1f9iVnvz7e3/IzCiV1gBVUzY"))
+    */
+    match token_string {
+        Some(token_string) => Ok(token_string),
+//        Some(token_string) => println!("token string is {}", token_string),
+        _ => Err(Error::InternalError)
+    }
+    /*
+    trow::response::trowtoken[DEBUG] token response
+-----------------------------------------------------------------------------
+trow::response::trowtoken[DEBUG] current time is SystemTime { tv_sec: 1550048621, tv_nsec: 65616687 }
+trow::response::trowtoken[DEBUG] self TrowToken
+
+        */
+
+    // let test_string=Some(token_string);
+
+//    println!("test string is {}", test_string);
+//    format!("{}", token_string);
+    /*
+    let testy_this = token.signed(AUTHORISATION_SECRET.as_bytes(), Sha256::new()).ok();
+    match testy_this {
+        Ok(testy_this) => println!("pass string is {}", testy_this),
+        Err(_) => println!("error of some prescription")
+    };
+    return Ok(token_string);
+    */
+    Ok("test".to_string())
     /*
   const CREDENTIAL_LEN: usize = digest::SHA512_OUTPUT_LEN;
   const N_ITER: u32 = 100_000;
@@ -151,7 +200,7 @@ fn encode_token() -> Result<(), Error> {
   assert!(should_succeed.is_ok());
   assert!(!should_fail.is_ok());
 */
-    Ok(())
+//    signed
 }
 
 impl<'r> Responder<'r> for TrowToken {
@@ -164,8 +213,10 @@ impl<'r> Responder<'r> for TrowToken {
         debug!("token response"); 
         println!("-----------------------------------------------------------------------------");
         let current_time = SystemTime::now();
-        encode_token();
+        let token_string = encode_token();
         debug!("current time is {:?}", current_time);
+        debug!("self {:?}", self);
+//        debug!("Request {:?}", Request);
         Response::build()
             .status(Status::Ok)
 //            .header(token_header)

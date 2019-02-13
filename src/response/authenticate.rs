@@ -15,7 +15,7 @@ impl<'r> Responder<'r> for Authenticate {
         println!("   ");
         debug!("www-authenticate response"); 
         println!("-----------------------------------------------------------------------------");
-        let authenticate_header = Header::new("www-authenticate","Bearer realm=\"https://0.0.0.0:8443/token\",service=\"trow_registry\",scope=\"unused\"");
+        let authenticate_header = Header::new("www-authenticate","Bearer realm=\"https://0.0.0.0:8443/login\",service=\"trow_registry\",scope=\"unused\"");
         Response::build()
             .status(Status::Unauthorized)
             .header(authenticate_header)

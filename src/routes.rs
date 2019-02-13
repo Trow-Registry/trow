@@ -60,6 +60,10 @@ struct AuthorisedUser(String);
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
     fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
+        use crypto::sha2::Sha256;
+        use jwt::{Header, Token, Registered};
+        debug!("from reuest"); 
+        println!("-----------------------------------------------------------------------------");
         // Look in headers for an Authorization header
         let keys: Vec<_> = _req.headers().get("Authorization").collect();
         if keys.len()!=1 {
@@ -77,31 +81,41 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
         }
         debug!("String 1 is {}", auth_strings[0]); // Basic - here can test for different tokens
         debug!("String 2 is {}", auth_strings[1]);
-        match base64::decode(&auth_strings[1].to_string()) {
-            Ok(decoded) => {
-                debug!("decoded is {:?}", decoded);
-                debug!("undecoded string is {:?}", str::from_utf8(&decoded));
-                for z in 0..decoded.len() {
-                    debug!("print value at {} which is {} converts to {}", z, decoded[z], char::from(decoded[z]));
+        if auth_strings[0].to_string()=="Basic" {
+            debug!("basic token");
+            match base64::decode(&auth_strings[1].to_string()) {
+                Ok(decoded) => {
+                    debug!("decoded is {:?}", decoded);
+                    debug!("undecoded string is {:?}", str::from_utf8(&decoded));
+                    for z in 0..decoded.len() {
+                        debug!("print value at {} which is {} converts to {}", z, decoded[z], char::from(decoded[z]));
+                    }
+                    let mut count=0;
+                    let mut username = String::new();
+                    let mut password = String::new();
+                    while char::from(decoded[count])!=':' {
+                        username.push(char::from(decoded[count]));
+                        count += 1;
+                    }
+                    count+=1;
+                    while char::from(decoded[count])!='\n' {
+                        password.push(char::from(decoded[count]));
+                        count += 1;
+                    }
+                    debug!("username is {} and password is {}", username, password)
                 }
-                let mut count=0;
-                let mut username = String::new();
-                let mut password = String::new();
-                while char::from(decoded[count])!=':' {
-                    username.push(char::from(decoded[count]));
-                    count += 1;
+                DecodeError => {
+                    debug!("base64 decode error");
                 }
-                count+=1;
-                while char::from(decoded[count])!='\n' {
-                    password.push(char::from(decoded[count]));
-                    count += 1;
-                }
-                debug!("username is {} and password is {}", username, password)
             }
-            DecodeError => {
-                debug!("base64 decode error");
+        } else if auth_strings[0]=="Bearer".to_string() {
+            debug!("bearer token");
+            let token = Token::<Header, Registered>::parse(&auth_strings[1]).unwrap();
+            if token.verify(b"Bob Marley Rastafaria", Sha256::new()) {
+                debug!("TOKEN VERIFIED!");
             }
         }
+        debug!("outcome success!");
         Outcome::Success(AuthorisedUser("test".to_owned()))
      }
 }
@@ -134,6 +148,13 @@ fn get_login(auth_user: AuthorisedUser) -> TrowToken
     //debug!("Authorization string is {:?}", auth_user);
     debug!("get_login");
     TrowToken
+        /*(
+        auth_user.0,
+        auth_user.0,
+        auth_user.0,
+        3600,
+        3600
+    )*/
 //    debug!("Authorization string is {}", auth_user.0); //test
     //debug!("Authorization string is {:?}", auth_user)
 }
