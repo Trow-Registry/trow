@@ -56,7 +56,10 @@ pub fn routes() -> Vec<rocket::Route> {
     */
 }
 
-struct AuthorisedUser(String);
+struct AuthorisedUser {
+    username: String,
+    authorized: bool,
+}
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
     fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
@@ -70,7 +73,12 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
             debug!("no keys");
             //            return (Status::Unauthorized, Error::Unauthorized);
         //    Outcome::Failure((Status::Unauthorized, Status::Unauthorized))
-            return Outcome::Success(AuthorisedUser("failure".to_owned()));
+            let auth_user = AuthorisedUser {
+                username: "".to_string(),
+                authorized: false,
+            };
+//            return Outcome::Success(AuthorisedUser("failure".to_owned()));
+            return Outcome::Success(auth_user);
         }
         for i in 0..keys.len() {
             debug!("The key at {} is {:?}", i, keys[i]);
@@ -102,7 +110,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
                         password.push(char::from(decoded[count]));
                         count += 1;
                     }
-                    debug!("username is {} and password is {}", username, password)
+                    debug!("username is {} and password is {}", username, password);
+                    let auth_user = AuthorisedUser {
+                        username: username,
+                        authorized: true,
+                    };
+                    //            return Outcome::Success(AuthorisedUser("failure".to_owned()));
+                    return Outcome::Success(auth_user);
+
                 }
                 DecodeError => {
                     debug!("base64 decode error");
@@ -113,10 +128,19 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
             let token = Token::<Header, Registered>::parse(&auth_strings[1]).unwrap();
             if token.verify(b"Bob Marley Rastafaria", Sha256::new()) {
                 debug!("TOKEN VERIFIED!");
+                let auth_user = AuthorisedUser {
+                    username: "bearer_token".to_string(),
+                    authorized: true,
+                };
+                //            return Outcome::Success(AuthorisedUser("failure".to_owned()));
+                return Outcome::Success(auth_user);
             }
         }
-        debug!("outcome success!");
-        Outcome::Success(AuthorisedUser("test".to_owned()))
+        let auth_user = AuthorisedUser {
+            username: "".to_string(),
+            authorized: false,
+        };
+        return Outcome::Success(auth_user);
      }
 }
 
@@ -128,6 +152,7 @@ Returns 200.
 
 #[get("/v2")]
 fn get_v2root() -> Authenticate {
+    // throw authenticate header
     Authenticate
 }
 
@@ -145,9 +170,11 @@ fn get_homepage<'a>() -> HTML<'a> {
 #[get("/login")]
 fn get_login(auth_user: AuthorisedUser) -> TrowToken
 {
-    //debug!("Authorization string is {:?}", auth_user);
     debug!("get_login");
-    TrowToken
+    debug!("Authorization string is {}", auth_user.username);
+    debug!("Authorization string is {}", auth_user.authorized);
+    /********* need to put check on auth_user before calling token ***********/
+        TrowToken
         /*(
         auth_user.0,
         auth_user.0,

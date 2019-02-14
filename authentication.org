@@ -1,0 +1,197 @@
+* TODO Proper time value
+* TODO why is the time in secs not compiling
+* TODO returning token no matter what the string
+* TODO move ok token string to within the match token
+* TODO proper catch all value for token enum
+* Authentication in Trow
+An implementation of the Open Authorization standard.
+
+** no url - passes Welcome message
+** /v2/ url - sends the www.authenticate response
+** /login/ - reads the basic token and returns a bearer token
+** all subsequent urls check bearer token
+
+At the moment takes a base64 encoded user/pass combination and checks it against hard coded values. If credentials are valid a bearer token is returned.
+
+TODO
+
+Need other methods of input rather than just base 64 encoded credentials.
+Need better than a hardcoded username / password combination. Interim configurable user/pass. Medium term password file. Long term full blown OAuth implementation.
+
+
+/*
+example token fields;
+access_token: token_string
+token_type: bearer
+expires_in: expiry_time
+refresh_token: refresh_token
+scope: scope
+
+example token headers:
+Cache-Control: no-store
+Pragma: no-cache
+
+Example:
+HTTP/1.1 200 OK
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+ 
+{
+  "access_token":"MTQ0NjJkZmQ5OTM2NDE1ZTZjNGZmZjI3",
+  "token_type":"bearer",
+  "expires_in":3600,
+  "refresh_token":"IwOGYzYTlmM2YxOTQ5MGE3YmNmMDFkNTVk",
+  "scope":"create"
+}
+
+Bad Request example:
+HTTP/1.1 400 Bad Request
+Content-Type: application/json;charset=UTF-8
+Cache-Control: no-store
+Pragma: no-cache
+ 
+{
+  "error": "invalid_request",
+  "error_description": "Request was missing the 'redirect_uri' parameter.",
+  "error_uri": "See the full API docs at https://authorization-server.com/docs/access_token"
+}
+ */
+
+/*
+{
+   "typ":"JWT",
+   "alg":"HS256”
+ }
+
+{
+  "sub": 1000,
+  "iss": "https://authorization-server.com",
+  "cid": "https://example-app.com",
+  "iat": 1470002703,
+  "exp": 1470009903,
+  "scope": "read write"
+}
+
+Base64-encoding the first two components
+
+calculate a hash of the two strings along with a secret,
+
+concatenate all three strings together separated by periods
+*/
+
+/*
+encode in token
+
+user_id
+client_id
+scope
+iat
+exp
+scope
+*/
+
+example scopes from docker
+registry:catalog:*
+repository:1/2/5:push,pull
+
+
+    /*
+    println!("{:?}", bearer_token);
+    Token { raw: None, header: Header { typ: Some(JWT), kid: None, alg: HS256 }, claims: TroutToken { userId: "admin", clientId: "docker", scope: "push/pull", iat: 234523456, exp: 3600 } }
+    */
+    // let signed =
+    let token_string = token.signed(AUTHORISATION_SECRET.as_bytes(), Sha256::new()).ok();
+//    println!("{:?}", token_string);
+    /*
+    Some("eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJ1c2VySWQiOiJhZG1pbiIsImNsaWVudElkIjoiZG9ja2VyIiwic2NvcGUiOiJwdXNoL3B1bGwiLCJpYXQiOjIzNDUyMzQ1NiwiZXhwIjozNjAwfQ.MKDAir42OCVyHOlC7fH1f9iVnvz7e3/IzCiV1gBVUzY")
+    */
+//    println!("{:?}", Some(token_string));
+    /*
+    Some(Some("eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJ1c2VySWQiOiJhZG1pbiIsImNsaWVudElkIjoiZG9ja2VyIiwic2NvcGUiOiJwdXNoL3B1bGwiLCJpYXQiOjIzNDUyMzQ1NiwiZXhwIjozNjAwfQ.MKDAir42OCVyHOlC7fH1f9iVnvz7e3/IzCiV1gBVUzY"))
+    */
+//        Some(token_string) => println!("token string is {}", token_string),
+//        Some(token_string) => println!("token string is {}", token_string),
+//        Some(token_string) => dbg!(token_string),
+//        _ => Err(Error::InternalError) 
+//            _ => Ok("test".to_string())
+//            _ => println!("Error here")
+//            _ => dbg!(username.to_string()),
+    // let test_string=Some(token_string);
+
+//    println!("test string is {}", test_string);
+//    format!("{}", token_string);
+    /*
+    let testy_this = token.signed(AUTHORISATION_SECRET.as_bytes(), Sha256::new()).ok();
+    match testy_this {
+        Ok(testy_this) => println!("pass string is {}", testy_this),
+        Err(_) => println!("error of some prescription")
+    };
+    return Ok(token_string);
+    */
+//    Ok("test".to_string())
+    /*
+  const CREDENTIAL_LEN: usize = digest::SHA512_OUTPUT_LEN;
+  const N_ITER: u32 = 100_000;
+  let rng = rand::SystemRandom::new();
+
+  let mut salt = [0u8; CREDENTIAL_LEN];
+  rng.fill(&mut salt)?;
+
+  let password = "Guess Me If You Can!";
+  let mut pbkdf2_hash = [0u8; CREDENTIAL_LEN];
+  pbkdf2::derive(
+      &digest::SHA512,
+      N_ITER,
+      &salt,
+      password.as_bytes(),
+      &mut pbkdf2_hash,
+  );
+  println!("Salt: {}", HEXUPPER.encode(&salt));
+  println!("PBKDF2 hash: {}", HEXUPPER.encode(&pbkdf2_hash));
+
+  let should_succeed = pbkdf2::verify(
+      &digest::SHA512,
+      N_ITER,
+      &salt,
+      password.as_bytes(),
+      &pbkdf2_hash,
+  );
+  let wrong_password = "Definitely not the correct password";
+  let should_fail = pbkdf2::verify(
+      &digest::SHA512,
+      N_ITER,
+      &salt,
+      wrong_password.as_bytes(),
+      &pbkdf2_hash,
+  );
+
+  assert!(should_succeed.is_ok());
+  assert!(!should_fail.is_ok());
+*/
+//    signed
+
+
+    println!("system time {:?}", now);
+    system time SystemTime { tv_sec: 1550139494, tv_nsec: 336577417 }
+    println!("current time {:?}", current_time);
+    current time Ok(1550139494.336577417s)
+
+
+curl commands
+
+curl -iv -H "Authorization: Basic YWRtaW46cGFzc3dvcmQK" https://trow.test:8443/ --cacert certs/ca.crt
+
+curl -iv -H "Authorization: Basic YWRtaW46cGFzc3dvcmQK" https://trow.test:8443/v2 --cacert certs/ca.crt
+
+curl -iv -H "Authorization: Basic YWRtaW46cGFzc3dvcmQK" https://trow.test:8443/login --cacert certs/ca.crt
+
+curl -iv -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJ1c2VyX2lkIjoiYWRtaW4iLCJjbGllbnRfaWQiOiJkb2NrZXIiLCJzY29wZSI6InB1c2gvcHVsbCIsImlhdCI6MjM0NTIzNDU2LCJleHAiOjM2MDB9.tNgEg1f5a6qvJT5Kxx0Gpw2vh4nSpz5UbMf0Al66k2g" https://trow.test:8443/login --cacert certs/ca.crt
+
+curl -iv -H "Authorization: Basic YWRtaW46cGFzc3dvcmQKbadtoken" https://trow.test:8443/login --cacert certs/ca.crt
+
+curl -iv -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJ1c2VyX2lkIjoiYWRtaW4iLCJjbGllbnRfaWQiOiJkb2NrZXIiLCJzY29wZSI6InB1c2gvcHVsbCIsImlhdCI6MjM0NTIzNDU2LCJleHAiOjM2MDB9.tNgEg1f5a6qvJT5Kxx0Gpw2vh4nSpz5UbMf0Al66k2gbadtoken" https://trow.test:8443/login --cacert certs/ca.crt
+
+curl "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/ubuntu:pull"
+
+
