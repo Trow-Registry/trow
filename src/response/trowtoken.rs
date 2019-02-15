@@ -12,8 +12,9 @@ const AUTHORISATION_SECRET: &'static str = "Bob Marley Rastafaria";
 
 #[derive(Debug, Serialize)]
 pub struct TrowToken;
+
 #[derive(Debug, Serialize, RustcEncodable, RustcDecodable)]
-pub struct TroutToken {
+pub struct BearerToken {
     user_id: String,
     client_id: String,
     scope: String,
@@ -31,7 +32,7 @@ fn encode_token() -> Result<String, Error> {
     let expiry_time = 3600;
 
     // build token from structure and return token string
-    let token_claims = TroutToken {
+    let token_claims = BearerToken {
         user_id: username.to_string(),
         client_id: client_id.to_string(),
         scope: scope.to_string(),
@@ -47,7 +48,6 @@ fn encode_token() -> Result<String, Error> {
         Some(token_enum) => token_string = token_enum,
         _ => (),
     };
-    println!("return string is {}", token_string);
     Ok(token_string)
 }
 
