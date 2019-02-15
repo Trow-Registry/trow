@@ -19,7 +19,7 @@ pub struct TroutToken {
     exp: u64,
 }
 
-static AUTHORISATION_SECRET: &'static str = "Bob Marley Rastafaria";
+const AUTHORISATION_SECRET: &'static str = "Bob Marley Rastafaria";
 
 fn encode_token() -> Result<String, Error> {
     // hard coded values for token

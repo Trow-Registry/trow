@@ -11,14 +11,16 @@ use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
 use rocket_contrib::json::{Json, JsonValue};
 use serde_json::Value;
+use crypto::sha2::Sha256;
+use jwt::{Header, Token, Registered};
 use types::*;
+const AUTHORISATION_SECRET: &'static str = "Bob Marley Rastafaria";
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
         get_login,
-        get_test,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -58,47 +60,38 @@ pub fn routes() -> Vec<rocket::Route> {
 }
 
 struct AuthorisedUser {
+    // other useful fields could include organisation home scope permissions
     username: String,
     authorized: bool,
 }
+
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
     fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
-        use crypto::sha2::Sha256;
-        use jwt::{Header, Token, Registered};
-        debug!("from reuest"); 
-        println!("-----------------------------------------------------------------------------");
         // Look in headers for an Authorization header
         let keys: Vec<_> = _req.headers().get("Authorization").collect();
-        if keys.len()!=1 {
-            debug!("no keys");
-            //            return (Status::Unauthorized, Error::Unauthorized);
-        //    Outcome::Failure((Status::Unauthorized, Status::Unauthorized))
+        if keys.len()!=1 { // no key return false in auth structure
             let auth_user = AuthorisedUser {
                 username: "".to_string(),
                 authorized: false,
             };
-//            return Outcome::Success(AuthorisedUser("failure".to_owned()));
             return Outcome::Success(auth_user);
         }
-        for i in 0..keys.len() {
-            debug!("The key at {} is {:?}", i, keys[i]);
-        }
+
+        // split the header on white space
         let auth_strings: Vec<String>=keys[0].to_string().split_whitespace().map(String::from).collect();
         if auth_strings.len()!=2 {
-            debug!("wrong number of strings");
+            let auth_user = AuthorisedUser {
+                username: "".to_string(),
+                authorized: false,
+            };
+            return Outcome::Success(auth_user);
         }
-        debug!("String 1 is {}", auth_strings[0]); // Basic - here can test for different tokens
-        debug!("String 2 is {}", auth_strings[1]);
-        if auth_strings[0].to_string()=="Basic" {
-            debug!("basic token");
+
+        // Basic token is a base64 encoded user/pass
+        if auth_strings[0].to_string()=="Basic" { 
             match base64::decode(&auth_strings[1].to_string()) {
                 Ok(decoded) => {
-                    debug!("decoded is {:?}", decoded);
-                    debug!("undecoded string is {:?}", str::from_utf8(&decoded));
-                    for z in 0..decoded.len() {
-                        debug!("print value at {} which is {} converts to {}", z, decoded[z], char::from(decoded[z]));
-                    }
                     let mut count=0;
                     let mut username = String::new();
                     let mut password = String::new();
@@ -111,29 +104,25 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
                         password.push(char::from(decoded[count]));
                         count += 1;
                     }
-                    debug!("username is {} and password is {}", username, password);
-                    let auth_user = AuthorisedUser {
-                        username: username,
-                        authorized: true,
-                    };
-                    //            return Outcome::Success(AuthorisedUser("failure".to_owned()));
-                    return Outcome::Success(auth_user);
-
+                    if username == "admin" && password == "password" {
+                        let auth_user = AuthorisedUser {
+                            username: username,
+                            authorized: true,
+                        };
+                        return Outcome::Success(auth_user);
+                    }
                 }
-                DecodeError => {
+                decode_error => {
                     debug!("base64 decode error");
                 }
             }
-        } else if auth_strings[0]=="Bearer".to_string() {
-            debug!("bearer token");
+        } else if auth_strings[0]=="Bearer".to_string() { // parse for bearer token and verify it
             let token = Token::<Header, Registered>::parse(&auth_strings[1]).unwrap();
-            if token.verify(b"Bob Marley Rastafaria", Sha256::new()) {
-                debug!("TOKEN VERIFIED!");
+            if token.verify(AUTHORISATION_SECRET.as_bytes(), Sha256::new()) {
                 let auth_user = AuthorisedUser {
                     username: "bearer_token".to_string(),
                     authorized: true,
                 };
-                //            return Outcome::Success(AuthorisedUser("failure".to_owned()));
                 return Outcome::Success(auth_user);
             }
         }
@@ -145,22 +134,22 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
      }
 }
 /*
-fn check_token() -> Result<Authenticate, Status> {
-    
-}
-*/
-/*
 Registry root.
 
 Returns 200.
  */
 
+/*
+ * v2 - throw www-authenticate header
+ */
 #[get("/v2")]
 fn get_v2root() -> Authenticate {
     // throw authenticate header
     Authenticate
 }
-
+/*
+ * Welcome message
+ */
 #[get("/")]
 fn get_homepage<'a>() -> HTML<'a> {
     const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
@@ -169,52 +158,20 @@ fn get_homepage<'a>() -> HTML<'a> {
 
     HTML(ROOT_RESPONSE)
 }
-struct FireMe {
-    fire: String,
-    fired: bool,
-}
-impl<'a, 'r> FromRequest<'a, 'r> for FireMe {
-    type Error = ();
-    fn from_request(_req: &'a Request<'r>) -> request::Outcome<FireMe, ()> {
-        println!("fire me"); 
-        let fire_me = FireMe {
-            fire: "fire".to_string(),
-            fired: true,
-        };
-        Outcome::Success(fire_me)
-    }
-}
-#[get("/test")]
-fn get_test(fire_me: FireMe)
-{
-    println!("This is a test route.");
-    println!("fireme is {} and {}", fire_me.fire, fire_me.fired);
-}
 /* login should it be /v2/login?
  * this is where client will attempt to login
  */
 #[get("/login")]
 fn get_login(auth_user: AuthorisedUser) -> Result<TrowToken,Error>
 {
-    debug!("get_login");
     debug!("Authorization string is {}", auth_user.username);
     debug!("Authorization string is {}", auth_user.authorized);
-    /********* need to put check on auth_user before calling token ***********/
     if auth_user.authorized {
         Ok(TrowToken)
     }
     else {
         Err(Error::InternalError)
     }
-        /*(
-        auth_user.0,
-        auth_user.0,
-        auth_user.0,
-        3600,
-        3600
-    )*/
-//    debug!("Authorization string is {}", auth_user.0); //test
-    //debug!("Authorization string is {:?}", auth_user)
 }
 /*
 ---
