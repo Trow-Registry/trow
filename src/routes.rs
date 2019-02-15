@@ -112,7 +112,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
                         return Outcome::Success(auth_user);
                     }
                 }
-                decode_error => {
+                _decode_error => {
                     debug!("base64 decode error");
                 }
             }
