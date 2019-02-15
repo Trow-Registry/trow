@@ -144,6 +144,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
      }
 }
 
+fn check_token() -> Result<Authenticate, Status> {
+    
+}
+
 /*
 Registry root.
 
