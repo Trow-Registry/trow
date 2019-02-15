@@ -18,6 +18,7 @@ pub fn routes() -> Vec<rocket::Route> {
         get_v2root,
         get_homepage,
         get_login,
+        get_test,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -143,11 +144,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
         return Outcome::Success(auth_user);
      }
 }
-
+/*
 fn check_token() -> Result<Authenticate, Status> {
     
 }
-
+*/
 /*
 Registry root.
 
@@ -168,17 +169,43 @@ fn get_homepage<'a>() -> HTML<'a> {
 
     HTML(ROOT_RESPONSE)
 }
+struct FireMe {
+    fire: String,
+    fired: bool,
+}
+impl<'a, 'r> FromRequest<'a, 'r> for FireMe {
+    type Error = ();
+    fn from_request(_req: &'a Request<'r>) -> request::Outcome<FireMe, ()> {
+        println!("fire me"); 
+        let fire_me = FireMe {
+            fire: "fire".to_string(),
+            fired: true,
+        };
+        Outcome::Success(fire_me)
+    }
+}
+#[get("/test")]
+fn get_test(fire_me: FireMe)
+{
+    println!("This is a test route.");
+    println!("fireme is {} and {}", fire_me.fire, fire_me.fired);
+}
 /* login should it be /v2/login?
  * this is where client will attempt to login
  */
 #[get("/login")]
-fn get_login(auth_user: AuthorisedUser) -> TrowToken
+fn get_login(auth_user: AuthorisedUser) -> Result<TrowToken,Error>
 {
     debug!("get_login");
     debug!("Authorization string is {}", auth_user.username);
     debug!("Authorization string is {}", auth_user.authorized);
     /********* need to put check on auth_user before calling token ***********/
-        TrowToken
+    if auth_user.authorized {
+        Ok(TrowToken)
+    }
+    else {
+        Err(Error::InternalError)
+    }
         /*(
         auth_user.0,
         auth_user.0,
