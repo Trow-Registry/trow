@@ -19,16 +19,3 @@ impl<'r> Responder<'r> for Authenticate {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use response::token::Token;
-    use rocket::http::Status;
-
-    use response::test_helper::test_route;
-
-    #[test]
-    fn authenticate_ok() {
-        let response = test_route(Token);
-        assert_eq!(response.status(), Status::Unauthorized);
-    }
-}
