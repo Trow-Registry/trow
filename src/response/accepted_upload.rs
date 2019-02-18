@@ -9,6 +9,7 @@ impl<'r> Responder<'r> for AcceptedUpload {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
 
         let location = format!("{}/v2/{}/blobs/{}", get_base_url(req), self.repo_name(), self.digest());
+        debug!("accepted upload response");
         let location_header = Header::new("Location", location);
         let digest_header = Header::new("Docker-Content-Digest", self.digest().0.clone());
         Response::build()

@@ -9,6 +9,7 @@ extern crate hostname;
 extern crate jwt;
 extern crate orset;
 extern crate protobuf;
+extern crate base64;
 #[macro_use]
 extern crate rocket;
 extern crate rocket_contrib;
@@ -23,6 +24,8 @@ extern crate trow_protobuf;
 extern crate trow_server;
 
 extern crate env_logger;
+extern crate crypto;
+extern crate chrono;
 
 use log::{LogLevelFilter, LogRecord, SetLoggerError};
 #[macro_use]

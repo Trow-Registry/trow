@@ -5,6 +5,8 @@ use TrowConfig;
 pub mod accepted_upload;
 pub mod blob_reader;
 pub mod empty;
+pub mod authenticate;
+pub mod trowtoken;
 pub mod errors;
 pub mod html;
 pub mod manifest_reader;

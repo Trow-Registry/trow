@@ -35,9 +35,11 @@ failure_derive = "^0.1"
 trow-protobuf = { path = "./lib/protobuf" }
 trow-server = { path = "./lib/server" }
 
-
+base64 = "0.10.0"
+data-encoding = "2.1.2"
 #This is a rocket dependency, but we need a newer version with the p>q bugfix
 ring ="^0.13"
+chrono = "^0.4"
 
 [build-dependencies]
 
