@@ -30,3 +30,8 @@ curl -iv -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTM
 curl "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/ubuntu:pull"
 * TODO proper catch all value for token enum
 * TODO move ok token string to within the match token
+* TODO create tests for authentication code
+* TODO authorisation secret is declared in 2 places
+* TODO used system time, but then had to add chrono time to format the time string for docker
+* TODO not sure how to call authentication check on all routes
+* TODO Using the auth_user struct to determine if the user is logged in may bot be the best way to do it

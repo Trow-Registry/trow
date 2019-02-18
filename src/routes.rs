@@ -15,7 +15,7 @@ use serde_json::Value;
 use crypto::sha2::Sha256;
 use jwt::{Header, Token, Registered};
 use types::*;
-const AUTHORISATION_SECRET: &'static str = "Bob Marley Rastafaria";
+const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -94,7 +94,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
         }
 
         // Basic token is a base64 encoded user/pass
-        if auth_strings[0].to_string()=="Basic" { 
+        if auth_strings[0]=="Basic" { 
             match base64::decode(&auth_strings[1].to_string()) {
                 Ok(decoded) => {
                     let mut count=0;
@@ -111,7 +111,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
                     }
                     if username == "admin" && password == "password" {
                         let auth_user = AuthorisedUser {
-                            username: username,
+                            username,
                             authorized: true,
                         };
                         return Outcome::Success(auth_user);
@@ -121,7 +121,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
                     debug!("base64 decode error");
                 }
             }
-        } else if auth_strings[0]=="Bearer".to_string() { // parse for bearer token and verify it
+        } else if auth_strings[0]=="Bearer" { // parse for bearer token and verify it
             let token = Token::<Header, Registered>::parse(&auth_strings[1]).unwrap();
             if token.verify(AUTHORISATION_SECRET.as_bytes(), Sha256::new()) {
                 let auth_user = AuthorisedUser {
@@ -135,7 +135,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
             username: "".to_string(),
             authorized: false,
         };
-        return Outcome::Success(auth_user);
+        Outcome::Success(auth_user)
      }
 }
 /*

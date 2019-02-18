@@ -6,10 +6,10 @@ use rocket::http::{ContentType};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 use crypto::sha2::Sha256;
-use jwt::{Header as TokenHeader, Token};
 use chrono::Local;
+use jwt::{Header as TokenHeader, Token};
 
-const AUTHORISATION_SECRET: &'static str = "Bob Marley Rastafaria";
+const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
 
 #[derive(Debug, Serialize)]
 pub struct TrowToken;
@@ -45,10 +45,13 @@ fn encode_token() -> Result<String, Error> {
 
     let token_enum = bearer_token.signed(AUTHORISATION_SECRET.as_bytes(), Sha256::new()).ok();
     let mut token_string = String::new();
+    /*
     match token_enum {
         Some(token_enum) => token_string = token_enum,
         _ => (),
     };
+     */
+    if let Some(token_enum) = token_enum { token_string = token_enum };
     Ok(token_string)
 }
 
