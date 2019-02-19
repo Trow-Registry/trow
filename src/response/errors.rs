@@ -48,7 +48,6 @@ struct ErrorMsg {
 //This needs refactored.
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        debug!("error formatter");
         match *self {
             Error::Unsupported => write!(f, "Unsupported Operation"),
             Error::Unauthorized => write!(f, "Authorization required"),
@@ -76,7 +75,6 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {
     fn description(&self) -> &str {
-        debug!("Error matcher");
         match *self {
             Error::Unsupported => "The operation was unsupported due to a missing implementation or invalid set of parameters.",
             Error::Unauthorized => "The operation requires authorization.",

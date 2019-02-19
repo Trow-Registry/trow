@@ -10,6 +10,7 @@ use chrono::Local;
 use jwt::{Header as TokenHeader, Token};
 
 const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
+const EXPIRY_TIME: u64 = 3600;
 
 #[derive(Debug, Serialize)]
 pub struct TrowToken;
@@ -30,7 +31,6 @@ fn encode_token() -> Result<String, Error> {
     let scope = "push/pull";
     let now = SystemTime::now();
     let current_time = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-    let expiry_time = 3600;
 
     // build token from structure and return token string
     let token_claims = BearerToken {
@@ -38,7 +38,7 @@ fn encode_token() -> Result<String, Error> {
         client_id: client_id.to_string(),
         scope: scope.to_string(),
         iat: current_time.as_secs(),
-        exp: expiry_time,
+        exp: EXPIRY_TIME,
     };
     let token_header: TokenHeader = Default::default();
     let bearer_token = Token::new(token_header, token_claims);
@@ -58,17 +58,14 @@ fn encode_token() -> Result<String, Error> {
 impl<'r> Responder<'r> for TrowToken {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
-        let expiry_time=3600;
         // create token string and put it in response header
         let token_string = encode_token();
         match token_string {
             Ok(token_string) => {
                 let date = Local::now();
                 let formatted_date =  date.format("%Y-%m-%dT%H:%M:%SZ");
-                let formatted_string=format!("{{\"token\":\"{}\",\"expires_in\":{},\"issued_at\":\"{}\"}}/n", token_string, expiry_time, formatted_date/*"2019-02-18T13:01:21.241377823Z".to_string() current_time.as_secs()*/);
-                println!("formatted estring is {:?}", formatted_string);
+                let formatted_string=format!("{{\"token\":\"{}\",\"expires_in\":{},\"issued_at\":\"{}\"}}/n", token_string, EXPIRY_TIME, formatted_date);
                 let formatted_body = Cursor::new(formatted_string);
-                println!("formatted body is {:?}", formatted_body);
                 Response::build()
                     .status(Status::Ok)
                     .header(ContentType::JSON)
@@ -76,7 +73,7 @@ impl<'r> Responder<'r> for TrowToken {
                     .ok()
             }
             _ => {
-                println!("CATCHALL!");
+                debug!("CATCHALL!");
                 Response::build().status(Status::Unauthorized).ok()
             }
         }

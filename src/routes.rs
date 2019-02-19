@@ -21,6 +21,7 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
+        get_test_auth,
         get_login,
         get_manifest,
         get_manifest_2level,
@@ -145,12 +146,20 @@ Returns 200.
  */
 
 /*
- * v2 - throw www-authenticate header
+ * test-auth - throw www-authenticate header
  */
-#[get("/v2")]
-fn get_v2root() -> Authenticate {
+#[get("/test-auth")]
+fn get_test_auth() -> Authenticate {
     // throw authenticate header
     Authenticate
+}
+/*
+ * v2 - throw Empty
+ */
+#[get("/v2")]
+fn get_v2root() -> Empty {
+    // throw authenticate header
+    Empty
 }
 /*
  * Welcome message
