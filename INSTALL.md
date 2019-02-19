@@ -129,7 +129,7 @@ deployment.apps "proxy" created
 $ kubectl get deployment proxy
 NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 proxy     1         0         0            0           13s
-$ kubectl describe rs proxy-744d6db965
+$ kubectl describe rs proxy-
 ...
   Warning  FailedCreate  16s (x13 over 57s)  replicaset-controller  Error creating: admission webhook "validator.trow.io" denied the request: Remote image docker.io/nginx disallowed as not contained in this registry and not in allow list
 ```
@@ -153,6 +153,48 @@ If you get an error when pushing, check the logs for the Trow pod e.g:
 $ kubectl logs trow-deploy-5cf9bccdcc-g28vq -n kube-public
 ...
 ```
+
+If a deployment isn't starting, check the logs for the replica set e.g:
+
+```
+$ kubectl get rs my-app-844d6db962
+...
+```
+
+If there is a failed create message, the image may have been refused validation by Trow. If the message reads like:
+
+```
+Error creating: admission webhook "validator.trow.io" denied the request: *Remote* image docker.io/nginx disallowed as not contained in this registry and not in allow list
+```
+
+That means Trow considered the image name to refer to a _remote_ repository (i.e. not Trow itself) which has not been added to the allow list. If you believe the image should have been considered local, check the repository address appears in the list of addresses passed to Trow on start-up with the `-n` switch. If you want to allow a single remote image, add it to Trow by using the `--allow-images` flag. If you want to allow a whole repository or subdirectory of a repository use `--allow-prefixes`.
+
+If the message reads:
+
+```
+Error creating: admission webhook "validator.trow.io" denied the request: Local image trow.kube-public:31000/notpresent disallowed as not contained in this registry and not in allow list
+```
+
+It means Trow expected to be able to serve this image itself but it wasn't found in the repository. Either push the image or use the `allow-images` or `allow-prefixes` flag to pre-approve images. Note that Kubernetes will keep trying to validate images.
+
+If you get the error:
+
+```
+Error creating: Internal error occurred: failed calling admission webhook "validator.trow.io": Post https://trow.kube-public.svc:443/validate-image?timeout=30s: no endpoints available for service "trow"
+```
+
+Kubernetes has probably tried to start a new instance of Trow, but can't because there is no Trow instance to validate the image (can you say "catch 22"?). This will largely go away when we have HA, but until then you'll have to disable validation for Trow to restart. You'll also have to repeat the install steps for approving the certificate, distributing the certificate and setting up validation (in the future we will look to automate this process or reuse certificates to simply this).
+
+If you get errors about certificates, either in `docker push` or from a replica set, you may need to re-approve and distribute the certificates (possibly due to the Trow pod being restarted):
+
+```
+$ kubectl certificate approve trow.kube-public
+$ ./copy-certs.sh
+$ ./sudo ./configure-host.sh --add-hosts
+$ ./validate.sh
+```
+
+See above for full details.
 
 ## Install without TLS
 
