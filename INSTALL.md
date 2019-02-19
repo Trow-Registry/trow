@@ -13,11 +13,19 @@ certificate signed by the Kubernetes CA. They have been tested on both minikube
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
 ```
 $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
+clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ```
- - Run the main k8s yaml:
+ - Run the main k8s yaml from the root of this repository:
 
 ```
 $ kubectl apply -f trow.yaml
+serviceaccount "trow" created
+role.rbac.authorization.k8s.io "trow" created
+clusterrole.rbac.authorization.k8s.io "trow" created
+rolebinding.rbac.authorization.k8s.io "trow" created
+clusterrolebinding.rbac.authorization.k8s.io "trow" created
+deployment.apps "trow-deploy" created
+service "trow" created
 ```
 
  - This will create a service for Trow that includes a NodePort for external
@@ -28,6 +36,7 @@ by:
 
 ```
 $ kubectl certificate approve trow.kube-public
+certificatesigningrequest.certificates.k8s.io "trow.kube-public" approved
 ```
 
  - If you get the error "No resources found" wait a moment and try again. In some
@@ -35,11 +44,14 @@ cases it takes a few minutes for the request to appear in k8s.
  - Trow should now be up and running, but we still need to make the nodes trust
    the certificate if we want them to be able to pull. The easy way is by
 running the following script, but be aware that this will modify files on the
-Nodes, including /etc/hosts:
+Nodes, including `/etc/hosts`:
 
 ```
 $ cd install
 $ ./copy-certs.sh
+Copying certs to nodes
+job.batch "copy-certs-5a2fa2bc-3457-11e9-a2bc-42010a800018" created
+job.batch "copy-certs-55cf8134-3457-11e9-a2bc-42010a800018" created
 ```
 
 Note there is an issue with this approach, as new nodes will not automatically
@@ -51,6 +63,13 @@ solution in the future, but it may require changes to Kubernetes.
 
 ```
 $ sudo ./configure-host.sh --add-hosts
+Copying cert into Docker
+Successfully copied cert
+Adding entry to /etc/hosts for trow.kube-public
+
+Exposing registry via /etc/hosts
+
+Successfully configured localhost
 ```
 
 This will copy Trow's cert into Docker and also add an entry to /etc/hosts for
@@ -58,8 +77,17 @@ trow.kube-public. We can test it all out by trying to push an image:
 
 ```
 $ docker pull nginx:alpine
+alpine: Pulling from library/nginx
+Digest: sha256:e0292d158b6b353fde34909243a4886977cb9d1abb8a8a5fef9e0ff7138dd3e2
+Status: Image is up to date for nginx:alpine
 $ docker tag nginx:alpine trow.kube-public:31000/test/nginx:alpine
 $ docker push trow.kube-public:31000/test/nginx:alpine
+The push refers to repository [trow.kube-public:31000/test/nginx]
+979531bcfa2b: Pushed 
+8d36c62f099e: Pushed 
+4b735058ece4: Pushed 
+503e53e365f3: Pushed 
+alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c3752d11a55 size: 11903
 ```
 
 If the push seems to hang, check if port 31000 is blocked (in GKE it normally is
@@ -69,7 +97,10 @@ The Kubernetes cluster should now be able to pull and run the image:
 
 ```
 $ kubectl run trow-test --image=trow.kube-public:31000/test/nginx:alpine
+deployment.apps "trow-test" created
 $ kubectl get deploy trow-test
+NAME        DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+trow-test   1         1         1            1           8s
 ```
 ### Enable Validation
 
@@ -120,6 +151,7 @@ If you get an error when pushing, check the logs for the Trow pod e.g:
 
 ```
 $ kubectl logs trow-deploy-5cf9bccdcc-g28vq -n kube-public
+...
 ```
 
 ## Install without TLS
