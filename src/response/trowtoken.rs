@@ -76,7 +76,7 @@ impl<'r> Responder<'r> for TrowToken {
             .ok()
     }
 }
-
+/*
 #[cfg(test)]
 mod test {
     use response::trowtoken::TrowToken;
@@ -92,3 +92,4 @@ mod test {
 //        assert_eq!(headers.contains(""))
     }
 }
+*/
