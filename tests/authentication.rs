@@ -97,8 +97,12 @@ mod authentication_tests {
 
     fn test_login(cl: &reqwest::Client) {
         let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(AUTHZ_HEADER, "Basic YWRtaW46cGFzc3dvcmQK").send().unwrap();
-        // Authorization: Basic YWRtaW46cGFzc3dvcmQK"
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    fn test_login_fail(cl: &reqwest::Client) {
+        let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(AUTHZ_HEADER, "Basic thisstringwillfail").send().unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[test]

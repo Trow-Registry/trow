@@ -3,9 +3,9 @@ use std::str;
 use client_interface::ClientInterface;
 use response::empty::Empty;
 use response::authenticate::Authenticate;
-use response::trowtoken::TrowToken;
 use response::errors::Error;
 use response::html::HTML;
+use response::trowtoken::{self, TrowToken};
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
@@ -65,10 +65,10 @@ pub fn catchers() -> Vec<rocket::Catcher> {
     catchers![not_found]
 }
 
-struct AuthorisedUser {
+pub struct AuthorisedUser {
     // other useful fields could include organisation home scope permissions
-    username: String,
-    authorized: bool,
+    pub username: String,
+    pub authorized: bool,
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
@@ -178,7 +178,6 @@ fn get_homepage<'a>() -> HTML<'a> {
 fn not_found(_: &Request) -> Json<String> {
     Json("404 page not found".to_string())
 }
-
 /* login should it be /v2/login?
  * this is where client will attempt to login
  */
@@ -188,10 +187,10 @@ fn get_login(auth_user: AuthorisedUser) -> Result<TrowToken,Error>
     debug!("Authorization string is {}", auth_user.username);
     debug!("Authorization string is {}", auth_user.authorized);
     if auth_user.authorized {
-        Ok(TrowToken)
+        trowtoken::new(auth_user).map_err(|_| {Error::Unauthorized})
     }
     else {
-        Err(Error::InternalError)
+        Err(Error::Unauthorized)
     }
 }
 /*
