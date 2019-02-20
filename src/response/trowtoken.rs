@@ -80,18 +80,18 @@ impl<'r> Responder<'r> for TrowToken {
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
-    use response::token::Token;
+    use response::trowtoken::TrowToken;
     use rocket::http::Status;
 
     use response::test_helper::test_route;
 
     #[test]
     fn token_ok() {
-        let response = test_route(Token);
-        assert_eq!(response.status(), Status::Unauthorized);
+        let response = test_route(TrowToken);
+        let headers = response.headers();
+        assert_eq!(response.status(), Status::Ok);
+//        assert_eq!(headers.contains(""))
     }
 }
-*/

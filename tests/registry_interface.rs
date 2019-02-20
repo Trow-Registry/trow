@@ -16,7 +16,7 @@ mod interface_tests {
     use environment::Environment;
 
     use common;
-    use hyper::StatusCode;
+    use reqwest::StatusCode;
     use reqwest;
     use serde_json;
     use std::fs::{self, File};
@@ -28,16 +28,20 @@ mod interface_tests {
     use trow::types::{RepoCatalog, RepoName, TagList};
     use trow_server::manifest;
 
-    const LYCAON_ADDRESS: &str = "https://trow.test:8443";
+    const TROW_ADDRESS: &str = "https://trow.test:8443";
 
+    /*
     header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
     header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }
+    */
+    const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
+    const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
 
     struct TrowInstance {
         pid: Child,
     }
     /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.
+    /// Seriously considering moving to docker run.https://docs.docker.com/registry/spec/auth/token/
 
     fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
@@ -62,10 +66,10 @@ mod interface_tests {
             .build()
             .unwrap();
 
-        let mut response = client.get(LYCAON_ADDRESS).send();
-        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::Ok)) {
+        let mut response = client.get(TROW_ADDRESS).send();
+        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(LYCAON_ADDRESS).send();
+            response = client.get(TROW_ADDRESS).send();
             timeout -= 1;
         }
         if timeout == 0 {
@@ -83,56 +87,56 @@ mod interface_tests {
     }
 
     fn get_main(cl: &reqwest::Client) {
-        let resp = cl.get(LYCAON_ADDRESS).send().unwrap();
-        assert_eq!(resp.status(), StatusCode::Ok);
+        let resp = cl.get(TROW_ADDRESS).send().unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
-            resp.headers().get::<DistributionApi>().unwrap().0,
+            resp.headers().get(DIST_API_HEADER).unwrap(),
             "registry/2.0"
         );
 
         //All v2 registries should respond with a 200 to this
         let resp = cl
-            .get(&(LYCAON_ADDRESS.to_owned() + "/v2/"))
+            .get(&(TROW_ADDRESS.to_owned() + "/v2/"))
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::Ok);
+        assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
-            resp.headers().get::<DistributionApi>().unwrap().0,
+            resp.headers().get(DIST_API_HEADER).unwrap(),
             "registry/2.0"
         );
     }
 
     fn get_non_existent_blob(cl: &reqwest::Client) {
         let resp = cl
-            .get(&(LYCAON_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"))
+            .get(&(TROW_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"))
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::NotFound);
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     fn unsupported(cl: &reqwest::Client) {
         //Delete currently unimplemented
         let resp = cl
-            .delete(&(LYCAON_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
+            .delete(&(TROW_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::MethodNotAllowed);
+        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
         //Might need accept headers here
         let mut resp = cl
-            .get(&format!("{}/v2/{}/manifests/{}", LYCAON_ADDRESS, name, tag))
+            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::Ok);
+        assert_eq!(resp.status(), StatusCode::OK);
         let mani: manifest::ManifestV2 = resp.json().unwrap();
         assert_eq!(mani.schema_version, 2);
     }
 
     fn check_repo_catalog(cl: &reqwest::Client, rc: &RepoCatalog) {
         let mut resp = cl
-            .get(&format!("{}/v2/_catalog", LYCAON_ADDRESS))
+            .get(&format!("{}/v2/_catalog", TROW_ADDRESS))
             .send()
             .unwrap();
         let rc_resp: RepoCatalog = serde_json::from_str(&resp.text().unwrap()).unwrap();
@@ -143,7 +147,7 @@ mod interface_tests {
         let mut resp = cl
             .get(&format!(
                 "{}/v2/{}/tags/list",
-                LYCAON_ADDRESS,
+                TROW_ADDRESS,
                 tl.repo_name()
             ))
             .send()
