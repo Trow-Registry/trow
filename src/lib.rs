@@ -179,7 +179,9 @@ impl TrowBuilder {
     fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
         let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
             .address(self.config.addr.host.clone())
-            .port(self.config.addr.port);
+            .port(self.config.addr.port)
+            .keep_alive(60)
+            .workers(256);
 
         if let Some(ref tls) = self.config.tls {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
