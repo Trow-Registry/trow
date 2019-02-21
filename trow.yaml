@@ -98,6 +98,8 @@ spec:
         volumeMounts:
         - mountPath: /certs
           name: cert-vol
+        - mountPath: /data
+          name: data-vol
       initContainers:
       - name: trow-init
         image: containersol/trow:init
@@ -122,6 +124,8 @@ spec:
         - name: cert-vol
           emptyDir:
             medium: Memory
+        - name: data-vol
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
