@@ -6,7 +6,7 @@ extern crate failure;
 extern crate futures;
 extern crate grpcio;
 extern crate hostname;
-extern crate jwt;
+extern crate frank_jwt;
 extern crate orset;
 extern crate protobuf;
 extern crate base64;

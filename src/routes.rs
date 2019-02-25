@@ -11,9 +11,8 @@ use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
 use rocket_contrib::json::Json;
 use TrowConfig;
-use serde_json::Value;
 use crypto::sha2::Sha256;
-use jwt::{Header, Token, Registered};
+use frank_jwt::{Header, Payload, encode, decode, Algorithm};
 use types::*;
 const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
 
@@ -66,6 +65,28 @@ pub fn catchers() -> Vec<rocket::Catcher> {
 }
 
 pub struct AuthorisedUser {
+    pub username: String,
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
+    type Error = ();
+    fn from_request(req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
+        return Outcome::Failure((Status::Unauthorized, ()));
+    }
+}
+
+pub struct ValidToken {
+    pub tokenstring: String,
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for ValidToken {
+    type Error = ();
+    fn from_request(req: &'a Request<'r>) -> request::Outcome<ValidToken, ()> {
+        return Outcome::Failure((Status::Unauthorized, ()));
+    }
+}
+/*
+pub struct AuthorisedUser {
     // other useful fields could include organisation home scope permissions
     pub username: String,
     pub authorized: bool,
@@ -73,10 +94,10 @@ pub struct AuthorisedUser {
 
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
     type Error = ();
-    fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
+    fn from_request(req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
         // Look in headers for an Authorization header
-        let keys: Vec<_> = _req.headers().get("Authorization").collect();
-        if keys.len()!=1 { // no key return false in auth structure
+        let keys: Vec<_> = req.headers().get("Authorization").collect();
+        if keys.len() != 1 { // no key return false in auth structure
             let auth_user = AuthorisedUser {
                 username: "".to_string(),
                 authorized: false,
@@ -139,6 +160,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
         Outcome::Success(auth_user)
      }
 }
+*/
 /*
 Registry root.
 
@@ -215,6 +237,7 @@ Accept: manifest-version
  */
 #[get("/v2/<onename>/manifests/<reference>")]
 fn get_manifest(
+    //token: BearerToken,
     ci: rocket::State<ClientInterface>,
     onename: String,
     reference: String,
