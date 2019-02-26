@@ -1,0 +1,157 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: kube-public
+  name: trow
+  labels:
+    app: trow
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  namespace: kube-public
+  name: trow
+  labels:
+    app: trow
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - patch
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  namespace: kube-public
+  name: trow
+  labels:
+    app: trow
+rules:
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - create
+  - get
+  - watch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  namespace: kube-public
+  name: trow
+  labels:
+    app: trow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: trow
+subjects:
+- kind: ServiceAccount
+  name: trow
+  namespace: kube-public
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  namespace: kube-public
+  name: trow
+  labels:
+    app: trow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: trow
+subjects:
+- kind: ServiceAccount
+  name: trow
+  namespace: kube-public
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trow-deploy
+  namespace: kube-public
+spec:
+  selector:
+    matchLabels:
+      app: trow
+  template:
+    metadata:
+      labels:
+        app: trow
+    spec:
+      serviceAccountName: trow
+      containers:
+      - name: trow-pod
+        image: containersol/trow:default
+        args: ["-n", "trow:31000 trow.kube-public:31000"]
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - mountPath: /certs
+          name: cert-vol
+        - mountPath: /data
+          name: data-vol
+      initContainers:
+      - name: trow-init
+        image: containersol/trow:init
+        imagePullPolicy: Always
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+        volumeMounts:
+        - mountPath: /certs
+          name: cert-vol
+      volumes:
+        - name: cert-vol
+          emptyDir:
+            medium: Memory
+        - name: data-vol
+          persistentVolumeClaim:
+            claimName: data-claim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-claim
+  namespace: kube-public
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trow
+  namespace: kube-public
+spec:
+  selector:
+    app: trow
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 443
+    targetPort: 8443
+    nodePort: 31000
+
