@@ -15,7 +15,7 @@ mod validation_tests {
 
   use common;
   use environment::Environment;
-  use hyper::StatusCode;
+  use reqwest::StatusCode;
   use std::fs::{self, File};
   use std::io::Read;
   use std::process::Child;
@@ -65,7 +65,7 @@ mod validation_tests {
       .unwrap();
 
     let mut response = client.get(LYCAON_ADDRESS).send();
-    while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::Ok)) {
+    while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
       thread::sleep(Duration::from_millis(100));
       response = client.get(LYCAON_ADDRESS).send();
       timeout -= 1;
@@ -204,7 +204,7 @@ mod validation_tests {
       .send()
       .unwrap();
 
-    assert_eq!(resp.status(), StatusCode::Ok);
+    assert_eq!(resp.status(), StatusCode::OK);
     //should deny by default
     let txt = resp.text().unwrap();
     assert!(txt.contains("\"allowed\":false"));
@@ -272,7 +272,7 @@ mod validation_tests {
       .send()
       .unwrap();
 
-    assert_eq!(resp.status(), StatusCode::Ok);
+    assert_eq!(resp.status(), StatusCode::OK);
     //should deny by default
     let txt = resp.text().unwrap();
     if is_allowed {

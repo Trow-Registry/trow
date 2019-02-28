@@ -1,21 +1,25 @@
 use std::str;
 
 use client_interface::ClientInterface;
+use response::authenticate::Authenticate;
 use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
+use response::trowtoken::ValidBasicToken;
+use response::trowtoken::{self, TrowToken};
 use response::upload_info::UploadInfo;
-use rocket::request::{self, FromRequest, Request};
-use rocket::{self, Outcome};
+use rocket;
+use rocket::request::Request;
 use rocket_contrib::json::Json;
-use TrowConfig;
-
 use types::*;
+use TrowConfig;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
+        get_test_auth,
+        login,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -58,23 +62,31 @@ pub fn catchers() -> Vec<rocket::Catcher> {
     catchers![not_found]
 }
 
-struct AuthorisedUser(String);
-impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
-    type Error = ();
-    fn from_request(_req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
-        Outcome::Success(AuthorisedUser("test".to_owned()))
+/*
+ * test-auth - throw www-authenticate header
+ */
+#[get("/test-auth")]
+fn get_test_auth() -> Authenticate {
+    //Response guard should forward to authenticate, shouldn't be here
+
+    // throw authenticate header
+    //format!("logged in as {}", token.user)
+    Authenticate {
+        username: "admin".to_string(),
     }
 }
-/*
-Registry root.
 
-Returns 200.
-*/
+/*
+ * v2 - throw Empty
+ */
 #[get("/v2")]
 fn get_v2root() -> Empty {
+    // throw authenticate header
     Empty
 }
-
+/*
+ * Welcome message
+ */
 #[get("/")]
 fn get_homepage<'a>() -> HTML<'a> {
     const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
@@ -88,6 +100,15 @@ fn get_homepage<'a>() -> HTML<'a> {
 #[catch(404)]
 fn not_found(_: &Request) -> Json<String> {
     Json("404 page not found".to_string())
+}
+/* login should it be /v2/login?
+ * this is where client will attempt to login
+ *
+ * If login is called with a valid bearer token, return session token
+ */
+#[get("/login")]
+fn login(auth_user: ValidBasicToken) -> Result<TrowToken, Error> {
+    trowtoken::new(auth_user).map_err(|_| Error::InternalError)
 }
 
 /*
@@ -112,6 +133,7 @@ Accept: manifest-version
  */
 #[get("/v2/<onename>/manifests/<reference>")]
 fn get_manifest(
+    //token: BearerToken,
     ci: rocket::State<ClientInterface>,
     onename: String,
     reference: String,
@@ -163,7 +185,6 @@ fn get_blob(
     ci: rocket::State<ClientInterface>,
     name_repo: String,
     digest: String,
-    _auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
     ci.get_reader_for_blob(&RepoName(name_repo), &Digest(digest))
         .ok()
@@ -178,9 +199,8 @@ fn get_blob_2level(
     name: String,
     repo: String,
     digest: String,
-    auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}", name, repo), digest, auth_user)
+    get_blob(ci, format!("{}/{}", name, repo), digest)
 }
 
 /*
@@ -193,9 +213,8 @@ fn get_blob_3level(
     name: String,
     repo: String,
     digest: String,
-    auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest, auth_user)
+    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest)
 }
 /*
 ---

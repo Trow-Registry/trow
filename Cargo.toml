@@ -6,6 +6,7 @@ authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchi
 [dependencies]
 rust-crypto = "^0.2"
 jwt = "^0.4"
+frank_jwt = "^3.1"
 rustc-serialize = "^0.3"
 
 rocket = { git = "https://github.com/SergioBenitez/Rocket", branch = "v0.4", features = ["tls"] }
@@ -35,9 +36,11 @@ failure_derive = "^0.1"
 trow-protobuf = { path = "./lib/protobuf" }
 trow-server = { path = "./lib/server" }
 
-
+base64 = "0.10.0"
+data-encoding = "2.1.2"
 #This is a rocket dependency, but we need a newer version with the p>q bugfix
 ring ="^0.13"
+chrono = "^0.4"
 
 [build-dependencies]
 
@@ -47,4 +50,4 @@ assert_cli = "^0.5"
 environment = "^0.1"
 hyper = "^0.11"
 rand = "^0.4"
-reqwest = "^0.8"
+reqwest = "^0.9"
