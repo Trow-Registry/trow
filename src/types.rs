@@ -203,6 +203,7 @@ impl TagList {
     }
 }
 
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Status {
     pub status: String,          //"Success" or "Failure". TODO: use proper type.

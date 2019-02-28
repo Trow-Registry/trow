@@ -28,6 +28,7 @@ pub enum Error {
     */
     ManifestUnknown(String),
     ManifestInvalid,
+    Unauthorized,
     BlobUnknown,
     BlobUploadUnknown,
     Unsupported,
@@ -49,6 +50,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::Unsupported => write!(f, "Unsupported Operation"),
+            Error::Unauthorized => write!(f, "Authorization required"),
             Error::BlobUnknown => write!(f, "Blob Unknown"),
             Error::BlobUploadUnknown => write!(f, "Blob Upload Unknown"),
             Error::InternalError => write!(f, "Internal Error"),
@@ -75,6 +77,7 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::Unsupported => "The operation was unsupported due to a missing implementation or invalid set of parameters.",
+            Error::Unauthorized => "The operation requires authorization.",
             Error::BlobUnknown => "Reference made to an unknown blob (e.g. invalid UUID)",
             Error::BlobUploadUnknown => "If a blob upload has been cancelled or was never started, this error code may be returned.",
             Error::InternalError => "An internal error occured, please consult the logs for more details.",
@@ -92,6 +95,7 @@ impl<'r> Responder<'r> for Error {
 
         let status = match self {
             Error::Unsupported => Status::MethodNotAllowed,
+            Error::Unauthorized => Status::Unauthorized,
             Error::BlobUploadUnknown | Error::ManifestUnknown(_) => Status::NotFound,
             Error::InternalError => Status::InternalServerError,
             Error::DigestInvalid | Error::ManifestInvalid | Error::BlobUnknown => {

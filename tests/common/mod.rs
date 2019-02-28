@@ -1,18 +1,15 @@
-
-
-
-use hyper::StatusCode;
+use reqwest::StatusCode;
+use reqwest::header;
 use crypto::sha2::Sha256;
 use trow_server::manifest;
-use hyper::header::Location;
 use crypto::digest::Digest;
 use rand::Rng;
 
 pub const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 
-
-header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
-header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }
+const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
+const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
+const LOCATION_HEADER: &str = "Location";
 
 pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
@@ -29,18 +26,18 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
             .post(&format!("{}/v2/{}/blobs/uploads/", LYCAON_ADDRESS, name))
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::Accepted);
-        let uuid = resp.headers().get::<UploadUuid>().unwrap().to_string();
-        let location = resp.headers().get::<Location>().unwrap().to_string();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+        let uuid = resp.headers().get(UPLOAD_HEADER).unwrap().to_str().unwrap();
+        let location = resp.headers().get(LOCATION_HEADER).unwrap().to_str().unwrap();
 
         //Upload file. Start uploading blob with patch then digest with put
         let blob = gen_rand_blob(100);
         let resp = cl
-            .patch(location.as_str())
+            .patch(location)
             .body(blob.clone())
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::Accepted);
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
 
         let mut hasher = Sha256::new();
         hasher.input(&blob);
@@ -52,14 +49,14 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
             ))
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::Created);
+        assert_eq!(resp.status(), StatusCode::CREATED);
 
         //Finally get it back again
         let mut resp = cl
             .get(&format!("{}/v2/{}/blobs/{}", LYCAON_ADDRESS, name, digest))
             .send()
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::Ok);
+        assert_eq!(resp.status(), StatusCode::OK);
 
         let mut buf = Vec::new();
         resp.copy_to(&mut buf).unwrap();
@@ -88,7 +85,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         };
         let manifest_addr = format!("{}/v2/{}/manifests/{}", LYCAON_ADDRESS, name, tag);
         let resp = cl.put(&manifest_addr).json(&mani).send().unwrap();
-        assert_eq!(resp.status(), StatusCode::Created);
-        let location = resp.headers().get::<Location>().unwrap().to_string();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let location = resp.headers().get("Location").unwrap().to_str().unwrap();
         assert_eq!(&location, &manifest_addr);
     }
