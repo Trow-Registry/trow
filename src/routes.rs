@@ -1,19 +1,20 @@
 use std::str;
 
 use client_interface::ClientInterface;
-use response::empty::Empty;
+use crypto::sha2::Sha256;
+use frank_jwt::{decode, encode, Algorithm};
 use response::authenticate::Authenticate;
+use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
+use response::trowtoken::ValidBasicToken;
 use response::trowtoken::{self, TrowToken};
 use response::upload_info::UploadInfo;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
 use rocket_contrib::json::Json;
-use TrowConfig;
-use crypto::sha2::Sha256;
-use frank_jwt::{Header, Payload, encode, decode, Algorithm};
 use types::*;
+use TrowConfig;
 const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -21,7 +22,7 @@ pub fn routes() -> Vec<rocket::Route> {
         get_v2root,
         get_homepage,
         get_test_auth,
-        get_login,
+        login,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -64,27 +65,6 @@ pub fn catchers() -> Vec<rocket::Catcher> {
     catchers![not_found]
 }
 
-pub struct AuthorisedUser {
-    pub username: String,
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
-    type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
-        return Outcome::Failure((Status::Unauthorized, ()));
-    }
-}
-
-pub struct ValidToken {
-    pub tokenstring: String,
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for ValidToken {
-    type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<ValidToken, ()> {
-        return Outcome::Failure((Status::Unauthorized, ()));
-    }
-}
 /*
 pub struct AuthorisedUser {
     // other useful fields could include organisation home scope permissions
@@ -116,7 +96,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
         }
 
         // Basic token is a base64 encoded user/pass
-        if auth_strings[0]=="Basic" { 
+        if auth_strings[0]=="Basic" {
             match base64::decode(&auth_strings[1].to_string()) {
                 Ok(decoded) => {
                     let mut count=0;
@@ -171,10 +151,11 @@ Returns 200.
  * test-auth - throw www-authenticate header
  */
 #[get("/test-auth")]
-fn get_test_auth() -> Authenticate {
+fn get_test_auth(token: TrowToken) -> String {
     // throw authenticate header
-    Authenticate
+    format!("logged in as {}", token.user)
 }
+
 /*
  * v2 - throw Empty
  */
@@ -202,19 +183,14 @@ fn not_found(_: &Request) -> Json<String> {
 }
 /* login should it be /v2/login?
  * this is where client will attempt to login
+ *
+ * If login is called with a valid bearer token, return session token
  */
 #[get("/login")]
-fn get_login(auth_user: AuthorisedUser) -> Result<TrowToken,Error>
-{
-    debug!("Authorization string is {}", auth_user.username);
-    debug!("Authorization string is {}", auth_user.authorized);
-    if auth_user.authorized {
-        trowtoken::new(auth_user).map_err(|_| {Error::Unauthorized})
-    }
-    else {
-        Err(Error::Unauthorized)
-    }
+fn login(auth_user: ValidBasicToken) -> Result<TrowToken, Error> {
+    trowtoken::new(auth_user).map_err(|_| Error::InternalError)
 }
+
 /*
 ---
 Pulling an image
@@ -289,7 +265,6 @@ fn get_blob(
     ci: rocket::State<ClientInterface>,
     name_repo: String,
     digest: String,
-    _auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
     ci.get_reader_for_blob(&RepoName(name_repo), &Digest(digest))
         .ok()
@@ -304,9 +279,8 @@ fn get_blob_2level(
     name: String,
     repo: String,
     digest: String,
-    auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}", name, repo), digest, auth_user)
+    get_blob(ci, format!("{}/{}", name, repo), digest)
 }
 
 /*
@@ -319,9 +293,8 @@ fn get_blob_3level(
     name: String,
     repo: String,
     digest: String,
-    auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest, auth_user)
+    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest)
 }
 /*
 ---
