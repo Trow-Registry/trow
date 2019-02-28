@@ -14,12 +14,13 @@ const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
 const TOKEN_DURATION: u64 = 3600;
 
 pub struct ValidBasicToken {
-    pub user: String,
+    user: String,
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
     type Error = ();
     fn from_request(req: &'a Request<'r>) -> request::Outcome<ValidBasicToken, ()> {
+       
         //As Authorization is a standard header, we should be able to use standard code here
         //But Rocket doesn't seem to support it, despite exporting Hyper Headers
         let auth_val = match req.headers().get_one("Authorization") {
@@ -27,10 +28,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
             None => return Outcome::Failure((Status::Unauthorized, ())),
         };
 
-        //Base64 colon separated
-
-        //Check header handling - isn't there a next?
-        // split the header on white space
+        // The value of the header is the type of the auth (Basic or Bearer), followed by an
+        // encoded string, separate by whitespace.
         let auth_strings: Vec<String> = auth_val.split_whitespace().map(String::from).collect();
         if auth_strings.len() != 2 {
             //TODO: Should this be BadRequest?
@@ -42,7 +41,22 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
             return Outcome::Failure((Status::Unauthorized, ()));
         }
 
-        return Outcome::Failure((Status::Unauthorized, ()));
+        let outcome = match base64::decode(&auth_strings[1]) {
+            Ok(userpass) => {
+
+                // Hard-coded credential for testing
+                if userpass == b"admin:test" {
+                    Outcome::Success(ValidBasicToken {
+                        user: "admin".to_owned(),
+                    })
+                } else {
+                    Outcome::Failure((Status::Unauthorized, ()))
+                }
+            }
+            Err(_) => Outcome::Failure((Status::Unauthorized, ())),
+        };
+
+        outcome
     }
 }
 
@@ -70,11 +84,9 @@ struct TokenClaim {
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
 pub fn new(vbt: ValidBasicToken) -> Result<TrowToken, frank_jwt::Error> {
-    //let username = vbt.user;
-    let client_id = "docker";
-    let scope = "push/pull";
-    let now = SystemTime::now();
-    let current_time = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let current_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
 
     // build token from structure and return token string
     let token_claim = TokenClaim {
@@ -87,7 +99,7 @@ pub fn new(vbt: ValidBasicToken) -> Result<TrowToken, frank_jwt::Error> {
         jti: Uuid::new_v4().to_string(),
     };
 
-    let mut header = json!({});
+    let header = json!({});
     let payload = serde_json::to_value(&token_claim)?;
 
     let token = encode(
@@ -156,7 +168,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
         ) {
             Ok((_, payload)) => payload,
             Err(_) => {
-                warn!("Failed to decode user toekn");
+                warn!("Failed to decode user token");
                 return Outcome::Failure((Status::Unauthorized, ()));
             }
         };
@@ -172,17 +184,15 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
 
 #[cfg(test)]
 mod test {
-    use response::trowtoken;
+    use response::trowtoken::{self, ValidBasicToken};
     use rocket::http::Status;
-    use routes::AuthorisedUser;
 
     use response::test_helper::test_route;
 
     #[test]
     fn token_ok() {
-        let user = AuthorisedUser {
-            username: "admin".to_string(),
-            authorized: true,
+        let user = ValidBasicToken {
+            user: "admin".to_string(),
         };
         let response = test_route(trowtoken::new(user));
         assert_eq!(response.status(), Status::Ok);

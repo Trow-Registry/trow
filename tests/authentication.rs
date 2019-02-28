@@ -6,6 +6,7 @@ extern crate rand;
 extern crate reqwest;
 extern crate serde_json;
 extern crate trow;
+extern crate base64;
 extern crate trow_server;
 
 mod common;
@@ -20,6 +21,7 @@ mod authentication_tests {
     use reqwest::header::LOCATION;
     use reqwest;
     use serde_json;
+    use base64::encode;
     use std::fs::{self, File};
     use std::io::Read;
     use std::process::Child;
@@ -96,7 +98,9 @@ mod authentication_tests {
     }
 
     fn test_login(cl: &reqwest::Client) {
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(AUTHZ_HEADER, "Basic YWRtaW46cGFzc3dvcmQK").send().unwrap();
+        let bytes = encode(b"admin:test");
+        let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
+            AUTHZ_HEADER, format!("Basic {}", bytes)).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
@@ -126,7 +130,12 @@ mod authentication_tests {
             .build()
             .unwrap();
 
-        println!("Running get_main()");
+        println!("Running test_auth_redir()");
         test_auth_redir(&client);
+        println!("Running test_login()");
+        test_login(&client);
+        println!("Running test_login_fail()");
+        test_login_fail(&client);
+
     }
 }
