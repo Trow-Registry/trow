@@ -1,27 +1,25 @@
 use std::str;
 
 use client_interface::ClientInterface;
-use response::empty::Empty;
 use response::authenticate::Authenticate;
+use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
+use response::trowtoken::ValidBasicToken;
 use response::trowtoken::{self, TrowToken};
 use response::upload_info::UploadInfo;
-use rocket::request::{self, FromRequest, Request};
-use rocket::{self, Outcome};
+use rocket;
+use rocket::request::Request;
 use rocket_contrib::json::Json;
-use TrowConfig;
-use crypto::sha2::Sha256;
-use frank_jwt::{Header, Payload, encode, decode, Algorithm};
 use types::*;
-const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
+use TrowConfig;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
         get_test_auth,
-        get_login,
+        login,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
@@ -64,117 +62,20 @@ pub fn catchers() -> Vec<rocket::Catcher> {
     catchers![not_found]
 }
 
-pub struct AuthorisedUser {
-    pub username: String,
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
-    type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
-        return Outcome::Failure((Status::Unauthorized, ()));
-    }
-}
-
-pub struct ValidToken {
-    pub tokenstring: String,
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for ValidToken {
-    type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<ValidToken, ()> {
-        return Outcome::Failure((Status::Unauthorized, ()));
-    }
-}
-/*
-pub struct AuthorisedUser {
-    // other useful fields could include organisation home scope permissions
-    pub username: String,
-    pub authorized: bool,
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for AuthorisedUser {
-    type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<AuthorisedUser, ()> {
-        // Look in headers for an Authorization header
-        let keys: Vec<_> = req.headers().get("Authorization").collect();
-        if keys.len() != 1 { // no key return false in auth structure
-            let auth_user = AuthorisedUser {
-                username: "".to_string(),
-                authorized: false,
-            };
-            return Outcome::Success(auth_user);
-        }
-
-        // split the header on white space
-        let auth_strings: Vec<String>=keys[0].to_string().split_whitespace().map(String::from).collect();
-        if auth_strings.len()!=2 {
-            let auth_user = AuthorisedUser {
-                username: "".to_string(),
-                authorized: false,
-            };
-            return Outcome::Success(auth_user);
-        }
-
-        // Basic token is a base64 encoded user/pass
-        if auth_strings[0]=="Basic" { 
-            match base64::decode(&auth_strings[1].to_string()) {
-                Ok(decoded) => {
-                    let mut count=0;
-                    let mut username = String::new();
-                    let mut password = String::new();
-                    while char::from(decoded[count])!=':' {
-                        username.push(char::from(decoded[count]));
-                        count += 1;
-                    }
-                    count+=1;
-                    while char::from(decoded[count])!='\n' {
-                        password.push(char::from(decoded[count]));
-                        count += 1;
-                    }
-                    if username == "admin" && password == "password" {
-                        let auth_user = AuthorisedUser {
-                            username,
-                            authorized: true,
-                        };
-                        return Outcome::Success(auth_user);
-                    }
-                }
-                _decode_error => {
-                    debug!("base64 decode error");
-                }
-            }
-        } else if auth_strings[0]=="Bearer" { // parse for bearer token and verify it
-            let token = Token::<Header, Registered>::parse(&auth_strings[1]).unwrap();
-            if token.verify(AUTHORISATION_SECRET.as_bytes(), Sha256::new()) {
-                let auth_user = AuthorisedUser {
-                    username: "bearer_token".to_string(),
-                    authorized: true,
-                };
-                return Outcome::Success(auth_user);
-            }
-        }
-        let auth_user = AuthorisedUser {
-            username: "".to_string(),
-            authorized: false,
-        };
-        Outcome::Success(auth_user)
-     }
-}
-*/
-/*
-Registry root.
-
-Returns 200.
- */
-
 /*
  * test-auth - throw www-authenticate header
  */
 #[get("/test-auth")]
 fn get_test_auth() -> Authenticate {
+    //Response guard should forward to authenticate, shouldn't be here
+
     // throw authenticate header
-    Authenticate
+    //format!("logged in as {}", token.user)
+    Authenticate {
+        username: "admin".to_string(),
+    }
 }
+
 /*
  * v2 - throw Empty
  */
@@ -202,19 +103,14 @@ fn not_found(_: &Request) -> Json<String> {
 }
 /* login should it be /v2/login?
  * this is where client will attempt to login
+ *
+ * If login is called with a valid bearer token, return session token
  */
 #[get("/login")]
-fn get_login(auth_user: AuthorisedUser) -> Result<TrowToken,Error>
-{
-    debug!("Authorization string is {}", auth_user.username);
-    debug!("Authorization string is {}", auth_user.authorized);
-    if auth_user.authorized {
-        trowtoken::new(auth_user).map_err(|_| {Error::Unauthorized})
-    }
-    else {
-        Err(Error::Unauthorized)
-    }
+fn login(auth_user: ValidBasicToken) -> Result<TrowToken, Error> {
+    trowtoken::new(auth_user).map_err(|_| Error::InternalError)
 }
+
 /*
 ---
 Pulling an image
@@ -289,7 +185,6 @@ fn get_blob(
     ci: rocket::State<ClientInterface>,
     name_repo: String,
     digest: String,
-    _auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
     ci.get_reader_for_blob(&RepoName(name_repo), &Digest(digest))
         .ok()
@@ -304,9 +199,8 @@ fn get_blob_2level(
     name: String,
     repo: String,
     digest: String,
-    auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}", name, repo), digest, auth_user)
+    get_blob(ci, format!("{}/{}", name, repo), digest)
 }
 
 /*
@@ -319,9 +213,8 @@ fn get_blob_3level(
     name: String,
     repo: String,
     digest: String,
-    auth_user: AuthorisedUser,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest, auth_user)
+    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest)
 }
 /*
 ---
