@@ -40,7 +40,7 @@ mod interface_tests {
         pid: Child,
     }
     /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.https://docs.docker.com/registry/spec/auth/token/
+    /// Seriously considering moving to docker run.
 
     fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")

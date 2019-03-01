@@ -5,10 +5,11 @@ use response::authenticate::Authenticate;
 use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
-use response::trowtoken::ValidBasicToken;
-use response::trowtoken::{self, TrowToken};
+use response::trow_token::ValidBasicToken;
+use response::trow_token::{self, TrowToken};
 use response::upload_info::UploadInfo;
 use rocket;
+use rocket::State;
 use rocket::request::Request;
 use rocket_contrib::json::Json;
 use types::*;
@@ -107,8 +108,8 @@ fn not_found(_: &Request) -> Json<String> {
  * If login is called with a valid bearer token, return session token
  */
 #[get("/login")]
-fn login(auth_user: ValidBasicToken) -> Result<TrowToken, Error> {
-    trowtoken::new(auth_user).map_err(|_| Error::InternalError)
+fn login(auth_user: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, Error> {
+    trow_token::new(auth_user, tc).map_err(|_| Error::InternalError)
 }
 
 /*

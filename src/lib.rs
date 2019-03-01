@@ -3,13 +3,13 @@
 
 #[macro_use]
 extern crate failure;
+extern crate base64;
+extern crate frank_jwt;
 extern crate futures;
 extern crate grpcio;
 extern crate hostname;
-extern crate frank_jwt;
 extern crate orset;
 extern crate protobuf;
-extern crate base64;
 #[macro_use]
 extern crate rocket;
 extern crate rocket_contrib;
@@ -23,9 +23,9 @@ extern crate display_derive;
 extern crate trow_protobuf;
 extern crate trow_server;
 
-extern crate env_logger;
-extern crate crypto;
 extern crate chrono;
+extern crate crypto;
+extern crate env_logger;
 
 use log::{LogLevelFilter, LogRecord, SetLoggerError};
 #[macro_use]
@@ -43,6 +43,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::thread;
+use uuid::Uuid;
 
 use grpcio::{ChannelBuilder, EnvBuilder};
 use rocket::fairing;
@@ -82,6 +83,7 @@ pub struct TrowConfig {
     deny_prefixes: Vec<String>,
     deny_images: Vec<String>,
     dry_run: bool,
+    token_secret: String,
 }
 
 #[derive(Clone, Debug)]
@@ -166,6 +168,7 @@ impl TrowBuilder {
             deny_prefixes,
             deny_images,
             dry_run,
+            token_secret: Uuid::new_v4().to_string(),
         };
         TrowBuilder { config }
     }

@@ -12,7 +12,7 @@ pub mod manifest_reader;
 pub mod repo_catalog;
 pub mod tag_list;
 mod test_helper;
-pub mod trowtoken;
+pub mod trow_token;
 pub mod upload_info;
 pub mod verified_manifest;
 
@@ -23,7 +23,9 @@ pub mod verified_manifest;
 fn get_base_url(req: &Request) -> String {
     let host = get_domain_name(req);
 
-    let config = req.guard::<rocket::State<TrowConfig>>().unwrap();
+    let config = req
+        .guard::<rocket::State<TrowConfig>>()
+        .expect("TrowConfig not present!");
     match config.tls {
         None => format!("http://{}", host),
         Some(_) => format!("https://{}", host),

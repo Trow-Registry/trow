@@ -1,6 +1,5 @@
 extern crate crypto;
 extern crate environment;
-#[macro_use]
 extern crate hyper;
 extern crate rand;
 extern crate reqwest;
@@ -16,11 +15,7 @@ mod authentication_tests {
 
     use environment::Environment;
 
-    use common;
     use reqwest::StatusCode;
-    use reqwest::header::LOCATION;
-    use reqwest;
-    use serde_json;
     use base64::encode;
     use std::fs::{self, File};
     use std::io::Read;
@@ -28,8 +23,6 @@ mod authentication_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use trow::types::{RepoCatalog, RepoName, TagList};
-    use trow_server::manifest;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
 

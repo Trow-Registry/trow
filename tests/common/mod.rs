@@ -1,5 +1,4 @@
 use reqwest::StatusCode;
-use reqwest::header;
 use crypto::sha2::Sha256;
 use trow_server::manifest;
 use crypto::digest::Digest;

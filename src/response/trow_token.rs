@@ -3,14 +3,14 @@ use rocket::http::ContentType;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::{Responder, Response};
-use rocket::Outcome;
+use rocket::{Outcome, State};
 use serde_json::json;
 use std::io::Cursor;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
+use TrowConfig;
 
-const AUTHORISATION_SECRET: &str = "Bob Marley Rastafaria";
 const TOKEN_DURATION: u64 = 3600;
 
 pub struct ValidBasicToken {
@@ -20,7 +20,6 @@ pub struct ValidBasicToken {
 impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
     type Error = ();
     fn from_request(req: &'a Request<'r>) -> request::Outcome<ValidBasicToken, ()> {
-       
         //As Authorization is a standard header, we should be able to use standard code here
         //But Rocket doesn't seem to support it, despite exporting Hyper Headers
         let auth_val = match req.headers().get_one("Authorization") {
@@ -43,7 +42,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
 
         let outcome = match base64::decode(&auth_strings[1]) {
             Ok(userpass) => {
-
                 // Hard-coded credential for testing
                 if userpass == b"admin:test" {
                     Outcome::Success(ValidBasicToken {
@@ -83,14 +81,14 @@ struct TokenClaim {
  * Create new jsonwebtoken.
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
-pub fn new(vbt: ValidBasicToken) -> Result<TrowToken, frank_jwt::Error> {
+pub fn new(vbt: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, frank_jwt::Error> {
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
 
     // build token from structure and return token string
     let token_claim = TokenClaim {
-        iss: "trow.local".to_owned(), // TODO: get this from somewhere, should be fqdn
+        iss: tc.host_names[0].clone(),
         sub: vbt.user.clone(),
         aud: "Trow Registry".to_owned(),
         exp: current_time.add(Duration::new(TOKEN_DURATION, 0)).as_secs(),
@@ -102,12 +100,8 @@ pub fn new(vbt: ValidBasicToken) -> Result<TrowToken, frank_jwt::Error> {
     let header = json!({});
     let payload = serde_json::to_value(&token_claim)?;
 
-    let token = encode(
-        header,
-        &AUTHORISATION_SECRET.to_string(),
-        &payload,
-        Algorithm::HS256,
-    )?;
+    //Use generated config here
+    let token = encode(header, &tc.token_secret, &payload, Algorithm::HS256)?;
 
     Ok(TrowToken {
         user: vbt.user,
@@ -161,11 +155,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
 
         // parse for bearer token
         // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
-        let dec_token = match decode(
-            &auth_strings[1],
-            &AUTHORISATION_SECRET.to_string(),
-            Algorithm::HS256,
-        ) {
+        let config = req
+            .guard::<rocket::State<TrowConfig>>()
+            .expect("TrowConfig not present!");
+
+        let dec_token = match decode(&auth_strings[1], &config.token_secret, Algorithm::HS256) {
             Ok((_, payload)) => payload,
             Err(_) => {
                 warn!("Failed to decode user token");
@@ -179,22 +173,5 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
         };
 
         Outcome::Success(ttoken)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use response::trowtoken::{self, ValidBasicToken};
-    use rocket::http::Status;
-
-    use response::test_helper::test_route;
-
-    #[test]
-    fn token_ok() {
-        let user = ValidBasicToken {
-            user: "admin".to_string(),
-        };
-        let response = test_route(trowtoken::new(user));
-        assert_eq!(response.status(), Status::Ok);
     }
 }

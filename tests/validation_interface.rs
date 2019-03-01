@@ -1,6 +1,5 @@
 extern crate crypto;
 extern crate environment;
-#[macro_use]
 extern crate hyper;
 extern crate rand;
 extern crate reqwest;
