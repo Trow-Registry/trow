@@ -23,6 +23,7 @@ extern crate display_derive;
 extern crate trow_protobuf;
 extern crate trow_server;
 
+extern crate argon2;
 extern crate chrono;
 extern crate crypto;
 extern crate env_logger;
@@ -84,6 +85,7 @@ pub struct TrowConfig {
     deny_images: Vec<String>,
     dry_run: bool,
     token_secret: String,
+    user: Option<UserConfig>,
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +97,12 @@ struct GrpcConfig {
 struct TlsConfig {
     cert_file: String,
     key_file: String,
+}
+
+#[derive(Clone, Debug)]
+struct UserConfig {
+    user: String,
+    hash_encoded: String, //Surprised not bytes
 }
 
 fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, Error> {
@@ -169,6 +177,7 @@ impl TrowBuilder {
             deny_images,
             dry_run,
             token_secret: Uuid::new_v4().to_string(),
+            user: None,
         };
         TrowBuilder { config }
     }
@@ -179,6 +188,16 @@ impl TrowBuilder {
             key_file,
         };
         self.config.tls = Some(cfg);
+        self
+    }
+
+    pub fn with_user(&mut self, user: String, pass: String) -> &mut TrowBuilder {
+        let hash_config = argon2::Config::default();
+        let hash_encoded =
+            argon2::hash_encoded(pass.as_bytes(), Uuid::new_v4().as_bytes(), &hash_config)
+                .expect("Error hashing password");
+        let usercfg = UserConfig { user, hash_encoded };
+        self.config.user = Some(usercfg);
         self
     }
 

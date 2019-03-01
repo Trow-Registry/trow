@@ -10,6 +10,7 @@ use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 use TrowConfig;
+use UserConfig;
 
 const TOKEN_DURATION: u64 = 3600;
 
@@ -20,6 +21,18 @@ pub struct ValidBasicToken {
 impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
     type Error = ();
     fn from_request(req: &'a Request<'r>) -> request::Outcome<ValidBasicToken, ()> {
+        let config = req
+            .guard::<rocket::State<TrowConfig>>()
+            .expect("TrowConfig not present!");
+
+        let usercfg = match config.user {
+            Some(ref usercfg) => usercfg,
+            None => {
+                warn!("Attempted login, but no users are configured");
+                return Outcome::Failure((Status::Unauthorized, ()));
+            }
+        };
+
         //As Authorization is a standard header, we should be able to use standard code here
         //But Rocket doesn't seem to support it, despite exporting Hyper Headers
         let auth_val = match req.headers().get_one("Authorization") {
@@ -42,10 +55,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
 
         let outcome = match base64::decode(&auth_strings[1]) {
             Ok(userpass) => {
-                // Hard-coded credential for testing
-                if userpass == b"admin:test" {
+                
+                if verify_user(userpass, usercfg) {
                     Outcome::Success(ValidBasicToken {
-                        user: "admin".to_owned(),
+                        user: usercfg.user.clone(),
                     })
                 } else {
                     Outcome::Failure((Status::Unauthorized, ()))
@@ -56,6 +69,23 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
 
         outcome
     }
+}
+
+/**
+ * Sod the errors, just fail verification if there's an encoding problem.
+ */
+fn verify_user(userpass: Vec<u8>, usercfg: &UserConfig) -> bool {
+    let mut userpass = userpass.split(|b| b == &b':');
+    if let Some(user) = userpass.next() {
+        if let Some(pass) = userpass.next() {
+            if usercfg.user.as_bytes() == user {
+                if let Ok(v) = argon2::verify_encoded(&usercfg.hash_encoded, pass) {
+                    return v;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 #[derive(Debug, Serialize, RustcEncodable, RustcDecodable)]
@@ -121,20 +151,13 @@ impl<'r> Responder<'r> for TrowToken {
             .ok()
     }
 }
+
 /*
  *
  */
 impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
     type Error = ();
     fn from_request(req: &'a Request<'r>) -> request::Outcome<TrowToken, ()> {
-        // Look in headers for an Authorization header
-        /*
-                let keys: Vec<_> = req.headers().get("Authorization").collect();
-                if keys.len() != 1 {
-                    // no key return false in auth structure
-                    return Outcome::Failure((Status::Unauthorized, ()));
-                }
-        */
         let auth_val = match req.headers().get_one("Authorization") {
             Some(a) => a,
             None => return Outcome::Failure((Status::Unauthorized, ())),

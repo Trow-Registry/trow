@@ -43,6 +43,11 @@ mod authentication_tests {
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
+            .arg("--")
+            .arg("-u")
+            .arg("authtest")
+            .arg("-p")
+            .arg("authpass")
             .spawn()
             .expect("failed to start");
 
@@ -91,7 +96,7 @@ mod authentication_tests {
     }
 
     fn test_login(cl: &reqwest::Client) {
-        let bytes = encode(b"admin:test");
+        let bytes = encode(b"authtest:authpass");
         let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
             AUTHZ_HEADER, format!("Basic {}", bytes)).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);

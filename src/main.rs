@@ -3,6 +3,8 @@ extern crate trow;
 
 use clap::{Arg, ArgMatches};
 use trow::{NetAddr, TrowBuilder};
+use std::fs::File;
+use std::io::prelude::*;
 
 const PROGRAM_NAME: &str = "Trow";
 const PROGRAM_DESC: &str = "\nThe Cluster Registry";
@@ -129,6 +131,32 @@ For example 'beta' will match myhost.com/beta/myapp assuming myhost.com is the n
             .help("Disallow local images that match the full name _not_ including any host name.  
 For example 'beta/myapp:tag' will match myhost.com/beta/myapp:tag assuming myhost.com is the name of this registry.")
             .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("user")
+            .long("user")
+            .short("u")
+            .value_name("user")
+            .help("Set the username that can be used to access Trow (e.g. via docker login).
+Must be used with --pass or --pass-file")
+            .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("password")
+            .long("password")
+            .short("p")
+            .value_name("password")
+            .help("Set the password that can be used to access Trow (e.g. via docker login).
+Must be used with --user")
+            .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("password-file")
+            .long("password-file")
+            .value_name("password-file")
+            .help("Location of file with password that can be used to access Trow (e.g. via docker login).
+Must be used with --user")
+            .takes_value(true)
         )        
         .get_matches()
 }
@@ -189,6 +217,31 @@ fn main() {
     );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
+    }
+    if matches.is_present("user") {
+
+        let user = matches.value_of("user").expect("Failed to read user name");
+
+        if matches.is_present("password") {
+
+            let pass = matches.value_of("password").expect("Failed to read user password");
+            builder.with_user(user.to_string(), pass.to_string());
+            
+           } else if matches.is_present("password-file") {
+                let file_name = matches.value_of("password-file").expect(
+                    "Failed to read user password file");
+                let mut file = File::open(file_name).expect(
+                   &format!("Failed to read password file {}", file_name));
+                let mut pass = String::new();
+                file.read_to_string(&mut pass).expect(
+                    &format!("Failed to read password file {}", file_name));
+
+                builder.with_user(user.to_string(), pass);
+
+        } else {
+            eprintln!("Either --pass or --pass-file must be set if --user is set");
+            std::process::exit(1);
+        }
     }
     builder.start().unwrap_or_else(|e| {
         eprintln!("Error launching Trow:\n\n{}", e);
