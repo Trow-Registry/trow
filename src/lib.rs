@@ -12,6 +12,7 @@ extern crate orset;
 extern crate protobuf;
 #[macro_use]
 extern crate rocket;
+#[macro_use]
 extern crate rocket_contrib;
 extern crate rustc_serialize;
 extern crate serde;
@@ -234,7 +235,7 @@ impl TrowBuilder {
         println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
 
         println!(
-            "  These host names will considered local (refer to this regsitry): {:?}",
+            "  These host names will considered local (refer to this registry): {:?}",
             self.config.host_names
         );
         println!(

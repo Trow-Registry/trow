@@ -91,15 +91,17 @@ mod authentication_tests {
         //Test get redir header
         assert_eq!(
             resp.headers().get(AUTHN_HEADER).unwrap(), 
-            "Bearer realm=\"https://0.0.0.0:8443/login\",service=\"trow_registry\",scope=\"push/pull\""
+            "Bearer realm=\"https://trow.test:8443/login\",service=\"trow_registry\",scope=\"push/pull\""
         );
     }
 
     fn test_login(cl: &reqwest::Client) {
         let bytes = encode(b"authtest:authpass");
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
+        let mut resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
             AUTHZ_HEADER, format!("Basic {}", bytes)).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.text().unwrap().starts_with("{\"token\":"));
+        //TODO try getting something with bearer token
     }
 
     fn test_login_fail(cl: &reqwest::Client) {

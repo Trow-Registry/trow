@@ -55,7 +55,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
 
         let outcome = match base64::decode(&auth_strings[1]) {
             Ok(userpass) => {
-                
                 if verify_user(userpass, usercfg) {
                     Outcome::Success(ValidBasicToken {
                         user: usercfg.user.clone(),
@@ -143,7 +142,8 @@ pub fn new(vbt: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, fra
  */
 impl<'r> Responder<'r> for TrowToken {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
-        let formatted_body = Cursor::new(self.token);
+        //TODO: would be better to use serde here
+        let formatted_body = Cursor::new(format!("{{\"token\": \"{}\"}}", self.token));
         Response::build()
             .status(Status::Ok)
             .header(ContentType::JSON)
@@ -160,15 +160,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
     fn from_request(req: &'a Request<'r>) -> request::Outcome<TrowToken, ()> {
         let auth_val = match req.headers().get_one("Authorization") {
             Some(a) => a,
-            None => return Outcome::Failure((Status::Unauthorized, ())),
+            None => return Outcome::Forward(()),
         };
 
         //Check header handling - isn't there a next?
         // split the header on white space
         let auth_strings: Vec<String> = auth_val.split_whitespace().map(String::from).collect();
         if auth_strings.len() != 2 {
-            //TODO: Should this be BadRequest?
-            return Outcome::Failure((Status::Unauthorized, ()));
+            return Outcome::Failure((Status::BadRequest, ()));
         }
         // We're looking for a Bearer token
         //TODO: Maybe should forward or something on Basic

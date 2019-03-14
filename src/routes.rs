@@ -9,15 +9,16 @@ use response::trow_token::ValidBasicToken;
 use response::trow_token::{self, TrowToken};
 use response::upload_info::UploadInfo;
 use rocket;
-use rocket::State;
 use rocket::request::Request;
-use rocket_contrib::json::Json;
+use rocket::State;
+use rocket_contrib::json::{Json,JsonValue};
 use types::*;
 use TrowConfig;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
+        get_v2root_unauthorised,
         get_homepage,
         get_test_auth,
         login,
@@ -72,19 +73,23 @@ fn get_test_auth() -> Authenticate {
 
     // throw authenticate header
     //format!("logged in as {}", token.user)
-    Authenticate {
-        username: "admin".to_string(),
-    }
+    Authenticate {}
 }
 
 /*
  * v2 - throw Empty
  */
 #[get("/v2")]
-fn get_v2root() -> Empty {
-    // throw authenticate header
-    Empty
+fn get_v2root(_auth_user: TrowToken) -> Json<JsonValue> {
+    Json(json!({}))
 }
+
+//TODO: I think we can get rid of Authenticate completely by subsuming into TrowToken response
+#[get("/v2", rank = 2)]
+fn get_v2root_unauthorised() -> Authenticate {
+    Authenticate {}
+}
+
 /*
  * Welcome message
  */
