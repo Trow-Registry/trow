@@ -158,6 +158,16 @@ impl<'r> Responder<'r> for TrowToken {
 impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
     type Error = ();
     fn from_request(req: &'a Request<'r>) -> request::Outcome<TrowToken, ()> {
+        let config = req
+            .guard::<rocket::State<TrowConfig>>()
+            .expect("TrowConfig not present!");
+
+        if let None = config.user {
+            //Authentication is not configured
+            //TODO: Figure out how to create this only once
+            let no_auth_token = TrowToken{user: "none".to_string(), token: "none".to_string()};
+            return Outcome::Success(no_auth_token);
+        }
         let auth_val = match req.headers().get_one("Authorization") {
             Some(a) => a,
             None => return Outcome::Forward(()),
@@ -177,9 +187,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
 
         // parse for bearer token
         // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
-        let config = req
-            .guard::<rocket::State<TrowConfig>>()
-            .expect("TrowConfig not present!");
 
         let dec_token = match decode(&auth_strings[1], &config.token_secret, Algorithm::HS256) {
             Ok((_, payload)) => payload,

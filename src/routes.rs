@@ -139,7 +139,7 @@ Accept: manifest-version
  */
 #[get("/v2/<onename>/manifests/<reference>")]
 fn get_manifest(
-    //token: BearerToken,
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     onename: String,
     reference: String,
@@ -150,6 +150,7 @@ fn get_manifest(
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_2level(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
@@ -164,6 +165,7 @@ fn get_manifest_2level(
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
@@ -188,6 +190,7 @@ digest - unique identifier for the blob to be downoaded
 
 #[get("/v2/<name_repo>/blobs/<digest>")]
 fn get_blob(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     name_repo: String,
     digest: String,
@@ -201,12 +204,13 @@ fn get_blob(
 
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
 fn get_blob_2level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     name: String,
     repo: String,
     digest: String,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}", name, repo), digest)
+    get_blob(auth_user, ci, format!("{}/{}", name, repo), digest)
 }
 
 /*
@@ -214,13 +218,14 @@ fn get_blob_2level(
  */
 #[get("/v2/<org>/<name>/<repo>/blobs/<digest>")]
 fn get_blob_3level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     name: String,
     repo: String,
     digest: String,
 ) -> Option<BlobReader> {
-    get_blob(ci, format!("{}/{}/{}", org, name, repo), digest)
+    get_blob(auth_user, ci, format!("{}/{}/{}", org, name, repo), digest)
 }
 /*
 ---
@@ -249,6 +254,7 @@ Content-Type: application/octet-stream
  */
 #[put("/v2/<repo_name>/blobs/uploads/<uuid>?<digest>")]
 fn put_blob(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
@@ -263,13 +269,14 @@ fn put_blob(
  */
 #[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<digest>")]
 fn put_blob_2level(
+    auth_user: TrowToken,
     config: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
     digest: String,
 ) -> Result<AcceptedUpload, Error> {
-    put_blob(config, format!("{}/{}", repo, name), uuid, digest)
+    put_blob(auth_user, config, format!("{}/{}", repo, name), uuid, digest)
 }
 
 /*
@@ -277,6 +284,7 @@ fn put_blob_2level(
  */
 #[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>")]
 fn put_blob_3level(
+    auth_user: TrowToken,
     config: rocket::State<ClientInterface>,
     org: String,
     repo: String,
@@ -284,7 +292,7 @@ fn put_blob_3level(
     uuid: String,
     digest: String,
 ) -> Result<AcceptedUpload, Error> {
-    put_blob(config, format!("{}/{}/{}", org, repo, name), uuid, digest)
+    put_blob(auth_user, config, format!("{}/{}/{}", org, repo, name), uuid, digest)
 }
 
 /*
@@ -296,6 +304,7 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 */
 #[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
@@ -333,13 +342,14 @@ fn patch_blob(
  */
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_2level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    patch_blob(ci, format!("{}/{}", repo, name), uuid, chunk)
+    patch_blob(auth_user, ci, format!("{}/{}", repo, name), uuid, chunk)
 }
 
 /*
@@ -347,6 +357,7 @@ fn patch_blob_2level(
  */
 #[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_3level(
+    auth_user: TrowToken,
     handler: rocket::State<ClientInterface>,
     org: String,
     repo: String,
@@ -354,7 +365,7 @@ fn patch_blob_3level(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    patch_blob(handler, format!("{}/{}/{}", org, repo, name), uuid, chunk)
+    patch_blob(auth_user, handler, format!("{}/{}/{}", org, repo, name), uuid, chunk)
 }
 
 /*
@@ -366,6 +377,7 @@ fn patch_blob_3level(
 */
 #[post("/v2/<repo_name>/blobs/uploads")]
 fn post_blob_upload(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
 ) -> Result<UploadInfo, Error> {
@@ -390,12 +402,13 @@ fn post_blob_upload(
  */
 #[post("/v2/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload_2level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload {}/{}", repo, name);
-    post_blob_upload(ci, format!("{}/{}", repo, name))
+    post_blob_upload(auth_user, ci, format!("{}/{}", repo, name))
 }
 
 /*
@@ -403,13 +416,14 @@ fn post_blob_upload_2level(
  */
 #[post("/v2/<org>/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload_3level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload 3 way {}/{}/{}", org, repo, name);
-    post_blob_upload(ci, format!("{}/{}/{}", org, repo, name))
+    post_blob_upload(auth_user, ci, format!("{}/{}/{}", org, repo, name))
 }
 
 /*
@@ -422,6 +436,7 @@ Content-Type: <manifest media type>
  */
 #[put("/v2/<repo_name>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     reference: String,
@@ -448,13 +463,14 @@ fn put_image_manifest(
  */
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest_2level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(ci, format!("{}/{}", user, repo), reference, chunk)
+    put_image_manifest(auth_user, ci, format!("{}/{}", user, repo), reference, chunk)
 }
 
 /*
@@ -462,6 +478,7 @@ fn put_image_manifest_2level(
  */
 #[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 fn put_image_manifest_3level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
@@ -469,7 +486,7 @@ fn put_image_manifest_3level(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(ci, format!("{}/{}/{}", org, user, repo), reference, chunk)
+    put_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), reference, chunk)
 }
 
 /*
@@ -479,12 +496,12 @@ DELETE /v2/<name>/manifests/<reference>
 */
 
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn delete_image_manifest(_name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
+fn delete_image_manifest(_auth_user: TrowToken, _name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
     Err(Error::Unsupported)
 }
 
 #[get("/v2/_catalog")]
-fn get_catalog(ci: rocket::State<ClientInterface>) -> Result<RepoCatalog, Error> {
+fn get_catalog(_auth_user: TrowToken, ci: rocket::State<ClientInterface>) -> Result<RepoCatalog, Error> {
     match ci.get_catalog() {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
@@ -492,7 +509,7 @@ fn get_catalog(ci: rocket::State<ClientInterface>) -> Result<RepoCatalog, Error>
 }
 
 #[get("/v2/<repo_name>/tags/list")]
-fn list_tags(ci: rocket::State<ClientInterface>, repo_name: String) -> Result<TagList, Error> {
+fn list_tags(_auth_user: TrowToken, ci: rocket::State<ClientInterface>, repo_name: String) -> Result<TagList, Error> {
     match ci.list_tags(&RepoName(repo_name)) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
@@ -501,21 +518,23 @@ fn list_tags(ci: rocket::State<ClientInterface>, repo_name: String) -> Result<Ta
 
 #[get("/v2/<user>/<repo>/tags/list")]
 fn list_tags_2level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
 ) -> Result<TagList, Error> {
-    list_tags(ci, format!("{}/{}", user, repo))
+    list_tags(auth_user, ci, format!("{}/{}", user, repo))
 }
 
 #[get("/v2/<org>/<user>/<repo>/tags/list")]
 fn list_tags_3level(
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
 ) -> Result<TagList, Error> {
-    list_tags(ci, format!("{}/{}/{}", org, user, repo))
+    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo))
 }
 
 //Might want to move this stuff somewhere else
@@ -524,6 +543,7 @@ fn list_tags_3level(
 //Just using String for debugging
 #[post("/validate-image", data = "<image_data>")]
 fn validate_image(
+    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     tc: rocket::State<TrowConfig>,
     image_data: Json<AdmissionReview>,
