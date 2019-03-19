@@ -18,9 +18,7 @@ use TrowConfig;
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
-        get_v2root_unauthorised,
         get_homepage,
-        get_test_auth,
         login,
         get_manifest,
         get_manifest_2level,
@@ -61,19 +59,7 @@ pub fn routes() -> Vec<rocket::Route> {
 }
 
 pub fn catchers() -> Vec<rocket::Catcher> {
-    catchers![not_found]
-}
-
-/*
- * test-auth - throw www-authenticate header
- */
-#[get("/test-auth")]
-fn get_test_auth() -> Authenticate {
-    //Response guard should forward to authenticate, shouldn't be here
-
-    // throw authenticate header
-    //format!("logged in as {}", token.user)
-    Authenticate {}
+    catchers![not_found, no_auth]
 }
 
 /*
@@ -83,13 +69,6 @@ fn get_test_auth() -> Authenticate {
 fn get_v2root(_auth_user: TrowToken) -> Json<JsonValue> {
     Json(json!({}))
 }
-
-//TODO: I think we can get rid of Authenticate completely by subsuming into TrowToken response
-#[get("/v2", rank = 2)]
-fn get_v2root_unauthorised() -> Authenticate {
-    Authenticate {}
-}
-
 /*
  * Welcome message
  */
@@ -107,6 +86,13 @@ fn get_homepage<'a>() -> HTML<'a> {
 fn not_found(_: &Request) -> Json<String> {
     Json("404 page not found".to_string())
 }
+
+#[catch(401)]
+fn no_auth(_req: &Request) -> Authenticate {
+    Authenticate {}
+}
+
+
 /* login should it be /v2/login?
  * this is where client will attempt to login
  *
@@ -144,6 +130,7 @@ fn get_manifest(
     onename: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
+    warn!("matched");
     ci.get_reader_for_manifest(&RepoName(onename), &reference)
         .map_err(|_| Error::ManifestUnknown(reference))
 }
@@ -543,7 +530,6 @@ fn list_tags_3level(
 //Just using String for debugging
 #[post("/validate-image", data = "<image_data>")]
 fn validate_image(
-    _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     tc: rocket::State<TrowConfig>,
     image_data: Json<AdmissionReview>,

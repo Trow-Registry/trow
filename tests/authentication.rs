@@ -7,6 +7,7 @@ extern crate serde_json;
 extern crate trow;
 extern crate base64;
 extern crate trow_server;
+extern crate rocket_contrib;
 
 mod common;
 
@@ -23,6 +24,8 @@ mod authentication_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
+    use rocket_contrib::json::{Json,JsonValue};
+    use common;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
 
@@ -86,7 +89,7 @@ mod authentication_tests {
     }
 
     fn test_auth_redir(cl: &reqwest::Client) {
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/test-auth")).send().unwrap();
+        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/v2")).send().unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         //Test get redir header
         assert_eq!(
@@ -100,8 +103,12 @@ mod authentication_tests {
         let mut resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
             AUTHZ_HEADER, format!("Basic {}", bytes)).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        assert!(resp.text().unwrap().starts_with("{\"token\":"));
-        //TODO try getting something with bearer token
+        let token: JsonValue = resp.json().unwrap();
+        let resp2 = cl
+            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, "name", "tag"))
+            .send()
+            .unwrap();
+        assert_eq!(resp2.status(), StatusCode::UNAUTHORIZED);
     }
 
     fn test_login_fail(cl: &reqwest::Client) {

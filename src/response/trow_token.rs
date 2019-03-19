@@ -170,7 +170,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
         }
         let auth_val = match req.headers().get_one("Authorization") {
             Some(a) => a,
-            None => return Outcome::Forward(()),
+            None => return Outcome::Failure((Status::Unauthorized, ())),
         };
 
         //Check header handling - isn't there a next?
