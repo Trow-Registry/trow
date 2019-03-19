@@ -104,11 +104,11 @@ mod authentication_tests {
             AUTHZ_HEADER, format!("Basic {}", bytes)).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let token: JsonValue = resp.json().unwrap();
-        let resp2 = cl
+        let resp = cl
             .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, "name", "tag"))
             .send()
             .unwrap();
-        assert_eq!(resp2.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     fn test_login_fail(cl: &reqwest::Client) {
