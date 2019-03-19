@@ -58,7 +58,7 @@ Note there is an issue with this approach, as new nodes will not automatically
 get the certs and will be unable to pull from Trow. We hope to have a better
 solution in the future, but it may require changes to Kubernetes.
 
- - Finally, you probably want to be able to push from your development laptop,
+ - Finally, you probably want to be able to push images from your development laptop,
    which you can do with:
 
 ```
