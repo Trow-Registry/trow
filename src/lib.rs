@@ -221,11 +221,12 @@ impl TrowBuilder {
 
     pub fn start(&self) -> Result<(), Error> {
         init_logger()?;
+        
+        let rocket_config = &self.build_rocket_config()?;
+
         // GRPC Backend thread.
         let _grpc_thread = init_trow_server(self.config.clone())?;
 
-        //TODO: shouldn't need to clone rocket config
-        let rocket_config = &self.build_rocket_config()?;
         println!(
             "Starting trow on {}:{}",
             self.config.addr.host, self.config.addr.port
