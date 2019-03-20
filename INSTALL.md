@@ -58,7 +58,7 @@ Note there is an issue with this approach, as new nodes will not automatically
 get the certs and will be unable to pull from Trow. We hope to have a better
 solution in the future, but it may require changes to Kubernetes.
 
- - Finally, you probably want to be able to push from your development laptop,
+ - Finally, you probably want to be able to push images from your development laptop,
    which you can do with:
 
 ```
@@ -106,7 +106,7 @@ trow-test   1         1         1            1           8s
 
 One of the major features of Trow is the ability to control the images that run in
 the cluster. To achieve this, we need to set-up an [Admission Webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) in the Kubernetes cluster
-that will ask Trow everytime a resource is created or updated.
+that will ask Trow for permission everytime a resource is created or updated.
 
 The default policy will allow all images local to the Trow registry to be used, plus
 Kubernetes system images and the Trow images themselves. All other images are denied by
@@ -144,6 +144,36 @@ local-proxy   1         1         1            1           16s
 ```
 
 If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
+
+### Enable Authentication
+
+At this time the only authentication available is a simple username & password combination that can be set when starting Trow. To enable this, use the `-p` and `-u` arguments, which can be set in the appropriate section of the `trow.yaml` file:
+
+```
+     ...
+     containers:                                                               
+      - name: trow-pod                                                          
+        image: containersol/trow:default                                        
+        args: ["-u", "myuser", "-p", "mypass", "-n", "trow:31000 trow.kube-public:31000"]                       
+        imagePullPolicy: Always
+     ...   
+
+```
+
+After this you will need to run `docker login` to push and pull images:
+
+```
+$ docker pull trow.test:8443/myimage
+Using default tag: latest
+Error response from daemon: Get https://trow.test:8443/v2/myimage/manifests/latest: unauthorized: authentication required
+$ docker login trow.test:8443
+Username: myuser
+Password: 
+Login Succeeded
+$ docker pull ...
+```
+
+Trow also accepts a pointer to a file containing the password via the `--password-file` argument instead of `-p`. This allows the password to be stored in a Kubernetes secret that can be mounted into a volume inside the container.
 
 ### Troubleshooting
 
