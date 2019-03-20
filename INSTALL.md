@@ -170,7 +170,7 @@ $ docker login trow.test:8443
 Username: myuser
 Password: 
 Login Succeeded
-$ docker pul ...
+$ docker pull ...
 ```
 
 Trow also accepts a pointer to a file containing the password via the `--password-file` argument instead of `-p`. This allows the password to be stored in a Kubernetes secret that can be mounted into a volume inside the container.
