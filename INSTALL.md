@@ -138,7 +138,7 @@ deployment.apps "proxy" created
 $ kubectl get deployment proxy
 NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 proxy     1         0         0            0           13s
-$ kubectl describe rs proxy-
+$ kubectl describe rs proxy-<TAB>
 ...
   Warning  FailedCreate  16s (x13 over 57s)  replicaset-controller  Error creating: admission webhook "validator.trow.io" denied the request: Remote image docker.io/nginx disallowed as not contained in this registry and not in allow list
 ```
