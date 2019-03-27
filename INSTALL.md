@@ -7,7 +7,7 @@ Installation Instructions
 
 The following instructions install the Trow registry on an existing Kubernetes cluster, with a
 certificate signed by the Kubernetes CA. They have been tested on both minikube
-(with the KVM2 driver on Linux) and GKE.
+(with the KVM2 driver on Linux) and GKE. The instructions assume `kubectl` is configured to point to your cluster.
 
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
@@ -15,9 +15,17 @@ certificate signed by the Kubernetes CA. They have been tested on both minikube
 $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
 clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ```
- - Run the main kubernetes yaml from the root of this repository:
+ - If you've not already done so, clone the Trow repository:
 
 ```
+$ git clone https://github.com/ContainerSolutions/trow.git
+...
+```
+
+ - Apply the `trow.yaml` file from the root of this repository:
+
+```
+$ cd trow
 $ kubectl apply -f trow.yaml
 serviceaccount "trow" created
 role.rbac.authorization.k8s.io "trow" created
