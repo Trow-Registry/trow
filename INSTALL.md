@@ -9,6 +9,8 @@ The following instructions install the Trow registry on an existing Kubernetes c
 certificate signed by the Kubernetes CA. They have been primarily tested GKE. Minikube should work, but there may be issues with signing certificates. The instructions assume `kubectl` is configured to point to your cluster.
 We recommend spinning up a small GKE cluster for testing Trow to begin with.
 
+_MacOS warning:_ I've just realised that some of the Bash scripts don't work on MacOS. I'll update shortly.
+
 ### Steps
 
  - If you're running on GKE or have RBAC configured you may need to expand your
