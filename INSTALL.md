@@ -6,8 +6,7 @@ Installation Instructions
 ***These instructions modify nodes in your cluster. Only run on test clusters currently.***
 
 The following instructions install the Trow registry on an existing Kubernetes cluster, with a
-certificate signed by the Kubernetes CA. They have been tested on both minikube
-(with the KVM2 driver on Linux) and GKE. The instructions assume `kubectl` is configured to point to your cluster.
+certificate signed by the Kubernetes CA. They have been primarily tested GKE. Minikube should work, but there may be issues with signing certificates. The instructions assume `kubectl` is configured to point to your cluster.
 We recommend spinning up a small GKE cluster for testing Trow to begin with.
 
 ### Steps
