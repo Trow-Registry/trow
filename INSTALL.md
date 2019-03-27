@@ -1,13 +1,15 @@
 Installation Instructions
 =========================
 
-## Install with TLS
+## Install with TLS (default)
 
 ***These instructions modify nodes in your cluster. Only run on test clusters currently.***
 
-The following instructions install the Trow registry on Kubernetes, with a
-certificate signed by the Kubernetes CA. They have been tested on both minikube
-(with the KVM2 driver on Linux) and GKE.
+The following instructions install the Trow registry on an existing Kubernetes cluster, with a
+certificate signed by the Kubernetes CA. They have been primarily tested GKE. Minikube should work, but there may be issues with signing certificates. The instructions assume `kubectl` is configured to point to your cluster.
+We recommend spinning up a small GKE cluster for testing Trow to begin with.
+
+### Steps
 
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
@@ -15,9 +17,17 @@ certificate signed by the Kubernetes CA. They have been tested on both minikube
 $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
 clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ```
- - Run the main k8s yaml from the root of this repository:
+ - If you've not already done so, clone the Trow repository:
 
 ```
+$ git clone https://github.com/ContainerSolutions/trow.git
+...
+```
+
+ - Apply the `trow.yaml` file from the root of this repository:
+
+```
+$ cd trow
 $ kubectl apply -f trow.yaml
 serviceaccount "trow" created
 role.rbac.authorization.k8s.io "trow" created
@@ -55,8 +65,7 @@ job.batch "copy-certs-55cf8134-3457-11e9-a2bc-42010a800018" created
 ```
 
 Note there is an issue with this approach, as new nodes will not automatically
-get the certs and will be unable to pull from Trow. We hope to have a better
-solution in the future, but it may require changes to Kubernetes.
+get the certs and will be unable to pull from Trow. We will fix this issue in the future.
 
  - Finally, you probably want to be able to push images from your development laptop,
    which you can do with:
@@ -90,8 +99,7 @@ The push refers to repository [trow.kube-public:31000/test/nginx]
 alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c3752d11a55 size: 11903
 ```
 
-If the push seems to hang, check if port 31000 is blocked (in GKE it normally is
-by default).
+If the push seems to hang, check if port 31000 is blocked (common in GKE).
 
 The Kubernetes cluster should now be able to pull and run the image:
 
@@ -129,7 +137,7 @@ deployment.apps "proxy" created
 $ kubectl get deployment proxy
 NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 proxy     1         0         0            0           13s
-$ kubectl describe rs proxy-
+$ kubectl describe rs proxy-<TAB>
 ...
   Warning  FailedCreate  16s (x13 over 57s)  replicaset-controller  Error creating: admission webhook "validator.trow.io" denied the request: Remote image docker.io/nginx disallowed as not contained in this registry and not in allow list
 ```

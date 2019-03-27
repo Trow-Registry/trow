@@ -18,7 +18,7 @@ with "brow".
  
 ## Install
 
-See [INSTALL.md](./INSTALL.md). Note that it's currently very alpha software.
+See [INSTALL.md](./INSTALL.md). Note that Trow is currently alpha and you can expect to find rough edges.
 
 ## Use Cases
 
