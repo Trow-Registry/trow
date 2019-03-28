@@ -43,10 +43,12 @@ function add_to_etc_hosts {
   # redirectred stderr here, as ed likes to write to it even in success case
 
   if [[ -n "$add_host_ip" ]]; then
+    echo "This requires sudo privileges"
     printf "g/%s/d\nw\n" "$add_host_name" \
-      | ed /etc/hosts 2> /dev/null
+      | sudo ed /etc/hosts 2> /dev/null
 
-    echo "$add_host_ip $add_host_name # added for trow registry" >> /etc/hosts
+    echo "$add_host_ip $add_host_name # added for trow registry" \
+      | sudo tee -a /etc/hosts
   else
     echo
     echo "Failed to find external address for cluster" >&2
@@ -62,18 +64,12 @@ function add_to_etc_hosts {
 
 #Copy cert to host
 
-if [[ $(id -u) -ne 0 ]]; then
-  echo "Installing certificate requires root privileges i.e:"
-  echo 
-  echo "$ sudo $0 $@"
-  exit 1
-fi
-
-mkdir --parents "/etc/docker/certs.d/$registry_host_port/"
 echo "Copying cert into Docker"
+echo "This requires sudo privileges"
+sudo mkdir -p "/etc/docker/certs.d/$registry_host_port/"
 
 kubectl get configmap trow-cert -n kube-public -o jsonpath='{.data.cert}' \
-    > "/etc/docker/certs.d/$registry_host_port/ca.crt"
+    | sudo tee -a "/etc/docker/certs.d/$registry_host_port/ca.crt"
 
 echo "Successfully copied cert"
 
