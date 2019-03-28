@@ -9,6 +9,8 @@ The following instructions install the Trow registry on an existing Kubernetes c
 certificate signed by the Kubernetes CA. They have been primarily tested GKE. Minikube should work, but there may be issues with signing certificates. The instructions assume `kubectl` is configured to point to your cluster.
 We recommend spinning up a small GKE cluster for testing Trow to begin with.
 
+_MacOS warning:_ I've just realised that some of the Bash scripts don't work on MacOS. I'll update shortly.
+
 ### Steps
 
  - If you're running on GKE or have RBAC configured you may need to expand your
@@ -99,7 +101,7 @@ The push refers to repository [trow.kube-public:31000/test/nginx]
 alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c3752d11a55 size: 11903
 ```
 
-If the push seems to hang, check if port 31000 is blocked (common in GKE).
+If the push seems to hang, check if port 31000 is blocked (common with cloud provider default network rules).
 
 The Kubernetes cluster should now be able to pull and run the image:
 
