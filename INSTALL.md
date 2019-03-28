@@ -101,7 +101,7 @@ The push refers to repository [trow.kube-public:31000/test/nginx]
 alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c3752d11a55 size: 11903
 ```
 
-If the push seems to hang, check if port 31000 is blocked (common in GKE).
+If the push seems to hang, check if port 31000 is blocked (common with cloud provider default network rules).
 
 The Kubernetes cluster should now be able to pull and run the image:
 
