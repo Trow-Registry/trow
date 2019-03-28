@@ -73,7 +73,7 @@ get the certs and will be unable to pull from Trow. We will fix this issue in th
    which you can do with:
 
 ```
-$ sudo ./configure-host.sh --add-hosts
+$ ./configure-host.sh --add-hosts
 Copying cert into Docker
 Successfully copied cert
 Adding entry to /etc/hosts for trow.kube-public
