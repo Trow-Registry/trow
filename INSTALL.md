@@ -6,30 +6,37 @@ Installation Instructions
 ***These instructions modify nodes in your cluster. Only run on test clusters currently.***
 
 The following instructions install the Trow registry on an existing Kubernetes cluster, with a
-certificate signed by the Kubernetes CA. They have been primarily tested GKE. Minikube should work, but there may be issues with signing certificates. The instructions assume `kubectl` is configured to point to your cluster.
+certificate signed by the Kubernetes CA. They have been tested with GKE and minikube.
+
 We recommend spinning up a small GKE cluster for testing Trow to begin with.
 
-_MacOS warning:_ I've just realised that some of the Bash scripts don't work on MacOS. I'll update shortly.
+_MacOS warning:_ The scripts have been tested on Linux, let us know if there are any MacOS issues.
 
-### Steps
+### Pre-requisites
 
+ - `kubectl` install and configured to point at the cluster to install Trow on
+ - You've cloned or downloaded this repo
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
 ```
 $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
 clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ```
- - If you've not already done so, clone the Trow repository:
+
+### Automatic installation
+
+ - Just run `./install.sh` and follow the prompts. 
+
+If you'd rather have more control over the process, follow the manual steps below.
+
+Afterwards skip to the testing phase below.
+
+### Manual Steps
+
+ - Apply the `trow.yaml` file from the install direcotry:
 
 ```
-$ git clone https://github.com/ContainerSolutions/trow.git
-...
-```
-
- - Apply the `trow.yaml` file from the root of this repository:
-
-```
-$ cd trow
+$ cd install
 $ kubectl apply -f trow.yaml
 serviceaccount "trow" created
 role.rbac.authorization.k8s.io "trow" created
@@ -84,7 +91,29 @@ Successfully configured localhost
 ```
 
 This will copy Trow's cert into Docker and also add an entry to /etc/hosts for
-trow.kube-public. We can test it all out by trying to push an image:
+trow.kube-public. 
+
+One of the major features of Trow is the ability to control the images that run in
+the cluster. To achieve this, we need to set-up an [Admission Webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) in the Kubernetes cluster
+that will ask Trow for permission everytime a resource is created or updated.
+
+The default policy will allow all images local to the Trow registry to be used, plus
+Kubernetes system images and the Trow images themselves. All other images are denied by
+default, including Docker Hub images.
+
+To enable validation run (from the `install` directory):
+
+```
+$ ./validate.sh 
+Setting up trow as a validating webhook
+WARNING: This will limit what images can run in your cluster
+
+validatingwebhookconfiguration.admissionregistration.k8s.io "trow-validator" configured
+```
+
+### Test it out
+
+Try pushing an image:
 
 ```
 $ docker pull nginx:alpine
@@ -112,26 +141,10 @@ $ kubectl get deploy trow-test
 NAME        DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 trow-test   1         1         1            1           8s
 ```
-### Enable Validation
 
-One of the major features of Trow is the ability to control the images that run in
-the cluster. To achieve this, we need to set-up an [Admission Webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) in the Kubernetes cluster
-that will ask Trow for permission everytime a resource is created or updated.
+_NOTE: Don't worry if you get a message about run being deprecated. The command still works and I'll update these instructions in the future_
 
-The default policy will allow all images local to the Trow registry to be used, plus
-Kubernetes system images and the Trow images themselves. All other images are denied by
-default, including Docker Hub images.
-
-To enable validation run (from the `install` directory):
-
-```
-$ ./validate.sh 
-Setting up trow as a validating webhook
-WARNING: This will limit what images can run in your cluster
-
-validatingwebhookconfiguration.admissionregistration.k8s.io "trow-validator" configured
-```
-Now try running a Docker Hub image, which should be denied:
+If you have enabled validation of images, try running a Docker Hub image, which should be denied:
 
 ```
 $ kubectl run proxy --image=docker.io/nginx
