@@ -33,7 +33,6 @@ Afterwards skip to the testing phase below.
 
 ### Manual Steps
 
- - 
  - Apply the `trow.yaml` file from the install direcotry:
 
 ```
