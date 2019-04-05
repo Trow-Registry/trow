@@ -154,15 +154,6 @@ $ kubectl describe rs proxy-<TAB>
 ...
   Warning  FailedCreate  16s (x13 over 57s)  replicaset-controller  Error creating: admission webhook "validator.trow.io" denied the request: Remote image docker.io/nginx disallowed as not contained in this registry and not in allow list
 ```
-But local images still run:
-
-```
-$ kubectl run local-proxy --image=trow.kube-public:31000/test/nginx:alpine
-deployment.apps "local-proxy" created
-$ kubectl get deploy local-proxy
-NAME          DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-local-proxy   1         1         1            1           16s
-```
 
 If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
 
