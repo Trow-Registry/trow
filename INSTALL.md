@@ -10,7 +10,7 @@ certificate signed by the Kubernetes CA. They have been tested with GKE and mini
 
 We recommend spinning up a small GKE cluster for testing Trow to begin with.
 
-_MacOS warning:_ The scripts have been tested on Linux, let me know if there are any MacOS issues.
+_MacOS warning:_ The scripts have been tested on Linux, let us know if there are any MacOS issues.
 
 ### Pre-requisites
 
