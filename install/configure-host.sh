@@ -29,8 +29,9 @@ function get_ip_from_k8s {
     add_host_ip=$(minikube ip)
     set -e
     if [[ -z "$add_host_ip" ]]; then
-      echo "Failed to discover IP for kubernetes node"
-      exit 2
+      echo "Not minikube. Assuming running on localhost. This might work if 
+running Docker for Mac..."
+      add_host_ip="127.0.0.1"
     fi
   fi
 }
