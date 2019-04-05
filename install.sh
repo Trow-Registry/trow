@@ -39,6 +39,16 @@ do
   esac
 done
 
+on_mac=false
+if [[ "$(uname -s)" = "Darwin" ]]; then
+  on_mac=true
+fi
+
+#change to directory with script so we can reach deps
+#https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
+src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$src_dir"
+
 echo "Starting Kubernetes Resources"
 kubectl apply -f install/trow.yaml
 

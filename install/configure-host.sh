@@ -68,10 +68,36 @@ echo "Copying cert into Docker"
 echo "This requires sudo privileges"
 sudo mkdir -p "/etc/docker/certs.d/$registry_host_port/"
 
-kubectl get configmap trow-cert -n kube-public -o jsonpath='{.data.cert}' \
-    | sudo tee -a "/etc/docker/certs.d/$registry_host_port/ca.crt"
+set +e
+kubectl get configmap trow-cert -n kube-public &> /dev/null
+rc=$?
+while [[ $rc != 0 ]]
+do
+  sleep 1
+  echo -n "."
+  kubectl get configmap trow-cert -n kube-public &> /dev/null
+  rc=$?
+done
+set -e
 
-echo "Successfully copied cert"
+on_mac=false
+if [[ "$(uname -s)" = "Darwin" ]]; then
+  on_mac=true
+fi
+
+cert_file=$(mktemp /tmp/cert.XXXXXX)
+kubectl get configmap trow-cert -n kube-public -o jsonpath='{.data.cert}' \
+    | sudo tee -a $cert_file
+
+if "$on_mac"; then
+  echo "Assuming running Docker for Mac - adding certificate to Docker keychain"
+  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$cert_file"
+  echo 
+  echo "Certificate added"
+else #On linux
+  sudo cp "$cert_file" "/etc/docker/certs.d/$registry_host_port/ca.crt"
+  echo "Successfully copied cert"
+fi
 
 if [[ "$1" = "--add-hosts" ]]; then
   echo "Adding entry to /etc/hosts for trow.kube-public" 
