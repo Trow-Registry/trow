@@ -111,7 +111,7 @@ validatingwebhookconfiguration.admissionregistration.k8s.io "trow-validator" con
 
 ### Test it out
 
-Try pushing an image:
+Trow has configured the domain `trow.kube-public` to point to your kubernetes cluster. Try pushing an image:
 
 ```
 $ docker pull nginx:alpine
