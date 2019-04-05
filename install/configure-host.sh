@@ -95,6 +95,7 @@ if "$on_mac"; then
   sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$cert_file"
   echo 
   echo "Certificate added"
+  echo "Restart Docker for Mac for this to take effect."
 else #On linux
   sudo cp "$cert_file" "/etc/docker/certs.d/$registry_host_port/ca.crt"
   echo "Successfully copied cert"
