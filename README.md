@@ -19,6 +19,9 @@ with "brow".
 ## Install
 
 See [INSTALL.md](./INSTALL.md). Note that Trow is currently alpha and you can expect to find rough edges.
+This screencast shows how quick it is to get started:
+
+<script id="asciicast-48HK88yR4rJw0QuHt2VdkuVZn" src="https://asciinema.org/a/48HK88yR4rJw0QuHt2VdkuVZn.js" async></script>
 
 ## Use Cases
 
