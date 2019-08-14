@@ -6,11 +6,9 @@ Installation Instructions
 ***These instructions modify nodes in your cluster. Only run on test clusters currently.***
 
 The following instructions install the Trow registry on an existing Kubernetes cluster, with a
-certificate signed by the Kubernetes CA. They have been tested with GKE and minikube.
+certificate signed by the Kubernetes CA. They have been tested with GKE and minikube from MacOS and Linux.
 
 We recommend spinning up a small GKE cluster for testing Trow to begin with.
-
-_MacOS warning:_ The scripts have been tested on Linux, let us know if there are any MacOS issues.
 
 ### Pre-requisites
 
@@ -113,7 +111,7 @@ validatingwebhookconfiguration.admissionregistration.k8s.io "trow-validator" con
 
 ### Test it out
 
-Try pushing an image:
+Trow has configured the domain `trow.kube-public` to point to your kubernetes cluster. Try pushing an image:
 
 ```
 $ docker pull nginx:alpine
@@ -152,18 +150,9 @@ deployment.apps "proxy" created
 $ kubectl get deployment proxy
 NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 proxy     1         0         0            0           13s
-$ kubectl describe rs proxy-<TAB>
+$ kubectl describe rs proxy
 ...
   Warning  FailedCreate  16s (x13 over 57s)  replicaset-controller  Error creating: admission webhook "validator.trow.io" denied the request: Remote image docker.io/nginx disallowed as not contained in this registry and not in allow list
-```
-But local images still run:
-
-```
-$ kubectl run local-proxy --image=trow.kube-public:31000/test/nginx:alpine
-deployment.apps "local-proxy" created
-$ kubectl get deploy local-proxy
-NAME          DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-local-proxy   1         1         1            1           16s
 ```
 
 If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
