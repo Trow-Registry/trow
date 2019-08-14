@@ -14,9 +14,9 @@ This installer will perform the following steps:
 
   - Create a ServiceAccount and associated Roles for Trow 
   - Create a Kubernetes Service and Deployment
-  - Request and sign a TLS certificate for Trow
+  - Request and sign a TLS certificate for Trow from the cluster CA
   - Copy the public certificate to all nodes in the cluster
-  - Copy the certificate to this machine (optional)
+  - Copy the public certificate to this machine (optional)
   - Register a ValidatingAdmissionWebhook (optional) 
 
 If you're running on GKE, you may first need to give your user cluster-admin
@@ -49,9 +49,11 @@ fi
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
+echo
 echo "Starting Kubernetes Resources"
 kubectl apply -f install/trow.yaml
 
+echo
 echo "Approving certificate. This may take some time."
 set +e
 kubectl certificate approve trow.kube-public &> /dev/null
@@ -65,22 +67,25 @@ do
 done
 set -e
 
+echo
 cd install
 ./copy-certs.sh
+echo
 
 while true
 do
   read -r -p 'Do you wish to install certs on this host and configure /etc/hosts to allow access from this machine? (y/n) ' choice
   case "$choice" in
     n|N) break;;
-    y|Y) ./configure-host.sh --add-hosts; break;;
+    y|Y) echo; ./configure-host.sh --add-hosts; break;;
     *) echo 'Response not valid';;
   esac
 done
 
+echo
 while true
 do
-  read -r -p 'Configure validation webhook (NB this will stop external images from being deployed to the cluster)? (y/n) ' choice
+  read -r -p 'Do you want to configure Trow as a validation webhook (NB this will stop external images from being deployed to the cluster)? (y/n) ' choice
   case "$choice" in
     n|N) break;;
     y|Y) ./validate.sh; break;;

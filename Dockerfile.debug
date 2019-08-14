@@ -41,7 +41,7 @@ LABEL org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.source="https://github.com/ContainerSolutions/trow"
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends openssl \
+ && apt-get install -y --no-install-recommends openssl libssl-dev \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
