@@ -88,7 +88,7 @@ fi
 
 cert_file=$(mktemp /tmp/cert.XXXXXX)
 kubectl get configmap trow-cert -n kube-public -o jsonpath='{.data.cert}' \
-    | sudo tee -a $cert_file
+    | tee -a $cert_file
 
 if "$on_mac"; then
   echo "Assuming running Docker for Mac - adding certificate to Docker keychain"
