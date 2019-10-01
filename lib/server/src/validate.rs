@@ -67,13 +67,13 @@ fn parse_image(image_str: &str) -> Image {
 fn check_image(
     image_raw: &str,
     local_hosts: Vec<String>,
-    image_exists: &Fn(&Image) -> bool,
-    deny: &Fn(&Image) -> bool,
-    allow: &Fn(&Image) -> bool,
+    image_exists: &dyn Fn(&Image) -> bool,
+    deny: &dyn Fn(&Image) -> bool,
+    allow: &dyn Fn(&Image) -> bool,
 ) -> (bool, String) {
-
     let image = parse_image(&image_raw);
-    if local_hosts.contains(&image.host) { //local image
+    if local_hosts.contains(&image.host) {
+        //local image
         if image_exists(&image) {
             if deny(&image) {
                 return (false, format!("Local image {} on deny list", &image_raw));
@@ -274,5 +274,4 @@ mod test {
         );
         assert_eq!(true, v);
     }
-
 }

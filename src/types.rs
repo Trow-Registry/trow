@@ -104,11 +104,11 @@ pub fn create_verified_manifest(
 pub struct ManifestReader {
     content_type: String,
     digest: Digest,
-    reader: Box<Read>,
+    reader: Box<dyn Read>,
 }
 
 impl ManifestReader {
-    pub fn get_reader(self) -> Box<Read> {
+    pub fn get_reader(self) -> Box<dyn Read> {
         self.reader
     }
 
@@ -122,7 +122,7 @@ impl ManifestReader {
 }
 
 pub fn create_manifest_reader(
-    reader: Box<Read>,
+    reader: Box<dyn Read>,
     content_type: String,
     digest: Digest,
 ) -> ManifestReader {
@@ -135,11 +135,11 @@ pub fn create_manifest_reader(
 
 pub struct BlobReader {
     digest: Digest,
-    reader: Box<Read>,
+    reader: Box<dyn Read>,
 }
 
 impl BlobReader {
-    pub fn get_reader(self) -> Box<Read> {
+    pub fn get_reader(self) -> Box<dyn Read> {
         self.reader
     }
 
@@ -148,7 +148,7 @@ impl BlobReader {
     }
 }
 
-pub fn create_blob_reader(reader: Box<Read>, digest: Digest) -> BlobReader {
+pub fn create_blob_reader(reader: Box<dyn Read>, digest: Digest) -> BlobReader {
     BlobReader { reader, digest }
 }
 
@@ -202,7 +202,6 @@ impl TagList {
         &self.list
     }
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Status {
