@@ -9,6 +9,7 @@ RUN mv ./kubectl /usr/local/bin/kubectl
 RUN apt update
 RUN apt install -y dnsutils jq
 COPY init.sh /
+RUN chmod go+x init.sh
 
 ENTRYPOINT [""]
 CMD ["/init.sh"]
