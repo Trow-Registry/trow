@@ -103,6 +103,7 @@ spec:
       initContainers:
       - name: trow-init
         image: containersol/trow:init
+        command: ["/init.sh"]
         imagePullPolicy: Always
         env:
           - name: POD_NAME

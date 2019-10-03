@@ -102,6 +102,7 @@ spec:
           name: data-vol
       initContainers:
       - name: trow-init
+        command: ["/init.sh"]
         image: containersol/trow:init
         imagePullPolicy: Always
         env:
