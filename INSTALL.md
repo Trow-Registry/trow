@@ -256,3 +256,16 @@ Method 1) can work well internally in a cluster using NodePort to forward
 traffic. Method 2) can then be used to get an image into the registry from a
 development machine.
 
+### Microk8s and Containerd Support
+
+For trow to work with containerd, we need to use the secure registry
+configuration described here
+https://github.com/containerd/cri/blob/master/docs/registry.md. This config is
+only supported in containerd v1.3.0 and on. Currently (4 Oct 2019), microk8s
+uses version 1.2.5 of containerd and is not compatible.
+
+I am hopeful that Trow can use the mirror config in containerd to avoid the
+need to edit `/etc/hosts`. This would be a large step forward, but does mean we
+need access to the containerd config on all hosts. Once microk8s supports
+containerd, I'll test out this theory.
+
