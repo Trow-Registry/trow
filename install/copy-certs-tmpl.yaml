@@ -20,8 +20,8 @@ spec:
               name: cert-dir
             - mountPath: /hostfile
               name: host-dir
-          securityContext:
-            privileged: true
+#          securityContext:
+#            privileged: true
       volumes:
         - name: cert-dir
           hostPath: 
@@ -30,6 +30,6 @@ spec:
           hostPath: 
             path: /etc/hosts
       nodeSelector: 
-        kubernetes.io/hostname: "{{.metadata.name}}"
+        kubernetes.io/hostname: '{{index .metadata.labels "kubernetes.io/hostname"}}'
 ---
 {{end}}{{end}}

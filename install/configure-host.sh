@@ -29,9 +29,23 @@ function get_ip_from_k8s {
     add_host_ip=$(minikube ip)
     set -e
     if [[ -z "$add_host_ip" ]]; then
-      echo "Not minikube. Assuming running on localhost. This might work if 
+      echo "Not minikube."
+      echo "Trying internal IP which may work for local clusters e.g. microk8s"
+
+      schedulable_nodes="$(kubectl get nodes -o template \
+        --template='{{range.items}}{{if not .spec.unschedulable}}{{range.status.addresses}}{{if eq .type "InternalIP"}}{{.address}} {{end}}{{end}}{{end}}{{end}}')" 
+
+      for n in $schedulable_nodes 
+      do
+        add_host_ip=$n
+        break
+      done
+
+      if [[ -z "$add_host_ip" ]]; then
+        echo "Assuming running on localhost. This might work if 
 running Docker for Mac..."
-      add_host_ip="127.0.0.1"
+        add_host_ip="127.0.0.1"
+      fi
     fi
   fi
 }
