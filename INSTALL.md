@@ -61,6 +61,8 @@ The Kubernetes cluster should now be able to pull and run the image:
 ```
 $ kubectl run trow-test --image=trow.kube-public:31000/test/nginx:alpine
 deployment.apps "trow-test" created
+```
+```
 $ kubectl get deploy trow-test
 NAME        DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 trow-test   1         1         1            1           8s
@@ -73,9 +75,13 @@ If you have enabled validation of images, try running a Docker Hub image, which 
 ```
 $ kubectl run proxy --image=docker.io/nginx
 deployment.apps "proxy" created
+```
+```
 $ kubectl get deployment proxy
 NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 proxy     1         0         0            0           13s
+```
+```
 $ kubectl describe rs proxy
 ...
   Warning  FailedCreate  16s (x13 over 57s)  replicaset-controller  Error creating: admission webhook "validator.trow.io" denied the request: Remote image docker.io/nginx disallowed as not contained in this registry and not in allow list
@@ -104,6 +110,8 @@ After this you will need to run `docker login` to push and pull images:
 $ docker pull trow.test:8443/myimage
 Using default tag: latest
 Error response from daemon: Get https://trow.test:8443/v2/myimage/manifests/latest: unauthorized: authentication required
+```
+```
 $ docker login trow.test:8443
 Username: myuser
 Password: 
