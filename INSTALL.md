@@ -40,7 +40,11 @@ $ docker pull nginx:alpine
 alpine: Pulling from library/nginx
 Digest: sha256:e0292d158b6b353fde34909243a4886977cb9d1abb8a8a5fef9e0ff7138dd3e2
 Status: Image is up to date for nginx:alpine
+```
+```
 $ docker tag nginx:alpine trow.kube-public:31000/test/nginx:alpine
+```
+```
 $ docker push trow.kube-public:31000/test/nginx:alpine
 The push refers to repository [trow.kube-public:31000/test/nginx]
 979531bcfa2b: Pushed 
