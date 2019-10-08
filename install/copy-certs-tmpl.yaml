@@ -1,4 +1,11 @@
-{{range .items}}{{if not .spec.unschedulable}}
+{{- range .items}}
+  {{- $schedulable := true }}
+  {{- range .spec.taints}}
+    {{- if eq .effect "NoSchedule"}}
+      {{- $schedulable = false }}
+    {{- end}}
+  {{- end}}
+  {{- if $schedulable }}
 kind: Job
 apiVersion: batch/v1
 metadata:
@@ -32,4 +39,4 @@ spec:
       nodeSelector: 
         kubernetes.io/hostname: '{{index .metadata.labels "kubernetes.io/hostname"}}'
 ---
-{{end}}{{end}}
+{{- end}}{{- end}}
