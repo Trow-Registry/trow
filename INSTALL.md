@@ -16,7 +16,7 @@ We recommend spinning up a small GKE cluster for testing Trow to begin with.
  - `kubectl` is installed and configured to point at the cluster you wish to install Trow on
  - You've cloned or downloaded this repo
  - Port 31000 can be reached on the worker nodes (you may need to edit the
-   network policy on AWS or GKE)
+   network policy or firewall settings for your cluster)
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
 ```
