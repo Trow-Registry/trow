@@ -26,7 +26,7 @@ function get_ip_from_k8s {
     echo "Trying minikube"
 
     set +e
-    add_host_ip=$(minikube ip)
+    add_host_ip=$(minikube ip 2>/dev/null)
     set -e
     if [[ -z "$add_host_ip" ]]; then
       echo "Not minikube."
