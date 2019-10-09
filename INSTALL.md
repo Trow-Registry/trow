@@ -59,7 +59,7 @@ If the push seems to hang, check if port 31000 is blocked (common with cloud pro
 The Kubernetes cluster should now be able to pull and run the image:
 
 ```
-$ kubectl run trow-test --image=trow.kube-public:31000/test/nginx:alpine
+$ kubectl create deploy trow-test --image=trow.kube-public:31000/test/nginx:alpine
 deployment.apps "trow-test" created
 ```
 ```
@@ -68,12 +68,10 @@ NAME        DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 trow-test   1         1         1            1           8s
 ```
 
-_NOTE: Don't worry if you get a message about run being deprecated. The command still works and I'll update these instructions in the future_
-
 If you have enabled validation of images, try running a Docker Hub image, which should be denied:
 
 ```
-$ kubectl run proxy --image=docker.io/nginx
+$ kubectl create deploy proxy --image=docker.io/nginx
 deployment.apps "proxy" created
 ```
 ```
