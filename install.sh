@@ -7,7 +7,7 @@ cat << EOF
 Trow AutoInstaller for Kubernetes
 =================================
 
-This installer assumes kubectl is configued to point to the cluster you want to
+This installer assumes kubectl is configured to point to the cluster you want to
 install Trow on and that your user has cluster-admin rights.
 
 This installer will perform the following steps:
