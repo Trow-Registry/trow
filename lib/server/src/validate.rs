@@ -225,7 +225,7 @@ mod test {
         assert_eq!(true, v); //Easier to read than assert!(!v)
 
         //Image refers to this registry but not present in registry (so deny)
-        let (v, r) = check_image(
+        let (v, _) = check_image(
             "localhost:8080/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| false,
@@ -235,7 +235,7 @@ mod test {
         assert_eq!(false, v);
 
         //Image refers to this registry & not present but is in allow list (so allow)
-        let (v, r) = check_image(
+        let (v, _) = check_image(
             "localhost:8080/mydir/myimage:test",
             vec!["localhost:8080".to_owned()],
             &|_| false, //determines if in this registry

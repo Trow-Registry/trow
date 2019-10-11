@@ -41,7 +41,7 @@ pub struct ManifestV2 {
 #[serde(rename_all = "camelCase")]
 pub struct Object {
     pub media_type: String, //enum would be better
-    pub size: u64,
+    pub size: Option<u64>,
     pub digest: String, //special type would be nice
 }
 
@@ -77,10 +77,10 @@ fn schema_1(raw: &Value) -> Result<Manifest, Error> {
         tag,
         architecture,
         /*
-                fsLayers: BlobSummary::from_json_map(&raw["fsLayers"]),
-                signatures: Signature::from_json_map(&raw["signatures"]),
-                history: EmptyStruct::from_json_map(&raw["history"]),
-                */
+        fsLayers: BlobSummary::from_json_map(&raw["fsLayers"]),
+        signatures: Signature::from_json_map(&raw["signatures"]),
+        history: EmptyStruct::from_json_map(&raw["history"]),
+        */
         fs_layers: Vec::new(),
         signatures: Vec::new(),
         history: Vec::new(),
@@ -253,6 +253,71 @@ mod test {
     use serde_json::{self, Value};
 
     #[test]
+    fn valid_v2_2() {
+        let data = r#"{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+   "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "digest": "sha256:4d3c246dfef2edb11eccb051b47d896d0db8f1c4563c0cce9f6274b9abd9ac74"
+   },
+   "layers": [
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 2789670,
+         "digest": "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 5876721,
+         "digest": "sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826"
+      }
+   ]
+}"#;
+
+        //Pretty sure we should be able to do this directly
+        let v: Value = serde_json::from_str(data).unwrap();
+        let mani = Manifest::from_json(&v).unwrap();
+
+        // There's probably an easier way to do this
+        let m_v2 = match mani {
+            Manifest::V2(ref m2) => m2,
+            Manifest::V1(_) => panic!(),
+        };
+
+        assert_eq!(
+            m_v2.media_type,
+            "application/vnd.docker.distribution.manifest.v2+json"
+        );
+        assert_eq!(m_v2.schema_version, 2);
+        assert_eq!(
+            m_v2.config.media_type,
+            "application/vnd.docker.container.image.v1+json"
+        );
+        assert_eq!(m_v2.config.size, None);
+        assert_eq!(
+            m_v2.config.digest,
+            "sha256:4d3c246dfef2edb11eccb051b47d896d0db8f1c4563c0cce9f6274b9abd9ac74"
+        );
+        assert_eq!(
+            m_v2.layers[0].media_type,
+            "application/vnd.docker.image.rootfs.diff.tar.gzip"
+        );
+        assert_eq!(m_v2.layers[0].size, Some(2789670));
+        assert_eq!(
+            m_v2.layers[0].digest,
+            "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
+        );
+
+        assert_eq!(mani.get_asset_digests().len(), 3);
+        assert!(mani
+            .get_asset_digests()
+            .contains(&"sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"));
+        assert!(mani
+            .get_asset_digests()
+            .contains(&"sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826"));
+    }
+    #[test]
     fn valid_v2() {
         let data = r#"{
      "schemaVersion": 2,
@@ -289,7 +354,7 @@ mod test {
             m_v2.config.media_type,
             "application/vnd.docker.container.image.v1+json"
         );
-        assert_eq!(m_v2.config.size, 1278);
+        assert_eq!(m_v2.config.size.unwrap(), 1278);
         assert_eq!(
             m_v2.config.digest,
             "sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
@@ -298,23 +363,19 @@ mod test {
             m_v2.layers[0].media_type,
             "application/vnd.docker.image.rootfs.diff.tar.gzip"
         );
-        assert_eq!(m_v2.layers[0].size, 1967949);
+        assert_eq!(m_v2.layers[0].size.unwrap(), 1967949);
         assert_eq!(
             m_v2.layers[0].digest,
             "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
         );
 
         assert_eq!(mani.get_asset_digests().len(), 2);
-        assert!(
-            mani.get_asset_digests().contains(
-                &"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
-            )
-        );
-        assert!(
-            mani.get_asset_digests().contains(
-                &"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
-            )
-        );
+        assert!(mani
+            .get_asset_digests()
+            .contains(&"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"));
+        assert!(mani
+            .get_asset_digests()
+            .contains(&"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"));
     }
 
     #[test]
@@ -355,5 +416,4 @@ mod test {
         let v: Value = serde_json::from_str(data).unwrap();
         assert!(Manifest::from_json(&v).is_ok());
     }
-
 }
