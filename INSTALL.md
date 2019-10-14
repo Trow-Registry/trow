@@ -29,7 +29,7 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
  - Just run `./install.sh` and follow the prompts. 
 
 If you'd rather have more control over the process, follow the [manual
-steps](./MANUAL_INSTALL.md).
+steps](./docs/MANUAL_INSTALL.md).
 
 ### Test it out
 
