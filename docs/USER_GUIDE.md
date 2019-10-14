@@ -25,7 +25,7 @@ For any given repository, we can use the `/v2/<repository>/tags/list` GET
 endpoint to list the available tags e.g:
 
 ```
-curl --cacert cert2.pem https://trow.kube-public:31000/v2/repo/tags/list
+curl --insecure https://trow.kube-public:31000/v2/repo/tags/list
 {"name":"repo","tags":["tag","tag3","tag2"]}
 ```
 
