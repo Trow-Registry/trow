@@ -1,7 +1,7 @@
 # Trow User Guide
 
 More information is available in the [README](../README.md) and [Installation
-instructions](../INSTALL.md.
+instructions](../INSTALL.md).
 
 ## Listing Repositories and Tags
 
