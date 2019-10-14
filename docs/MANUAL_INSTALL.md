@@ -84,4 +84,4 @@ validatingwebhookconfiguration.admissionregistration.k8s.io "trow-validator" con
 ```
 
 You can test everything worked correctly by following the instructions in [the
-main install guide](./INSTALL.md).
+main install guide](../INSTALL.md).
