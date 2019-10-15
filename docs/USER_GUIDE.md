@@ -35,6 +35,7 @@ Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/), the
 following should work:
 
 ```
+...
       volumes:
         - name: cert-vol
           emptyDir:
