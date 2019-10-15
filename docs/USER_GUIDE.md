@@ -1,7 +1,7 @@
 # Trow User Guide
 
  * [Persisting Data/Images](#persisting-dataimages)
- * [Listing Repositories and Tags](#listing-repostiories-and-tags)
+ * [Listing Repositories and Tags](#listing-repositories-and-tags)
  * [Using Curl Securely](#using-curl-securely)
 
 More information is available in the [README](../README.md) and [Installation
