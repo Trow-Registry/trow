@@ -38,7 +38,7 @@ images that are run on their clusters. Proposed features include:
 ## Docs
 
 Work has started on a [User Guide](docs/USER_GUIDE.md). Currently this explains
-how to list repositories and tags via curl.
+how to persist images and how to list repositories and tags via curl.
 
 ## Notes
 
