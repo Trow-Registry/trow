@@ -8,7 +8,7 @@ registry_host_port="${registry_host}:${registry_port}"
 
 mkdir --parents "/etc/docker/certs.d/$registry_host_port/"
 echo "copying certs"
-kubectl get configmap trow-cert -n kube-public -o jsonpath='{.data.cert}'
+kubectl get secret -o jsonpath="{.items[?(@.type==\"kubernetes.io/service-account-token\")].data['ca\.crt']}" | base64 --decode
     > "/etc/docker/certs.d/$registry_host_port/ca.crt"
 echo "Successfully copied certs"
 

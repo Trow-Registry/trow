@@ -83,25 +83,13 @@ echo "Copying cert into Docker"
 echo "This requires sudo privileges"
 sudo mkdir -p "/etc/docker/certs.d/$registry_host_port/"
 
-set +e
-kubectl get configmap trow-cert -n kube-public &> /dev/null
-rc=$?
-while [[ $rc != 0 ]]
-do
-  sleep 1
-  echo -n "."
-  kubectl get configmap trow-cert -n kube-public &> /dev/null
-  rc=$?
-done
-set -e
-
 on_mac=false
 if [[ "$(uname -s)" = "Darwin" ]]; then
   on_mac=true
 fi
 
 cert_file=$(mktemp /tmp/cert.XXXXXX)
-kubectl get configmap trow-cert -n kube-public -o jsonpath='{.data.cert}' \
+kubectl get secret -o jsonpath="{.items[?(@.type==\"kubernetes.io/service-account-token\")].data['ca\.crt']}" | base64 --decode \
     | tee -a $cert_file
 
 if "$on_mac"; then
