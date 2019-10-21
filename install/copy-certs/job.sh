@@ -8,7 +8,7 @@ registry_host_port="${registry_host}:${registry_port}"
 
 mkdir --parents "/etc/docker/certs.d/$registry_host_port/"
 echo "copying certs"
-kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 --decode \
+kubectl config view --raw --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 --decode \
     > "/etc/docker/certs.d/$registry_host_port/ca.crt"
 echo "Successfully copied certs"
 

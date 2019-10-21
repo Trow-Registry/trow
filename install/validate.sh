@@ -9,7 +9,7 @@ echo "By default, only images in Trow and official Kubernetes images will be
 allowed"
 echo
 
-cabundle=$(kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}')
+cabundle=$(kubectl config view --raw --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 #Really not happy about use of sed here
 #Can we use go-template now?
 sed "s/{{cabundle}}/${cabundle}/" validate-tmpl.yaml > validate.yaml
