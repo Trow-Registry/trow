@@ -121,7 +121,7 @@ specification.
 To avoid the need to use `--insecure` when talking to Trow, you need to provide
 curl with the Certificate Authority certificate (_not_ the Trow cert, but the
 authority that issued the cert). In a normal install, this will be the
-Kubernetes CA. One way to do this is via a service account secret:
+Kubernetes CA. One way to do this is to pull it out of the service account secret:
 
 ```
 $ kubectl get secret -o jsonpath="{.items[?(@.type==\"kubernetes.io/service-account-token\")].data['ca\.crt']}" | base64 --decode > k8sca.crt
