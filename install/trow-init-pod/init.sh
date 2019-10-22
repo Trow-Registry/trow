@@ -6,7 +6,7 @@ IFS=$'\n\t'
 # Only do this if we don't already have a cert
 # There is a danger the cert is incorrect or expired
 # Need to add some checks
-if [ -f /certs/domain.key && -f /certs/ca.crt ]; then
+if [[ -f /certs/domain.key && -f /certs/ca.crt ]]; then
   echo "Using existing certificate"
 else
   # Get service IP. Not sure how essential the IP addresses are, but let's do it
