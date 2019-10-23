@@ -3,6 +3,7 @@
  * [Persisting Data/Images](#persisting-dataimages)
  * [Listing Repositories and Tags](#listing-repositories-and-tags)
  * [Using Curl Securely](#using-curl-securely)
+ * [Troubleshooting](#troubleshooting)
 
 More information is available in the [README](../README.md) and [Installation
 instructions](../INSTALL.md).
@@ -137,3 +138,62 @@ $ curl --cacert k8sca.crt https://trow.kube-public:31000/v2/
 {}
 ```
 
+## Troubleshooting
+
+### Where are the logs?
+
+The first place to look for debugging information is in the output from the
+`kubectl describe` command. It's worth looking at the output for the deployment,
+replicaset and pod:
+
+```
+$ kubectl describe deploy -n kube-public trow-deploy
+$ kubectl describe replicaset -n kube-public trow-deploy
+$ kubectl describe pod -n kube-public trow-deploy
+```
+
+If there are any problems pulling images or with containers crashing, you should
+see this here.
+
+For the actual applcation logs try:
+
+```
+$ kubectl logs -n kube-public trow-deploy-596bf849c8-m7b7l
+```
+
+The ID at the end of your pod name will be different, but you should be able to
+use autocomplete to get the correct name (hit the tab key after typing
+"trow-deploy").
+
+If there are no logs there, check the init container:
+
+```
+$ kubectl logs -n kube-public trow-deploy-596bf849c8-m7b7l -c trow-init
+```
+
+The `copy-certs` job may also log errors:
+
+```
+$ kubectl logs -n kube-public copy-certs-925a5126-48bd-43d4-b9ea-3f792519b051-fznp8
+```
+
+### I can't push images into Trow
+
+
+### My pod can't pull images from Trow
+
+### Trow failed to restart after eviction
+
+If the Trow pod is restarted on the same node, it should  
+
+
+
+
+
+
+
+NAME                                                    READY   STATUS      RESTARTS   AGE
+copy-certs-03e740d5-f57c-11e9-9ebf-42010a80009f-x28f4   0/1     Completed   0          3m16s
+copy-certs-04130ba6-f57c-11e9-9ebf-42010a80009f-zlztv   0/1     Completed   0          3m16s
+copy-certs-04bdf9db-f57c-11e9-9ebf-42010a80009f-rpxzn   0/1     Completed   0          3m16s
+trow-deploy-5d64f6fff6-lwnxh                            0/1     Init:0/1    0          3m32s

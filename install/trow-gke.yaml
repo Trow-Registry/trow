@@ -123,8 +123,7 @@ spec:
           name: cert-vol
       volumes:
         - name: cert-vol
-          emptyDir:
-            medium: Memory
+          emptyDir: {}
         - name: data-vol
           persistentVolumeClaim:
             claimName: data-claim
