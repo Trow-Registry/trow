@@ -13,8 +13,8 @@ instructions](../INSTALL.md).
 By default, Trow stores images and metadata in a Kubernetes [emptyDir
 volume](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir). This
 means that the data will survive pod restarts, but will be lost if the Trow pod
-is evicted from the node it is running on. This can occur when a node fails or
-is brought down for maintenance.
+is deleted or evicted from the node it is running on. This can occur when a node
+fails or is brought down for maintenance.
 
 To avoid losing data in this manner it is recommended to run using some form
 of persistent data volume. To do this we need to edit the `trow.yaml` file in
@@ -152,8 +152,7 @@ $ kubectl describe replicaset -n kube-public trow-deploy
 $ kubectl describe pod -n kube-public trow-deploy
 ```
 
-If there are any problems pulling images or with containers crashing, you should
-see this here.
+In particular, look for problems pulling images or with containers crashing.
 
 For the actual applcation logs try:
 
@@ -165,7 +164,13 @@ The ID at the end of your pod name will be different, but you should be able to
 use autocomplete to get the correct name (hit the tab key after typing
 "trow-deploy").
 
-If there are no logs there, check the init container:
+If there are no logs or you get output like: 
+
+```
+Error from server (BadRequest): container "trow-pod" in pod "trow-deploy-6f6f8fbc6d-rndtd" is waiting to start: PodInitializing
+```
+
+Look at the logs for the init container:
 
 ```
 $ kubectl logs -n kube-public trow-deploy-596bf849c8-m7b7l -c trow-init
@@ -179,21 +184,87 @@ $ kubectl logs -n kube-public copy-certs-925a5126-48bd-43d4-b9ea-3f792519b051-fz
 
 ### I can't push images into Trow
 
+If you get an error like:
+
+```
+$ docker push trow.kube-public:31000/nginx:alpine
+The push refers to repository [trow.kube-public:31000/nginx]
+Get https://trow.kube-public:31000/v2/: dial tcp 192.168.39.211:31000: connect: no route to host
+```
+
+Your client isn't reaching the Trow service. Please check the following:
+
+ - Verify that Trow is running (e.g. `kubectl get deploy -n kube-public
+   trow-deploy`). If not, refer to the section on logs above to diagnose the
+   issue. 
+ - Check that the NodePort service exists (e.g. `kubectl describe svc -n
+   kube-public trow`). 
+ - Check that your network or cloud provider isn't blocking port 31000, if
+   you're using GKE or AWS, you will likely need to configure networking rules.
+ - Make sure that your client is pointing to the correct address. The IP address
+   given in the error message should match the public IP of one of the cluster
+   nodes. If it doesn't, try running the `install/configure-host.sh` script.
+
+If you get an error like:
+
+```
+$ docker push trow.kube-public:31000/nginx:alpine
+The push refers to repository [trow.kube-public:31000/nginx]
+Get https://trow.kube-public:31000/v2/: x509: certificate signed by unknown authority
+```
+
+This indicates the Docker client doesn't trust the remote server. To fix this,
+we need to add Kubernetes CA certificate or the Trow certificate to Docker. The
+easiest way to do this is by running the `install/configure-host.sh`, which
+should place the correct under `/etc/docker/certs.d/_registry-name_`.  
+
+If you get an error like:
+
+```
+docker push trow.kube-public:31000/nginx:alpine
+The push refers to repository [trow.kube-public:31000/nginx]
+Get https://trow.kube-public:31000/v2/: dial tcp: lookup trow.kube-public: No address associated with hostname
+```
+
+This indicates it can't resolve the host name. Running `install/configure-host.sh` should add an entry to `/etc/hosts` that will fix the issue.
 
 ### My pod can't pull images from Trow
 
-### Trow failed to restart after eviction
+If a deployment isn't starting, check the logs for the replica set e.g:
 
-If the Trow pod is restarted on the same node, it should  
+```
+$ kubectl get rs my-app-844d6db962
+...
+```
 
+If there is a failed create message, the image may have been refused validation by Trow. If the message reads like:
 
+```
+Error creating: admission webhook "validator.trow.io" denied the request: *Remote* image docker.io/nginx disallowed as not contained in this registry and not in allow list
+```
 
+That means Trow considered the image name to refer to a _remote_ repository (i.e. not Trow itself) which has not been added to the allow list. If you believe the image should have been considered local, check the repository address appears in the list of addresses passed to Trow on start-up with the `-n` switch. If you want to allow a single remote image, add it to Trow by using the `--allow-images` flag. If you want to allow a whole repository or subdirectory of a repository use `--allow-prefixes`.
 
+If the message reads:
 
+```
+Error creating: admission webhook "validator.trow.io" denied the request: Local image trow.kube-public:31000/notpresent disallowed as not contained in this registry and not in allow list
+```
 
+It means Trow expected to be able to serve this image itself but it wasn't found in the repository. Either push the image or use the `allow-images` or `allow-prefixes` flag to pre-approve images. Note that Kubernetes will keep trying to validate images.
 
-NAME                                                    READY   STATUS      RESTARTS   AGE
-copy-certs-03e740d5-f57c-11e9-9ebf-42010a80009f-x28f4   0/1     Completed   0          3m16s
-copy-certs-04130ba6-f57c-11e9-9ebf-42010a80009f-zlztv   0/1     Completed   0          3m16s
-copy-certs-04bdf9db-f57c-11e9-9ebf-42010a80009f-rpxzn   0/1     Completed   0          3m16s
-trow-deploy-5d64f6fff6-lwnxh                            0/1     Init:0/1    0          3m32s
+If you get the error:
+
+```
+Error creating: Internal error occurred: failed calling admission webhook "validator.trow.io": Post https://trow.kube-public.svc:443/validate-image?timeout=30s: no endpoints available for service "trow"
+```
+
+Trow probably isn't running. You will need to disable the admission webhook and
+restart Trow. To disable the webhook run `kubectl delete
+validatingwebhookconfigurations.admissionregistration.k8s.io trow-validator`. If
+Trow doesn't restart automatically, refer to the other sections on
+troubleshooting or try reinstalling.
+
+If the error is not to do with validation, it may be that the node is unable to
+pull from the Trow registry. By default nodes are configured by the `copy-certs`
+job. You can check that the job completed succesfully with `kubectl get jobs -n kube-public`. If the node is new, try running the script `install/copy-certs.sh`.
