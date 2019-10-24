@@ -57,7 +57,7 @@ mod authentication_tests {
         let mut timeout = 20;
 
         let mut buf = Vec::new();
-        File::open("./certs/ca.crt")
+        File::open("./certs/domain.crt")
             .unwrap()
             .read_to_end(&mut buf)
             .unwrap();
@@ -126,7 +126,7 @@ mod authentication_tests {
         let _trow = start_trow();
 
         let mut buf = Vec::new();
-        File::open("./certs/ca.crt")
+        File::open("./certs/domain.crt")
             .unwrap()
             .read_to_end(&mut buf)
             .unwrap();

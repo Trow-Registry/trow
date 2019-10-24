@@ -52,7 +52,7 @@ mod validation_tests {
     let mut timeout = 20;
 
     let mut buf = Vec::new();
-    File::open("./certs/ca.crt")
+    File::open("./certs/domain.crt")
       .unwrap()
       .read_to_end(&mut buf)
       .unwrap();
@@ -288,7 +288,7 @@ mod validation_tests {
     fs::remove_dir_all("./data").unwrap_or(());
 
     let mut buf = Vec::new();
-    File::open("./certs/ca.crt")
+    File::open("./certs/domain.crt")
       .unwrap()
       .read_to_end(&mut buf)
       .unwrap();

@@ -8,7 +8,7 @@ use std::io::prelude::*;
 
 const PROGRAM_NAME: &str = "Trow";
 const PROGRAM_DESC: &str = "\nThe Cluster Registry";
-const DEFAULT_CERT_PATH: &str = "./certs/ca.crt";
+const DEFAULT_CERT_PATH: &str = "./certs/domain.crt";
 const DEFAULT_KEY_PATH: &str = "./certs/domain.key";
 
 /*
