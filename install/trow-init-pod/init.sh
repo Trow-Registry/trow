@@ -1,15 +1,24 @@
 #!/bin/bash
 
-set -euo pipefail
 IFS=$'\n\t'
 
 date
 # Only do this if we don't already have a cert
 # There is a danger the cert is incorrect or expired
 # Need to add some checks
-if [[ -f /certs/domain.key && -f /certs/ca.crt ]]; then
-  echo "Using existing certificate"
+
+if [[ $(kubectl get secret trow-tls) ]]; then
+
+  echo "Found existing trow-tls certificate"
+  # save it out to tmpfs volume at /certs/
+
+  kubectl get secret -n kube-public trow-tls -o jsonpath="{.data.tls\.crt}" \
+    | base64 --decode > /certs/domain.crt
+  kubectl get secret -n kube-public trow-tls -o jsonpath="{.data.tls\.key}" \
+    | base64 --decode > /certs/domain.key
+
 else
+  set -euo pipefail
   echo "Generating new certificate"
   # Get service IP. Not sure how essential the IP addresses are, but let's do it
   echo "Getting IP of trow service"
@@ -44,9 +53,9 @@ else
 }
 EOF
 
-  # certs should be a volume that the main pod can read
-  cp trow-key.pem /certs/domain.key
-  echo "Saved key to /certs/domain.key"
+  # Key is now saved to trow-key.pem
+  mv trow-key.pem /certs/domain.key
+  # TODO: pipe straight to tmpfs volume
 
   REQ=$(cat trow.csr | base64 | tr -d '\n')
 
@@ -87,20 +96,12 @@ $ kubectl certificate approve trow.$POD_NAMESPACE
   done
 
   kubectl get csr trow.$POD_NAMESPACE -o jsonpath='{.status.certificate}' \
-      | base64 -d > /certs/ca.crt
+      | base64 -d > /certs/domain.crt
 
-  echo "Saved signed cert to /certs/ca.crt"
-
-  # CSRs get garbaged collected, so save the public cert to a configmap to make it
-  # easy to retrieve later.
-
-  # We're using the pipe through apply trick to handle case where configmap
-  # already exists.
-  kubectl create configmap trow-cert --from-file=cert=/certs/ca.crt \
-    --dry-run -o json | kubectl apply -n $POD_NAMESPACE -f -
+  kubectl create secret tls trow-tls -n kube-public --key="/certs/domain.key" --cert="/certs/domain.crt"
 
   echo
-  echo "Saved cert to trow-cert config map"
+  echo "Saved certificate and key to trow-tls secret"
   echo
 fi
 

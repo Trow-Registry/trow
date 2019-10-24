@@ -17,6 +17,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - secrets
   - configmaps
   verbs:
   - create
@@ -91,7 +92,7 @@ spec:
       containers:
       - name: trow-pod
         image: containersol/trow:default
-        args: ["-n", "trow:31000 trow.kube-public:31000"]
+        args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt"]
         imagePullPolicy: Always
         ports:
         - containerPort: 8443
@@ -123,7 +124,8 @@ spec:
           name: cert-vol
       volumes:
         - name: cert-vol
-          emptyDir: {}
+          emptyDir:
+            medium: Memory
         - name: data-vol
           emptyDir: {}
 ---

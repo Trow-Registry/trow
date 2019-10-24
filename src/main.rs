@@ -176,7 +176,7 @@ fn main() {
     let port: u16 = matches
         .value_of("port")
         .map_or(default_port, |x| x.parse().unwrap());
-    let cert_path = matches.value_of("cert").unwrap_or("./certs/ca.crt");
+    let cert_path = matches.value_of("cert").unwrap_or("./certs/domain.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
     let host_names_str = matches.value_of("names").unwrap_or(host);
