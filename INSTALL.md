@@ -27,9 +27,12 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ### Automatic installation
 
  - Just run `./install.sh` and follow the prompts. 
+ - Once done, restart docker.
 
 If you'd rather have more control over the process, follow the [manual
 steps](./docs/MANUAL_INSTALL.md).
+
+
 
 ### Test it out
 
@@ -55,6 +58,12 @@ alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c375
 ```
 
 If the push seems to hang, check if port 31000 is blocked (common with cloud provider default network rules).
+
+If you are using google cloud you may need to run this:
+
+```
+$ gcloud compute firewall-rules create trow-rule --allow=tcp:31000
+```
 
 The Kubernetes cluster should now be able to pull and run the image:
 
@@ -86,6 +95,27 @@ $ kubectl describe rs proxy
 ```
 
 If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
+
+As an example: editing install/trow.yaml and adding the args:
+```
+containers:
+- name: trow-pod
+  image: containersol/trow:default
+  args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt","--allow-docker-official","--allow-prefixes"]
+```
+Then you run
+```
+$ kubectl apply -f install/trow.yaml 
+
+serviceaccount/trow unchanged
+role.rbac.authorization.k8s.io/trow unchanged
+clusterrole.rbac.authorization.k8s.io/trow unchanged
+rolebinding.rbac.authorization.k8s.io/trow unchanged
+clusterrolebinding.rbac.authorization.k8s.io/trow unchanged
+deployment.apps/trow-deploy configured
+service/trow unchanged
+```
+
 
 ### Enable Authentication
 

@@ -92,7 +92,7 @@ spec:
       containers:
       - name: trow-pod
         image: containersol/trow:default
-        args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt"]
+        args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt","--allow-docker-official","--allow-prefixes"]
         imagePullPolicy: Always
         ports:
         - containerPort: 8443

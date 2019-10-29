@@ -268,3 +268,12 @@ troubleshooting or try reinstalling.
 If the error is not to do with validation, it may be that the node is unable to
 pull from the Trow registry. By default nodes are configured by the `copy-certs`
 job. You can check that the job completed succesfully with `kubectl get jobs -n kube-public`. If the node is new, try running the script `install/copy-certs.sh`.
+
+
+```
+The push refers to repository [trow.kube-public:31000/test/nginx]
+Get https://trow.kube-public:31000/v2/: x509: certificate signed by unknown authority
+```
+
+If you get this error, and you are using docker for mac, restart docker.
+
