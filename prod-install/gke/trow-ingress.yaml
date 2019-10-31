@@ -1,0 +1,10 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: trow-ingress
+  annotations:
+    networking.gke.io/managed-certificates: trow-certificate
+spec:
+  backend:
+    serviceName: trow-svc
+    servicePort: 443
