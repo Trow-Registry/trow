@@ -27,7 +27,7 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ### Automatic installation
 
  - Just run `./install.sh` and follow the prompts. 
- - Once done, restart docker.
+ - If you are using Mac: restart Docker once the install script is done.
 
 If you'd rather have more control over the process, follow the [manual
 steps](./docs/MANUAL_INSTALL.md).
@@ -59,7 +59,7 @@ alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c375
 
 If the push seems to hang, check if port 31000 is blocked (common with cloud provider default network rules).
 
-If you are using google cloud you may need to run this:
+If you're using Google cloud, you can open port 31000 as follows:
 
 ```
 $ gcloud compute firewall-rules create trow-rule --allow=tcp:31000
@@ -96,14 +96,14 @@ $ kubectl describe rs proxy
 
 If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
 
-As an example: editing install/trow.yaml and adding the args:
+The following example allows official images from Docker Hub and images with the prefix "registry.container-solutions.com/" to run in the cluster:
 ```
 containers:
 - name: trow-pod
   image: containersol/trow:default
-  args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt","--allow-docker-official","--allow-prefixes"]
+  args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt","--allow-docker-official","--allow-prefixes","registry.container-solutions.com/"]
 ```
-Then you run
+To apply the changes and restart Trow, run the following:
 ```
 $ kubectl apply -f install/trow.yaml 
 

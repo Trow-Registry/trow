@@ -275,5 +275,5 @@ The push refers to repository [trow.kube-public:31000/test/nginx]
 Get https://trow.kube-public:31000/v2/: x509: certificate signed by unknown authority
 ```
 
-If you get this error, and you are using docker for mac, restart docker.
+If you get this error, and you are using Docker for Mac, restart Docker.
 
