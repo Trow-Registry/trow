@@ -3,7 +3,7 @@
 The following walks through the steps in the automatic installer. If you need to
 customise Trow for any reason, this is a good place to start.
 
- - Apply the `trow.yaml` file from the install direcotry:
+ - Apply the `trow.yaml` file from the install directory:
 
 ```
 $ cd install
