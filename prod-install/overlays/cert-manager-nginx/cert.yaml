@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: trow-registry
+  namespace: default
+spec:
+  secretName: trow-registry-tls
+  duration: 8640h # 360d
+  renewBefore: 360h # 15d
+  commonName: registry.trow.io
+  dnsNames:
+  - registry.trow.io
+  issuerRef:
+    name: trow-issuer
+    kind: ClusterIssuer

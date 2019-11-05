@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# This will configure Trow for running on GKE, using the default ingress and a Google
+# ManagedCertificate. You will need to point your (sub)domain DNS at the ingress IP address. It will
+# take some time for the ingress and certificate to be provisioned.
+
+bases:
+    - ../../base
+
+resources:
+    - cert.yaml # Update with domain for your registry
+    - trow-ingress.yaml

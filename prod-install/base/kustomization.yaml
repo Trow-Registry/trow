@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trow
+
+# This will bring up the main trow pod and a service that routes to it. 
+#
+# A working install will require an ingress forwarding a (sub)domain you control to this service.
+# This install assumes the ingress terminates TLS; internally Trow is running over http only.
+#
+# The overlay directories include examples of how to provision ingress on various types of
+# Kubernetes cluster.
+#
+resources:
+    - trow.yaml # Update the container start command with its domain name
+    - trow-service.yaml
+
+  #- validate.yaml # Enable for validation webhook
+  
+containers:
+- name: trow:default
+  image: trow:0.1
