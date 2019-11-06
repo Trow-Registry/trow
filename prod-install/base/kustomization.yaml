@@ -17,6 +17,6 @@ resources:
 
   #- validate.yaml # Enable for validation webhook
   
-containers:
-- name: trow:default
-  image: trow:0.1
+images:
+- name: containersol/trow
+  newTag: "0.1"
