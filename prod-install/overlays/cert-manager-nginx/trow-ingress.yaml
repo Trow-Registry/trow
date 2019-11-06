@@ -5,6 +5,14 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: "nginx"
 spec:
-  backend:
-    serviceName: trow-svc
-    servicePort: 443
+  rules:
+    - host: registry.trow.io
+      http:
+        paths:
+          - backend:
+            serviceName: trow-svc
+            servicePort: 443
+  tls: 
+    - hosts:
+        - registry.trow.io
+      secretName: trow-registry-tls

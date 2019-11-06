@@ -5,6 +5,7 @@ metadata:
 spec:
   selector:
     app: trow
+  type: NodePort
   ports:
   - protocol: TCP
     port: 443
