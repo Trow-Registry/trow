@@ -9,5 +9,22 @@ bases:
     - ../../base
 
 resources:
-    - cert.yaml # Update with domain for your registry
+    - cert.yaml # Needs to be updated with your domain name, see patches below.
     - trow-ingress.yaml
+
+# The following patches update the domain name without editing the base files.
+# Create your own version of these files with your domain name.
+
+#patchesJson6902:
+#    - path: patch-cert-domain.yaml
+#      target:
+#        kind: ManagedCertificate
+#        name: trow-certificate
+#        group: networking.gke.io
+#        version: v1beta1
+#    - path: patch-trow-arg.yaml
+#      target:
+#        kind: Deployment
+#        name: trow-deploy
+#        group: apps
+#        version: v1
