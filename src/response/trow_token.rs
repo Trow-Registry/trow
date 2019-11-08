@@ -1,4 +1,4 @@
-use frank_jwt::{decode, encode, Algorithm};
+use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
 use rocket::http::ContentType;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
@@ -165,7 +165,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
         if let None = config.user {
             //Authentication is not configured
             //TODO: Figure out how to create this only once
-            let no_auth_token = TrowToken{user: "none".to_string(), token: "none".to_string()};
+            let no_auth_token = TrowToken {
+                user: "none".to_string(),
+                token: "none".to_string(),
+            };
             return Outcome::Success(no_auth_token);
         }
         let auth_val = match req.headers().get_one("Authorization") {
@@ -188,7 +191,12 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
         // parse for bearer token
         // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
 
-        let dec_token = match decode(&auth_strings[1], &config.token_secret, Algorithm::HS256) {
+        let dec_token = match decode(
+            &auth_strings[1],
+            &config.token_secret,
+            Algorithm::HS256,
+            &ValidationOptions::default(),
+        ) {
             Ok((_, payload)) => payload,
             Err(_) => {
                 warn!("Failed to decode user token");
