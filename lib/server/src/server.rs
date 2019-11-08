@@ -318,7 +318,7 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
         let path = self.get_path_for_layer(dr.get_repo_name(), dr.get_digest());
 
         if !path.exists() {
-            warn!("Request for unknown blob");
+            warn!("Request for unknown blob: {:?}", path);
             let f = sink
                 .fail(RpcStatus::new(
                     RpcStatusCode::Unknown,

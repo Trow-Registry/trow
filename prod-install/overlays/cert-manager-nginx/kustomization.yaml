@@ -10,5 +10,4 @@ bases:
     - ../../base
 
 resources:
-    - cert.yaml # Update with domain for your registry
     - trow-ingress.yaml

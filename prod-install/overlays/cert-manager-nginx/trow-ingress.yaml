@@ -4,14 +4,16 @@ metadata:
   name: trow-ingress
   annotations:
     kubernetes.io/ingress.class: "nginx"
+    certmanager.k8s.io/cluster-issuer: "letsencrypt-prod"
 spec:
   rules:
     - host: registry.trow.io
       http:
         paths:
-          - backend:
-            serviceName: trow-svc
-            servicePort: 443
+          - path: /
+            backend:
+              serviceName: trow-svc
+              servicePort: 8000
   tls: 
     - hosts:
         - registry.trow.io
