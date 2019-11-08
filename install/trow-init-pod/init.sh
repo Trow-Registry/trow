@@ -22,11 +22,11 @@ else
   echo "Generating new certificate"
   # Get service IP. Not sure how essential the IP addresses are, but let's do it
   echo "Getting IP of trow service"
-  SERVICE_IP=$(dig +short trow.$POD_NAMESPACE.svc.cluster.local)
+  SERVICE_IP=$(dig +short +search trow.$POD_NAMESPACE)
   while [[ $SERVICE_IP == "" ]]
   do
     sleep 2
-    SERVICE_IP=$(dig +short trow.$POD_NAMESPACE.svc.cluster.local)
+    SERVICE_IP=$(dig +short +search trow.$POD_NAMESPACE)
   done
 
   echo "POD NAMESPACE: $POD_NAMESPACE"
