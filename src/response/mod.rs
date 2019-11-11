@@ -26,9 +26,21 @@ fn get_base_url(req: &Request) -> String {
     let config = req
         .guard::<rocket::State<TrowConfig>>()
         .expect("TrowConfig not present!");
-    match config.tls {
-        None => format!("http://{}", host),
-        Some(_) => format!("https://{}", host),
+
+    // Check if we have an upstream load balancer doing TLS termination
+    match req.headers().get("X-Forwarded-Proto").next() {
+        None => {
+            match config.tls {
+                None => format!("http://{}", host),
+                Some(_) => format!("https://{}", host),
+            }        
+        }
+        Some(proto) => {
+            if proto == "http" {
+                warn!("Security issue! Upstream proxy is using HTTP");
+            }
+            format!("{}://{}", proto, host)
+        }
     }
 }
 
