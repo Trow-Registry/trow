@@ -227,19 +227,27 @@ fn main() {
             let pass = matches.value_of("password").expect("Failed to read user password");
             builder.with_user(user.to_string(), pass.to_string());
             
-           } else if matches.is_present("password-file") {
-                let file_name = matches.value_of("password-file").expect(
-                    "Failed to read user password file");
-                let mut file = File::open(file_name).expect(
-                   &format!("Failed to read password file {}", file_name));
-                let mut pass = String::new();
-                file.read_to_string(&mut pass).expect(
-                    &format!("Failed to read password file {}", file_name));
+        } else if matches.is_present("password-file") {
+            let file_name = matches.value_of("password-file").expect(
+                "Failed to read user password file");
+            let mut file = File::open(file_name).expect(
+                &format!("Failed to read password file {}", file_name));
+            let mut pass = String::new();
+            file.read_to_string(&mut pass).expect(
+                &format!("Failed to read password file {}", file_name));
 
-                builder.with_user(user.to_string(), pass);
+            //Remove final newline if present
+            if pass.ends_with('\n') {
+                pass.pop();
+                if pass.ends_with('\r') {
+                    pass.pop();
+                }
+            }
+
+            builder.with_user(user.to_string(), pass);
 
         } else {
-            eprintln!("Either --pass or --pass-file must be set if --user is set");
+            eprintln!("Either --pass or --password-file must be set if --user is set");
             std::process::exit(1);
         }
     }
