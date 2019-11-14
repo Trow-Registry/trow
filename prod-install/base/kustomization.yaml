@@ -3,7 +3,8 @@ kind: Kustomization
 
 namespace: trow
 
-# This will bring up the main trow pod and a service that routes to it. 
+# This will bring up the main trow pod, a persistent volume for data, and a service that routes
+# to it. 
 #
 # A working install will require an ingress forwarding a (sub)domain you control to this service.
 # This install assumes the ingress terminates TLS; internally Trow is running over http only.
@@ -11,12 +12,32 @@ namespace: trow
 # The overlay directories include examples of how to provision ingress on various types of
 # Kubernetes cluster.
 #
-resources:
-    - trow.yaml # Update the container start command with its domain name
-    - trow-service.yaml
+resources: 
+- deploy.yaml 
+- service.yaml 
+- pvc.yaml
 
-  #- validate.yaml # Enable for validation webhook
+  #- validate.yaml # Enable for validation webhook, requires CA bundle
   
 images:
 - name: containersol/trow
   newTag: "0.1"
+
+# The following patches update the domain name in the trow argument and validator without editing the yaml. 
+# Create your own version of the patch file with your domain name and reference in your overlay as
+# below:
+#
+#patchesJson6902:
+#    - path: patch-trow-arg.yaml
+#      target:
+#        kind: Deployment
+#        name: trow-deploy
+#        group: apps
+#        version: v1
+#
+#    - path: patch-validator-domain.yaml
+#      target:
+#        kind: ValidatingWebhookConfiguration
+#        name: trow-validator
+#        group: admissionregistration.k8s.io
+#        version: v1

@@ -12,10 +12,11 @@ bases:
 
 resources:
     - cert.yaml # Needs to be updated with your domain name, see patches below.
-    - trow-ingress.yaml
+    - ingress.yaml
 
-# The following patches update the domain name without editing the base files.
-# Create your own version of these files with your domain name.
+# The following patch updates the certificate domain name without editing the yaml. 
+# Create your own version of the patch file with your domain name and reference in your overlay as
+# below:
 
 #patchesJson6902:
 #    - path: patch-cert-domain.yaml
@@ -24,9 +25,3 @@ resources:
 #        name: trow-certificate
 #        group: networking.gke.io
 #        version: v1beta1
-#    - path: patch-trow-arg.yaml
-#      target:
-#        kind: Deployment
-#        name: trow-deploy
-#        group: apps
-#        version: v1

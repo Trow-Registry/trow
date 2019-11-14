@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trow-deploy
+spec:
+  selector:
+    matchLabels:
+      app: trow
+  template:
+    metadata:
+      labels:
+        app: trow
+    spec:
+      containers:
+      - name: trow-pod
+        image: containersol/trow:default
+        args: ["--no-tls", "-n", "registry.trow.io", "-u", "cs", "--password-file", "/etc/trow/pass"]
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: data-vol
+          mountPath: /data
+        - name: trow-pass
+          mountPath: /etc/trow
+          readOnly: true
+      volumes:
+        - name: data-vol
+          persistentVolumeClaim:
+              claimName: trow-data-claim
+        - name: trow-pass
+          secret:
+              secretName: trow-pass
+              items:
+                  - key: pass
+                    path: pass
+      securityContext:             
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
