@@ -3,7 +3,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: trow-validator
 webhooks:
-  - name: registry.trow.io
+  - name: myregistry.mydomain.com
     rules:
       - apiGroups:
           - ""

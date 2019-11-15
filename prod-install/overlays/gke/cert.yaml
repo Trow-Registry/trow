@@ -4,4 +4,4 @@ metadata:
   name: trow-certificate
 spec:
   domains:
-    - registry.trow.io
+    - myregistry.mydomain.com

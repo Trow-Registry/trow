@@ -14,7 +14,14 @@ spec:
       containers:
       - name: trow-pod
         image: containersol/trow:default
-        args: ["--no-tls", "-n", "registry.trow.io", "-u", "cs", "--password-file", "/etc/trow/pass"]
+        args: 
+          - "--no-tls" 
+          - "-n" 
+          - "myregistry.mydomain.io" 
+          - "-u" 
+          - "myuser" 
+          - "--password-file" 
+          - "/etc/trow/pass"
         imagePullPolicy: Always
         ports:
         - containerPort: 8000

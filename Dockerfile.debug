@@ -40,6 +40,9 @@ ARG VCS_REF
 LABEL org.opencontainers.image.revision=$VCS_REF \
   org.opencontainers.image.source="https://github.com/ContainerSolutions/trow"
 
+
+RUN groupadd -r -g 999 trow && useradd -r -g trow -u 999 trow
+
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl libssl-dev \
   && apt-get clean \
@@ -49,6 +52,7 @@ COPY --from=builder /usr/src/trow/out/trow /trow
 
 COPY install/self-cert /install/self-cert
 COPY start-trow.sh /
-RUN mkdir --parents /data/layers
-RUN mkdir /data/scratch
+RUN mkdir --parents /data/layers && mkdir /data/scratch
+RUN chown -R trow /data 
+USER trow
 ENTRYPOINT ["/start-trow.sh"]

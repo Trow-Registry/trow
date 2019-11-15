@@ -10,7 +10,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
 spec:
   rules:
-    - host: registry.trow.io
+    - host: myregistry.mydomain.io
       http:
         paths:
           - path: /
@@ -19,5 +19,5 @@ spec:
               servicePort: 8000
   tls: 
     - hosts:
-        - registry.trow.io
+        - myregistry.mydomain.io
       secretName: trow-registry-tls
