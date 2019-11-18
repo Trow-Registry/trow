@@ -1,7 +1,7 @@
 Standard Kubernetes Install
 ===========================
 
-At its heart Trow is just a single deploy that needs to be exposed through a service. The only 
+At its heart, Trow is just a single deploy that needs to be exposed through a service. The main 
 complication is getting TLS configured correctly. The developer or quick install uses a
 cluster-signed cert that is used by Trow itself and copies the CA certificate to all nodes and
 clients. The standard install runs Trow behind a TLS-terminating ingress. The TLS cert can be
