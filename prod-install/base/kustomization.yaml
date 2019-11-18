@@ -17,7 +17,7 @@ resources:
 - service.yaml 
 - pvc.yaml
 
-  #- validate.yaml # Enable for validation webhook, requires CA bundle
+#- validate.yaml # Enable for validation webhook
   
 images:
 - name: containersol/trow
@@ -27,7 +27,7 @@ images:
 # Create your own version of the patch file with your domain name and reference in your overlay as
 # below:
 #
-#patchesJson6902:
+patchesJson6902:
 #    - path: patch-trow-arg.yaml
 #      target:
 #        kind: Deployment

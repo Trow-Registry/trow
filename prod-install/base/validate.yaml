@@ -15,7 +15,6 @@ webhooks:
           - pods
     failurePolicy: Fail
     clientConfig:
-      caBundle: TK
       service:
         name: trow
         path: "/validate-image"
