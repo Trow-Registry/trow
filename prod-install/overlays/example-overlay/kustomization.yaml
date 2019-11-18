@@ -6,12 +6,13 @@ namespace: trow-example
 bases:
   - ../cert-manager-nginx
 
+generatorOptions:
+    disableNameSuffixHash: true
+
 secretGenerator:
   - name: trow-pass
     literals:
-    - docker-server=example.registry.com
-    - docker-username=example
-    - docker-password=s3cr3tp@55
+    - pass=s3cr3tp@55
   - name: trow-cred
     type: docker-registry
     literals:
