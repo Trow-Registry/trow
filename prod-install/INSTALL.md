@@ -13,7 +13,7 @@ the cluster.
 The standard install instructions are based on Kustomize (see [Scot Lowe's
 blog](https://blog.scottlowe.org/2019/09/13/an-introduction-to-kustomize/) for a good introduction).
 You will need to create a new overlay for your cluster, containing your domain name and any special
-configruation (e.g. ingress). The overlay will refer to other configuration files. By keeping all
+configuration (e.g. ingress). The overlay will refer to other configuration files. By keeping all
 changes to your own directory, any updates to Trow base configuration can be easily merged by just
 pulling the new commits. 
 
@@ -41,7 +41,7 @@ previous step.
 
 If you're using a Google ManagedCertificate, change the base in `kustomization.yaml` to `../gke` and
 replace `patch-ingress-host.yaml` with a copy of `patch-cert-domain.yaml` from the `overlays/gke`
-directory and edit as appopriate.
+directory and edit as appropriate.
 
 For other installs, please use the provided files as a base and consider contributing new
 overlays back to the project.
