@@ -1,15 +1,20 @@
-Installation Instructions
-=========================
+Dev/Test Installation Instructions
+==================================
 
-## Install with TLS (default)
+## Install with TLS
 
-***These instructions modify nodes in your cluster. Only run on test clusters currently.***
+These instructions are intended for installing Trow on short-lived clusters when developing or
+testing with Kubernetes. For longer-lived clusters, please see the standard installation
+instructions. 
 
-The following instructions install the Trow registry on an existing Kubernetes
-cluster, with a certificate signed by the Kubernetes CA. They have been
-primarily tested with GKE and minikube from MacOS and Linux. 
+The install script will configure the Trow registry on an existing Kubernetes
+cluster, with a certificate signed by the Kubernetes CA. It will copy the certificate to the nodes
+in the Kubernetes cluster as well the client machine. The address "trow.kube-public" is configured
+to point to the registry by adding an entry to `/etc/hosts`.
 
-We recommend spinning up a small GKE cluster for testing Trow to begin with.
+The script has been primarily tested with GKE and minikube on MacOS and Linux. 
+
+***These instructions modify nodes in your cluster. Only run on test or dev clusters.***
 
 ### Pre-requisites
 
@@ -27,12 +32,10 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ### Automatic installation
 
  - Just run `./install.sh` and follow the prompts. 
- - If you are using Mac: restart Docker once the install script is done.
+ - If you are using a Mac, restart Docker once the install script has completed.
 
 If you'd rather have more control over the process, follow the [manual
 steps](./docs/MANUAL_INSTALL.md).
-
-
 
 ### Test it out
 
