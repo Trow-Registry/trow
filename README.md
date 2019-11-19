@@ -21,16 +21,16 @@ with "brow".
 The primary goal for Trow is to create a registry that runs within Kubernetes
 and provides a secure and fast way to get containers running on the cluster.
 
-A major focus is providing controls for cluster adminstrators to define which images
+A major focus is providing controls for cluster administrators to define which images
 can run in the cluster. Trow can prevent unauthorised and potentially insecure or malicious
 images from touching your cluster.
 
 Features include:
 
  - [x] allowing operations such as approve/deny lists for images and external registries
-   (implemented)
- - [ ] full auditing and authentication of image access (in progress)
- - [ ] distributed architecture for HA and scalability (planned)
+   _(implemented)_
+ - [ ] full auditing and authentication of image access _(in progress)_
+ - [ ] distributed architecture for HA and scalability _(planned)_
 
 ## Install
 
