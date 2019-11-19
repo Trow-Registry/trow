@@ -16,6 +16,22 @@ an archaic word meaning "to think, believe, or trust". The reader is free to
 choose which interpretation they like most, but it should be pronounced to rhyme
 with "brow".
  
+## Use Cases
+
+The primary goal for Trow is to create a registry that runs within Kubernetes
+and provides a secure and fast way to get containers running on the cluster.
+
+A major focus is providing controls for cluster adminstrators to define which images
+can run in the cluster. Trow can prevent unauthorised and potentially insecure or malicious
+images from touching your cluster.
+
+Features include:
+
+ - allowing operations such as approve/deny lists for images and external registries
+   (implemented)
+ - full auditing and authentication of image access (in progress)
+ - distributed architecture for HA and scalability (planned)
+
 ## Install
 
 If you want to quickly try out Trow on a development cluster (either local or remote), follow the
@@ -33,18 +49,6 @@ and maintain, and ideal for clusters following the
 
 Note that Trow is currently alpha and you can expect to find rough edges.
 
-## Use Cases
-
-The primary goal for Trow is to create a registry that runs within Kubernetes
-and provides a secure and fast way to get containers running on the cluster.
-
-We hope to make it possible for Kubernetes operators to verify and control the
-images that are run on their clusters. Proposed features include:
-
- - allowing operations such as approve/deny lists for images and external registries
- - auditing and authentication of image access 
- - distributed architecture for HA and scalability
- 
 ## Docs
 
 Work has started on a [User Guide](docs/USER_GUIDE.md). Currently this explains
