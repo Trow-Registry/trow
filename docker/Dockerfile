@@ -50,7 +50,7 @@ RUN apt-get update \
 
 COPY --from=builder /usr/src/trow/out/trow /trow
 
-COPY install/self-cert /install/self-cert
+COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch
 RUN chown -R trow /data 

@@ -12,7 +12,8 @@ cluster, with a certificate signed by the Kubernetes CA. It will copy the certif
 in the Kubernetes cluster as well the client machine. The address "trow.kube-public" is configured
 to point to the registry by adding an entry to `/etc/hosts`.
 
-The script has been primarily tested with GKE and minikube on MacOS and Linux. 
+The script has been primarily tested with GKE and minikube on MacOS and Linux. It isn't currently
+compatible with containerd based distributions such as microk8s (see #14).
 
 ***These instructions modify nodes in your cluster. Only run on test or dev clusters.***
 
