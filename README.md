@@ -27,10 +27,10 @@ images from touching your cluster.
 
 Features include:
 
- - allowing operations such as approve/deny lists for images and external registries
+ - [x] allowing operations such as approve/deny lists for images and external registries
    (implemented)
- - full auditing and authentication of image access (in progress)
- - distributed architecture for HA and scalability (planned)
+ - [ ] full auditing and authentication of image access (in progress)
+ - [ ] distributed architecture for HA and scalability (planned)
 
 ## Install
 
