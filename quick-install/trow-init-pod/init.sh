@@ -34,6 +34,7 @@ else
   echo "POD IP: $POD_IP"
   echo "SERVICE IP: $SERVICE_IP"
 
+  cd /tmp
   cat << EOF | cfssl genkey - | cfssljson -bare trow
 {
   "hosts": [
@@ -53,8 +54,8 @@ else
 }
 EOF
 
-  # Key is now saved to trow-key.pem
-  mv trow-key.pem /certs/domain.key
+  # Key is now saved to /tmp/trow-key.pem
+  mv /tmp/trow-key.pem /certs/domain.key
   # TODO: pipe straight to tmpfs volume
 
   REQ=$(cat trow.csr | base64 | tr -d '\n')

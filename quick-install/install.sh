@@ -51,7 +51,7 @@ cd "$src_dir"
 
 echo
 echo "Starting Kubernetes Resources"
-kubectl apply -f install/trow.yaml
+kubectl apply -f trow.yaml
 
 echo
 echo "Approving certificate. This may take some time."
@@ -77,7 +77,6 @@ kubectl create configmap trow-ca-cert --from-file=cert=$cert_file \
   --dry-run -o json | kubectl apply -n kube-public -f -
 
 echo
-cd install
 ./copy-certs.sh
 echo
 

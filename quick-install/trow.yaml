@@ -128,6 +128,10 @@ spec:
             medium: Memory
         - name: data-vol
           emptyDir: {}
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
 ---
 apiVersion: v1
 kind: Service
