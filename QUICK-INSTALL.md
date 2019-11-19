@@ -4,8 +4,8 @@ Quick Install for Dev/Test Instructions
 ## Install with TLS
 
 These instructions are intended for installing Trow on short-lived clusters, typically when
-developing or testing with Kubernetes. For longer-lived clusters, please see the standard
-installation instructions. 
+developing or testing with Kubernetes. For longer-lived clusters, please see the [standard
+installation instructions](install/INSTALL.md). 
 
 The install script will configure the Trow registry on an existing Kubernetes
 cluster, with a certificate signed by the Kubernetes CA. It will copy the certificate to the nodes
@@ -32,7 +32,7 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 
 ### Automatic installation
 
- - Just run `./install.sh` from the quick-install directory and follow the prompts. 
+ - Just run `./install.sh` from the `quick-install` directory and follow the prompts. 
  - If you are using a Mac, restart Docker once the install script has completed.
 
 If you'd rather have more control over the process, follow the [manual
