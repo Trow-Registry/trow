@@ -1,14 +1,13 @@
 Standard Kubernetes Install
 ===========================
 
-At its heart, Trow is just a single deploy that needs to be exposed through a service. The main 
+At its heart, Trow is just a single deploy that needs to be exposed through a service. The main
 complication is getting TLS configured correctly. The developer or quick install uses a
 cluster-signed cert that is used by Trow itself and copies the CA certificate to all nodes and
 clients. The standard install runs Trow behind a TLS-terminating ingress. The TLS cert can be
 obtained automatically via [cert-manager](https://github.com/jetstack/cert-manager) (or a
 [ManagedCertificate](https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs) if
-running on GKE), but does require that the client has a (sub)domain whose DNS can be pointed at
-the cluster.
+running on GKE), but does require a (sub)domain whose DNS can be pointed at the cluster.
 
 The standard install instructions are based on Kustomize (see [Scot Lowe's
 blog](https://blog.scottlowe.org/2019/09/13/an-introduction-to-kustomize/) for a good introduction).

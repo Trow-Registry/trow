@@ -1,11 +1,11 @@
-Dev/Test Installation Instructions
-==================================
+Quick Install for Dev/Test Instructions
+=======================================
 
 ## Install with TLS
 
-These instructions are intended for installing Trow on short-lived clusters when developing or
-testing with Kubernetes. For longer-lived clusters, please see the standard installation
-instructions. 
+These instructions are intended for installing Trow on short-lived clusters, typically when
+developing or testing with Kubernetes. For longer-lived clusters, please see the standard
+installation instructions. 
 
 The install script will configure the Trow registry on an existing Kubernetes
 cluster, with a certificate signed by the Kubernetes CA. It will copy the certificate to the nodes
