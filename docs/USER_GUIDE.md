@@ -82,7 +82,7 @@ $ kubectl describe pod -n trow trow-deploy
 
 In particular, look for problems pulling images or with containers crashing.
 
-For the actual applcation logs try:
+For the actual application logs try:
 
 ```
 $ kubectl logs -n trow trow-deploy-596bf849c8-m7b7l
@@ -205,7 +205,7 @@ troubleshooting or try reinstalling.
 
 If the error is not to do with validation and you used the quick-install, it may be that the node is
 unable to pull from the Trow registry. By default nodes are configured by the `copy-certs` job. You
-can check that the job completed succesfully with `kubectl get jobs -n kube-public`. If the node is
+can check that the job completed successfully with `kubectl get jobs -n kube-public`. If the node is
 new, try running the script `install/copy-certs.sh`.
 
 
