@@ -42,6 +42,7 @@ data-encoding = "2.1.2"
 #This is a rocket dependency, but we need a newer version with the p>q bugfix
 ring ="^0.13"
 chrono = "^0.4"
+rand = "^0.7.2"
 
 [build-dependencies]
 
@@ -50,5 +51,5 @@ quickcheck = "^0.6"
 assert_cli = "^0.5"
 environment = "^0.1"
 hyper = "^0.11"
-rand = "^0.4"
+rand = "^0.7.2"
 reqwest = "^0.9"

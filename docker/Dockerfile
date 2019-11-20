@@ -52,7 +52,7 @@ COPY --from=builder /usr/src/trow/out/trow /trow
 
 COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
-RUN mkdir --parents /data/layers && mkdir /data/scratch
-RUN chown -R trow /data 
+RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
+RUN chown -R trow /data /certs
 USER trow
 ENTRYPOINT ["/start-trow.sh"]

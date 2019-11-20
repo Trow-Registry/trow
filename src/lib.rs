@@ -36,6 +36,7 @@ extern crate failure_derive;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+extern crate rand;
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -46,6 +47,7 @@ use std::fs;
 use std::path::Path;
 use std::thread;
 use uuid::Uuid;
+use rand::Rng;
 
 use grpcio::{ChannelBuilder, EnvBuilder};
 use rocket::fairing;
@@ -203,10 +205,19 @@ impl TrowBuilder {
     }
 
     fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
+
+        // When run in production, Rocket wants a secret key for private cookies.
+        // As we don't use private cookies, we just generate it here.
+        let mut rng = rand::thread_rng();
+        let mut key = [0u8; 32];
+        rng.fill(&mut key[..]);
+        let skey = base64::encode(&key);
+        
         let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
             .address(self.config.addr.host.clone())
             .port(self.config.addr.port)
             .keep_alive(60)
+            .secret_key(skey)
             .workers(256);
 
         if let Some(ref tls) = self.config.tls {
