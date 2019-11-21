@@ -9,6 +9,7 @@ before_script:
   - mkdir protoc && cd protoc 
   - curl -o protoc.zip -sSL https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip && unzip protoc.zip 
   - export PATH=$PATH:$PWD/bin/
+  - export VCS_REF=$(git rev-parse HEAD)
 addons:
   hosts:
     - trow.test
