@@ -30,16 +30,12 @@ RUN cargo build # should cache all build deps
 
 COPY lib lib
 COPY src src
-RUN touch src/main.rs
 #Do a normal build for debug
+ARG VCS_REF
+ENV VCS_REF=$VCS_REF
 RUN cargo build -Z unstable-options --out-dir ./out
 
 FROM debian:stable-slim
-
-ARG VCS_REF
-LABEL org.opencontainers.image.revision=$VCS_REF \
-  org.opencontainers.image.source="https://github.com/ContainerSolutions/trow"
-
 
 RUN groupadd -r -g 999 trow && useradd -r -g trow -u 999 trow
 
@@ -53,6 +49,23 @@ COPY --from=builder /usr/src/trow/out/trow /trow
 COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
-RUN chown -R trow /data /certs
+RUN chown -R trow /data /certs /install
 USER trow
 ENTRYPOINT ["/start-trow.sh"]
+
+ARG VCS_REF
+ARG DATE
+ARG VERSION
+ARG REPO
+ARG TAG
+ENV CREATED=$DATE
+
+LABEL org.opencontainers.image.created=$DATE \
+  org.opencontainers.image.authors="Container Solutions Labs" \
+  org.opencontainers.image.url="https://trow.io" \
+  org.opencontainers.image.source="https://github.com/ContainerSolutions/trow" \
+  org.opencontainers.image.version=$VERSION \
+  org.opencontainers.image.revision=$VCS_REF \
+  org.opencontainers.image.title="Trow Cluster Registry" \
+  repository=$REPO \
+  tag=$TAG

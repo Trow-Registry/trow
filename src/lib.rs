@@ -239,8 +239,8 @@ impl TrowBuilder {
         let _grpc_thread = init_trow_server(self.config.clone())?;
 
         println!(
-            "Starting trow on {}:{}",
-            self.config.addr.host, self.config.addr.port
+            "Starting Trow {} on {}:{}",
+            env!("CARGO_PKG_VERSION"), self.config.addr.host, self.config.addr.port
         );
         println!("\n**Validation callback configuration\n");
 

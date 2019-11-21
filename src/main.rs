@@ -158,6 +158,14 @@ Must be used with --user")
 Must be used with --user")
             .takes_value(true)
         )        
+        .arg(
+            Arg::with_name("version")
+            .long("version")
+            .short("v")
+            .value_name("version")
+            .help("Get the version number of Trow")
+            .takes_value(false)
+        )        
         .get_matches()
 }
 
@@ -169,6 +177,11 @@ fn parse_list(names: &str) -> Vec<String> {
 
 fn main() {
     let matches = parse_args();
+
+    if matches.is_present("version") {
+        println!("Trow version {} Commit {}", env!("CARGO_PKG_VERSION"), env!("VCS_REF"));
+        std::process::exit(0);
+    }
 
     let no_tls = matches.is_present("no-tls");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
@@ -182,7 +195,6 @@ fn main() {
     let host_names_str = matches.value_of("names").unwrap_or(host);
     let host_names = parse_list(&host_names_str);
     let dry_run = matches.is_present("dry-run");
-
 
     let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
     if matches.is_present("allow-docker-official") {
