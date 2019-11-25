@@ -3,10 +3,10 @@
 The following walks through the steps in the automatic installer. If you need to
 customise Trow for any reason, this is a good place to start.
 
- - Apply the `trow.yaml` file from the install directory:
+ - Apply the `trow.yaml` file from the quick-install directory:
 
 ```
-$ cd install
+$ cd quick-install
 $ kubectl apply -f trow.yaml
 serviceaccount "trow" created
 role.rbac.authorization.k8s.io "trow" created
