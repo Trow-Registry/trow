@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package lycaon;
+package trow;
 
 message UploadRequest {
   //e.g. "amouat/network-utils", "nginx", "my-org/my-team/my-repo"

@@ -1,11 +1,11 @@
-extern crate protoc_grpcio;
-
 fn main() {
-    let proto_root = "src/";
-    println!("cargo:rerun-if-changed={}", proto_root);
-    protoc_grpcio::compile_grpc_protos(
-        &["server.proto"],
-        &[proto_root],
-        &proto_root
-    ).expect("Failed to compile gRPC definitions!");
+    //tonic_build::compile_protos("src/server.proto").unwrap_or_else(|e| panic!("Failed to compile protos {:?}", e));
+    
+    tonic_build::configure()
+        .out_dir("out")
+        .compile(
+            &["src/server.proto"],
+            &["src/"]
+        ).unwrap_or_else(|e| panic!("Failed to compile protos {:?}", e));
+        
 }

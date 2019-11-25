@@ -1,10 +1,9 @@
 [package]
-name = "trow-protobuf"
+name = "tonic-server"
 version = "0.1.0"
 edition = "2018"
 
-authors = ["Adrian Mouat <adrian.mouat@container-solutions.com", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
-build = "build.rs"
+authors = ["Adrian Mouat <adrian.mouat@container-solutions.com" ]
 
 [dependencies]
 async-stream = "0.1.2"
