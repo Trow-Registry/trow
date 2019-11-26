@@ -82,26 +82,32 @@ service Registry {
 
   //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
   //Assigns a "UUID" to a Upload that is then used to track it
+  
   rpc RequestUpload (UploadRequest) returns (UploadDetails) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
+  
   rpc GetWriteLocationForBlob (BlobRef) returns (WriteLocation) {}
 
   //Given a digest and repo, get the download
+  
   rpc GetReadLocationForBlob (DownloadRef) returns (BlobReadLocation) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
+  
   rpc GetWriteLocationForManifest (ManifestRef) returns (WriteLocation) {}
 
   rpc GetReadLocationForManifest (ManifestRef) returns (ManifestReadLocation) {}
   
   //Check the blobs exist and the digest is correct etc
+  
   rpc VerifyManifest (ManifestRef) returns (VerifiedManifest) {}
 
   // Called once all blobs and manifest has been uploaded
   // Returns _server_ digest, which may differ to the _user_ digest (due to compression alg)
+  
   rpc CompleteUpload (CompleteRequest) returns (CompletedUpload) {}
 
   rpc GetCatalog (CatalogRequest) returns (stream CatalogEntry) {}
