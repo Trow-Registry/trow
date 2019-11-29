@@ -12,9 +12,9 @@ if [[ $(kubectl get secret trow-tls) ]]; then
   echo "Found existing trow-tls certificate"
   # save it out to tmpfs volume at /certs/
 
-  kubectl get secret -n kube-public trow-tls -o jsonpath="{.data.tls\.crt}" \
+  kubectl get secret -n $POD_NAMESPACE trow-tls -o jsonpath="{.data.tls\.crt}" \
     | base64 --decode > /certs/domain.crt
-  kubectl get secret -n kube-public trow-tls -o jsonpath="{.data.tls\.key}" \
+  kubectl get secret -n $POD_NAMESPACE trow-tls -o jsonpath="{.data.tls\.key}" \
     | base64 --decode > /certs/domain.key
 
 else
@@ -99,7 +99,7 @@ $ kubectl certificate approve trow.$POD_NAMESPACE
   kubectl get csr trow.$POD_NAMESPACE -o jsonpath='{.status.certificate}' \
       | base64 -d > /certs/domain.crt
 
-  kubectl create secret tls trow-tls -n kube-public --key="/certs/domain.key" --cert="/certs/domain.crt"
+  kubectl create secret tls trow-tls -n $POD_NAMESPACE --key="/certs/domain.key" --cert="/certs/domain.crt"
 
   echo
   echo "Saved certificate and key to trow-tls secret"
