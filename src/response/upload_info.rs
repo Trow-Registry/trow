@@ -1,8 +1,8 @@
-use response::get_base_url;
+use crate::response::get_base_url;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-pub use types::{create_upload_info, UploadInfo};
+pub use crate::types::{create_upload_info, UploadInfo};
 
 impl<'r> Responder<'r> for UploadInfo {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {

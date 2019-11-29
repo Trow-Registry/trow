@@ -1,9 +1,9 @@
-use response::get_base_url;
+use crate::response::get_base_url;
 use rocket::http::Header;
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-use types::VerifiedManifest;
+use crate::types::VerifiedManifest;
 
 impl<'r> Responder<'r> for VerifiedManifest {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {

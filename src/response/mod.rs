@@ -1,6 +1,6 @@
 use hostname;
 use rocket::request::Request;
-use TrowConfig;
+use crate::TrowConfig;
 
 pub mod accepted_upload;
 pub mod authenticate;

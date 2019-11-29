@@ -6,10 +6,8 @@ extern crate failure;
 extern crate base64;
 extern crate frank_jwt;
 extern crate futures;
-extern crate grpcio;
 extern crate hostname;
 extern crate orset;
-extern crate protobuf;
 #[macro_use]
 extern crate rocket;
 #[macro_use]
@@ -21,7 +19,6 @@ extern crate uuid;
 #[macro_use]
 extern crate display_derive;
 
-extern crate trow_protobuf;
 extern crate trow_server;
 
 extern crate argon2;
@@ -49,16 +46,14 @@ use std::thread;
 use uuid::Uuid;
 use rand::Rng;
 
-use grpcio::{ChannelBuilder, EnvBuilder};
 use rocket::fairing;
-use std::sync::Arc;
 
 mod client_interface;
 pub mod response;
 mod routes;
 pub mod types;
 
-use client_interface::{BackendClient, ClientInterface};
+use client_interface::ClientInterface;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -132,7 +127,7 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
     };
 
     Ok(thread::spawn(move || {
-        ts.start_sync();
+        ts.start_trow_sync();
     }))
 }
 
@@ -308,10 +303,10 @@ fn attach_sigterm() -> Result<(), Error> {
     .map_err(|e| e.into())
 }
 
-pub fn build_handlers(listen_host: &str, listen_port: u16) -> ClientInterface {
-    debug!("Connecting to backend: {}:{}", listen_host, listen_port);
-    let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", listen_host, listen_port));
-    let client = BackendClient::new(ch);
-    ClientInterface::new(client)
+pub fn build_handlers(listen_host: &str, listen_port: u16) -> Result<ClientInterface, Error> {
+    let addr = format!("http://{}:{}", listen_host, listen_port);
+    let ci;
+    debug!("Connecting to backend: {}", addr);
+
+    ClientInterface::new(addr);
 }

@@ -1,7 +1,7 @@
 use rocket::http::Header;
 use rocket::request::Request;
 use rocket::response::{self, Responder, Stream};
-use types::BlobReader;
+use crate::types::BlobReader;
 
 impl<'r> Responder<'r> for BlobReader {
     fn respond_to(self, req: &Request) -> response::Result<'r> {

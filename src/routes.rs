@@ -1,19 +1,19 @@
 use std::str;
 
-use client_interface::ClientInterface;
-use response::authenticate::Authenticate;
-use response::empty::Empty;
-use response::errors::Error;
-use response::html::HTML;
-use response::trow_token::ValidBasicToken;
-use response::trow_token::{self, TrowToken};
-use response::upload_info::UploadInfo;
+use crate::client_interface::ClientInterface;
+use crate::response::authenticate::Authenticate;
+use crate::response::empty::Empty;
+use crate::response::errors::Error;
+use crate::response::html::HTML;
+use crate::response::trow_token::ValidBasicToken;
+use crate::response::trow_token::{self, TrowToken};
+use crate::response::upload_info::UploadInfo;
 use rocket;
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json,JsonValue};
-use types::*;
-use TrowConfig;
+use crate::types::*;
+use crate::TrowConfig;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![

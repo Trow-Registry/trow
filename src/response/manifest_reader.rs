@@ -1,7 +1,7 @@
 use rocket::http::Header;
 use rocket::request::Request;
 use rocket::response::{self, Responder, Stream};
-use types::ManifestReader;
+use crate::types::ManifestReader;
 
 impl<'r> Responder<'r> for ManifestReader {
     fn respond_to(self, req: &Request) -> response::Result<'r> {

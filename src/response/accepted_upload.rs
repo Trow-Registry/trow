@@ -1,8 +1,8 @@
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-use response::get_base_url;
-use types::AcceptedUpload;
+use crate::response::get_base_url;
+use crate::types::AcceptedUpload;
 
 
 impl<'r> Responder<'r> for AcceptedUpload {
