@@ -9,7 +9,6 @@
 kind: Job
 apiVersion: batch/v1
 metadata:
-  namespace: kube-public
   name: copy-certs-{{.metadata.uid}}
 spec:
   template:
@@ -20,6 +19,11 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: copy-certs-{{.metadata.uid}}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           image: containersol/trow:copy-certs
           imagePullPolicy: Always
           volumeMounts:
