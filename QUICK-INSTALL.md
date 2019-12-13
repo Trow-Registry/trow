@@ -21,8 +21,14 @@ compatible with containerd based distributions such as microk8s (see #14).
 
  - `kubectl` is installed and configured to point at the cluster you wish to install Trow on
  - You've cloned or downloaded this repo
- - Port 31000 can be reached on the worker nodes (you may need to edit the
-   network policy or firewall settings for your cluster)
+ - Port 31000 can be reached on the worker nodes. You may need to edit the
+   network policy or firewall settings for your cluster, for example run the following if using GKE:
+```
+$ gcloud compute firewall-rules create trow \
+    --allow tcp:31000 
+    --description "Allow inbound Trow registry traffic" 
+    --project <project name>
+```
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
 ```
