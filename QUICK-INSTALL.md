@@ -24,8 +24,8 @@ compatible with containerd based distributions such as microk8s (see #14).
  - Port 31000 can be reached on the worker nodes. You may need to edit the network policy or firewall settings if running in the cloud. For example, run the following if using GKE:
 ```
 $ gcloud compute firewall-rules create trow \
-    --allow tcp:31000 
-    --description "Allow inbound Trow registry traffic" 
+    --allow tcp:31000 \ 
+    --description "Allow inbound Trow registry traffic" \ 
     --project <project name>
 ```
 
