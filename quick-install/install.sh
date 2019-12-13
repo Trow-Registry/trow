@@ -27,6 +27,11 @@ rights:
 Where <user> is your user, normally the e-mail address you use with your GKE 
 account.
 
+Also make sure port 31000 is open on the firewall so clients can connect.
+If you're running on the Google cloud, the following should work:
+
+  $ gcloud compute firewall-rules create trow --allow tcp:31000 --project <project name>
+
 EOF
 
 while true
