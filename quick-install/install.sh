@@ -22,7 +22,7 @@ This installer will perform the following steps:
 If you're running on GKE, you may first need to give your user cluster-admin
 rights:
 
-  $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
+  $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=$(gcloud config get-value core/account)
 
 Where <user> is your user, normally the e-mail address you use with your GKE 
 account.
