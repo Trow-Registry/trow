@@ -14,6 +14,7 @@ use rocket::State;
 use rocket_contrib::json::{Json,JsonValue};
 use crate::types::*;
 use crate::TrowConfig;
+use futures::executor::block_on;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -130,9 +131,11 @@ fn get_manifest(
     onename: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
-    warn!("matched");
-    ci.get_reader_for_manifest(&RepoName(onename), &reference)
-        .map_err(|_| Error::ManifestUnknown(reference))
+
+    let rn = RepoName(onename);
+    let f = ci.get_reader_for_manifest(
+            &rn, &reference);
+    block_on(f).map_err(|_| Error::ManifestUnknown(reference))
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
@@ -143,8 +146,10 @@ fn get_manifest_2level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-    ci.get_reader_for_manifest(&RepoName(format!("{}/{}", user, repo)), &reference)
-        .ok()
+
+    let rn = RepoName(format!("{}/{}", user, repo));
+    let r = ci.get_reader_for_manifest(&rn, &reference);
+    block_on(r).ok()
 }
 
 /*
@@ -159,8 +164,10 @@ fn get_manifest_3level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-    ci.get_reader_for_manifest(&RepoName(format!("{}/{}/{}", org, user, repo)), &reference)
-        .ok()
+
+    let rn = RepoName(format!("{}/{}/{}", org, user, repo));
+    let r = ci.get_reader_for_manifest(&rn, &reference);
+    block_on(r).ok()
 }
 
 /*
@@ -182,9 +189,13 @@ fn get_blob(
     name_repo: String,
     digest: String,
 ) -> Option<BlobReader> {
-    ci.get_reader_for_blob(&RepoName(name_repo), &Digest(digest))
-        .ok()
+
+    let rn = RepoName(name_repo);
+    let d = Digest(digest);
+    let r = ci.get_reader_for_blob(&rn, &d);
+    block_on(r).ok()
 }
+
 /*
  * Parse 2 level <repo>/<name> style path and pass it to get_blob
  */
@@ -247,8 +258,12 @@ fn put_blob(
     uuid: String,
     digest: String,
 ) -> Result<AcceptedUpload, Error> {
-    ci.complete_upload(&RepoName(repo_name), &Uuid(uuid), &Digest(digest))
-        .map_err(|_| Error::InternalError)
+
+    let rn = RepoName(repo_name);
+    let uuid = Uuid(uuid);
+    let digest = Digest(digest);
+    let r = ci.complete_upload(&rn, &uuid, &digest);
+    block_on(r).map_err(|_| Error::InternalError)
 }
 
 /*
@@ -299,7 +314,9 @@ fn patch_blob(
 ) -> Result<UploadInfo, Error> {
     let repo = RepoName(repo_name);
     let uuid = Uuid(uuid);
-    let sink = ci.get_write_sink_for_upload(&repo, &uuid);
+
+    let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
+    let sink = block_on(sink_f);
 
     match sink {
         Ok(mut sink) => {
@@ -378,7 +395,10 @@ fn post_blob_upload(
     and tell the backend what the UUID is. This is a potential
     optimisation, but is arguably less flexible.
     */
-    ci.request_upload(&RepoName(repo_name)).map_err(|e| {
+
+    let rn = RepoName(repo_name);
+    let r = ci.request_upload(&rn);
+    block_on(r).map_err(|e| {
         warn!("Error getting ref from backend: {}", e);
         Error::InternalError
     })
@@ -430,13 +450,15 @@ fn put_image_manifest(
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
     let repo = RepoName(repo_name);
-    match ci
-        .get_write_sink_for_manifest(&repo, &reference)
-        .map(|mut sink| chunk.stream_to(&mut sink))
+
+    let sink_loc = ci.get_write_sink_for_manifest(&repo, &reference);
+    
+    match block_on(sink_loc).map(|mut sink| chunk.stream_to(&mut sink))
     {
         Ok(_) => {
             //This can probably be moved to responder
-            match ci.verify_manifest(&repo, &reference) {
+            let ver = ci.verify_manifest(&repo, &reference);
+            match block_on(ver) {
                 Ok(vm) => Ok(vm),
                 Err(_) => Err(Error::ManifestInvalid),
             }
@@ -489,7 +511,9 @@ fn delete_image_manifest(_auth_user: TrowToken, _name: String, _repo: String, _r
 
 #[get("/v2/_catalog")]
 fn get_catalog(_auth_user: TrowToken, ci: rocket::State<ClientInterface>) -> Result<RepoCatalog, Error> {
-    match ci.get_catalog() {
+
+    let cat = ci.get_catalog();
+    match block_on(cat) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }
@@ -497,7 +521,11 @@ fn get_catalog(_auth_user: TrowToken, ci: rocket::State<ClientInterface>) -> Res
 
 #[get("/v2/<repo_name>/tags/list")]
 fn list_tags(_auth_user: TrowToken, ci: rocket::State<ClientInterface>, repo_name: String) -> Result<TagList, Error> {
-    match ci.list_tags(&RepoName(repo_name)) {
+    
+    let rn = RepoName(repo_name);
+    let tags = ci.list_tags(&rn);
+    
+    match block_on(tags) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }

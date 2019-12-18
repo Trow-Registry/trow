@@ -45,6 +45,7 @@ use std::path::Path;
 use std::thread;
 use uuid::Uuid;
 use rand::Rng;
+use futures::executor::block_on;
 
 use rocket::fairing;
 
@@ -88,7 +89,7 @@ pub struct TrowConfig {
 
 #[derive(Clone, Debug)]
 struct GrpcConfig {
-    listen: NetAddr,
+    listen: String,
 }
 
 #[derive(Clone, Debug)]
@@ -112,8 +113,7 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
 
     let ts = trow_server::build_server(
         &config.data_dir,
-        &config.grpc.listen.host,
-        config.grpc.listen.port,
+        config.grpc.listen.parse::<std::net::SocketAddr>()?,
         config.allow_prefixes,
         config.allow_images,
         config.deny_prefixes,
@@ -155,7 +155,7 @@ impl TrowBuilder {
     pub fn new(
         data_dir: String,
         addr: NetAddr,
-        listen: NetAddr,
+        listen: String,
         host_names: Vec<String>,
         allow_prefixes: Vec<String>,
         allow_images: Vec<String>,
@@ -266,10 +266,6 @@ impl TrowBuilder {
             std::process::exit(0);
         }
         rocket::custom(rocket_config.clone())
-            .manage(build_handlers(
-                &self.config.grpc.listen.host,
-                self.config.grpc.listen.port,
-            ))
             .manage(self.config.clone())
             .attach(fairing::AdHoc::on_attach(
                 "SIGTERM handler",
@@ -303,10 +299,9 @@ fn attach_sigterm() -> Result<(), Error> {
     .map_err(|e| e.into())
 }
 
-pub fn build_handlers(listen_host: &str, listen_port: u16) -> Result<ClientInterface, Error> {
+pub async fn build_handlers(listen_host: String, listen_port: u16) -> Result<ClientInterface, Error> {
     let addr = format!("http://{}:{}", listen_host, listen_port);
-    let ci;
     debug!("Connecting to backend: {}", addr);
 
-    ClientInterface::new(addr);
+    futures::executor::block_on(ClientInterface::new(&addr))
 }

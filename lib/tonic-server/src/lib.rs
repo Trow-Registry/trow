@@ -8,8 +8,7 @@ use server::TrowServer;
 
 pub struct TrowServerBuilder {
     data_path: String,
-    listen_addr: String,
-    listen_port: u16,
+    listen_addr: std::net::SocketAddr,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -21,8 +20,7 @@ pub struct TrowServerBuilder {
 
 pub fn build_server(
     data_path: &str,
-    listen_addr: &str,
-    listen_port: u16,
+    listen_addr: std::net::SocketAddr,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -30,8 +28,7 @@ pub fn build_server(
 ) -> TrowServerBuilder {
     TrowServerBuilder {
         data_path: data_path.to_string(),
-        listen_addr: listen_addr.to_string(),
-        listen_port,
+        listen_addr,
         allow_prefixes,
         allow_images,
         deny_prefixes,
@@ -55,12 +52,12 @@ impl TrowServerBuilder {
     }
 
     pub async fn start_trow_sync(self) -> Result<(), Box<dyn std::error::Error>> {
-        let addr = format!("{}:{}", self.listen_addr, self.listen_port).parse()?;
+        
         let ts = TrowServer {};
 
         match Server::builder()
             .add_service(RegistryServer::new(ts))
-            .serve(addr)
+            .serve(self.listen_addr)
             .await
         {
             Ok(()) => {

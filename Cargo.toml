@@ -24,7 +24,7 @@ ctrlc = { version = "^3.0", features = ["termination"] }
 hostname = "^0.1"
 display_derive = "^0.0"
 
-futures-preview = { version = "0.3.0-alpha.19", default-features = false, features = ["alloc"]}
+futures-preview = { version = "0.3.0-alpha.19" }
 
 clap = "~2.29"
 

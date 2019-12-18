@@ -14,7 +14,8 @@ use std::fs::OpenOptions;
 use std::io::prelude::*;
 
 pub struct ClientInterface {
-    rc: RegistryClient<tonic::transport::Channel>,
+    server: String,
+    //rc: RegistryClient<tonic::transport::Channel>,
     //ac: AdmissionControllerClient,
 }
 
@@ -47,11 +48,15 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
 }
 
 impl ClientInterface {
-    pub async fn new(addr: String) -> Result<Self, Error> {
-        let ad = addr;
-        let rc = RegistryClient::connect(ad).await?;
-        //let ac = AdmissionControllerClient::new(backend.chan);
-        Ok(ClientInterface { rc })
+    pub async fn new(server: &str) -> Result<Self, Error> {
+        
+        Ok(ClientInterface { server: server.to_string() })
+    }
+
+    pub async fn connect_registry(&self) -> 
+    Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
+
+        RegistryClient::connect(self.server.to_string()).await
     }
 
     /**
@@ -68,7 +73,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone()
         };
 
-        let response = self.rc.request_upload(Request::new(req)).await?.into_inner();
+        let response = self.connect_registry().await?.request_upload(Request::new(req)).await?.into_inner();
 
         Ok(create_upload_info(
             types::Uuid(response.uuid.to_owned()),
@@ -83,12 +88,12 @@ impl ClientInterface {
         uuid: &Uuid,
         digest: &Digest,
     ) -> Result<AcceptedUpload, Error> {
-        let mut req = CompleteRequest {
+        let req = CompleteRequest {
             repo_name: repo_name.0.clone(),
             uuid: uuid.0.clone(),
             user_digest: digest.0.clone()
         };
-        let resp = self.rc.complete_upload(Request::new(req)).await?.into_inner();
+        let resp = self.connect_registry().await?.complete_upload(Request::new(req)).await?.into_inner();
 
         Ok(create_accepted_upload(
             Digest(resp.digest.to_owned()),
@@ -101,12 +106,12 @@ impl ClientInterface {
         repo_name: &RepoName,
         uuid: &Uuid,
     ) -> Result<impl Write, Error> {
-        let mut br = BlobRef {
+        let br = BlobRef {
             uuid: uuid.0.clone(),
             repo_name: repo_name.0.clone()
         };
 
-        let resp = self.rc.get_write_location_for_blob(
+        let resp = self.connect_registry().await?.get_write_location_for_blob(
             Request::new(br)).await?.into_inner();
 
         //For the moment we know it's a file location
@@ -127,7 +132,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone()
         };
     
-        let resp = self.rc.get_write_location_for_manifest(
+        let resp = self.connect_registry().await?.get_write_location_for_manifest(
             Request::new(mr)).await?.into_inner();
 
         //For the moment we know it's a file location
@@ -149,7 +154,7 @@ impl ClientInterface {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone()
         };
-        let resp = self.rc.get_read_location_for_manifest(
+        let resp = self.connect_registry().await?.get_read_location_for_manifest(
             Request::new(mr)).await?.into_inner();
 
         //For the moment we know it's a file location
@@ -172,7 +177,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone()
         };
 
-        let resp = self.rc.get_read_location_for_blob(
+        let resp = self.connect_registry().await?.get_read_location_for_blob(
             Request::new(dr)).await?.into_inner();
 
         //For the moment we know it's a file location
@@ -191,7 +196,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone()
         };
 
-        let resp = self.rc.verify_manifest(
+        let resp = self.connect_registry().await?.verify_manifest(
             Request::new(mr)).await?.into_inner();
         
 
@@ -207,11 +212,11 @@ impl ClientInterface {
     pub async fn get_catalog(&self) -> Result<RepoCatalog, Error> {
 
         let cr = CatalogRequest {};
-        let mut stream = self.rc
-        .get_catalog(
-            Request::new(cr))
-            .await?
-            .into_inner();
+        let mut stream = self.connect_registry().await?
+            .get_catalog(
+                Request::new(cr))
+                .await?
+                .into_inner();
         let mut catalog = RepoCatalog::new();
 
         while let Some(ce) = stream.message().await? {
@@ -226,7 +231,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone()
         };
 
-        let mut stream = self.rc
+        let mut stream = self.connect_registry().await?
         .list_tags(
             Request::new(ce))
             .await?
