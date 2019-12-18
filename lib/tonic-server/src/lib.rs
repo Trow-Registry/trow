@@ -5,6 +5,8 @@ use tonic::transport::Server;
 mod server;
 use server::trow_server::server::RegistryServer;
 use server::TrowServer;
+use tokio::prelude::*;
+use tokio::runtime::Runtime;
 
 pub struct TrowServerBuilder {
     data_path: String,
@@ -51,14 +53,16 @@ impl TrowServerBuilder {
         self
     }
 
-    pub async fn start_trow_sync(self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn start_trow_sync(self) -> () {
         
+        let rt = Runtime::new().unwrap();
         let ts = TrowServer {};
 
-        match Server::builder()
+        let server = Server::builder()
             .add_service(RegistryServer::new(ts))
-            .serve(self.listen_addr)
-            .await
+            .serve(self.listen_addr);
+
+        match rt.block_on(server)
         {
             Ok(()) => {
                 warn!("Server shutting down");
@@ -68,7 +72,5 @@ impl TrowServerBuilder {
                 std::process::exit(1);
             }
         }
-
-        Ok(())
     }
 }
