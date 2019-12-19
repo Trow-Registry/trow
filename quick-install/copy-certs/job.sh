@@ -2,14 +2,13 @@
 set -e
 set -o pipefail
 
-registry_host="trow.kube-public"
+registry_host="trow.${POD_NAMESPACE}"
 registry_port="31000"
 registry_host_port="${registry_host}:${registry_port}"
 
 mkdir --parents "/etc/docker/certs.d/$registry_host_port/"
 echo "copying certs"
-kubectl get configmap trow-ca-cert -n kube-public -o jsonpath='{.data.cert}' \
-    > "/etc/docker/certs.d/$registry_host_port/ca.crt"
+cp /run/secrets/kubernetes.io/serviceaccount/ca.crt /etc/docker/certs.d/$registry_host_port/
 echo "Successfully copied certs"
 
 echo "Adding entry to /etc/hosts"
