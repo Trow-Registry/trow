@@ -2,13 +2,7 @@
 set -eo pipefail
 unset CDPATH
 
-namespace='kube-public'
-if [ -z $1 ]
-then
-	namespace=$1
-fi
-
-registry_host="trow.${namespace}"
+registry_host="trow.kube-public"
 registry_port="31000"
 registry_host_port="${registry_host}:${registry_port}"
 add_host_ip=""
@@ -110,8 +104,8 @@ else #On linux
 fi
 
 if [[ "$1" = "--add-hosts" ]]; then
-  echo "Adding entry to /etc/hosts for trow.${namespace}" 
+  echo "Adding entry to /etc/hosts for trow.kube-public" 
   get_ip_from_k8s
-  add_host_name="trow.${namespace}"
+  add_host_name="trow.kube-public"
   add_to_etc_hosts
 fi

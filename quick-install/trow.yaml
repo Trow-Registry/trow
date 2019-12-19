@@ -1,6 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+  namespace: kube-public
   name: trow
   labels:
     app: trow
@@ -8,6 +9,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
+  namespace: kube-public
   name: trow
   labels:
     app: trow
@@ -25,7 +27,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: '{{namespace}}:trow'
+  namespace: kube-public
+  name: trow
   labels:
     app: trow
 rules:
@@ -42,6 +45,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
+  namespace: kube-public
   name: trow
   labels:
     app: trow
@@ -52,12 +56,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: trow
-  namespace: {{namespace}}
+  namespace: kube-public
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: '{{namespace}}:trow'
+  namespace: kube-public
+  name: trow
   labels:
     app: trow
 roleRef:
@@ -67,12 +72,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: trow
-  namespace: {{namespace}}
+  namespace: kube-public
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: trow-deploy
+  namespace: kube-public
 spec:
   selector:
     matchLabels:
@@ -86,7 +92,7 @@ spec:
       containers:
       - name: trow-pod
         image: containersol/trow:default
-        args: ["-n", "trow:31000 trow.{{namespace}}:31000", "-c", "/certs/domain.crt"]
+        args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt"]
         imagePullPolicy: Always
         ports:
         - containerPort: 8443
@@ -131,6 +137,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: trow
+  namespace: kube-public
 spec:
   selector:
     app: trow
