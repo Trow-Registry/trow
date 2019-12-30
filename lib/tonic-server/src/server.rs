@@ -71,6 +71,27 @@ fn gen_digest(bytes: &[u8]) -> String {
     format!("sha256:{}", hasher.result_str())
 }
 
+/**
+ * Visits each subdir and adds path to set if there are files in the directory.
+ *
+ * Could be made more generic by taking a function argument.
+ */
+fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<(), Error> {
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit_dirs(&path, base, repos)?;
+            } else if let Some(d) = path.parent() {
+                    let repo = d.strip_prefix(base)?;
+                    repos.insert(repo.to_string_lossy().to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
 impl TrowServer {
         pub fn new(
             data_path: &str,
@@ -351,19 +372,55 @@ impl Registry for TrowServer {
         &self,
         _request: Request<CatalogRequest>,
     ) -> Result<Response<Self::GetCatalogStream>, Status> {
-        warn!("get catalog unimplemented");
-        unimplemented!()
+
+        let (mut tx, rx) = mpsc::channel(4);
+        let mut repos = HashSet::new();
+        match visit_dirs(&self.manifests_path, &self.manifests_path, &mut repos) {
+            Ok(_) => {
+                tokio::spawn(async move {
+                    for r in repos.iter() {
+                        let ce = CatalogEntry { repo_name: r.to_string() };
+                        tx.send(Ok(ce)).await.expect("Error streaming catalog");
+                    };
+                });
+                Ok(Response::new(rx))
+            }
+            Err(e) => {
+                warn!("Error retreiving repository catalog {:?}", e);
+                Err(Status::internal("Internal error streaming catalog"))
+            }
+        }
     }
 
     type ListTagsStream = mpsc::Receiver<Result<Tag, Status>>;
 
-
     async fn list_tags(
         &self,
-        _request: Request<CatalogEntry>,
+        request: Request<CatalogEntry>,
     ) -> Result<Response<Self::ListTagsStream>, Status> {
-        warn!("list tags unimplemented");
-        unimplemented!()
+
+        let (mut tx, rx) = mpsc::channel(4);
+        let mut path = PathBuf::from(&self.manifests_path);
+        let ce = request.into_inner();
+        path.push(ce.repo_name);
+
+        if let Ok(files) = fs::read_dir(path) {
+            tokio::spawn(async move {
+                for entry in files {
+                    if let Ok(en) = entry {
+                        let en_path = en.path();
+                        if en_path.is_file() {
+                            if let Some(tag_str) = en_path.file_name() {
+                                let  tag = Tag { tag: tag_str.to_string_lossy().to_string() };
+                                tx.send(Ok(tag)).await.expect("Error streaming tags");
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        Ok(Response::new(rx))
+
     }
 }
     
