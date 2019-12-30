@@ -25,6 +25,8 @@ hostname = "^0.1"
 display_derive = "^0.0"
 
 futures-preview = { version = "0.3.0-alpha.19" }
+#futures-core = "0.3"
+#futures-util = "0.3"
 
 clap = "~2.29"
 
@@ -33,8 +35,8 @@ orset = "^0.2"
 failure = "^0.1"
 failure_derive = "^0.1"
 
-tokio = "0.2.0-alpha.6"
-tonic = "0.1.0-alpha.5"
+tokio = "0.2"
+tonic = "0.1.0-beta.1"
 prost = "0.5"
 bytes = "0.4"
 

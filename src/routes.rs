@@ -14,7 +14,9 @@ use rocket::State;
 use rocket_contrib::json::{Json,JsonValue};
 use crate::types::*;
 use crate::TrowConfig;
-use futures::executor::block_on;
+
+use tokio::prelude::*;
+use tokio::runtime::Runtime;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -135,7 +137,12 @@ fn get_manifest(
     let rn = RepoName(onename);
     let f = ci.get_reader_for_manifest(
             &rn, &reference);
-    block_on(f).map_err(|_| Error::ManifestUnknown(reference))
+    // So we need to change this to use the tokio executor.
+    // Rocket uses multiple threads, so it's not clear how to make sure
+    // there is exactly one executor per thread; tokio may take care of this
+    // for us
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on(f).map_err(|_| Error::ManifestUnknown(reference))
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
@@ -149,7 +156,8 @@ fn get_manifest_2level(
 
     let rn = RepoName(format!("{}/{}", user, repo));
     let r = ci.get_reader_for_manifest(&rn, &reference);
-    block_on(r).ok()
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on(r).ok()
 }
 
 /*
@@ -167,7 +175,7 @@ fn get_manifest_3level(
 
     let rn = RepoName(format!("{}/{}/{}", org, user, repo));
     let r = ci.get_reader_for_manifest(&rn, &reference);
-    block_on(r).ok()
+    Runtime::new().unwrap().block_on(r).ok()
 }
 
 /*
@@ -193,7 +201,7 @@ fn get_blob(
     let rn = RepoName(name_repo);
     let d = Digest(digest);
     let r = ci.get_reader_for_blob(&rn, &d);
-    block_on(r).ok()
+    Runtime::new().unwrap().block_on(r).ok()
 }
 
 /*
@@ -263,7 +271,7 @@ fn put_blob(
     let uuid = Uuid(uuid);
     let digest = Digest(digest);
     let r = ci.complete_upload(&rn, &uuid, &digest);
-    block_on(r).map_err(|_| Error::InternalError)
+    Runtime::new().unwrap().block_on(r).map_err(|_| Error::InternalError)
 }
 
 /*
@@ -316,7 +324,7 @@ fn patch_blob(
     let uuid = Uuid(uuid);
 
     let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
-    let sink = block_on(sink_f);
+    let sink = Runtime::new().unwrap().block_on(sink_f);
 
     match sink {
         Ok(mut sink) => {
@@ -398,7 +406,7 @@ fn post_blob_upload(
 
     let rn = RepoName(repo_name);
     let r = ci.request_upload(&rn);
-    block_on(r).map_err(|e| {
+    Runtime::new().unwrap().block_on(r).map_err(|e| {
         warn!("Error getting ref from backend: {}", e);
         Error::InternalError
     })
@@ -452,13 +460,13 @@ fn put_image_manifest(
     let repo = RepoName(repo_name);
 
     let sink_loc = ci.get_write_sink_for_manifest(&repo, &reference);
-    
-    match block_on(sink_loc).map(|mut sink| chunk.stream_to(&mut sink))
+    let mut rt = Runtime::new().unwrap();
+    match rt.block_on(sink_loc).map(|mut sink| chunk.stream_to(&mut sink))
     {
         Ok(_) => {
             //This can probably be moved to responder
             let ver = ci.verify_manifest(&repo, &reference);
-            match block_on(ver) {
+            match rt.block_on(ver) {
                 Ok(vm) => Ok(vm),
                 Err(_) => Err(Error::ManifestInvalid),
             }
@@ -513,7 +521,7 @@ fn delete_image_manifest(_auth_user: TrowToken, _name: String, _repo: String, _r
 fn get_catalog(_auth_user: TrowToken, ci: rocket::State<ClientInterface>) -> Result<RepoCatalog, Error> {
 
     let cat = ci.get_catalog();
-    match block_on(cat) {
+    match Runtime::new().unwrap().block_on(cat) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }
@@ -525,7 +533,7 @@ fn list_tags(_auth_user: TrowToken, ci: rocket::State<ClientInterface>, repo_nam
     let rn = RepoName(repo_name);
     let tags = ci.list_tags(&rn);
     
-    match block_on(tags) {
+    match Runtime::new().unwrap().block_on(tags) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }

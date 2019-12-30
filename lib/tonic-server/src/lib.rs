@@ -1,12 +1,22 @@
-#[macro_use(log, warn)]
+#[macro_use(log, warn, debug, info)]
 extern crate log;
+
+#[macro_use]
+extern crate serde_derive;
+extern crate rustc_serialize;
+extern crate serde_json;
+extern crate crypto;
+extern crate failure_derive;
+#[macro_use]
+extern crate failure;
 
 use tonic::transport::Server;
 mod server;
-use server::trow_server::server::RegistryServer;
+use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
-use tokio::prelude::*;
 use tokio::runtime::Runtime;
+
+pub mod manifest;
 
 pub struct TrowServerBuilder {
     data_path: String,
@@ -55,12 +65,19 @@ impl TrowServerBuilder {
 
     pub fn start_trow_sync(self) -> () {
         
-        let rt = Runtime::new().unwrap();
-        let ts = TrowServer {};
-
+        let mut rt = Runtime::new().expect("Failed to start Tokio runtime");
+        let ts = TrowServer::new( 
+            &self.data_path, 
+            self.allow_prefixes, 
+            self.allow_images, 
+            self.deny_prefixes, 
+            self.deny_images).expect("Failure configuring Trow Server");
+    
         let server = Server::builder()
             .add_service(RegistryServer::new(ts))
             .serve(self.listen_addr);
+        
+        warn!("Server listening on {}", self.listen_addr);
 
         match rt.block_on(server)
         {

@@ -45,7 +45,6 @@ use std::path::Path;
 use std::thread;
 use uuid::Uuid;
 use rand::Rng;
-use futures::executor::block_on;
 
 use rocket::fairing;
 
@@ -55,6 +54,8 @@ mod routes;
 pub mod types;
 
 use client_interface::ClientInterface;
+use tokio::prelude::*;
+use tokio::runtime::Runtime;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -265,8 +266,12 @@ impl TrowBuilder {
             println!("Dry run, exiting.");
             std::process::exit(0);
         }
+        let s = format!("https://{}", self.config.grpc.listen);
+        let ci:ClientInterface = build_handlers(s)?;
+
         rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
+            .manage(ci)
             .attach(fairing::AdHoc::on_attach(
                 "SIGTERM handler",
                 |r| match attach_sigterm() {
@@ -287,6 +292,7 @@ impl TrowBuilder {
             .mount("/", routes::routes())
             .register(routes::catchers())
             .launch();
+  
         Ok(())
     }
 }
@@ -299,9 +305,10 @@ fn attach_sigterm() -> Result<(), Error> {
     .map_err(|e| e.into())
 }
 
-pub async fn build_handlers(listen_host: String, listen_port: u16) -> Result<ClientInterface, Error> {
-    let addr = format!("http://{}:{}", listen_host, listen_port);
-    debug!("Connecting to backend: {}", addr);
+pub fn build_handlers(listen_addr: String) -> Result<ClientInterface, Error> {
+    
+    debug!("Address for backend: {}", listen_addr);
 
-    futures::executor::block_on(ClientInterface::new(&addr))
+    //TODO this function is useless currently
+    ClientInterface::new(listen_addr)
 }

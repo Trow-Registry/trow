@@ -3,7 +3,7 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    client::RegistryClient, BlobRef, CatalogEntry, CatalogRequest,
+    registry_client::RegistryClient, BlobRef, CatalogEntry, CatalogRequest,
     CompleteRequest, DownloadRef, ManifestRef, UploadRequest,
 };
 use tonic::Request;
@@ -12,9 +12,13 @@ use failure::{format_err, Error};
 use serde_json::Value;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use tokio::prelude::*;
+use tokio::runtime::Runtime;
+use tokio;
 
 pub struct ClientInterface {
     server: String,
+    runtime: Runtime
     //rc: RegistryClient<tonic::transport::Channel>,
     //ac: AdmissionControllerClient,
 }
@@ -48,15 +52,25 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
 }
 
 impl ClientInterface {
-    pub async fn new(server: &str) -> Result<Self, Error> {
+    pub fn new(server: String) -> Result<Self, Error> {
         
-        Ok(ClientInterface { server: server.to_string() })
+        //delete me
+        let runtime = Runtime::new()?;
+
+        Ok(ClientInterface { server, runtime })
+
+
+        //Create tokio runtime here. 
+        // Should be able to call spawn (but not block_on which is &mut)
     }
 
-    pub async fn connect_registry(&self) -> 
+    async fn connect_registry(&self) -> 
     Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
 
-        RegistryClient::connect(self.server.to_string()).await
+        warn!("Connecting to {}", self.server);
+        let x = RegistryClient::connect(self.server.to_string()).await;
+        warn!("Connected to {}", self.server);
+        x
     }
 
     /**
@@ -69,6 +83,7 @@ impl ClientInterface {
      **/
 
     pub async fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
+        
         let req = UploadRequest{
             repo_name: repo_name.0.clone()
         };
