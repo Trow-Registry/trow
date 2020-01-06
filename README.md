@@ -51,12 +51,7 @@ Note that Trow is currently alpha and you can expect to find rough edges.
 
 ## Tests
 
-There is a reasonably large test suite that can be run with `cargo run test`, assuming you have rust
-and cargo installed. The suite expects to find the server at `trow.test:8443`, so you may want to
-set up the following mapping in `/etc/hosts`:
-
-127.0.0.1	trow.test
-...
+There is a reasonably large test suite, which can be run with the `docker/test.sh` script.
 
 ## Docs
 

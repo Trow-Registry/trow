@@ -2,9 +2,7 @@
 FROM rust:latest as builder
 
 RUN rustup update nightly && rustup default nightly;
-RUN apt-get update && apt-get install -y cmake golang unzip
-#Add checksum or GPG checking
-RUN cd /usr/local && curl -o protoc.zip -sSL https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip && unzip protoc.zip
+RUN apt-get update && apt-get install -y unzip
 
 WORKDIR /usr/src/trow
 

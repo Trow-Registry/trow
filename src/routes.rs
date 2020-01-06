@@ -270,6 +270,10 @@ fn put_blob(
     let uuid = Uuid(uuid);
     let digest = Digest(digest);
     let r = ci.complete_upload(&rn, &uuid, &digest);
+
+    //ENORMOUS TODO: really shouldn't spawn a whole runtime for each request;
+    //it's hugely inefficient. Need to figure out how to use thread-local for
+    //each runtime or move to Warp and share the runtime.
     Runtime::new().unwrap().block_on(r).map_err(|_| Error::InternalError)
 }
 
