@@ -1,8 +1,8 @@
-use response::get_base_url;
+use crate::response::get_base_url;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-pub use types::{create_upload_info, UploadInfo};
+pub use crate::types::{create_upload_info, UploadInfo};
 
 impl<'r> Responder<'r> for UploadInfo {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
@@ -32,11 +32,11 @@ impl<'r> Responder<'r> for UploadInfo {
 
 #[cfg(test)]
 mod test {
-    use response::upload_info::{create_upload_info, UploadInfo};
+    use crate::response::upload_info::{create_upload_info, UploadInfo};
     use rocket::http::Status;
-    use types::{RepoName, Uuid};
+    use crate::types::{RepoName, Uuid};
 
-    use response::test_helper::test_route;
+    use crate::response::test_helper::test_route;
     fn build_response() -> UploadInfo {
         create_upload_info(
             Uuid("whatever".to_owned()),

@@ -179,7 +179,7 @@ fn main() {
     let matches = parse_args();
 
     if matches.is_present("version") {
-        println!("Trow version {} Commit {}", env!("CARGO_PKG_VERSION"), env!("VCS_REF"));
+        println!("Trow version {} Commit {:#?}", env!("CARGO_PKG_VERSION"), option_env!("VCS_REF"));
         std::process::exit(0);
     }
 
@@ -212,14 +212,10 @@ fn main() {
         host: host.to_string(),
         port,
     };
-    let grpc_listen = NetAddr {
-        host: "127.0.0.1".to_owned(),
-        port: 51000,
-    };
     let mut builder = TrowBuilder::new(
         data_path.to_string(),
         addr,
-        grpc_listen,
+        "127.0.0.1:51000".to_string(),
         host_names,
         allow_prefixes,
         allow_images,

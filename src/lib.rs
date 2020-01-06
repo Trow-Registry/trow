@@ -6,10 +6,8 @@ extern crate failure;
 extern crate base64;
 extern crate frank_jwt;
 extern crate futures;
-extern crate grpcio;
 extern crate hostname;
 extern crate orset;
-extern crate protobuf;
 #[macro_use]
 extern crate rocket;
 #[macro_use]
@@ -21,7 +19,6 @@ extern crate uuid;
 #[macro_use]
 extern crate display_derive;
 
-extern crate trow_protobuf;
 extern crate trow_server;
 
 extern crate argon2;
@@ -49,16 +46,14 @@ use std::thread;
 use uuid::Uuid;
 use rand::Rng;
 
-use grpcio::{ChannelBuilder, EnvBuilder};
 use rocket::fairing;
-use std::sync::Arc;
 
 mod client_interface;
 pub mod response;
 mod routes;
 pub mod types;
 
-use client_interface::{BackendClient, ClientInterface};
+use client_interface::ClientInterface;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -93,7 +88,7 @@ pub struct TrowConfig {
 
 #[derive(Clone, Debug)]
 struct GrpcConfig {
-    listen: NetAddr,
+    listen: String,
 }
 
 #[derive(Clone, Debug)]
@@ -117,8 +112,7 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
 
     let ts = trow_server::build_server(
         &config.data_dir,
-        &config.grpc.listen.host,
-        config.grpc.listen.port,
+        config.grpc.listen.parse::<std::net::SocketAddr>()?,
         config.allow_prefixes,
         config.allow_images,
         config.deny_prefixes,
@@ -132,7 +126,7 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
     };
 
     Ok(thread::spawn(move || {
-        ts.start_sync();
+        ts.start_trow_sync();
     }))
 }
 
@@ -160,7 +154,7 @@ impl TrowBuilder {
     pub fn new(
         data_dir: String,
         addr: NetAddr,
-        listen: NetAddr,
+        listen: String,
         host_names: Vec<String>,
         allow_prefixes: Vec<String>,
         allow_images: Vec<String>,
@@ -270,12 +264,12 @@ impl TrowBuilder {
             println!("Dry run, exiting.");
             std::process::exit(0);
         }
+        let s = format!("https://{}", self.config.grpc.listen);
+        let ci:ClientInterface = build_handlers(s)?;
+
         rocket::custom(rocket_config.clone())
-            .manage(build_handlers(
-                &self.config.grpc.listen.host,
-                self.config.grpc.listen.port,
-            ))
             .manage(self.config.clone())
+            .manage(ci)
             .attach(fairing::AdHoc::on_attach(
                 "SIGTERM handler",
                 |r| match attach_sigterm() {
@@ -296,6 +290,7 @@ impl TrowBuilder {
             .mount("/", routes::routes())
             .register(routes::catchers())
             .launch();
+  
         Ok(())
     }
 }
@@ -308,10 +303,10 @@ fn attach_sigterm() -> Result<(), Error> {
     .map_err(|e| e.into())
 }
 
-pub fn build_handlers(listen_host: &str, listen_port: u16) -> ClientInterface {
-    debug!("Connecting to backend: {}:{}", listen_host, listen_port);
-    let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect(&format!("{}:{}", listen_host, listen_port));
-    let client = BackendClient::new(ch);
-    ClientInterface::new(client)
+pub fn build_handlers(listen_addr: String) -> Result<ClientInterface, Error> {
+    
+    debug!("Address for backend: {}", listen_addr);
+
+    //TODO this function is useless currently
+    ClientInterface::new(listen_addr)
 }

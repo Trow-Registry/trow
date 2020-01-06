@@ -6,13 +6,14 @@ extern crate reqwest;
 extern crate serde_json;
 extern crate trow;
 extern crate trow_server;
+extern crate libc;
 
 mod common;
 
 #[cfg(test)]
 mod validation_tests {
 
-  use common;
+  use crate::common;
   use environment::Environment;
   use reqwest::StatusCode;
   use std::fs::{self, File};
@@ -21,6 +22,7 @@ mod validation_tests {
   use std::process::Command;
   use std::thread;
   use std::time::Duration;
+  use libc;
 
   const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 
@@ -78,10 +80,13 @@ mod validation_tests {
 
   impl Drop for TrowInstance {
     fn drop(&mut self) {
-      //Y U NO HV STOP?
-      self.pid.kill().unwrap();
+      kill_gracefully(&self.pid);
     }
   }
+  
+  // https://stackoverflow.com/questions/49210815/how-do-i-send-a-signal-to-a-child-subprocess
+  pub fn kill_gracefully(child: &Child) { 
+    unsafe { libc::kill(child.id() as i32, libc::SIGTERM); } }
 
   /* Uses a copy of an actual AdmissionReview to test. */
   fn validate_example(cl: &reqwest::Client) {
@@ -275,7 +280,6 @@ mod validation_tests {
     //should deny by default
     let txt = resp.text().unwrap();
     if is_allowed {
-      println!("out {}", txt);
       assert!(txt.contains("\"allowed\":true"));
     } else {
       assert!(txt.contains("\"allowed\":false"));

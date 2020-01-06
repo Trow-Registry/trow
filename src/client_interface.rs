@@ -1,29 +1,20 @@
-use failure::{format_err, Error};
-use futures::{Future, Stream};
-use grpcio::Channel;
-use protobuf::repeated::RepeatedField;
+pub mod trow_proto {
+    include!("../lib/protobuf/out/trow.rs");
+}
+
+use trow_proto::{
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, BlobRef, CatalogEntry, CatalogRequest,
+    CompleteRequest, DownloadRef, ManifestRef, UploadRequest, AdmissionRequest
+};
+use tonic::Request;
+use crate::types::{self, *};
+use failure::Error;
 use serde_json::Value;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
-use trow_protobuf::server::*;
-use trow_protobuf::server_grpc::AdmissionControllerClient;
-use trow_protobuf::server_grpc::RegistryClient;
-use types::{self, *};
-
-/* Will move to server grpc */
-pub struct BackendClient {
-    chan: Channel,
-}
-
-impl BackendClient {
-    pub fn new(chan: Channel) -> BackendClient {
-        BackendClient { chan }
-    }
-}
 
 pub struct ClientInterface {
-    rc: RegistryClient,
-    ac: AdmissionControllerClient,
+    server: String,
 }
 
 /**
@@ -55,11 +46,27 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
 }
 
 impl ClientInterface {
-    pub fn new(backend: BackendClient) -> Self {
-        //Not sure if there's a reason we can't pass a reference to a channel
-        let rc = RegistryClient::new(backend.chan.clone());
-        let ac = AdmissionControllerClient::new(backend.chan);
-        ClientInterface { rc, ac }
+    pub fn new(server: String) -> Result<Self, Error> {
+
+        Ok(ClientInterface { server })
+    }
+
+    async fn connect_registry(&self) -> 
+    Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
+
+        warn!("Connecting to {}", self.server);
+        let x = RegistryClient::connect(self.server.to_string()).await;
+        warn!("Connected to {}", self.server);
+        x
+    }
+
+    async fn connect_admission_controller(&self) -> 
+    Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
+
+        warn!("Connecting to {}", self.server);
+        let x = AdmissionControllerClient::connect(self.server.to_string()).await;
+        warn!("Connected to {}", self.server);
+        x
     }
 
     /**
@@ -71,30 +78,33 @@ impl ClientInterface {
      * just changing this file...
      **/
 
-    pub fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
-        let mut req = UploadRequest::new();
-        req.set_repo_name(repo_name.0.clone());
+    pub async fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
+        
+        let req = UploadRequest{
+            repo_name: repo_name.0.clone()
+        };
 
-        let response = self.rc.request_upload(&req)?;
+        let response = self.connect_registry().await?.request_upload(Request::new(req)).await?.into_inner();
 
         Ok(create_upload_info(
-            types::Uuid(response.get_uuid().to_owned()),
+            types::Uuid(response.uuid.to_owned()),
             repo_name.clone(),
             (0, 0),
         ))
     }
 
-    pub fn complete_upload(
+    pub async fn complete_upload(
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
         digest: &Digest,
     ) -> Result<AcceptedUpload, Error> {
-        let mut req = CompleteRequest::new();
-        req.set_repo_name(repo_name.0.clone());
-        req.set_uuid(uuid.0.clone());
-        req.set_user_digest(digest.0.clone());
-        let resp = self.rc.complete_upload(&req)?;
+        let req = CompleteRequest {
+            repo_name: repo_name.0.clone(),
+            uuid: uuid.0.clone(),
+            user_digest: digest.0.clone()
+        };
+        let resp = self.connect_registry().await?.complete_upload(Request::new(req)).await?.into_inner();
 
         Ok(create_accepted_upload(
             Digest(resp.digest.to_owned()),
@@ -102,16 +112,18 @@ impl ClientInterface {
         ))
     }
 
-    pub fn get_write_sink_for_upload(
+    pub async fn get_write_sink_for_upload(
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
     ) -> Result<impl Write, Error> {
-        let mut br = BlobRef::new();
-        br.set_uuid(uuid.0.clone());
-        br.set_repo_name(repo_name.0.clone());
+        let br = BlobRef {
+            uuid: uuid.0.clone(),
+            repo_name: repo_name.0.clone()
+        };
 
-        let resp = self.rc.get_write_location_for_blob(&br)?;
+        let resp = self.connect_registry().await?.get_write_location_for_blob(
+            Request::new(br)).await?.into_inner();
 
         //For the moment we know it's a file location
         let file = OpenOptions::new()
@@ -121,16 +133,18 @@ impl ClientInterface {
         Ok(file)
     }
 
-    pub fn get_write_sink_for_manifest(
+    pub async fn get_write_sink_for_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<impl Write, Error> {
-        let mut mr = ManifestRef::new();
-        mr.set_reference(reference.to_owned());
-        mr.set_repo_name(repo_name.0.clone());
-
-        let resp = self.rc.get_write_location_for_manifest(&mr)?;
+        let mr = ManifestRef {
+            reference: reference.to_owned(),
+            repo_name: repo_name.0.clone()
+        };
+    
+        let resp = self.connect_registry().await?.get_write_location_for_manifest(
+            Request::new(mr)).await?.into_inner();
 
         //For the moment we know it's a file location
         //Manifests don't append; just overwrite
@@ -141,16 +155,18 @@ impl ClientInterface {
         Ok(file)
     }
 
-    pub fn get_reader_for_manifest(
+    pub async fn get_reader_for_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<ManifestReader, Error> {
-        let mut mr = ManifestRef::new();
-        mr.set_reference(reference.to_owned());
-        mr.set_repo_name(repo_name.0.clone());
-
-        let resp = self.rc.get_read_location_for_manifest(&mr)?;
+        
+        let mr = ManifestRef {
+            reference: reference.to_owned(),
+            repo_name: repo_name.0.clone()
+        };
+        let resp = self.connect_registry().await?.get_read_location_for_manifest(
+            Request::new(mr)).await?.into_inner();
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
@@ -162,16 +178,18 @@ impl ClientInterface {
         Ok(mr)
     }
 
-    pub fn get_reader_for_blob(
+    pub async fn get_reader_for_blob(
         &self,
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobReader, Error> {
-        let mut dr = DownloadRef::new();
-        dr.set_digest(digest.0.clone());
-        dr.set_repo_name(repo_name.0.clone());
+        let dr = DownloadRef {
+            digest: digest.0.clone(),
+            repo_name: repo_name.0.clone()
+        };
 
-        let resp = self.rc.get_read_location_for_blob(&dr)?;
+        let resp = self.connect_registry().await?.get_read_location_for_blob(
+            Request::new(dr)).await?.into_inner();
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
@@ -179,64 +197,61 @@ impl ClientInterface {
         Ok(br)
     }
 
-    pub fn verify_manifest(
+    pub async fn verify_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<types::VerifiedManifest, Error> {
-        let mut mr = ManifestRef::new();
-        mr.set_reference(reference.to_owned());
-        mr.set_repo_name(repo_name.0.clone());
+        let mr = ManifestRef {
+            reference: reference.to_owned(),
+            repo_name: repo_name.0.clone()
+        };
 
-        let resp = self.rc.verify_manifest(&mr)?;
+        let resp = self.connect_registry().await?.verify_manifest(
+            Request::new(mr)).await?.into_inner();
+        
 
         let vm = create_verified_manifest(
             repo_name.clone(),
-            Digest(resp.get_digest().to_string()),
+            Digest(resp.digest.to_owned()),
             reference.to_string(),
-            resp.get_content_type().to_string(),
+            resp.content_type.to_owned(),
         );
         Ok(vm)
     }
 
-    pub fn get_catalog(&self) -> Result<RepoCatalog, Error> {
-        let cr = CatalogRequest::new();
-        let mut repo_stream = self.rc.get_catalog(&cr)?;
+    pub async fn get_catalog(&self) -> Result<RepoCatalog, Error> {
+
+        let cr = CatalogRequest {};
+        let mut stream = self.connect_registry().await?
+            .get_catalog(
+                Request::new(cr))
+                .await?
+                .into_inner();
         let mut catalog = RepoCatalog::new();
 
-        loop {
-            let f = repo_stream.into_future();
-            match f.wait() {
-                Ok((Some(ce), s)) => {
-                    repo_stream = s;
-                    catalog.insert(RepoName(ce.get_repo_name().to_string()));
-                }
-                Ok((None, _)) => break,
-                Err((e, _)) => return Err(format_err!("Failure streaming from server {:?}", e)),
-            }
-        }
+        while let Some(ce) = stream.message().await? {
+            catalog.insert(RepoName(ce.repo_name.to_owned()));
+        }    
 
         Ok(catalog)
     }
 
-    pub fn list_tags(&self, repo_name: &RepoName) -> Result<TagList, Error> {
-        let mut ce = CatalogEntry::new();
-        ce.set_repo_name(repo_name.0.clone());
+    pub async fn list_tags(&self, repo_name: &RepoName) -> Result<TagList, Error> {
+        let ce = CatalogEntry {
+            repo_name: repo_name.0.clone()
+        };
 
-        let mut tag_stream = self.rc.list_tags(&ce)?;
+        let mut stream = self.connect_registry().await?
+        .list_tags(
+            Request::new(ce))
+            .await?
+            .into_inner();
         let mut list = TagList::new(repo_name.clone());
 
-        loop {
-            let f = tag_stream.into_future();
-            match f.wait() {
-                Ok((Some(tag), s)) => {
-                    tag_stream = s;
-                    list.insert(tag.get_tag().to_string());
-                }
-                Ok((None, _)) => break,
-                Err((e, _)) => return Err(format_err!("Failure streaming from server {:?}", e)),
-            }
-        }
+        while let Some(tag) = stream.message().await? {
+            list.insert(tag.tag.to_owned());
+        }    
 
         Ok(list)
     }
@@ -244,47 +259,48 @@ impl ClientInterface {
     /**
      * Returns an AdmissionReview object with the AdmissionResponse completed with details of vaildation.
      */
-    pub fn validate_admission(
+    pub async fn validate_admission(
         &self,
-        in_req: &types::AdmissionRequest,
+        req: &types::AdmissionRequest,
         host_names: &[String],
     ) -> Result<types::AdmissionResponse, Error> {
-        //TODO: write something to convert automatically (into())
-        let mut a_req = trow_protobuf::server::AdmissionRequest::new();
 
+        
+        //TODO: write something to convert automatically (into()) between AdmissionRequest types
+        //let mut a_req = AdmissionRequest::new();
         // TODO: we should really be sending the full object to the backend.
-        // Revisit this when we have proper rust bindings
         let mut images = Vec::new();
-        extract_images(&in_req.object, &mut images);
+        extract_images(&req.object, &mut images);
+        let ar = AdmissionRequest {
+            images,
+            namespace: req.namespace.clone(),
+            operation: req.operation.clone(),
+            host_names: host_names.to_vec()
+        };
 
-        //The conversion here will be easier when we can upgrade the protobuf stuff
-        a_req.set_images(RepeatedField::from_vec(images.clone()));
-
-        a_req.set_namespace(in_req.namespace.clone());
-        a_req.set_operation(in_req.operation.clone());
-        a_req.set_host_names(RepeatedField::from_vec(host_names.to_vec()));
-
-        let resp = self.ac.validate_admission(&a_req)?;
+        let resp = self.connect_admission_controller().await?.validate_admission(
+            Request::new(ar)).await?.into_inner();
 
         //TODO: again, this should be an automatic conversion
-        let st = if resp.get_is_allowed() {
+        let st = if resp.is_allowed {
             types::Status {
                 status: "Success".to_owned(),
                 message: None,
                 code: None,
             }
         } else {
-            //Not sure "Failure is correct"
+            //Not sure "Failure" is correct
             types::Status {
                 status: "Failure".to_owned(),
-                message: Some(resp.get_reason().to_string()),
+                message: Some(resp.reason.to_string()),
                 code: None,
             }
         };
         Ok(types::AdmissionResponse {
-            uid: in_req.uid.clone(),
-            allowed: resp.get_is_allowed(),
+            uid: req.uid.clone(),
+            allowed: resp.is_allowed,
             status: Some(st),
         })
+        
     }
 }

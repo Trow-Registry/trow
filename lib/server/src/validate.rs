@@ -1,10 +1,8 @@
-use server::TrowService;
+use tonic::{Request, Response, Status};
 
-use server::Image;
-use trow_protobuf;
-use trow_protobuf::server::*;
-
-use futures::Future;
+use crate::server::{TrowServer, Image};
+use crate::server::trow_server::admission_controller_server::AdmissionController;
+use crate::server::trow_server::{AdmissionRequest, AdmissionResponse};
 
 const DOCKER_HUB_HOSTNAME: &str = "docker.io";
 
@@ -66,11 +64,12 @@ fn parse_image(image_str: &str) -> Image {
 #[allow(clippy::needless_return)]
 fn check_image(
     image_raw: &str,
-    local_hosts: Vec<String>,
+    local_hosts: &[String],
     image_exists: &dyn Fn(&Image) -> bool,
     deny: &dyn Fn(&Image) -> bool,
     allow: &dyn Fn(&Image) -> bool,
 ) -> (bool, String) {
+    
     let image = parse_image(&image_raw);
     if local_hosts.contains(&image.host) {
         //local image
@@ -108,23 +107,23 @@ fn check_image(
     }
 }
 
-impl trow_protobuf::server_grpc::AdmissionController for TrowService {
-    fn validate_admission(
-        &self,
-        ctx: grpcio::RpcContext,
-        ar: AdmissionRequest,
-        sink: grpcio::UnarySink<AdmissionResponse>,
-    ) {
-        let mut resp = AdmissionResponse::new();
+#[tonic::async_trait]
+impl AdmissionController for TrowServer {
 
+    async fn validate_admission(
+        &self,
+        ar: Request<AdmissionRequest>
+    ) -> Result<Response<AdmissionResponse>, Status> {
+
+        let ar = ar.into_inner();
         let mut valid = true;
         let mut reason = "".to_string();
 
-        for image_raw in ar.images.into_vec() {
+        for image_raw in ar.images {
             //Using a closure here is inefficient but makes it easier to test check_image
             let (v, r) = check_image(
                 &image_raw,
-                ar.host_names.to_vec(),
+                &ar.host_names,
                 &|image| self.image_exists(image),
                 &|i| self.is_local_denied(i),
                 &|i| self.is_allowed(i),
@@ -136,13 +135,8 @@ impl trow_protobuf::server_grpc::AdmissionController for TrowService {
             }
         }
 
-        resp.set_is_allowed(valid);
-        resp.set_reason(reason);
-
-        let f = sink
-            .success(resp)
-            .map_err(|e| warn!("failed to reply! {:?}", e));
-        ctx.spawn(f);
+        let ar = AdmissionResponse { is_allowed: valid, reason};
+        Ok(Response::new(ar))
     }
 }
 

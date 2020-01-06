@@ -9,8 +9,8 @@ use std::io::Cursor;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
-use TrowConfig;
-use UserConfig;
+use crate::TrowConfig;
+use crate::UserConfig;
 
 const TOKEN_DURATION: u64 = 3600;
 

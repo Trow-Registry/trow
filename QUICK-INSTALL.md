@@ -28,7 +28,6 @@ $ gcloud compute firewall-rules create trow \
     --description "Allow inbound Trow registry traffic" \ 
     --project <project name>
 ```
-
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
 ```

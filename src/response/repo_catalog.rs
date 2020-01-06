@@ -3,7 +3,7 @@ use std::io::Cursor;
 use rocket::http::{ContentType};
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
-use types::RepoCatalog;
+use crate::types::RepoCatalog;
 
 use serde_json;
 

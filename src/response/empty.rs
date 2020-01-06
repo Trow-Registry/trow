@@ -13,10 +13,10 @@ impl<'r> Responder<'r> for Empty {
 
 #[cfg(test)]
 mod test {
-    use response::empty::Empty;
+    use crate::response::empty::Empty;
     use rocket::http::Status;
 
-    use response::test_helper::test_route;
+    use crate::response::test_helper::test_route;
 
     #[test]
     fn empty_ok() {

@@ -1,4 +1,4 @@
-use response::get_base_url;
+use crate::response::get_base_url;
 use rocket::http::ContentType;
 use rocket::http::{Header, Status};
 use rocket::request::Request;

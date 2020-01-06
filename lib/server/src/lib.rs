@@ -1,34 +1,28 @@
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate failure_derive;
-extern crate futures;
-extern crate grpcio;
-extern crate protobuf;
-extern crate uuid;
+#[macro_use(log, warn, debug, info)]
+extern crate log;
+
 #[macro_use]
 extern crate serde_derive;
-extern crate crypto;
 extern crate rustc_serialize;
 extern crate serde_json;
+extern crate crypto;
+extern crate failure_derive;
+#[macro_use]
+extern crate failure;
 
-#[macro_use(log, warn, info, debug)]
-extern crate log;
-extern crate trow_protobuf;
-
-pub mod manifest;
+use tonic::transport::Server;
 mod server;
 mod validate;
-use failure::Error;
-use futures::Future;
-use grpcio::{Environment, ServerBuilder};
-use server::TrowService;
-use std::thread;
+use server::trow_server::registry_server::RegistryServer;
+use server::trow_server::admission_controller_server::AdmissionControllerServer;
+use server::TrowServer;
+use tokio::runtime::Runtime;
+
+pub mod manifest;
 
 pub struct TrowServerBuilder {
     data_path: String,
-    listen_addr: String,
-    listen_port: u16,
+    listen_addr: std::net::SocketAddr,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -40,8 +34,7 @@ pub struct TrowServerBuilder {
 
 pub fn build_server(
     data_path: &str,
-    listen_addr: &str,
-    listen_port: u16,
+    listen_addr: std::net::SocketAddr,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -49,8 +42,7 @@ pub fn build_server(
 ) -> TrowServerBuilder {
     TrowServerBuilder {
         data_path: data_path.to_string(),
-        listen_addr: listen_addr.to_string(),
-        listen_port,
+        listen_addr,
         allow_prefixes,
         allow_images,
         deny_prefixes,
@@ -73,67 +65,32 @@ impl TrowServerBuilder {
         self
     }
 
-    pub fn start_sync(self) {
-        match self.server_async() {
-            Ok(mut server) => {
-                thread::park();
-                let _ = server.shutdown().wait();
-                warn!("Trow Server shutdown!");
+    pub fn start_trow_sync(self) -> () {
+        
+        let mut rt = Runtime::new().expect("Failed to start Tokio runtime");
+        let ts = TrowServer::new( 
+            &self.data_path, 
+            self.allow_prefixes, 
+            self.allow_images, 
+            self.deny_prefixes, 
+            self.deny_images).expect("Failure configuring Trow Server");
+    
+        let server = Server::builder()
+            .add_service(RegistryServer::new(ts.clone()))
+            .add_service(AdmissionControllerServer::new(ts))
+            .serve(self.listen_addr);
+        
+        warn!("Server listening on {}", self.listen_addr);
+
+        match rt.block_on(server)
+        {
+            Ok(()) => {
+                warn!("Server shutting down");
             }
             Err(e) => {
-                eprintln!("Failed to start Trow server: {:?}", e);
+                eprintln!("Failure in Trow server: {:?}", e);
                 std::process::exit(1);
             }
         }
-    }
-
-    pub fn server_async(self) -> Result<grpcio::Server, Error> {
-        use std::sync::Arc;
-
-        debug!("Setting up Trow server");
-        let env = Arc::new(Environment::new(1));
-
-        //It's a bit weird but cloning the service should be fine
-        //Internally it uses Arcs to point to the communal data
-        let ts = TrowService::new(
-            &self.data_path,
-            self.allow_prefixes,
-            self.allow_images,
-            self.deny_prefixes,
-            self.deny_images,
-        )?;
-        let registry_service = trow_protobuf::server_grpc::create_registry(ts.clone());
-        let admission_service = trow_protobuf::server_grpc::create_admission_controller(ts);
-
-        let sb = ServerBuilder::new(env)
-            .register_service(registry_service)
-            .register_service(admission_service);
-
-        /*
-        //Once we can use the secure feature, this will enable TLS certs
-
-        let sb = if self.tls_cert.is_some() && self.tls_key.is_some() {
-            let scb = ServerCredentialsBuilder::new()
-                .add_cert(self.tls_cert.unwrap(), self.tls_key.unwrap());
-            let scb = if let Some(key) = self.root_key {
-                scb.root_cert(key, true)
-            } else {
-                scb
-            };
-            let sc = scb.build();
-            sb.bind_secure(self.listen_addr, self.listen_port, sc)
-        } else {
-            sb.bind(self.listen_addr, self.listen_port)
-        };
-        */
-        let sb = sb.bind(self.listen_addr, self.listen_port);
-
-        let mut server = sb.build()?;
-        server.start();
-
-        for &(ref host, port) in server.bind_addrs() {
-            info!("listening on {}:{}", host, port);
-        }
-        Ok(server)
     }
 }

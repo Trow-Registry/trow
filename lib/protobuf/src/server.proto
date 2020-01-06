@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package lycaon;
+package trow;
 
 message UploadRequest {
   //e.g. "amouat/network-utils", "nginx", "my-org/my-team/my-repo"
@@ -82,26 +82,32 @@ service Registry {
 
   //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
   //Assigns a "UUID" to a Upload that is then used to track it
+  
   rpc RequestUpload (UploadRequest) returns (UploadDetails) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
+  
   rpc GetWriteLocationForBlob (BlobRef) returns (WriteLocation) {}
 
   //Given a digest and repo, get the download
+  
   rpc GetReadLocationForBlob (DownloadRef) returns (BlobReadLocation) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
+  
   rpc GetWriteLocationForManifest (ManifestRef) returns (WriteLocation) {}
 
   rpc GetReadLocationForManifest (ManifestRef) returns (ManifestReadLocation) {}
   
   //Check the blobs exist and the digest is correct etc
+  
   rpc VerifyManifest (ManifestRef) returns (VerifiedManifest) {}
 
   // Called once all blobs and manifest has been uploaded
   // Returns _server_ digest, which may differ to the _user_ digest (due to compression alg)
+  
   rpc CompleteUpload (CompleteRequest) returns (CompletedUpload) {}
 
   rpc GetCatalog (CatalogRequest) returns (stream CatalogEntry) {}
@@ -114,20 +120,15 @@ service Registry {
  * In future, we could directly use k8s types, but I'd rather leave that to a higher level.
  */
 message AdmissionRequest {
-  //When grpcio supports version 2.2 of protobuf, we can uncomment following and simplify code in client
-  //option rustproto.repeated_field_vec = true;
+
   repeated string images = 1;
   string namespace = 2;
   //TODO: should be enum
   string operation = 3;
-  //The name of this registry; required for figuring out whether images are stored here
-  //This may need to become "repeated". Also note this has security implications, need to
-  //be careful we aren't tricked into believing we are the different registry.
-  string registry_name = 4;
   //Host names that the Trow should consider "local" for figuring out if we host the given
   //images. As there might be upstream proxies etc it seemed wise to allow this to be
   //configured, but be aware that there are security implications.
-  repeated string host_names = 5;
+  repeated string host_names = 4;
 }
 
 //Mutate will require patch or equivalent

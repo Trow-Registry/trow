@@ -2,6 +2,7 @@
 name = "trow"
 version = "0.1.0"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
+edition = "2018"
 
 [dependencies]
 rust-crypto = "^0.2"
@@ -23,9 +24,7 @@ ctrlc = { version = "^3.0", features = ["termination"] }
 hostname = "^0.1"
 display_derive = "^0.0"
 
-futures = "^0.1"
-grpcio = "=0.2.3"
-protobuf = "=1.4.5"
+futures-preview = { version = "0.3.0-alpha.19" }
 
 clap = "~2.29"
 
@@ -33,6 +32,11 @@ orset = "^0.2"
 
 failure = "^0.1"
 failure_derive = "^0.1"
+
+tokio = "0.2"
+tonic = "0.1.0-beta.1"
+prost = "0.5"
+bytes = "0.4"
 
 trow-protobuf = { path = "./lib/protobuf" }
 trow-server = { path = "./lib/server" }
@@ -53,3 +57,4 @@ environment = "^0.1"
 hyper = "^0.11"
 rand = "^0.7.2"
 reqwest = "^0.9"
+libc = "^0.2"
