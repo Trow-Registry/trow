@@ -5,11 +5,11 @@ use rocket::local::Client;
 #[cfg(test)]
 use rocket::response::Responder;
 #[cfg(test)]
-use GrpcConfig;
+use crate::GrpcConfig;
 #[cfg(test)]
-use NetAddr;
+use crate::NetAddr;
 #[cfg(test)]
-use TrowConfig;
+use crate::TrowConfig;
 
 #[cfg(test)]
 pub fn test_route<'r, A: Responder<'r>>(handler: A) -> rocket::Response<'r> {
@@ -21,10 +21,7 @@ pub fn test_route<'r, A: Responder<'r>>(handler: A) -> rocket::Response<'r> {
         },
         tls: None,
         grpc: GrpcConfig {
-            listen: NetAddr {
-                host: "trow".to_string(),
-                port: 51000,
-            },
+            listen: "trow:51000".to_owned()
         },
         host_names: vec![],
         allow_prefixes: vec![],

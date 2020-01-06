@@ -265,15 +265,6 @@ impl ClientInterface {
         host_names: &[String],
     ) -> Result<types::AdmissionResponse, Error> {
 
-        /*
-        return Ok(
-            types::AdmissionResponse {
-                uid: in_req.uid.clone(),
-                allowed: true,
-                status: None,
-            })
-            */
-
         
         //TODO: write something to convert automatically (into()) between AdmissionRequest types
         //let mut a_req = AdmissionRequest::new();

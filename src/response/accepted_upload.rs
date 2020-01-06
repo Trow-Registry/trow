@@ -22,11 +22,11 @@ impl<'r> Responder<'r> for AcceptedUpload {
 
 #[cfg(test)]
 mod test {
-    use response::upload_info::{create_upload_info, UploadInfo};
+    use crate::response::upload_info::{create_upload_info, UploadInfo};
     use rocket::http::Status;
-    use types::{Uuid, RepoName};
-
-    use response::test_helper::test_route;
+    use crate::types::{Uuid, RepoName};
+    use crate::response::test_helper::test_route;
+    
     fn build_response() -> UploadInfo {
         create_upload_info(
             Uuid("whatever".to_owned()),

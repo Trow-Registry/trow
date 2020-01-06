@@ -14,6 +14,7 @@ use tonic::transport::Server;
 mod server;
 mod validate;
 use server::trow_server::registry_server::RegistryServer;
+use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::TrowServer;
 use tokio::runtime::Runtime;
 
@@ -75,7 +76,8 @@ impl TrowServerBuilder {
             self.deny_images).expect("Failure configuring Trow Server");
     
         let server = Server::builder()
-            .add_service(RegistryServer::new(ts))
+            .add_service(RegistryServer::new(ts.clone()))
+            .add_service(AdmissionControllerServer::new(ts))
             .serve(self.listen_addr);
         
         warn!("Server listening on {}", self.listen_addr);

@@ -25,7 +25,7 @@ mod authentication_tests {
     use std::thread;
     use std::time::Duration;
     use rocket_contrib::json::{Json,JsonValue};
-    use common;
+    use crate::common;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
 

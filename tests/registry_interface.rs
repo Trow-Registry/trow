@@ -14,7 +14,7 @@ mod interface_tests {
 
     use environment::Environment;
 
-    use common;
+    use crate::common;
     use reqwest::StatusCode;
     use reqwest;
     use serde_json;

@@ -26,9 +26,9 @@ impl<'r> Responder<'r> for VerifiedManifest {
 
 #[cfg(test)]
 mod test {
-    use response::test_helper::test_route;
+    use crate::response::test_helper::test_route;
     use rocket::http::Status;
-    use types::{create_verified_manifest, Digest, RepoName};
+    use crate::types::{create_verified_manifest, Digest, RepoName};
 
     #[test]
     fn accepted_ok() {
