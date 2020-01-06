@@ -15,7 +15,6 @@ use rocket_contrib::json::{Json,JsonValue};
 use crate::types::*;
 use crate::TrowConfig;
 
-use tokio::prelude::*;
 use tokio::runtime::Runtime;
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -579,7 +578,10 @@ fn validate_image(
      */
     let mut resp_data = image_data.clone();
     match image_data.0.request {
-        Some(req) => match ci.validate_admission(&req, &tc.host_names) {
+        
+        Some(req) => {
+            let r = ci.validate_admission(&req, &tc.host_names);
+            match Runtime::new().unwrap().block_on(r) {
             Ok(res) => {
                 resp_data.response = Some(res);
                 Json(resp_data)
@@ -596,6 +598,7 @@ fn validate_image(
                 });
                 Json(resp_data)
             }
+        }
         },
 
         None => {

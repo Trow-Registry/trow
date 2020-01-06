@@ -54,8 +54,6 @@ mod routes;
 pub mod types;
 
 use client_interface::ClientInterface;
-use tokio::prelude::*;
-use tokio::runtime::Runtime;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]

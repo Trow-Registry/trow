@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::collections::HashSet;
 use crate::manifest::{FromJson, Manifest};
 use std::fs;
+use std::fmt;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -53,6 +54,19 @@ pub struct TrowServer {
 struct Upload {
     repo_name: String,
     uuid: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Image {
+    pub host: String, //Including port, docker.io by default
+    pub repo: String, //Between host and : including any /s
+    pub tag: String,  //Bit after the :, latest by default
+}
+
+impl fmt::Display for Image {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}:{}", self.host, self.repo, self.tag)
+    }
 }
 
 fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, Error> {
@@ -211,6 +225,56 @@ impl TrowServer {
 
         Ok(())
     }
+    //Support functions for validate, would like to move these
+    
+    pub fn image_exists(&self, image: &Image) -> bool {
+        self.get_path_for_manifest(&image.repo, &image.tag).exists()
+    }
+
+    pub fn is_local_denied(&self, image: &Image) -> bool {
+        //Try matching both with and without host name
+        //Deny images are expected without host as always local
+        let full_name = format!("{}", image);
+        let name_without_host = format!("{}:{}", image.repo, image.tag);
+
+        for prefix in &self.deny_local_prefixes {
+            if full_name.starts_with(prefix) || name_without_host.starts_with(prefix) {
+                info!("Image {} matches prefix {} on deny list", image, prefix);
+                return true;
+            }
+        }
+
+        for name in &self.deny_local_images {
+            if &full_name == name || &name_without_host == name {
+                info!("Image {} matches image {} on deny list", image, name);
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn is_allowed(&self, image: &Image) -> bool {
+        //Have full names with host here
+        let name = format!("{}", image);
+
+        for prefix in &self.allow_prefixes {
+            if name.starts_with(prefix) {
+                info!("Image {} matches prefix {} on allow list", name, prefix);
+                return true;
+            }
+        }
+
+        for a_name in &self.allow_images {
+            if &name == a_name {
+                info!("Image {} matches image {} on allow list", name, a_name);
+                return true;
+            }
+        }
+
+        false
+    }
+
 }
 
 #[tonic::async_trait]
@@ -420,7 +484,6 @@ impl Registry for TrowServer {
             });
         }
         Ok(Response::new(rx))
-
     }
 }
     

@@ -3,24 +3,18 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, BlobRef, CatalogEntry, CatalogRequest,
-    CompleteRequest, DownloadRef, ManifestRef, UploadRequest,
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, BlobRef, CatalogEntry, CatalogRequest,
+    CompleteRequest, DownloadRef, ManifestRef, UploadRequest, AdmissionRequest
 };
 use tonic::Request;
 use crate::types::{self, *};
-use failure::{format_err, Error};
+use failure::Error;
 use serde_json::Value;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
-use tokio::prelude::*;
-use tokio::runtime::Runtime;
-use tokio;
 
 pub struct ClientInterface {
     server: String,
-    runtime: Runtime
-    //rc: RegistryClient<tonic::transport::Channel>,
-    //ac: AdmissionControllerClient,
 }
 
 /**
@@ -53,15 +47,8 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
 
 impl ClientInterface {
     pub fn new(server: String) -> Result<Self, Error> {
-        
-        //delete me
-        let runtime = Runtime::new()?;
 
-        Ok(ClientInterface { server, runtime })
-
-
-        //Create tokio runtime here. 
-        // Should be able to call spawn (but not block_on which is &mut)
+        Ok(ClientInterface { server })
     }
 
     async fn connect_registry(&self) -> 
@@ -69,6 +56,15 @@ impl ClientInterface {
 
         warn!("Connecting to {}", self.server);
         let x = RegistryClient::connect(self.server.to_string()).await;
+        warn!("Connected to {}", self.server);
+        x
+    }
+
+    async fn connect_admission_controller(&self) -> 
+    Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
+
+        warn!("Connecting to {}", self.server);
+        let x = AdmissionControllerClient::connect(self.server.to_string()).await;
         warn!("Connected to {}", self.server);
         x
     }
@@ -263,57 +259,57 @@ impl ClientInterface {
     /**
      * Returns an AdmissionReview object with the AdmissionResponse completed with details of vaildation.
      */
-    pub fn validate_admission(
+    pub async fn validate_admission(
         &self,
-        in_req: &types::AdmissionRequest,
+        req: &types::AdmissionRequest,
         host_names: &[String],
     ) -> Result<types::AdmissionResponse, Error> {
 
+        /*
         return Ok(
             types::AdmissionResponse {
                 uid: in_req.uid.clone(),
                 allowed: true,
                 status: None,
             })
+            */
 
-        /*
-        //TODO: write something to convert automatically (into())
-        let mut a_req = AdmissionRequest::new();
-
+        
+        //TODO: write something to convert automatically (into()) between AdmissionRequest types
+        //let mut a_req = AdmissionRequest::new();
         // TODO: we should really be sending the full object to the backend.
-        // Revisit this when we have proper rust bindings
         let mut images = Vec::new();
-        extract_images(&in_req.object, &mut images);
+        extract_images(&req.object, &mut images);
+        let ar = AdmissionRequest {
+            images,
+            namespace: req.namespace.clone(),
+            operation: req.operation.clone(),
+            host_names: host_names.to_vec()
+        };
 
-        //The conversion here will be easier when we can upgrade the protobuf stuff
-        a_req.set_images(RepeatedField::from_vec(images.clone()));
-
-        a_req.set_namespace(in_req.namespace.clone());
-        a_req.set_operation(in_req.operation.clone());
-        a_req.set_host_names(RepeatedField::from_vec(host_names.to_vec()));
-
-        let resp = self.ac.validate_admission(&a_req)?;
+        let resp = self.connect_admission_controller().await?.validate_admission(
+            Request::new(ar)).await?.into_inner();
 
         //TODO: again, this should be an automatic conversion
-        let st = if resp.get_is_allowed() {
+        let st = if resp.is_allowed {
             types::Status {
                 status: "Success".to_owned(),
                 message: None,
                 code: None,
             }
         } else {
-            //Not sure "Failure is correct"
+            //Not sure "Failure" is correct
             types::Status {
                 status: "Failure".to_owned(),
-                message: Some(resp.get_reason().to_string()),
+                message: Some(resp.reason.to_string()),
                 code: None,
             }
         };
         Ok(types::AdmissionResponse {
-            uid: in_req.uid.clone(),
-            allowed: resp.get_is_allowed(),
+            uid: req.uid.clone(),
+            allowed: resp.is_allowed,
             status: Some(st),
         })
-        */
+        
     }
 }

@@ -12,6 +12,7 @@ extern crate failure;
 
 use tonic::transport::Server;
 mod server;
+mod validate;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
 use tokio::runtime::Runtime;
