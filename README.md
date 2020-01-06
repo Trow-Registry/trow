@@ -49,6 +49,15 @@ and maintain, and ideal for clusters following the
 
 Note that Trow is currently alpha and you can expect to find rough edges.
 
+## Tests
+
+There is a reasonably large test suite that can be run with `cargo run test`, assuming you have rust
+and cargo installed. The suite expects to find the server at `trow.test:8443`, so you may want to
+set up the following mapping in `/etc/hosts`:
+
+127.0.0.1	trow.test
+...
+
 ## Docs
 
 Work has started on a [User Guide](docs/USER_GUIDE.md). Currently this explains

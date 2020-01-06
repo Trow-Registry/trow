@@ -26,6 +26,7 @@ rust-crypto = "^0.2"
 
 rustc-serialize = "^0.3"
 serde_derive = "^1.0"
+trow-protobuf = { path = "../protobuf" }
 
 [build-dependencies]
 tonic-build = "0.1.0-alpha.5"

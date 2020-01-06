@@ -2918,8 +2918,26 @@ dependencies = [
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trow-protobuf 0.1.0",
  "trow-server 0.1.0",
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "trow-protobuf"
+version = "0.1.0"
+dependencies = [
+ "async-stream 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-util 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tonic 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tonic-build 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2943,6 +2961,7 @@ dependencies = [
  "tokio 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic-build 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trow-protobuf 0.1.0",
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
