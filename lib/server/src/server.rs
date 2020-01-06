@@ -1,21 +1,28 @@
-use std;
-use std::sync::{Arc, RwLock};
-
-use failure::{self, Error};
-use futures::{stream, Future, Sink};
-use grpcio::{self, RpcStatus, RpcStatusCode, WriteFlags};
-use manifest::{FromJson, Manifest};
-use serde_json;
-use std::collections::HashSet;
-use std::fmt;
-use std::fs;
-use std::path::{Path, PathBuf};
-use trow_protobuf;
-use trow_protobuf::server::*;
+use tonic::{Request, Response, Status};
+use tokio::sync::mpsc;
 use uuid::Uuid;
+use failure::{self, Error};
+use std::sync::{Arc, RwLock};
+use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use crate::manifest::{FromJson, Manifest};
+use std::fs;
+use std::fmt;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
+
+pub mod trow_server {
+    include!("../../protobuf/out/trow.rs");
+}
+
+use trow_server::{
+    registry_server::Registry,
+    UploadRequest, UploadDetails, CatalogEntry, CatalogRequest, Tag, BlobRef, 
+    WriteLocation, DownloadRef, BlobReadLocation, ManifestRef, ManifestReadLocation,
+    VerifiedManifest, CompleteRequest, CompletedUpload
+};
+
 
 static MANIFESTS_DIR: &'static str = "manifests";
 static LAYERS_DIR: &'static str = "layers";
@@ -32,7 +39,7 @@ static SCRATCH_DIR: &'static str = "scratch";
  * The Arc makes sure they all point to the same data.
  */
 #[derive(Clone)]
-pub struct TrowService {
+pub struct TrowServer {
     active_uploads: Arc<RwLock<HashSet<Upload>>>,
     manifests_path: PathBuf,
     layers_path: PathBuf,
@@ -62,51 +69,82 @@ impl fmt::Display for Image {
     }
 }
 
-impl TrowService {
-    pub fn new(
-        data_path: &str,
-        allow_prefixes: Vec<String>,
-        allow_images: Vec<String>,
-        deny_local_prefixes: Vec<String>,
-        deny_local_images: Vec<String>,
-    ) -> Result<Self, Error> {
-        let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
-        let scratch_path = create_path(data_path, SCRATCH_DIR)?;
-        let layers_path = create_path(data_path, LAYERS_DIR)?;
-        let svc = TrowService {
-            active_uploads: Arc::new(RwLock::new(HashSet::new())),
-            manifests_path,
-            layers_path,
-            scratch_path,
-            allow_prefixes,
-            allow_images,
-            deny_local_prefixes,
-            deny_local_images,
-        };
-        Ok(svc)
+fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, Error> {
+    let data_path = Path::new(data_path);
+    let dir_path = data_path.join(dir);
+    if !dir_path.exists() {
+        fs::create_dir_all(&dir_path)?;
     }
+    Ok(dir_path)
+}
+
+
+fn gen_digest(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.input(bytes);
+    format!("sha256:{}", hasher.result_str())
+}
+
+/**
+ * Visits each subdir and adds path to set if there are files in the directory.
+ *
+ * Could be made more generic by taking a function argument.
+ */
+fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<(), Error> {
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit_dirs(&path, base, repos)?;
+            } else if let Some(d) = path.parent() {
+                    let repo = d.strip_prefix(base)?;
+                    repos.insert(repo.to_string_lossy().to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
+impl TrowServer {
+        pub fn new(
+            data_path: &str,
+            allow_prefixes: Vec<String>,
+            allow_images: Vec<String>,
+            deny_local_prefixes: Vec<String>,
+            deny_local_images: Vec<String>,
+        ) -> Result<Self, Error> {
+            let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
+            let scratch_path = create_path(data_path, SCRATCH_DIR)?;
+            let layers_path = create_path(data_path, LAYERS_DIR)?;
+            let svc = TrowServer {
+                active_uploads: Arc::new(RwLock::new(HashSet::new())),
+                manifests_path,
+                layers_path,
+                scratch_path,
+                allow_prefixes,
+                allow_images,
+                deny_local_prefixes,
+                deny_local_images,
+            };
+            Ok(svc)
+        }
+
 
     fn get_path_for_blob_upload(&self, uuid: &str) -> PathBuf {
         self.scratch_path.join(uuid)
-    }
-
-    /**
-     * TODO: needs to handle either tag or digest as reference.
-     */
-    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> PathBuf {
-        self.manifests_path.join(repo_name).join(reference)
     }
 
     fn get_path_for_layer(&self, repo_name: &str, digest: &str) -> PathBuf {
         self.layers_path.join(repo_name).join(digest)
     }
 
-    fn get_scratch_path_for_uuid(&self, uuid: &str) -> PathBuf {
-        self.scratch_path.join(uuid)
+    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> PathBuf {
+        self.manifests_path.join(repo_name).join(reference)
     }
 
-    pub fn image_exists(&self, image: &Image) -> bool {
-        self.get_path_for_manifest(&image.repo, &image.tag).exists()
+    fn get_scratch_path_for_uuid(&self, uuid: &str) -> PathBuf {
+        self.scratch_path.join(uuid)
     }
 
     fn create_verified_manifest(
@@ -135,12 +173,11 @@ impl TrowService {
             // TODO: check signature and names are correct on v1 manifests
         }
 
-        let mut vm = VerifiedManifest::new();
-
         //For performance, could generate only if verification is on, otherwise copy from somewhere
-        vm.set_digest(gen_digest(&manifest_bytes));
-        vm.set_content_type(manifest.get_media_type().to_string());
-        Ok(vm)
+        Ok(VerifiedManifest {
+            digest: gen_digest(&manifest_bytes),
+            content_type: manifest.get_media_type().to_string()
+        })
     }
 
     fn create_manifest_read_location(
@@ -149,14 +186,14 @@ impl TrowService {
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
-        //This isn't optimal
+        //TODO: This isn't optimal
         let path = self.get_path_for_manifest(&repo_name, &reference);
         let vm = self.create_verified_manifest(repo_name, reference, do_verification)?;
-        let mut mrl = ManifestReadLocation::new();
-        mrl.set_content_type(vm.get_content_type().to_string());
-        mrl.set_digest(vm.get_digest().to_string());
-        mrl.set_path(path.to_string_lossy().to_string());
-        Ok(mrl)
+        Ok( ManifestReadLocation {
+            content_type: vm.content_type.to_owned(),
+            digest: vm.digest.to_owned(),
+            path: path.to_string_lossy().to_string()
+        })
     }
 
     fn save_layer(&self, repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
@@ -187,6 +224,11 @@ impl TrowService {
         });
 
         Ok(())
+    }
+    //Support functions for validate, would like to move these
+    
+    pub fn image_exists(&self, image: &Image) -> bool {
+        self.get_path_for_manifest(&image.repo, &image.tag).exists()
     }
 
     pub fn is_local_denied(&self, image: &Image) -> bool {
@@ -232,54 +274,40 @@ impl TrowService {
 
         false
     }
+
 }
 
-/**
- * Visits each subdir and adds path to set if there are files in the directory.
- *
- * Could be made more generic by taking a function argument.
- */
-fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<(), Error> {
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                visit_dirs(&path, base, repos)?;
-            } else if let Some(d) = path.parent() {
-                    let repo = d.strip_prefix(base)?;
-                    repos.insert(repo.to_string_lossy().to_string());
-            }
-        }
-    }
-    Ok(())
-}
+#[tonic::async_trait]
+impl Registry for TrowServer {
 
-fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, Error> {
-    let data_path = Path::new(data_path);
-    let dir_path = data_path.join(dir);
-    if !dir_path.exists() {
-        fs::create_dir_all(&dir_path)?;
-    }
-    Ok(dir_path)
-}
-
-fn gen_digest(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.input(bytes);
-    format!("sha256:{}", hasher.result_str())
-}
-
-impl trow_protobuf::server_grpc::Registry for TrowService {
-    fn get_write_location_for_blob(
+    async fn request_upload(
         &self,
-        ctx: grpcio::RpcContext,
-        blob_ref: BlobRef,
-        sink: grpcio::UnarySink<WriteLocation>,
-    ) {
+        request: Request<UploadRequest>,
+    ) -> Result<Response<UploadDetails>, Status> {
+        
+        let uuid = Uuid::new_v4().to_string();
+        let reply = UploadDetails{uuid: uuid.clone()};
         let upload = Upload {
-            repo_name: blob_ref.get_repo_name().to_owned(),
-            uuid: blob_ref.get_uuid().to_owned(),
+            repo_name: request.into_inner().repo_name.to_owned(),
+            uuid,
+        };
+        {
+            self.active_uploads.write().unwrap().insert(upload);
+            debug!("Hash Table: {:?}", self.active_uploads);
+        }
+
+        Ok(Response::new(reply))
+    }
+
+    async fn get_write_location_for_blob(
+        &self,
+        req: Request<BlobRef>,
+    ) -> Result<Response<WriteLocation>, Status> {
+
+        let br = req.into_inner();
+        let upload = Upload {
+            repo_name: br.repo_name.clone(),
+            uuid: br.uuid.clone(),
         };
 
         // Apparently unwrap() is correct here. From the docs:
@@ -288,275 +316,174 @@ impl trow_protobuf::server_grpc::Registry for TrowService {
 
         let set = self.active_uploads.read().unwrap();
         if set.contains(&upload) {
-            let path = self.get_path_for_blob_upload(blob_ref.get_uuid());
-            let mut w = WriteLocation::new();
-            w.set_path(path.to_string_lossy().to_string());
-            let f = sink
-                .success(w)
-                .map_err(move |e| warn!("Failed sending to client {:?}", e));
-            ctx.spawn(f);
+            let path = self.get_path_for_blob_upload(&br.uuid);
+            Ok(Response::new(
+                WriteLocation {path: path.to_string_lossy().to_string()}))
+
         } else {
-            warn!("Request for write location for unknown upload");
-            let f = sink
-                .fail(RpcStatus::new(
-                    RpcStatusCode::Unknown,
-                    Some("UUID Not Known".to_string()),
-                ))
-                .map_err(|e| warn!("Failure sending error to client {:?}", e));
-            ctx.spawn(f);
+            Err(Status::failed_precondition(format!("No current upload matching {:?}", br)))
         }
     }
 
-    fn get_read_location_for_blob(
+    async fn get_read_location_for_blob(
         &self,
-        ctx: grpcio::RpcContext,
-        dr: DownloadRef,
-        sink: grpcio::UnarySink<BlobReadLocation>,
-    ) {
+        req: Request<DownloadRef>
+    ) -> Result<Response<BlobReadLocation>, Status> {
         //TODO: test that it exists
 
-        let path = self.get_path_for_layer(dr.get_repo_name(), dr.get_digest());
+        let dr = req.into_inner();
+        let path = self.get_path_for_layer(&dr.repo_name, &dr.digest);
 
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
-            let f = sink
-                .fail(RpcStatus::new(
-                    RpcStatusCode::Unknown,
-                    Some("Blob Not Known".to_string()),
-                ))
-                .map_err(|e| warn!("Failure sending error to client {:?}", e));
-            ctx.spawn(f);
+            Err(Status::failed_precondition(format!("No blob found matching {:?}", dr)))
+
         } else {
-            let mut r = BlobReadLocation::new();
-            r.set_path(path.to_string_lossy().to_string());
-            let f = sink
-                .success(r)
-                .map_err(move |e| warn!("Failed sending to client {:?}", e));
-            ctx.spawn(f);
+            Ok(Response::new( BlobReadLocation {path: path.to_string_lossy().to_string() }))
         }
     }
 
-    fn get_write_location_for_manifest(
+    async fn get_write_location_for_manifest(
         &self,
-        ctx: grpcio::RpcContext,
-        mr: ManifestRef,
-        sink: grpcio::UnarySink<super::server::WriteLocation>,
-    ) {
+        req: Request<ManifestRef>
+    ) -> Result<Response<WriteLocation>, Status> {
         //TODO: First save to temporary file and copy over after verify
 
-        let manifest_path = self.get_path_for_manifest(mr.get_repo_name(), mr.get_reference());
+        let mr = req.into_inner();
+        let manifest_path = self.get_path_for_manifest(&mr.repo_name, &mr.reference);
         let manifest_dir = manifest_path.parent().unwrap();
 
         match fs::create_dir_all(manifest_dir) {
             Ok(_) => {
-                let mut w = WriteLocation::new();
-                w.set_path(manifest_path.to_string_lossy().to_string());
-                let f = sink
-                    .success(w)
-                    .map_err(move |e| warn!("Failed sending to client {:?}", e));
-                ctx.spawn(f);
+                Ok(Response::new(
+                    WriteLocation {path: manifest_path.to_string_lossy().to_string()}))
             }
             Err(e) => {
                 warn!("Internal error creating directory {:?}", e);
-                let f = sink
-                    .fail(RpcStatus::new(
-                        RpcStatusCode::Internal,
-                        Some("Internal error creating directory".to_string()),
-                    ))
-                    .map_err(|e| warn!("Failed to send error message to client {:?}", e));
-                ctx.spawn(f);
+                Err(Status::internal("Failed to create directory for manifest"))
             }
         }
     }
 
-    fn get_read_location_for_manifest(
+    async fn get_read_location_for_manifest(
         &self,
-        ctx: grpcio::RpcContext,
-        mr: ManifestRef,
-        sink: grpcio::UnarySink<ManifestReadLocation>,
-    ) {
+        req: Request<ManifestRef>
+    ) -> Result<Response<ManifestReadLocation>, Status> {
         //Don't actually need to verify here; could set to false
 
+        let mr = req.into_inner();
+        // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
-            Ok(vm) => {
-                let f = sink
-                    .success(vm)
-                    .map_err(move |e| warn!("Failed sending to client {:?}", e));
-                ctx.spawn(f);
-            }
+            Ok(vm) => Ok(Response::new(vm)),
             Err(e) => {
                 warn!("Internal error with manifest {:?}", e);
-                let f = sink
-                    .fail(RpcStatus::new(
-                        RpcStatusCode::Internal,
-                        Some("Internal error finding manifest".to_string()),
-                    ))
-                    .map_err(|e| warn!("Failed to send error message to client {:?}", e));
-                ctx.spawn(f);
+                Err(Status::internal("Internal error finding manifest"))
             }
         }
     }
 
-    fn request_upload(
+    async fn complete_upload(
         &self,
-        ctx: grpcio::RpcContext,
-        req: UploadRequest,
-        sink: grpcio::UnarySink<UploadDetails>,
-    ) {
-        let mut resp = UploadDetails::new();
+        req: Request<CompleteRequest>
+    ) -> Result<Response<CompletedUpload>, Status> {
 
-        let uuid = Uuid::new_v4().to_string();
-        resp.set_uuid(uuid.clone());
-
-        let upload = Upload {
-            repo_name: req.get_repo_name().to_owned(),
-            uuid,
-        };
-        {
-            self.active_uploads.write().unwrap().insert(upload);
-            debug!("Hash Table: {:?}", self.active_uploads);
-        }
-
-        let f = sink
-            .success(resp)
-            .map_err(|e| warn!("failed to reply! {:?}", e));
-        ctx.spawn(f);
-    }
-
-    fn complete_upload(
-        &self,
-        ctx: grpcio::RpcContext,
-        cr: CompleteRequest,
-        sink: grpcio::UnarySink<CompletedUpload>,
-    ) {
-        match self.save_layer(cr.get_repo_name(), cr.get_user_digest(), cr.get_uuid()) {
+        let cr = req.into_inner();
+        let ret = match self.save_layer(&cr.repo_name, &cr.user_digest, &cr.uuid) {
             Ok(_) => {
-                let mut cu = CompletedUpload::new();
-                cu.set_digest(cr.get_user_digest().to_string());
-                let f = sink
-                    .success(cu)
-                    .map_err(move |e| warn!("failed to reply! {:?}", e));
-                ctx.spawn(f);
+                Ok(Response::new(CompletedUpload { digest: cr.user_digest.clone() }))
             }
             Err(e) => {
                 warn!("Failure when saving layer: {:?}", e);
-                let f = sink
-                    .fail(RpcStatus::new(
-                        RpcStatusCode::Internal,
-                        Some("Internal error saving file".to_string()),
-                    ))
-                    .map_err(|e| warn!("Internal error saving file {:?}", e));
-                ctx.spawn(f);
+                Err(Status::internal("Internal error saving layer"))
             }
-        }
+        };
 
         //delete uuid from uploads tracking
         let upload = Upload {
-            repo_name: cr.get_repo_name().to_string(),
-            uuid: cr.get_uuid().to_string(),
+            repo_name: cr.repo_name.clone(),
+            uuid: cr.uuid.clone(),
         };
 
         let mut set = self.active_uploads.write().unwrap();
         if !set.remove(&upload) {
             warn!("Upload {:?} not found when deleting", upload);
         }
+        ret
     }
 
-    fn verify_manifest(
+    async fn verify_manifest(
         &self,
-        ctx: grpcio::RpcContext,
-        mr: ManifestRef,
-        sink: grpcio::UnarySink<VerifiedManifest>,
-    ) {
+        req: Request<ManifestRef>
+    ) -> Result<Response<VerifiedManifest>, Status> {
+
+        let mr = req.into_inner();
         match self.create_verified_manifest(
-            mr.get_repo_name().to_string(),
-            mr.get_reference().to_string(),
+            mr.repo_name.clone(),
+            mr.reference.clone(),
             true,
         ) {
-            Ok(vm) => {
-                let f = sink
-                    .success(vm)
-                    .map_err(move |e| warn!("failed to reply! {:?}", e));
-                ctx.spawn(f);
-            }
+            Ok(vm) => Ok(Response::new(vm)),
             Err(e) => {
                 warn!("Error verifying manifest {:?}", e);
-                let f = sink
-                    .fail(RpcStatus::new(
-                        RpcStatusCode::Internal,
-                        Some("Problem verifying manifest".to_string()),
-                    ))
-                    .map_err(|e| warn!("Internal error saving file {:?}", e));
-                ctx.spawn(f);
+                Err(Status::internal("Internal error verifying manifest"))
             }
         }
     }
 
-    fn get_catalog(
+    type GetCatalogStream = mpsc::Receiver<Result<CatalogEntry, Status>>;
+
+    async fn get_catalog(
         &self,
-        ctx: grpcio::RpcContext,
-        _: CatalogRequest,
-        sink: grpcio::ServerStreamingSink<CatalogEntry>,
-    ) {
+        _request: Request<CatalogRequest>,
+    ) -> Result<Response<Self::GetCatalogStream>, Status> {
+
+        let (mut tx, rx) = mpsc::channel(4);
         let mut repos = HashSet::new();
         match visit_dirs(&self.manifests_path, &self.manifests_path, &mut repos) {
             Ok(_) => {
-                let repo_list: Vec<_> = repos
-                    .iter()
-                    .map(|r| {
-                        let mut ce = CatalogEntry::new();
-                        ce.set_repo_name(r.to_string());
-                        (ce, WriteFlags::default())
-                    })
-                    .collect();
-                let f = sink
-                    .send_all(stream::iter_ok::<_, grpcio::Error>(repo_list))
-                    .map(|_| {})
-                    .map_err(|e| warn!("Failed to handle catalog request: {:?}", e));
-                ctx.spawn(f)
+                tokio::spawn(async move {
+                    for r in repos.iter() {
+                        let ce = CatalogEntry { repo_name: r.to_string() };
+                        tx.send(Ok(ce)).await.expect("Error streaming catalog");
+                    };
+                });
+                Ok(Response::new(rx))
             }
             Err(e) => {
                 warn!("Error retreiving repository catalog {:?}", e);
-                let f = sink
-                    .fail(RpcStatus::new(
-                        RpcStatusCode::Internal,
-                        Some("Problem retrieving catalog".to_string()),
-                    ))
-                    .map_err(|e| warn!("Internal error sending response {:?}", e));
-                ctx.spawn(f);
+                Err(Status::internal("Internal error streaming catalog"))
             }
         }
     }
 
-    fn list_tags(
+    type ListTagsStream = mpsc::Receiver<Result<Tag, Status>>;
+
+    async fn list_tags(
         &self,
-        ctx: grpcio::RpcContext,
-        ce: CatalogEntry,
-        sink: grpcio::ServerStreamingSink<Tag>,
-    ) {
-        let mut tags = Vec::new();
+        request: Request<CatalogEntry>,
+    ) -> Result<Response<Self::ListTagsStream>, Status> {
+
+        let (mut tx, rx) = mpsc::channel(4);
         let mut path = PathBuf::from(&self.manifests_path);
-        path.push(ce.get_repo_name());
+        let ce = request.into_inner();
+        path.push(ce.repo_name);
 
         if let Ok(files) = fs::read_dir(path) {
-            for entry in files {
-                if let Ok(en) = entry {
-                    let en_path = en.path();
-                    if en_path.is_file() {
-                        if let Some(tag_str) = en_path.file_name() {
-                            let mut tag = Tag::new();
-                            tag.set_tag(tag_str.to_string_lossy().to_string());
-                            tags.push((tag, WriteFlags::default()));
+            tokio::spawn(async move {
+                for entry in files {
+                    if let Ok(en) = entry {
+                        let en_path = en.path();
+                        if en_path.is_file() {
+                            if let Some(tag_str) = en_path.file_name() {
+                                let  tag = Tag { tag: tag_str.to_string_lossy().to_string() };
+                                tx.send(Ok(tag)).await.expect("Error streaming tags");
+                            }
                         }
                     }
                 }
-            }
+            });
         }
-
-        let f = sink
-            .send_all(stream::iter_ok::<_, grpcio::Error>(tags))
-            .map(|_| {})
-            .map_err(|e| warn!("Failed to respond to ListTags request: {:?}", e));
-        ctx.spawn(f);
+        Ok(Response::new(rx))
     }
 }
+    

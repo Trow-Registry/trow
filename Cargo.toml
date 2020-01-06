@@ -38,7 +38,7 @@ tonic = "0.1.0-beta.1"
 prost = "0.5"
 bytes = "0.4"
 
-trow-server = { path = "./lib/tonic-server" }
+trow-server = { path = "./lib/server" }
 
 base64 = "0.10.0"
 data-encoding = "2.1.2"
