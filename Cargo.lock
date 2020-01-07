@@ -2881,7 +2881,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "trow"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "assert_cli 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2918,14 +2918,14 @@ dependencies = [
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "trow-protobuf 0.1.0",
- "trow-server 0.1.0",
+ "trow-protobuf 0.2.0",
+ "trow-server 0.2.0",
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "trow-protobuf"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-stream 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2942,7 +2942,7 @@ dependencies = [
 
 [[package]]
 name = "trow-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-stream 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2961,7 +2961,7 @@ dependencies = [
  "tokio 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic-build 0.1.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "trow-protobuf 0.1.0",
+ "trow-protobuf 0.2.0",
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

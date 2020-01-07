@@ -29,8 +29,6 @@ RUN cargo build # should cache all build deps
 COPY lib lib
 COPY src src
 #Do a normal build for debug
-ARG VCS_REF
-ENV VCS_REF=$VCS_REF
 RUN cargo build -Z unstable-options --out-dir ./out
 
 FROM debian:stable-slim
