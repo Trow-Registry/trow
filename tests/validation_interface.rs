@@ -4,10 +4,10 @@ extern crate hyper;
 extern crate rand;
 extern crate reqwest;
 extern crate serde_json;
-extern crate trow;
-extern crate trow_server;
 extern crate libc;
 
+
+#[cfg(test)]
 mod common;
 
 #[cfg(test)]

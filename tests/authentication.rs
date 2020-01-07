@@ -4,9 +4,7 @@ extern crate hyper;
 extern crate rand;
 extern crate reqwest;
 extern crate serde_json;
-extern crate trow;
 extern crate base64;
-extern crate trow_server;
 extern crate rocket_contrib;
 
 mod common;
@@ -24,13 +22,9 @@ mod authentication_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use rocket_contrib::json::{Json,JsonValue};
-    use crate::common;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
 
-    const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
-    const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
     const AUTHN_HEADER: &str = "www-authenticate";
     const AUTHZ_HEADER: &str = "Authorization";
 
@@ -100,10 +94,11 @@ mod authentication_tests {
 
     fn test_login(cl: &reqwest::Client) {
         let bytes = encode(b"authtest:authpass");
-        let mut resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
+        let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
             AUTHZ_HEADER, format!("Basic {}", bytes)).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let token: JsonValue = resp.json().unwrap();
+        // Uncomment if you want to inspect the token
+        // let _token: JsonValue = resp.json().unwrap(); 
         let resp = cl
             .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, "name", "tag"))
             .send()

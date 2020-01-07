@@ -1,15 +1,23 @@
+
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use rand::Rng;
 use reqwest::StatusCode;
 use trow_server::manifest;
 
-pub const LYCAON_ADDRESS: &str = "https://trow.test:8443";
+/* None of these are dead code, they are called from tests */
 
+#[allow(dead_code)]
+pub const TROW_ADDRESS: &str = "https://trow.test:8443";
+#[allow(dead_code)]
 const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
+#[allow(dead_code)]
 const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
+#[allow(dead_code)]
 const LOCATION_HEADER: &str = "Location";
 
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     let mut blob = Vec::with_capacity(size);
@@ -19,10 +27,12 @@ pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     blob
 }
 
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
     //Should support both image/test and imagetest, only former working currently
     let resp = cl
-        .post(&format!("{}/v2/{}/blobs/uploads/", LYCAON_ADDRESS, name))
+        .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
         .send()
         .unwrap();
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
@@ -45,7 +55,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
     let resp = cl
         .put(&format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
-            LYCAON_ADDRESS, name, uuid, digest
+            TROW_ADDRESS, name, uuid, digest
         ))
         .send()
         .unwrap();
@@ -53,7 +63,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
 
     //Finally get it back again
     let mut resp = cl
-        .get(&format!("{}/v2/{}/blobs/{}", LYCAON_ADDRESS, name, digest))
+        .get(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, digest))
         .send()
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -83,7 +93,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         config,
         layers,
     };
-    let manifest_addr = format!("{}/v2/{}/manifests/{}", LYCAON_ADDRESS, name, tag);
+    let manifest_addr = format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag);
     let resp = cl.put(&manifest_addr).json(&mani).send().unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();

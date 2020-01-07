@@ -4,9 +4,9 @@ extern crate hyper;
 extern crate rand;
 extern crate reqwest;
 extern crate serde_json;
-extern crate trow;
-extern crate trow_server;
 
+
+#[cfg(test)]
 mod common;
 
 #[cfg(test)]
@@ -28,13 +28,7 @@ mod interface_tests {
     use trow_server::manifest;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
-
-    /*
-    header! { (DistributionApi, "Docker-Distribution-API-Version") => [String] }
-    header! { (UploadUuid, "Docker-Upload-Uuid") => [String] }
-    */
     const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
-    const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
 
     struct TrowInstance {
         pid: Child,
@@ -44,7 +38,6 @@ mod interface_tests {
 
     fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
-            //.current_dir("../../")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
