@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y unzip
 
 WORKDIR /usr/src/trow
 
-#First get just the deps
+#First get just the deps for caching.
 COPY Cargo.toml .
 COPY Cargo.lock .
 
@@ -28,7 +28,6 @@ RUN cargo build # should cache all build deps
 
 COPY lib lib
 COPY src src
-#Do a normal build for debug
 RUN cargo build -Z unstable-options --out-dir ./out
 
 FROM debian:stable-slim
