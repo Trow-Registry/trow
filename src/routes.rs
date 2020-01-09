@@ -45,7 +45,8 @@ pub fn routes() -> Vec<rocket::Route> {
         list_tags_2level,
         list_tags_3level,
         get_catalog,
-        validate_image
+        validate_image,
+        delete_blob
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
@@ -517,6 +518,18 @@ DELETE /v2/<name>/manifests/<reference>
 
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
 fn delete_image_manifest(_auth_user: TrowToken, _name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
+    Err(Error::Unsupported)
+}
+
+
+#[delete("/v2/<_name>/<_repo>/blobs/<_reference>/<_uuid>?<_digest>")]
+fn delete_blob(_auth_user: TrowToken, 
+    _name: String, 
+    _repo: String, 
+    _reference: String,
+    _uuid: String,
+    _digest: String,
+) -> Result<Empty, Error> {
     Err(Error::Unsupported)
 }
 

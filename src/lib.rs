@@ -207,10 +207,16 @@ impl TrowBuilder {
         rng.fill(&mut key[..]);
         let skey = base64::encode(&key);
         
+        /*
+        Keep Alive has to be turned off to mitigate issue whereby some transfers would be cut off.
+        Seems to be caused by an old version of hyper in Rocket.
+        Keep Alive can be restored when Rocket is upgraded or by moving to different framework.
+        See #24
+        */
         let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
             .address(self.config.addr.host.clone())
             .port(self.config.addr.port)
-            .keep_alive(60)
+            .keep_alive(0) // Needed to mitigate #24. See above. 
             .secret_key(skey)
             .workers(256);
 
