@@ -69,12 +69,21 @@ impl fmt::Display for Image {
     }
 }
 
-fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, Error> {
+fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
     let data_path = Path::new(data_path);
     let dir_path = data_path.join(dir);
     if !dir_path.exists() {
-        fs::create_dir_all(&dir_path)?;
-    }
+        return match fs::create_dir_all(&dir_path) {
+            Ok(_) => Ok(dir_path),
+            Err(e) => {
+                error!(r#"
+                Failed to create directory required by trow {:?}
+                Please check the parent directory is writable by the trow user.
+                {:?}"#, dir_path, e);
+                Err(e)
+            }
+        }
+    };
     Ok(dir_path)
 }
 

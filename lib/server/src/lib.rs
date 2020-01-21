@@ -1,4 +1,4 @@
-#[macro_use(log, warn, debug, info)]
+#[macro_use(log, warn, debug, info, error)]
 extern crate log;
 
 #[macro_use]

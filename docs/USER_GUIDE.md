@@ -22,9 +22,11 @@ data. This should be reattached in the case of node or pod failure, thus avoidin
 If your cluster does not support Persistent Volumes, or you would like to use a different driver
 (e.g. cephfs) you will need to manually assign a volume. This should be straightforward, but is
 cluster-specific. Make sure that the volume is writeable by the Trow user (user id 999 by
-default).
+default). Normally this is taken care of by the `fsGroup` setting in the `securityContext` part of
+the deployment YAML, but this may not work for certain types of volume e.g. `hostPath` - in these
+cases you may need to perform an explicit `chown` or `chmod` using the UID of the Trow user.
 
-Backing up the Trow registry can be done by copying the `/data` directory. 
+Backing up the Trow registry can be done by copying the data directory (`/data` by default). 
 
 ## Listing Repositories and Tags
 
@@ -215,3 +217,11 @@ Get https://trow.kube-public:31000/v2/: x509: certificate signed by unknown auth
 ```
 
 If you get this error, and you are using the quick install on Docker for Mac, try restarting Docker.
+
+### Permission Denied Errors in Logs
+
+If you get errors such as `{ code: 13, kind: PermissionDenied, message: "Permission denied" }`, it is
+possible that Trow can't write to the data directory. Please verify that the data volume is
+accessible and writeable by the Trow user. If not, please use `chown` or `chmod` to give the Trow
+user access. As the Trow user only exists in the container, you will likely need to use it's
+equivalent UID e.g. `chown 999 /data`.
