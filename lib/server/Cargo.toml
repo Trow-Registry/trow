@@ -12,11 +12,11 @@ futures-core = "0.3"
 futures-util = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-prost = "0.5"
+prost = "0.6"
 rand = "0.7.2"
 tokio = { version = "0.2", features = ["macros", "sync", "stream", "time"] }
 
-tonic = "0.1.0-beta.1"
+tonic = "0.1"
 log = "^0.3"
 uuid = { version = "^0.5", features = ["v4", "rustc-serialize"] }
 failure = "^0.1"
@@ -29,4 +29,4 @@ serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
 
 [build-dependencies]
-tonic-build = "0.1.0-alpha.5"
+tonic-build = "0.1"
