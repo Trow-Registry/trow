@@ -10,7 +10,8 @@ TAG=${DOCKER_TAG:-"default"}
 IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
 DATE="$(date --rfc-3339=seconds)"
 
-docker build --platform linux/amd64 --platform linux/arm/v7 \
+export DOCKER_BUILDKIT=1
+docker buildx build --platform linux/amd64 --platform linux/arm/v7 \
   --build-arg VCS_REF="${SOURCE_COMMIT:-$(git rev-parse HEAD)}" \
   --build-arg VCS_BRANCH="${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}" \
   --build-arg REPO="$REPO" \
