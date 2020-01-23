@@ -1,7 +1,7 @@
 #Not a big fan of using nightly, but such is our lot currently
 FROM rust:latest as builder
 
-RUN rustup update nightly && rustup default nightly;
+RUN rustup update nightly && rustup default nightly && rustup component add rustfmt
 RUN apt-get update && apt-get install -y unzip
 
 WORKDIR /usr/src/trow
@@ -28,6 +28,8 @@ RUN cargo build # should cache all build deps
 
 COPY lib lib
 COPY src src
+# Must build protobuf first for generated code
+RUN cd lib/protobuf && cargo build
 RUN cargo build -Z unstable-options --out-dir ./out
 
 FROM debian:stable-slim
