@@ -3,6 +3,7 @@
  * [Persisting Data/Images](#persisting-dataimages)
  * [Listing Repositories and Tags](#listing-repositories-and-tags)
  * [Using Curl Securely](#using-curl-securely)
+ * [Multiplatform Builds](#multiplatform)
  * [Troubleshooting](#troubleshooting)
 
 More information is available in the [README](../README.md) and [Installation
@@ -66,6 +67,18 @@ the tags for any given repository can be listed with `/v2/<repository_name>/tags
 The catalog endpoint is a matter of debate by the OCI and may be replaced in future versions.  Do
 not expect different registries to have compatible implementations of this endpoint for historical
 reasons and ambiguities in specification.
+
+## Multiplatform Builds
+
+The images tagged `default` and `latest` on the [Docker
+Hub](https://hub.docker.com/r/containersol/trow/tags) are only built for linux/amd64. To build
+images for other platforms, either build directly on the required platform using the
+`docker/build.sh` script, or use Docker's multiplatform support and QEMU to build for the required
+platform. The easiest way to do this is via buildx, which is currently an experimental feature of
+the Docker CLI. 
+
+ - Make sure you are using a new version of Docker (at the time of writing this is still 19.03)
+ - Enable experimental features by setting `"experimental": "enabled"` in `~/.docker/config.json` or  
 
 ## Troubleshooting
 

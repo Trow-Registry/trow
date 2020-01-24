@@ -6,7 +6,7 @@ src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
 REPO=${DOCKER_REPO:-"containersol/trow"}
-TAG=${DOCKER_TAG:-"default"}
+TAG=${DOCKER_TAG:-"armv7"}
 IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
 DATE="$(date --rfc-3339=seconds)"
 
