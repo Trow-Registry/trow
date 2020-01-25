@@ -2,7 +2,7 @@
 #This can be a lot faster than compiling directly on slow hw.
 
 #Not a big fan of using nightly, but such is our lot currently
-FROM rust:latest as builder
+FROM --platform=linux/amd64 rust:latest as builder
 
 RUN rustup update nightly && rustup default nightly && \
     rustup component add rustfmt && rustup target install armv7-unknown-linux-gnueabihf && \
