@@ -72,7 +72,7 @@ reasons and ambiguities in specification.
 
 At the time of writing, Trow images on the [Docker Hub](https://hub.docker.com/r/containersol/trow/tags)
 only support the linux/amd64 platform, largely due to limitations of the Docker Hub autobuild
-system. Moving forward, we intend for release tagged images (e.g. `containersol/trow:0.2) to support
+system. Moving forward, we intend for release tagged images (e.g. `containersol/trow:0.2`) to support
 multiple platforms (`default` and `latest` will still be built from master).
 
 To build a Trow image for a given platform, there are several options:
@@ -84,9 +84,8 @@ To build a Trow image for a given platform, there are several options:
  3. Use Rust cross-compilation to produce a cross-compiled binary for the target platform and copy
     into a target platform base image
 
-Often 1) makes the most sense, but isn't always practical, due to the availability of hardware or
-speed of building on given hardware. In those cases, approach 2 (using buildx) can make more sense.
-To do this:
+Often 1) makes the most sense, but isn't always practical, due to lack of availability or slow speed
+of hardware. In those cases, approach 2 (using buildx) can make more sense.  To do this:
 
  - Make sure you are using a new version of Docker (at the time of writing this is 19.03).
  - Enable experimental features by setting `"experimental": "enabled"` in `~/.docker/config.json`.
@@ -94,11 +93,12 @@ To do this:
    the `Enable experimental features` toggle. Click `Apply & Restart`. 
  - Run `docker buildx ls` and verify that multiple platforms are listed. If not, you may need to
    register binfmt handlers, which can be done for common platforms with `docker run --rm
-   docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28`. Restart docker or create a new builder
-   instance after doing this.
- - From the `docker` directory, run `docker build --platform PLATFORM -f Dockerfile -t trow ../` or `docker
-   buildx build --platform PLATFORM -f Dockerfile -t trow --load ../`, replacing `PLATFORM` with the
-   approriate target e.g. `linux/arm/v7`.
+   docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28` (see [qus](https://github.com/dbhi/qus)
+   for an alternative approach and explanation of what is happening here). Restart docker or create
+   a new builder instance after doing this.
+ - From the `docker` directory, run `docker build --platform PLATFORM -f Dockerfile -t trow ../` or
+   `docker buildx build --platform PLATFORM -f Dockerfile -t trow --load ../`, replacing `PLATFORM`
+   with the approriate target e.g. `linux/arm/v7`.
 
 Approach 3 (using Rust cross compilation) may be more appropriate when regularly building for
 low-powered hardware, as it is likely to be considerably faster than 2. It does require some
