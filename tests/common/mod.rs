@@ -10,11 +10,11 @@ use trow_server::manifest;
 #[allow(dead_code)]
 pub const TROW_ADDRESS: &str = "https://trow.test:8443";
 #[allow(dead_code)]
-const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
+pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 #[allow(dead_code)]
-const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
+pub const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
 #[allow(dead_code)]
-const LOCATION_HEADER: &str = "Location";
+pub const LOCATION_HEADER: &str = "Location";
 
 #[cfg(test)]
 #[allow(dead_code)]

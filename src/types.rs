@@ -32,6 +32,7 @@ impl UploadInfo {
     pub fn range(&self) -> (u32, u32) {
         self.range
     }
+
 }
 
 pub fn create_upload_info(uuid: Uuid, repo_name: RepoName, range: (u32, u32)) -> UploadInfo {
@@ -46,11 +47,14 @@ pub fn create_upload_info(uuid: Uuid, repo_name: RepoName, range: (u32, u32)) ->
 pub struct AcceptedUpload {
     digest: Digest,
     repo_name: RepoName,
+    uuid: Uuid,
+    range: (u32, u32),
 }
 
-pub fn create_accepted_upload(digest: Digest, repo_name: RepoName) -> AcceptedUpload {
-    AcceptedUpload { digest, repo_name }
+pub fn create_accepted_upload(digest: Digest, repo_name: RepoName, uuid: Uuid, range: (u32, u32)) -> AcceptedUpload {
+    AcceptedUpload { digest, repo_name, uuid, range }
 }
+
 impl AcceptedUpload {
     pub fn digest(&self) -> &Digest {
         &self.digest
@@ -58,6 +62,10 @@ impl AcceptedUpload {
 
     pub fn repo_name(&self) -> &RepoName {
         &self.repo_name
+    }
+
+    pub fn range(&self) -> (u32, u32) {
+        self.range
     }
 }
 

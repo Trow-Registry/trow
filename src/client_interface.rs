@@ -98,6 +98,7 @@ impl ClientInterface {
         repo_name: &RepoName,
         uuid: &Uuid,
         digest: &Digest,
+        len: u64
     ) -> Result<AcceptedUpload, Error> {
         let req = CompleteRequest {
             repo_name: repo_name.0.clone(),
@@ -109,6 +110,8 @@ impl ClientInterface {
         Ok(create_accepted_upload(
             Digest(resp.digest.to_owned()),
             repo_name.clone(),
+            uuid.clone(),
+            (0, (len as u32))
         ))
     }
 

@@ -19,6 +19,7 @@ impl<'r> Responder<'r> for UploadInfo {
         let location = Header::new("Location", location_url);
 
         debug!("Range: {}-{}, Length: {}", left, right, right - left);
+
         Response::build()
             .header(upload_uuid)
             .header(location)

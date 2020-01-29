@@ -12,36 +12,44 @@ impl<'r> Responder<'r> for AcceptedUpload {
         debug!("accepted upload response");
         let location_header = Header::new("Location", location);
         let digest_header = Header::new("Docker-Content-Digest", self.digest().0.clone());
+        let (left, right) = self.range();
+        let range_header = Header::new("Range", format!("{}-{}", left, right));
+        let length_header = Header::new("Content-Length", "0");
+
         Response::build()
             .status(Status::Created)
             .header(location_header)
             .header(digest_header)
+            .header(range_header)
+            .header(length_header)
             .ok()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::response::upload_info::{create_upload_info, UploadInfo};
+    use crate::types::{create_accepted_upload, Digest, AcceptedUpload};
     use rocket::http::Status;
     use crate::types::{Uuid, RepoName};
     use crate::response::test_helper::test_route;
     
-    fn build_response() -> UploadInfo {
-        create_upload_info(
-            Uuid("whatever".to_owned()),
+    fn build_response() -> AcceptedUpload {
+        create_accepted_upload(
+            Digest("123".to_string()),
             RepoName("moredhel/test".to_owned()),
+            Uuid("whatever".to_owned()),
             (0, 0),
         )
     }
 
     #[test]
-    fn uuid_uuid() {
+    fn test_resp() {
         let response = test_route(build_response());
         let headers = response.headers();
-        assert_eq!(response.status(), Status::Accepted);
-        assert!(headers.contains("Docker-Upload-UUID"));
+        assert_eq!(response.status(), Status::Created);
         assert!(headers.contains("Location"));
         assert!(headers.contains("Range"));
+        assert!(headers.contains("Docker-Content-Digest"));
+        assert!(headers.contains("Content-Length"));
     }
 }

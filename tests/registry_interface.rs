@@ -22,6 +22,8 @@ mod interface_tests {
     use std::io::Read;
     use std::process::Child;
     use std::process::Command;
+    use crypto::digest::Digest;
+    use crypto::sha2::Sha256;
     use std::thread;
     use std::time::Duration;
     use trow::types::{RepoCatalog, RepoName, TagList};
@@ -148,6 +150,28 @@ mod interface_tests {
         assert_eq!(tl, &tl_resp);
     }
 
+    fn upload_with_put(cl: &reqwest::Client) {
+        let name = "puttest";
+        let resp = cl
+            .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+        let uuid = resp.headers().get(common::UPLOAD_HEADER).unwrap().to_str().unwrap();
+
+        let blob = common::gen_rand_blob(100);
+        let mut hasher = Sha256::new();
+        hasher.input(&blob);
+        let digest = hasher.result_str();
+        
+        let loc = &format!(
+            "{}/v2/{}/blobs/uploads/{}?digest={}",
+            TROW_ADDRESS, name, uuid, digest);
+
+        let resp = cl.put(loc).body(blob.clone()).send().unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+    }
+
     #[test]
     fn test_runner() {
         //Need to start with empty repo
@@ -183,6 +207,9 @@ mod interface_tests {
         common::upload_layer(&client, "onename", "tag");
         println!("Running upload_layer(onename:latest)");
         common::upload_layer(&client, "onename", "latest");
+        println!("Running upload_with_put()");
+        upload_with_put(&client);
+
         println!("Running get_manifest(onename:tag)");
         get_manifest(&client, "onename", "tag");
         println!("Running get_manifest(image/test:latest)");

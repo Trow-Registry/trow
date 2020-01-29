@@ -241,6 +241,96 @@ Content-Length: <size of layer>
 Content-Type: application/octet-stream
 
 <Layer Binary Data>
+ */
+
+/**
+ * Completes the upload.
+ *
+ * TODO: allow uploading of final data
+ * TODO: add other failure states
+ */
+#[put("/v2/<repo_name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
+fn put_blob(
+    _auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    repo_name: String,
+    uuid: String,
+    digest: String,
+    chunk: rocket::data::Data,
+) -> Result<AcceptedUpload, Error> {
+
+    let repo = RepoName(repo_name);
+    let uuid = Uuid(uuid);
+
+    let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
+    //ENORMOUS TODO: really shouldn't spawn a whole runtime for each request;
+    //it's hugely inefficient. Need to figure out how to use thread-local for
+    //each runtime or move to Warp and share the runtime.
+
+    let mut rt = Runtime::new().unwrap();
+    let sink = rt.block_on(sink_f);
+
+    match sink {
+        Ok(mut sink) => {
+
+            // Puts should be monolithic uploads (all in go I belive)
+            let len = chunk.stream_to(&mut sink);
+            match len {
+                //TODO: For chunked upload this should be start pos to end pos
+                Ok(len) => {
+                    let digest = Digest(digest);
+                    let r = ci.complete_upload(&repo, &uuid, &digest, len);
+                    rt.block_on(r).map_err(|_| Error::InternalError)
+                }
+                Err(_) => Err(Error::InternalError),
+            }
+        }
+        Err(_) => {
+            // TODO: this conflates rpc errors with uuid not existing
+            // TODO: pipe breaks if we don't accept the whole file
+            // Possibly makes us prone to DOS attack?
+            warn!("Uuid {} does not exist, piping to /dev/null", uuid);
+            let _ = chunk.stream_to_file("/dev/null");
+            Err(Error::BlobUnknown)
+        }
+    }
+}
+
+/*
+ * Parse 2 level <repo>/<name> style path and pass it to put_blob
+ */
+#[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
+fn put_blob_2level(
+    auth_user: TrowToken,
+    config: rocket::State<ClientInterface>,
+    repo: String,
+    name: String,
+    uuid: String,
+    digest: String,
+    chunk: rocket::data::Data,
+) -> Result<AcceptedUpload, Error> {
+    put_blob(auth_user, config, format!("{}/{}", repo, name), uuid, digest, chunk)
+}
+
+/*
+ * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
+ */
+#[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
+fn put_blob_3level(
+    auth_user: TrowToken,
+    config: rocket::State<ClientInterface>,
+    org: String,
+    repo: String,
+    name: String,
+    uuid: String,
+    digest: String,
+    chunk: rocket::data::Data,
+) -> Result<AcceptedUpload, Error> {
+    put_blob(auth_user, config, format!("{}/{}/{}", org, repo, name), uuid, digest, chunk)
+}
+
+/*
+
 ---
 Chunked Upload (Don't implement until Monolithic works)
 Must be implemented as docker only supports this
@@ -250,66 +340,7 @@ Content-Range: <start of range>-<end of range>
 Content-Type: application/octet-stream
 
 <Layer Chunk Binary Data>
- */
-
-/**
- * Completes the upload.
- *
- * TODO: allow uploading of final data
- * TODO: add other failure states
- */
-#[put("/v2/<repo_name>/blobs/uploads/<uuid>?<digest>")]
-fn put_blob(
-    _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
-    repo_name: String,
-    uuid: String,
-    digest: String,
-) -> Result<AcceptedUpload, Error> {
-
-    let rn = RepoName(repo_name);
-    let uuid = Uuid(uuid);
-    let digest = Digest(digest);
-    let r = ci.complete_upload(&rn, &uuid, &digest);
-
-    //ENORMOUS TODO: really shouldn't spawn a whole runtime for each request;
-    //it's hugely inefficient. Need to figure out how to use thread-local for
-    //each runtime or move to Warp and share the runtime.
-    Runtime::new().unwrap().block_on(r).map_err(|_| Error::InternalError)
-}
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to put_blob
- */
-#[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<digest>")]
-fn put_blob_2level(
-    auth_user: TrowToken,
-    config: rocket::State<ClientInterface>,
-    repo: String,
-    name: String,
-    uuid: String,
-    digest: String,
-) -> Result<AcceptedUpload, Error> {
-    put_blob(auth_user, config, format!("{}/{}", repo, name), uuid, digest)
-}
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
- */
-#[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>")]
-fn put_blob_3level(
-    auth_user: TrowToken,
-    config: rocket::State<ClientInterface>,
-    org: String,
-    repo: String,
-    name: String,
-    uuid: String,
-    digest: String,
-) -> Result<AcceptedUpload, Error> {
-    put_blob(auth_user, config, format!("{}/{}/{}", org, repo, name), uuid, digest)
-}
-
-/*
+---
 
 Uploads a blob or chunk of a blog.
 
