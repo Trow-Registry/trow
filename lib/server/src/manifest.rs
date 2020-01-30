@@ -32,7 +32,7 @@ pub enum Manifest {
 #[serde(rename_all = "camelCase")]
 pub struct ManifestV2 {
     pub schema_version: u8,
-    pub media_type: String, //make enum
+    pub media_type: String, //TODO: make enum
     pub config: Object,
     pub layers: Vec<Object>,
 }
@@ -88,26 +88,30 @@ fn schema_1(raw: &Value) -> Result<Manifest, Error> {
 }
 
 fn schema_2(raw: &Value) -> Result<Manifest, Error> {
+
     let mt = raw["mediaType"].as_str().ok_or(InvalidManifest {
         err: "mediaType is required".to_owned(),
     })?;
 
-    if mt != "application/vnd.docker.distribution.manifest.v2+json" {
+    if mt != "application/vnd.docker.distribution.manifest.v2+json" && 
+       mt != "application/vnd.oci.image.manifest.v1+json" {
         return Err(InvalidManifest {
             err: format!("Unexpected mediaType {}", mt).to_owned(),
         })?;
     }
 
     let m: ManifestV2 = serde_json::from_value(raw.clone())?;
+
     Ok(Manifest::V2(m))
 }
 
 impl FromJson for Manifest {
     fn from_json(raw: &Value) -> Result<Self, Error> {
+
         let schema_version = raw["schemaVersion"].as_u64().ok_or(InvalidManifest {
             err: "schemaVersion is required".to_owned(),
         })?;
-        debug!("version {}", schema_version);
+        
         match schema_version {
             1 => schema_1(raw),
             2 => schema_2(raw),
@@ -251,6 +255,8 @@ mod test {
     use super::FromJson;
     use super::Manifest;
     use serde_json::{self, Value};
+    use crypto::digest::Digest;
+    use crypto::sha2::Sha256;
 
     #[test]
     fn valid_v2_2() {
@@ -415,5 +421,24 @@ mod test {
 
         let v: Value = serde_json::from_str(data).unwrap();
         assert!(Manifest::from_json(&v).is_ok());
+    }
+
+    #[test]
+    fn valid_oci() {
+        let config = "{}\n".as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.input(&config);
+        let config_digest = hasher.result_str();
+        
+        let data = format!(
+            r#"{{ "config": {{ "digest": "{}", 
+                             "mediaType": "application/vnd.oci.image.config.v1+json", 
+                             "size": {} }},
+                 "mediaType": "application/vnd.oci.image.manifest.v1+json", 
+                 "layers": [], "schemaVersion": 2 }}"#, config_digest, config.len());
+
+        let v: Value = serde_json::from_str(&data).unwrap();
+        assert!(Manifest::from_json(&v).is_ok());
+
     }
 }

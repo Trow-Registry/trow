@@ -212,7 +212,6 @@ impl ClientInterface {
 
         let resp = self.connect_registry().await?.verify_manifest(
             Request::new(mr)).await?.into_inner();
-        
 
         let vm = create_verified_manifest(
             repo_name.clone(),

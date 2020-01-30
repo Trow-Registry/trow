@@ -16,7 +16,7 @@ pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
 
-use trow_server::{
+use self::trow_server::{
     registry_server::Registry,
     UploadRequest, UploadDetails, CatalogEntry, CatalogRequest, Tag, BlobRef, 
     WriteLocation, DownloadRef, BlobReadLocation, ManifestRef, ManifestReadLocation,
@@ -167,12 +167,12 @@ impl TrowServer {
         let manifest_bytes = std::fs::read(&manifest_path)?;
         let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
         let manifest = Manifest::from_json(&manifest_json)?;
+        
 
         if do_verification {
             //TODO: Need to make sure we find things indexed by digest or tag
             for digest in manifest.get_asset_digests() {
                 let path = self.get_path_for_layer(&repo_name, &digest);
-                info!("Path: {:?}", path);
 
                 if !path.exists() {
                     return Err(format_err!("Failed to find {} in {}", digest, repo_name));
@@ -433,7 +433,7 @@ impl Registry for TrowServer {
         ) {
             Ok(vm) => Ok(Response::new(vm)),
             Err(e) => {
-                warn!("Error verifying manifest {:?}", e);
+                error!("Error verifying manifest {:?}", e);
                 Err(Status::internal("Internal error verifying manifest"))
             }
         }

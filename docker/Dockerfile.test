@@ -36,4 +36,5 @@ COPY quick-install/self-cert/in.req certs/
 RUN cd certs && ./make-certs.sh
 # Must build protobuf first for generated code
 RUN cd lib/protobuf && cargo build
+RUN cd lib/server && cargo test
 RUN cargo test

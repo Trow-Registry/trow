@@ -211,7 +211,7 @@ mod test {
         //Image hosted in this registry, should be ok
         let (v, _) = check_image(
             "localhost:8080/mydir/myimage:test",
-            vec!["localhost:8080".to_owned()],
+            &vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
             &|_| false,
             &|_| false,
@@ -221,7 +221,7 @@ mod test {
         //Image refers to this registry but not present in registry (so deny)
         let (v, _) = check_image(
             "localhost:8080/mydir/myimage:test",
-            vec!["localhost:8080".to_owned()],
+            &vec!["localhost:8080".to_owned()],
             &|_| false,
             &|_| false,
             &|_| false,
@@ -231,7 +231,7 @@ mod test {
         //Image refers to this registry & not present but is in allow list (so allow)
         let (v, _) = check_image(
             "localhost:8080/mydir/myimage:test",
-            vec!["localhost:8080".to_owned()],
+            &vec!["localhost:8080".to_owned()],
             &|_| false, //determines if in this registry
             &|_| false,
             &|_| true,
@@ -241,7 +241,7 @@ mod test {
         //Image local and present but on deny list
         let (v, _) = check_image(
             "localhost:8080/mydir/myimage:test",
-            vec!["localhost:8080".to_owned()],
+            &vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
             &|_| true,
             &|_| false,
@@ -251,7 +251,7 @@ mod test {
         //Image remote and not on allow list (deny)
         let (v, _) = check_image(
             "quay.io/mydir/myimage:test",
-            vec!["localhost:8080".to_owned()],
+            &vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
             &|_| false,
             &|_| false,
@@ -261,7 +261,7 @@ mod test {
         //Image remote and on allow list (allow)
         let (v, _) = check_image(
             "quay.io/mydir/myimage:test",
-            vec!["localhost:8080".to_owned()],
+            &vec!["localhost:8080".to_owned()],
             &|_| true, //determines if in this registry
             &|_| false,
             &|_| true,

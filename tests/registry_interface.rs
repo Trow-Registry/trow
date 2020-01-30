@@ -150,8 +150,8 @@ mod interface_tests {
         assert_eq!(tl, &tl_resp);
     }
 
-    fn upload_with_put(cl: &reqwest::Client) {
-        let name = "puttest";
+    fn upload_with_put(cl: &reqwest::Client, name: &str) {
+    
         let resp = cl
             .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
             .send()
@@ -159,16 +159,39 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
         let uuid = resp.headers().get(common::UPLOAD_HEADER).unwrap().to_str().unwrap();
 
-        let blob = common::gen_rand_blob(100);
+        //used by oci_manifest_test
+        let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
-        hasher.input(&blob);
+        hasher.input(&config);
         let digest = hasher.result_str();
         
         let loc = &format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
             TROW_ADDRESS, name, uuid, digest);
 
-        let resp = cl.put(loc).body(blob.clone()).send().unwrap();
+        let resp = cl.put(loc).body(config.clone()).send().unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+    }
+
+    fn push_oci_manifest(cl: &reqwest::Client, name: &str) {
+
+        let config = "{}\n".as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.input(&config);
+        let config_digest = hasher.result_str();
+
+        let manifest = format!(
+            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
+                 "config": {{ "digest": "{}", 
+                             "mediaType": "application/vnd.oci.image.config.v1+json", 
+                             "size": {} }}, 
+                 "layers": [], "schemaVersion": 2 }}"#, config_digest, config.len());
+        
+        let bytes = manifest.clone();
+        let resp = cl.put(&format!(
+            "{}/v2/{}/manifests/{}",
+            TROW_ADDRESS, name, "puttest1"
+            )).body(bytes).send().unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
@@ -208,7 +231,9 @@ mod interface_tests {
         println!("Running upload_layer(onename:latest)");
         common::upload_layer(&client, "onename", "latest");
         println!("Running upload_with_put()");
-        upload_with_put(&client);
+        upload_with_put(&client, "puttest");
+        println!("Running push_oci_manifest()");
+        push_oci_manifest(&client, "puttest");
 
         println!("Running get_manifest(onename:tag)");
         get_manifest(&client, "onename", "tag");
@@ -221,6 +246,7 @@ mod interface_tests {
         rc.insert(RepoName("repo/image/test".to_string()));
         rc.insert(RepoName("image/test".to_string()));
         rc.insert(RepoName("onename".to_string()));
+        rc.insert(RepoName("puttest".to_string()));
 
         check_repo_catalog(&client, &rc);
 
