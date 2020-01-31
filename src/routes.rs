@@ -15,6 +15,9 @@ use rocket_contrib::json::{Json,JsonValue};
 use crate::types::*;
 use crate::TrowConfig;
 
+//ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
+//which is hugely inefficient. Need to figure out how to use thread-local
+//for each runtime or move to Warp and share the runtime.
 use tokio::runtime::Runtime;
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -137,10 +140,6 @@ fn get_manifest(
     let rn = RepoName(onename);
     let f = ci.get_reader_for_manifest(
             &rn, &reference);
-    // So we need to change this to use the tokio executor.
-    // Rocket uses multiple threads, so it's not clear how to make sure
-    // there is exactly one executor per thread; tokio may take care of this
-    // for us
     let mut rt = Runtime::new().unwrap();
     rt.block_on(f).map_err(|_| Error::ManifestUnknown(reference))
 }
@@ -263,9 +262,6 @@ fn put_blob(
     let uuid = Uuid(uuid);
 
     let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
-    //ENORMOUS TODO: really shouldn't spawn a whole runtime for each request;
-    //it's hugely inefficient. Need to figure out how to use thread-local for
-    //each runtime or move to Warp and share the runtime.
 
     let mut rt = Runtime::new().unwrap();
     let sink = rt.block_on(sink_f);

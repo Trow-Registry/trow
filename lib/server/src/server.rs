@@ -6,8 +6,9 @@ use std::sync::{Arc, RwLock};
 use std::path::{Path, PathBuf};
 use std::collections::HashSet;
 use crate::manifest::{FromJson, Manifest};
-use std::fs;
+use std::fs::{self, File};
 use std::fmt;
+use std::io::{BufReader, Read};
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -25,8 +26,8 @@ use self::trow_server::{
 
 
 static MANIFESTS_DIR: &'static str = "manifests";
-static LAYERS_DIR: &'static str = "layers";
-static SCRATCH_DIR: &'static str = "scratch";
+static BLOBS_DIR: &'static str = "blobs";
+static UPLOADS_DIR: &'static str = "scratch";
 
 /* Struct implementing callbacks for the Frontend
  *
@@ -115,6 +116,34 @@ fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<()
     Ok(())
 }
 
+/**
+ * Checks a file matches the given digest.
+ * 
+ * TODO: should be able to use range of hashes.
+ * TODO: check if using a static for the hasher speeds things up. 
+ */
+fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
+
+    let f = File::open(file)?;
+    let mut reader = BufReader::new(f);
+    let mut hasher = Sha256::new();
+    let mut buf = [0; 256]; // TODO: figure out best number here
+    let mut bytes_read = reader.read(&mut buf[..])?;
+    while bytes_read != 0 {
+        hasher.input(&buf[..bytes_read]);
+        bytes_read = reader.read(&mut buf[..])?;
+    }
+
+    let true_digest = hasher.result_str();
+    if true_digest != digest {
+        return Err(failure::err_msg(
+            format!("Upload did not match given digest. Was given {} but got {}", 
+                digest, true_digest)));
+    }
+
+    Ok(())
+}
+
 impl TrowServer {
         pub fn new(
             data_path: &str,
@@ -124,8 +153,8 @@ impl TrowServer {
             deny_local_images: Vec<String>,
         ) -> Result<Self, Error> {
             let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
-            let scratch_path = create_path(data_path, SCRATCH_DIR)?;
-            let layers_path = create_path(data_path, LAYERS_DIR)?;
+            let scratch_path = create_path(data_path, UPLOADS_DIR)?;
+            let layers_path = create_path(data_path, BLOBS_DIR)?;
             let svc = TrowServer {
                 active_uploads: Arc::new(RwLock::new(HashSet::new())),
                 manifests_path,
@@ -205,11 +234,8 @@ impl TrowServer {
         })
     }
 
-    fn save_layer(&self, repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
-        debug!("Saving layer {}", user_digest);
-
-        //TODO: This is wrong; user digest needs to be verified and potentially changed to our own digest
-        //if we want to use consistent compression alg
+    fn save_blob(&self, scratch_path: &PathBuf, repo_name: &str, user_digest: &str, uuid: &str) 
+    -> Result<(), Error> {
 
         let digest_path = self.get_path_for_layer(repo_name, user_digest);
         let repo_path = digest_path
@@ -220,22 +246,33 @@ impl TrowServer {
             fs::create_dir_all(repo_path)?;
         }
 
-        let scratch_path = self.get_scratch_path_for_uuid(uuid);
         fs::copy(&scratch_path, &digest_path)?;
+        Ok(())
+    }
+
+    fn validate_and_save_blob(&self, repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
+        debug!("Saving blob {}", user_digest);
+
+        let scratch_path = self.get_scratch_path_for_uuid(uuid);
+        let res = match validate_digest(&scratch_path, user_digest) {
+            Ok(_) => self.save_blob(&scratch_path, repo_name, user_digest, uuid),
+            Err(e) => Err(e)
+        };
 
         //Not an error, even if it's not great
         fs::remove_file(&scratch_path).unwrap_or_else(|e| {
-            warn!(
+            error!(
                 "Error deleting file {} {:?}",
                 &scratch_path.to_string_lossy(),
                 e
             )
         });
 
+        res?;
         Ok(())
     }
+
     //Support functions for validate, would like to move these
-    
     pub fn image_exists(&self, image: &Image) -> bool {
         self.get_path_for_manifest(&image.repo, &image.tag).exists()
     }
@@ -397,7 +434,7 @@ impl Registry for TrowServer {
     ) -> Result<Response<CompletedUpload>, Status> {
 
         let cr = req.into_inner();
-        let ret = match self.save_layer(&cr.repo_name, &cr.user_digest, &cr.uuid) {
+        let ret = match self.validate_and_save_blob(&cr.repo_name, &cr.user_digest, &cr.uuid) {
             Ok(_) => {
                 Ok(Response::new(CompletedUpload { digest: cr.user_digest.clone() }))
             }
