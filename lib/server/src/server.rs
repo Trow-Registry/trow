@@ -26,7 +26,7 @@ use self::trow_server::{
 
 
 static MANIFESTS_DIR: &'static str = "manifests";
-static BLOBS_DIR: &'static str = "blobs";
+static BLOBS_DIR: &'static str = "blobs/sha256"; // Note: only support sha256 digest for time being
 static UPLOADS_DIR: &'static str = "scratch";
 
 /* Struct implementing callbacks for the Frontend
@@ -43,7 +43,7 @@ static UPLOADS_DIR: &'static str = "scratch";
 pub struct TrowServer {
     active_uploads: Arc<RwLock<HashSet<Upload>>>,
     manifests_path: PathBuf,
-    layers_path: PathBuf,
+    blobs_path: PathBuf,
     scratch_path: PathBuf,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
@@ -154,11 +154,11 @@ impl TrowServer {
         ) -> Result<Self, Error> {
             let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
             let scratch_path = create_path(data_path, UPLOADS_DIR)?;
-            let layers_path = create_path(data_path, BLOBS_DIR)?;
+            let blobs_path = create_path(data_path, BLOBS_DIR)?;
             let svc = TrowServer {
                 active_uploads: Arc::new(RwLock::new(HashSet::new())),
                 manifests_path,
-                layers_path,
+                blobs_path,
                 scratch_path,
                 allow_prefixes,
                 allow_images,
@@ -169,20 +169,16 @@ impl TrowServer {
         }
 
 
-    fn get_path_for_blob_upload(&self, uuid: &str) -> PathBuf {
+    fn get_upload_path_for_blob(&self, uuid: &str) -> PathBuf {
         self.scratch_path.join(uuid)
     }
 
-    fn get_path_for_layer(&self, repo_name: &str, digest: &str) -> PathBuf {
-        self.layers_path.join(repo_name).join(digest)
+    fn get_catalog_path_for_blob(&self, digest: &str) -> PathBuf {
+        self.blobs_path.join(digest)
     }
 
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> PathBuf {
         self.manifests_path.join(repo_name).join(reference)
-    }
-
-    fn get_scratch_path_for_uuid(&self, uuid: &str) -> PathBuf {
-        self.scratch_path.join(uuid)
     }
 
     fn create_verified_manifest(
@@ -201,7 +197,7 @@ impl TrowServer {
         if do_verification {
             //TODO: Need to make sure we find things indexed by digest or tag
             for digest in manifest.get_asset_digests() {
-                let path = self.get_path_for_layer(&repo_name, &digest);
+                let path = self.get_catalog_path_for_blob(digest);
 
                 if !path.exists() {
                     return Err(format_err!("Failed to find {} in {}", digest, repo_name));
@@ -234,10 +230,9 @@ impl TrowServer {
         })
     }
 
-    fn save_blob(&self, scratch_path: &PathBuf, repo_name: &str, user_digest: &str, uuid: &str) 
-    -> Result<(), Error> {
+    fn save_blob(&self, scratch_path: &PathBuf, digest: &str) -> Result<(), Error> {
 
-        let digest_path = self.get_path_for_layer(repo_name, user_digest);
+        let digest_path = self.get_catalog_path_for_blob(digest);
         let repo_path = digest_path
             .parent()
             .ok_or_else(|| failure::err_msg("Error finding repository path"))?;
@@ -250,12 +245,12 @@ impl TrowServer {
         Ok(())
     }
 
-    fn validate_and_save_blob(&self, repo_name: &str, user_digest: &str, uuid: &str) -> Result<(), Error> {
+    fn validate_and_save_blob(&self, user_digest: &str, uuid: &str) -> Result<(), Error> {
         debug!("Saving blob {}", user_digest);
 
-        let scratch_path = self.get_scratch_path_for_uuid(uuid);
+        let scratch_path = self.get_upload_path_for_blob(uuid);
         let res = match validate_digest(&scratch_path, user_digest) {
-            Ok(_) => self.save_blob(&scratch_path, repo_name, user_digest, uuid),
+            Ok(_) => self.save_blob(&scratch_path, user_digest),
             Err(e) => Err(e)
         };
 
@@ -362,7 +357,7 @@ impl Registry for TrowServer {
 
         let set = self.active_uploads.read().unwrap();
         if set.contains(&upload) {
-            let path = self.get_path_for_blob_upload(&br.uuid);
+            let path = self.get_upload_path_for_blob(&br.uuid);
             Ok(Response::new(
                 WriteLocation {path: path.to_string_lossy().to_string()}))
 
@@ -378,7 +373,7 @@ impl Registry for TrowServer {
         //TODO: test that it exists
 
         let dr = req.into_inner();
-        let path = self.get_path_for_layer(&dr.repo_name, &dr.digest);
+        let path = self.get_catalog_path_for_blob(&dr.digest);
 
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
@@ -434,7 +429,7 @@ impl Registry for TrowServer {
     ) -> Result<Response<CompletedUpload>, Status> {
 
         let cr = req.into_inner();
-        let ret = match self.validate_and_save_blob(&cr.repo_name, &cr.user_digest, &cr.uuid) {
+        let ret = match self.validate_and_save_blob(&cr.user_digest, &cr.uuid) {
             Ok(_) => {
                 Ok(Response::new(CompletedUpload { digest: cr.user_digest.clone() }))
             }
