@@ -134,8 +134,10 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
         bytes_read = reader.read(&mut buf[..])?;
     }
 
-    let true_digest = hasher.result_str();
+    let true_digest = format!("sha256:{}", hasher.result_str());
     if true_digest != digest {
+        error!("Upload did not match given digest. Was given {} but got {}", 
+            digest, true_digest);
         return Err(failure::err_msg(
             format!("Upload did not match given digest. Was given {} but got {}", 
                 digest, true_digest)));

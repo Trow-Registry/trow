@@ -163,7 +163,7 @@ mod interface_tests {
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
-        let digest = hasher.result_str();
+        let digest = format!("sha256:{}", hasher.result_str());
         
         let loc = &format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
@@ -178,7 +178,7 @@ mod interface_tests {
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
-        let config_digest = hasher.result_str();
+        let config_digest = format!("sha256:{}", hasher.result_str());
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 

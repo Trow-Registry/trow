@@ -51,7 +51,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
 
     let mut hasher = Sha256::new();
     hasher.input(&blob);
-    let digest = hasher.result_str();
+    let digest = format!("sha256:{}", hasher.result_str());
     let resp = cl
         .put(&format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
