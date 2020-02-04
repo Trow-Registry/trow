@@ -84,10 +84,10 @@ kubectl config view --raw --minify --flatten \
   -o jsonpath='{.clusters[].cluster.certificate-authority-data}' \
   | base64 --decode | tee -a $cert_file
 kubectl create configmap trow-ca-cert --from-file=cert=$cert_file \
-  --dry-run -o json | kubectl apply -n $namespace -f -
+  --dry-run -o json | kubectl apply -n "$namespace" -f -
 
 echo
-./copy-certs.sh $namespace
+./copy-certs.sh "$namespace"
 echo
 
 while true
@@ -95,7 +95,7 @@ do
   read -r -p 'Do you wish to install certs on this host and configure /etc/hosts to allow access from this machine? (y/n) ' choice
   case "$choice" in
     n|N) break;;
-    y|Y) echo; ./configure-host.sh $namespace --add-hosts; break;;
+    y|Y) echo; ./configure-host.sh "$namespace" --add-hosts; break;;
     *) echo 'Response not valid';;
   esac
 done
@@ -106,7 +106,7 @@ do
   read -r -p 'Do you want to configure Trow as a validation webhook (NB this will stop external images from being deployed to the cluster)? (y/n) ' choice
   case "$choice" in
     n|N) break;;
-    y|Y) ./validate.sh $namespace; break;;
+    y|Y) ./validate.sh "$namespace"; break;;
     *) echo 'Response not valid';;
   esac
 done
