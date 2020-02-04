@@ -70,7 +70,7 @@ mod interface_tests {
      * Run a simple docker push/pull against the registry.
      * 
      * This assumes Docker is installed and has a cert for the registry.
-     * For that reason, it's set to ignored by default and has to be
+     * For that reason, it's set to ignored by default and has to be manually enabled.
      * 
      */
     #[test]
