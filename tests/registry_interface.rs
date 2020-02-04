@@ -192,6 +192,19 @@ mod interface_tests {
             TROW_ADDRESS, name, "puttest1"
             )).body(bytes).send().unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
+
+        // Try pulling by digest
+        hasher.reset();
+        hasher.input(manifest.as_bytes());
+        let digest = format!("sha256:{}", hasher.result_str());
+        
+        let mut resp = cl
+            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, digest))
+        .send()
+        .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let mani: manifest::ManifestV2 = resp.json().unwrap();
+        assert_eq!(mani.schema_version, 2);
     }
 
     #[test]

@@ -24,9 +24,9 @@ use self::trow_server::{
     VerifiedManifest, CompleteRequest, CompletedUpload
 };
 
-
+static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
-static BLOBS_DIR: &'static str = "blobs/sha256"; // Note: only support sha256 digest for time being
+static BLOBS_DIR: &'static str = "blobs";
 static UPLOADS_DIR: &'static str = "scratch";
 
 /* Struct implementing callbacks for the Frontend
@@ -146,6 +146,17 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
     Ok(())
 }
 
+fn is_digest(maybe_digest: &str) -> bool {
+
+    for alg in &SUPPORTED_DIGESTS {
+        if maybe_digest.starts_with(&format!("{}:",alg)) {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl TrowServer {
         pub fn new(
             data_path: &str,
@@ -175,12 +186,26 @@ impl TrowServer {
         self.scratch_path.join(uuid)
     }
 
-    fn get_catalog_path_for_blob(&self, digest: &str) -> PathBuf {
-        self.blobs_path.join(digest)
+    fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf, Error> {
+
+        let mut iter = digest.split(':');
+        let alg = iter.next().ok_or(
+            format_err!("Digest {} did not contain alg component", digest))?;
+        if !SUPPORTED_DIGESTS.contains(&alg) {
+            return Err(format_err!("Hash algorithm {} not supported", alg));
+        }
+        let val = iter.next().ok_or(
+            format_err!("Digest {} did not contain value component", digest))?;
+        assert_eq!(None, iter.next());
+        Ok(self.blobs_path.join(alg).join(val))
     }
 
-    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> PathBuf {
-        self.manifests_path.join(repo_name).join(reference)
+    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
+
+        if is_digest(reference) {
+            return self.get_catalog_path_for_blob(reference);
+        }
+        Ok(self.manifests_path.join(repo_name).join(reference))
     }
 
     fn create_verified_manifest(
@@ -189,7 +214,7 @@ impl TrowServer {
         reference: String,
         do_verification: bool,
     ) -> Result<VerifiedManifest, Error> {
-        let manifest_path = self.get_path_for_manifest(&repo_name, &reference);
+        let manifest_path = self.get_path_for_manifest(&repo_name, &reference)?;
 
         let manifest_bytes = std::fs::read(&manifest_path)?;
         let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
@@ -199,7 +224,7 @@ impl TrowServer {
         if do_verification {
             //TODO: Need to make sure we find things indexed by digest or tag
             for digest in manifest.get_asset_digests() {
-                let path = self.get_catalog_path_for_blob(digest);
+                let path = self.get_catalog_path_for_blob(digest)?;
 
                 if !path.exists() {
                     return Err(format_err!("Failed to find {} in {}", digest, repo_name));
@@ -223,7 +248,7 @@ impl TrowServer {
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
         //TODO: This isn't optimal
-        let path = self.get_path_for_manifest(&repo_name, &reference);
+        let path = self.get_path_for_manifest(&repo_name, &reference)?;
         let vm = self.create_verified_manifest(repo_name, reference, do_verification)?;
         Ok( ManifestReadLocation {
             content_type: vm.content_type.to_owned(),
@@ -234,7 +259,7 @@ impl TrowServer {
 
     fn save_blob(&self, scratch_path: &PathBuf, digest: &str) -> Result<(), Error> {
 
-        let digest_path = self.get_catalog_path_for_blob(digest);
+        let digest_path = self.get_catalog_path_for_blob(digest)?;
         let repo_path = digest_path
             .parent()
             .ok_or_else(|| failure::err_msg("Error finding repository path"))?;
@@ -271,7 +296,10 @@ impl TrowServer {
 
     //Support functions for validate, would like to move these
     pub fn image_exists(&self, image: &Image) -> bool {
-        self.get_path_for_manifest(&image.repo, &image.tag).exists()
+        match self.get_path_for_manifest(&image.repo, &image.tag) {
+            Ok(f) => f.exists(),
+            Err(_) => false
+        }
     }
 
     pub fn is_local_denied(&self, image: &Image) -> bool {
@@ -372,10 +400,10 @@ impl Registry for TrowServer {
         &self,
         req: Request<DownloadRef>
     ) -> Result<Response<BlobReadLocation>, Status> {
-        //TODO: test that it exists
 
         let dr = req.into_inner();
-        let path = self.get_catalog_path_for_blob(&dr.digest);
+        let path = self.get_catalog_path_for_blob(&dr.digest).map_err(
+            |e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
 
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
@@ -390,10 +418,13 @@ impl Registry for TrowServer {
         &self,
         req: Request<ManifestRef>
     ) -> Result<Response<WriteLocation>, Status> {
-        //TODO: First save to temporary file and copy over after verify
+        //BIG TODO: First save to temporary file and copy over after verify
 
         let mr = req.into_inner();
-        let manifest_path = self.get_path_for_manifest(&mr.repo_name, &mr.reference);
+        let manifest_path = match self.get_path_for_manifest(&mr.repo_name, &mr.reference) {
+            Ok(p) => p,
+            Err(e) => return Err(Status::failed_precondition(format!("Failed to find manifest {:?}", e)))
+        };
         let manifest_dir = manifest_path.parent().unwrap();
 
         match fs::create_dir_all(manifest_dir) {
