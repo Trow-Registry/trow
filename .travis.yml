@@ -1,4 +1,8 @@
 language: rust
+
+services:
+  - docker
+
 rust:
   - nightly
 before_script:
@@ -8,6 +12,10 @@ before_script:
   - rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
   - cargo update
   - export VCS_REF=$(git rev-parse HEAD)
+script:
+  - cargo build --verbose --all
+  - cd lib/server && cargo test --verbose && cd ../..
+  - cargo test --verbose --all
 addons:
   hosts:
     - trow.test

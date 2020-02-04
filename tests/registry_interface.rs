@@ -75,10 +75,9 @@ mod interface_tests {
 
     impl Drop for TrowInstance {
         fn drop(&mut self) {
-            //Y U NO HV STOP?
-            self.pid.kill().unwrap();
+          common::kill_gracefully(&self.pid);
         }
-    }
+      }
 
     fn get_main(cl: &reqwest::Client) {
         let resp = cl.get(TROW_ADDRESS).send().unwrap();
