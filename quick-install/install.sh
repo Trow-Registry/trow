@@ -53,7 +53,7 @@ then
 	namespace=$1
 fi
 
-echo "Installing trow in namespace: $namespace"
+echo "Installing Trow in namespace: $namespace"
 #change to directory with script so we can reach deps
 #https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
