@@ -22,7 +22,6 @@ mod validation_tests {
   use std::process::Command;
   use std::thread;
   use std::time::Duration;
-  use libc;
 
   const LYCAON_ADDRESS: &str = "https://trow.test:8443";
 
@@ -80,13 +79,9 @@ mod validation_tests {
 
   impl Drop for TrowInstance {
     fn drop(&mut self) {
-      kill_gracefully(&self.pid);
+      common::kill_gracefully(&self.pid);
     }
   }
-  
-  // https://stackoverflow.com/questions/49210815/how-do-i-send-a-signal-to-a-child-subprocess
-  pub fn kill_gracefully(child: &Child) { 
-    unsafe { libc::kill(child.id() as i32, libc::SIGTERM); } }
 
   /* Uses a copy of an actual AdmissionReview to test. */
   fn validate_example(cl: &reqwest::Client) {
