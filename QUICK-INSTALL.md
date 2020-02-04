@@ -38,6 +38,7 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 ### Automatic installation
 
  - Just run `./install.sh` from the `quick-install` directory and follow the prompts. 
+ - You can also specify installation namespace by running `./install.sh <namespace>`
  - If you are using a Mac, restart Docker once the install script has completed.
 
 If you'd rather have more control over the process, follow the [manual
