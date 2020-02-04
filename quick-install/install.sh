@@ -95,7 +95,7 @@ do
   read -r -p 'Do you wish to install certs on this host and configure /etc/hosts to allow access from this machine? (y/n) ' choice
   case "$choice" in
     n|N) break;;
-    y|Y) echo; ./configure-host.sh "$namespace" --add-hosts; break;;
+    y|Y) echo; ./configure-host.sh --namespace="$namespace" --add-hosts; break;;
     *) echo 'Response not valid';;
   esac
 done

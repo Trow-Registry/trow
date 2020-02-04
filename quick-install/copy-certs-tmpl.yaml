@@ -21,6 +21,7 @@ spec:
       containers:
         - name: copy-certs-{{.metadata.uid}}
           image: containersol/trow:copy-certs
+          imagePullPolicy: Always
           volumeMounts:
             - mountPath: /etc/docker
               name: cert-dir
