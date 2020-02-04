@@ -2,6 +2,7 @@
 set -eo pipefail
 unset CDPATH
 IFS=$'\n\t'
+set -x
 
 cat << EOF
 Trow AutoInstaller for Kubernetes
@@ -46,6 +47,13 @@ if [[ "$(uname -s)" = "Darwin" ]]; then
   on_mac=true
 fi
 
+namespace='kube-public'
+if [ ! -z "$1" ]
+then
+	namespace=$1
+fi
+
+echo "Installing trow in namespace: $namespace"
 #change to directory with script so we can reach deps
 #https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -53,18 +61,18 @@ cd "$src_dir"
 
 echo
 echo "Starting Kubernetes Resources"
-kubectl apply -f trow.yaml
+sed "s/{{namespace}}/${namespace}/" trow.yaml | kubectl apply -f -
 
 echo
 echo "Approving certificate. This may take some time."
 set +e
-kubectl certificate approve trow.kube-public &> /dev/null
+kubectl certificate approve trow.${namespace} &> /dev/null
 rc=$?
 while [[ $rc != 0 ]]
 do
     sleep 1
     echo -n "."
-    kubectl certificate approve trow.kube-public &> /dev/null
+    kubectl certificate approve trow.${namespace} &> /dev/null
     rc=$?
 done
 set -e
@@ -76,10 +84,10 @@ kubectl config view --raw --minify --flatten \
   -o jsonpath='{.clusters[].cluster.certificate-authority-data}' \
   | base64 --decode | tee -a $cert_file
 kubectl create configmap trow-ca-cert --from-file=cert=$cert_file \
-  --dry-run -o json | kubectl apply -n kube-public -f -
+  --dry-run -o json | kubectl apply -n $namespace -f -
 
 echo
-./copy-certs.sh
+./copy-certs.sh $namespace
 echo
 
 while true
@@ -87,7 +95,7 @@ do
   read -r -p 'Do you wish to install certs on this host and configure /etc/hosts to allow access from this machine? (y/n) ' choice
   case "$choice" in
     n|N) break;;
-    y|Y) echo; ./configure-host.sh --add-hosts; break;;
+    y|Y) echo; ./configure-host.sh $namespace --add-hosts; break;;
     *) echo 'Response not valid';;
   esac
 done
@@ -98,7 +106,7 @@ do
   read -r -p 'Do you want to configure Trow as a validation webhook (NB this will stop external images from being deployed to the cluster)? (y/n) ' choice
   case "$choice" in
     n|N) break;;
-    y|Y) ./validate.sh; break;;
+    y|Y) ./validate.sh $namespace; break;;
     *) echo 'Response not valid';;
   esac
 done
