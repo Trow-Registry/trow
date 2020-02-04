@@ -2,7 +2,6 @@
 set -eo pipefail
 unset CDPATH
 IFS=$'\n\t'
-set -x
 
 namespace='kube-public'
 if [ ! -z "$1" ]

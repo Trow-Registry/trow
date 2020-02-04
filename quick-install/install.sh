@@ -2,7 +2,6 @@
 set -eo pipefail
 unset CDPATH
 IFS=$'\n\t'
-set -x
 
 cat << EOF
 Trow AutoInstaller for Kubernetes
