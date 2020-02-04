@@ -66,13 +66,13 @@ sed "s/{{namespace}}/${namespace}/" trow.yaml | kubectl apply -f -
 echo
 echo "Approving certificate. This may take some time."
 set +e
-kubectl certificate approve trow.${namespace} &> /dev/null
+kubectl certificate approve "trow.${namespace}" &> /dev/null
 rc=$?
 while [[ $rc != 0 ]]
 do
     sleep 1
     echo -n "."
-    kubectl certificate approve trow.${namespace} &> /dev/null
+    kubectl certificate approve "trow.${namespace}" &> /dev/null
     rc=$?
 done
 set -e
