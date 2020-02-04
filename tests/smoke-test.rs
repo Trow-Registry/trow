@@ -69,11 +69,12 @@ mod interface_tests {
     /**
      * Run a simple docker push/pull against the registry.
      * 
-     * This requires Docker is installed and has a cert for the registry.
+     * This assumes Docker is installed and has a cert for the registry.
+     * For that reason, it's set to ignored by default and has to be
      * 
-     * Should add a step to copy the cert to the correct location.
      */
     #[test]
+    #[ignore]
     fn smoke_test() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
@@ -90,29 +91,25 @@ mod interface_tests {
         assert!(status.success());
         
         let image_name = format!("{}/alpine:trow", TROW_NAME);
-        status = Command::new("docker")
-          .args(&["tag", "alpine:latest", &image_name])
+        status = Command::new("docker").args(&["tag", "alpine:latest", &image_name])
           .status()
           .expect("Failed to call docker");
         
         assert!(status.success());
         
-        status = Command::new("docker")
-          .args(&["push", &image_name])
+        status = Command::new("docker").args(&["push", &image_name])
           .status()
           .expect("Failed to call docker");
         
         assert!(status.success());
         
-        status = Command::new("docker")
-          .args(&["rmi", &image_name])
+        status = Command::new("docker").args(&["rmi", &image_name])
           .status()
           .expect("Failed to call docker");
         
         assert!(status.success());
 
-        status = Command::new("docker")
-          .args(&["pull", &image_name])
+        status = Command::new("docker").args(&["pull", &image_name])
           .status()
           .expect("Failed to call docker");
         

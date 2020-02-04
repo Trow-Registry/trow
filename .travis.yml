@@ -16,6 +16,7 @@ script:
   - cargo build --verbose --all
   - cd lib/server && cargo test --verbose && cd ../..
   - cargo test --verbose --all
+  - cargo test --verbose -- --ignored
 addons:
   hosts:
     - trow.test
