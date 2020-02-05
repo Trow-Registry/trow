@@ -31,6 +31,22 @@ If you're running on the Google cloud, the following should work:
 
 EOF
 
+namespace='kube-public'
+if [ ! -z "$1" ]
+then
+	namespace=$1
+fi
+
+
+echo "This script will install Trow to the $namespace namespace."
+#If default namespace, let them know how to change it
+if [ -z "$1" ]
+then
+    echo "To choose a different namespace run:"
+    echo "  $ $0 <my-namespace>"
+fi
+echo
+
 while true
 do
   read -r -p 'Do you want to continue? (y/n) ' choice
@@ -40,6 +56,27 @@ do
     *) echo 'Response not valid';;
   esac
 done
+
+set +e
+kubectl get ns $namespace &> /dev/null
+if [[ $? != 0 ]]
+then
+    echo
+    echo "The namespace $namespace doesn't exist."
+    while true
+    do
+      read -r -p 'Should we create it now? (y/n) ' choice
+      case "$choice" in
+	n|N) exit;;
+	y|Y) break;;
+	*) echo 'Response not valid';;
+      esac
+    done
+    set -e
+    echo "Creating namespace $namespace"
+    kubectl create ns $namespace
+fi
+set -e
 
 on_mac=false
 if [[ "$(uname -s)" = "Darwin" ]]; then
