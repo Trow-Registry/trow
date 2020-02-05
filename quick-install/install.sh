@@ -83,6 +83,13 @@ if [[ "$(uname -s)" = "Darwin" ]]; then
   on_mac=true
 fi
 
+namespace='kube-public'
+if [ ! -z "$1" ]
+then
+	namespace=$1
+fi
+
+echo "Installing Trow in namespace: $namespace"
 #change to directory with script so we can reach deps
 #https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
