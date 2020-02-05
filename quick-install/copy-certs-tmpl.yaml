@@ -9,7 +9,7 @@
 kind: Job
 apiVersion: batch/v1
 metadata:
-  namespace: kube-public
+  namespace: {{namespace}}
   name: copy-certs-{{.metadata.uid}}
 spec:
   template:
@@ -27,6 +27,11 @@ spec:
               name: cert-dir
             - mountPath: /hostfile
               name: host-dir
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
 #          securityContext:
 #            privileged: true
       volumes:

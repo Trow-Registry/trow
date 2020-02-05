@@ -2,7 +2,27 @@
 set -eo pipefail
 unset CDPATH
 
-registry_host="trow.kube-public"
+for i in "$@"
+do
+case $i in
+    -n=*|--namespace=*)
+    NAMESPACE="${i#*=}"
+    ;;
+    --add-hosts)
+    ADD_HOSTS="YES"
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+done
+
+if [ -z "$NAMESPACE" ]
+then
+	NAMESPACE="kube-public"
+fi
+
+registry_host="trow.$NAMESPACE"
 registry_port="31000"
 registry_host_port="${registry_host}:${registry_port}"
 add_host_ip=""
@@ -103,9 +123,9 @@ else #On linux
   echo "Successfully copied cert"
 fi
 
-if [[ "$1" = "--add-hosts" ]]; then
-  echo "Adding entry to /etc/hosts for trow.kube-public" 
+if [[ "$ADD_HOSTS" = "YES" ]]; then
+  echo "Adding entry to /etc/hosts for trow.$NAMESPACE" 
   get_ip_from_k8s
-  add_host_name="trow.kube-public"
+  add_host_name="trow.$NAMESPACE"
   add_to_etc_hosts
 fi

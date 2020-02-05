@@ -18,5 +18,5 @@ webhooks:
       caBundle: {{cabundle}}
       service:
         name: trow
-        namespace: kube-public
+        namespace: {{namespace}}
         path: "/validate-image"
