@@ -1,14 +1,14 @@
-use tonic::{Request, Response, Status};
-use tokio::sync::mpsc;
-use uuid::Uuid;
-use failure::{self, Error};
-use std::sync::{Arc, RwLock};
-use std::path::{Path, PathBuf};
-use std::collections::HashSet;
 use crate::manifest::{FromJson, Manifest};
-use std::fs::{self, File};
+use failure::{self, Error};
+use std::collections::HashSet;
 use std::fmt;
+use std::fs::{self, File};
 use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
+use tokio::sync::mpsc;
+use tonic::{Request, Response, Status};
+use uuid::Uuid;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -18,10 +18,10 @@ pub mod trow_server {
 }
 
 use self::trow_server::{
-    registry_server::Registry,
-    UploadRequest, UploadDetails, CatalogEntry, CatalogRequest, Tag, BlobRef, 
-    WriteLocation, DownloadRef, BlobReadLocation, ManifestRef, ManifestReadLocation,
-    VerifiedManifest, CompleteRequest, CompletedUpload
+    registry_server::Registry, BlobReadLocation, BlobRef, CatalogEntry, CatalogRequest,
+    CompleteRequest, CompletedUpload, DownloadRef, ManifestReadLocation, ManifestRef,
+    ManifestWriteDetails, Tag, UploadDetails, UploadRequest, VerifiedManifest,
+    VerifyManifestRequest, WriteLocation,
 };
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -77,17 +77,19 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
         return match fs::create_dir_all(&dir_path) {
             Ok(_) => Ok(dir_path),
             Err(e) => {
-                error!(r#"
+                error!(
+                    r#"
                 Failed to create directory required by trow {:?}
                 Please check the parent directory is writable by the trow user.
-                {:?}"#, dir_path, e);
+                {:?}"#,
+                    dir_path, e
+                );
                 Err(e)
             }
-        }
+        };
     };
     Ok(dir_path)
 }
-
 
 fn gen_digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -108,8 +110,8 @@ fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<()
             if path.is_dir() {
                 visit_dirs(&path, base, repos)?;
             } else if let Some(d) = path.parent() {
-                    let repo = d.strip_prefix(base)?;
-                    repos.insert(repo.to_string_lossy().to_string());
+                let repo = d.strip_prefix(base)?;
+                repos.insert(repo.to_string_lossy().to_string());
             }
         }
     }
@@ -118,12 +120,11 @@ fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<()
 
 /**
  * Checks a file matches the given digest.
- * 
+ *
  * TODO: should be able to use range of hashes.
- * TODO: check if using a static for the hasher speeds things up. 
+ * TODO: check if using a static for the hasher speeds things up.
  */
 fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
-
     let f = File::open(file)?;
     let mut reader = BufReader::new(f);
     let mut hasher = Sha256::new();
@@ -136,20 +137,22 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
 
     let true_digest = format!("sha256:{}", hasher.result_str());
     if true_digest != digest {
-        error!("Upload did not match given digest. Was given {} but got {}", 
-            digest, true_digest);
-        return Err(failure::err_msg(
-            format!("Upload did not match given digest. Was given {} but got {}", 
-                digest, true_digest)));
+        error!(
+            "Upload did not match given digest. Was given {} but got {}",
+            digest, true_digest
+        );
+        return Err(failure::err_msg(format!(
+            "Upload did not match given digest. Was given {} but got {}",
+            digest, true_digest
+        )));
     }
 
     Ok(())
 }
 
 fn is_digest(maybe_digest: &str) -> bool {
-
     for alg in &SUPPORTED_DIGESTS {
-        if maybe_digest.starts_with(&format!("{}:",alg)) {
+        if maybe_digest.starts_with(&format!("{}:", alg)) {
             return true;
         }
     }
@@ -158,50 +161,51 @@ fn is_digest(maybe_digest: &str) -> bool {
 }
 
 impl TrowServer {
-        pub fn new(
-            data_path: &str,
-            allow_prefixes: Vec<String>,
-            allow_images: Vec<String>,
-            deny_local_prefixes: Vec<String>,
-            deny_local_images: Vec<String>,
-        ) -> Result<Self, Error> {
-            let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
-            let scratch_path = create_path(data_path, UPLOADS_DIR)?;
-            let blobs_path = create_path(data_path, BLOBS_DIR)?;
-            let svc = TrowServer {
-                active_uploads: Arc::new(RwLock::new(HashSet::new())),
-                manifests_path,
-                blobs_path,
-                scratch_path,
-                allow_prefixes,
-                allow_images,
-                deny_local_prefixes,
-                deny_local_images,
-            };
-            Ok(svc)
-        }
-
+    pub fn new(
+        data_path: &str,
+        allow_prefixes: Vec<String>,
+        allow_images: Vec<String>,
+        deny_local_prefixes: Vec<String>,
+        deny_local_images: Vec<String>,
+    ) -> Result<Self, Error> {
+        let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
+        let scratch_path = create_path(data_path, UPLOADS_DIR)?;
+        let blobs_path = create_path(data_path, BLOBS_DIR)?;
+        let svc = TrowServer {
+            active_uploads: Arc::new(RwLock::new(HashSet::new())),
+            manifests_path,
+            blobs_path,
+            scratch_path,
+            allow_prefixes,
+            allow_images,
+            deny_local_prefixes,
+            deny_local_images,
+        };
+        Ok(svc)
+    }
 
     fn get_upload_path_for_blob(&self, uuid: &str) -> PathBuf {
         self.scratch_path.join(uuid)
     }
 
     fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf, Error> {
-
         let mut iter = digest.split(':');
-        let alg = iter.next().ok_or(
-            format_err!("Digest {} did not contain alg component", digest))?;
+        let alg = iter.next().ok_or(format_err!(
+            "Digest {} did not contain alg component",
+            digest
+        ))?;
         if !SUPPORTED_DIGESTS.contains(&alg) {
             return Err(format_err!("Hash algorithm {} not supported", alg));
         }
-        let val = iter.next().ok_or(
-            format_err!("Digest {} did not contain value component", digest))?;
+        let val = iter.next().ok_or(format_err!(
+            "Digest {} did not contain value component",
+            digest
+        ))?;
         assert_eq!(None, iter.next());
         Ok(self.blobs_path.join(alg).join(val))
     }
 
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
-
         if is_digest(reference) {
             return self.get_catalog_path_for_blob(reference);
         }
@@ -210,34 +214,34 @@ impl TrowServer {
 
     fn create_verified_manifest(
         &self,
-        repo_name: String,
-        reference: String,
-        do_verification: bool,
+        manifest_path: &PathBuf,
+        verify_assets_exist: bool,
     ) -> Result<VerifiedManifest, Error> {
-        let manifest_path = self.get_path_for_manifest(&repo_name, &reference)?;
-
         let manifest_bytes = std::fs::read(&manifest_path)?;
         let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
         let manifest = Manifest::from_json(&manifest_json)?;
-        
 
-        if do_verification {
+        if verify_assets_exist {
             //TODO: Need to make sure we find things indexed by digest or tag
             for digest in manifest.get_asset_digests() {
                 let path = self.get_catalog_path_for_blob(digest)?;
 
                 if !path.exists() {
-                    return Err(format_err!("Failed to find {} in {}", digest, repo_name));
+                    return Err(format_err!(
+                        "Failed to find artifact with digest {}",
+                        digest
+                    ));
                 }
             }
 
             // TODO: check signature and names are correct on v1 manifests
+            // AM: Actually can we just nuke v1 support?
         }
 
         //For performance, could generate only if verification is on, otherwise copy from somewhere
         Ok(VerifiedManifest {
             digest: gen_digest(&manifest_bytes),
-            content_type: manifest.get_media_type().to_string()
+            content_type: manifest.get_media_type().to_string(),
         })
     }
 
@@ -249,16 +253,15 @@ impl TrowServer {
     ) -> Result<ManifestReadLocation, Error> {
         //TODO: This isn't optimal
         let path = self.get_path_for_manifest(&repo_name, &reference)?;
-        let vm = self.create_verified_manifest(repo_name, reference, do_verification)?;
-        Ok( ManifestReadLocation {
+        let vm = self.create_verified_manifest(&path, do_verification)?;
+        Ok(ManifestReadLocation {
             content_type: vm.content_type.to_owned(),
             digest: vm.digest.to_owned(),
-            path: path.to_string_lossy().to_string()
+            path: path.to_string_lossy().to_string(),
         })
     }
 
     fn save_blob(&self, scratch_path: &PathBuf, digest: &str) -> Result<(), Error> {
-
         let digest_path = self.get_catalog_path_for_blob(digest)?;
         let repo_path = digest_path
             .parent()
@@ -278,7 +281,7 @@ impl TrowServer {
         let scratch_path = self.get_upload_path_for_blob(uuid);
         let res = match validate_digest(&scratch_path, user_digest) {
             Ok(_) => self.save_blob(&scratch_path, user_digest),
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         };
 
         //Not an error, even if it's not great
@@ -298,7 +301,7 @@ impl TrowServer {
     pub fn image_exists(&self, image: &Image) -> bool {
         match self.get_path_for_manifest(&image.repo, &image.tag) {
             Ok(f) => f.exists(),
-            Err(_) => false
+            Err(_) => false,
         }
     }
 
@@ -345,19 +348,16 @@ impl TrowServer {
 
         false
     }
-
 }
 
 #[tonic::async_trait]
 impl Registry for TrowServer {
-
     async fn request_upload(
         &self,
         request: Request<UploadRequest>,
     ) -> Result<Response<UploadDetails>, Status> {
-        
         let uuid = Uuid::new_v4().to_string();
-        let reply = UploadDetails{uuid: uuid.clone()};
+        let reply = UploadDetails { uuid: uuid.clone() };
         let upload = Upload {
             repo_name: request.into_inner().repo_name.to_owned(),
             uuid,
@@ -374,7 +374,6 @@ impl Registry for TrowServer {
         &self,
         req: Request<BlobRef>,
     ) -> Result<Response<WriteLocation>, Status> {
-
         let br = req.into_inner();
         let upload = Upload {
             repo_name: br.repo_name.clone(),
@@ -388,60 +387,57 @@ impl Registry for TrowServer {
         let set = self.active_uploads.read().unwrap();
         if set.contains(&upload) {
             let path = self.get_upload_path_for_blob(&br.uuid);
-            Ok(Response::new(
-                WriteLocation {path: path.to_string_lossy().to_string()}))
-
+            Ok(Response::new(WriteLocation {
+                path: path.to_string_lossy().to_string(),
+            }))
         } else {
-            Err(Status::failed_precondition(format!("No current upload matching {:?}", br)))
+            Err(Status::failed_precondition(format!(
+                "No current upload matching {:?}",
+                br
+            )))
         }
     }
 
     async fn get_read_location_for_blob(
         &self,
-        req: Request<DownloadRef>
+        req: Request<DownloadRef>,
     ) -> Result<Response<BlobReadLocation>, Status> {
-
         let dr = req.into_inner();
-        let path = self.get_catalog_path_for_blob(&dr.digest).map_err(
-            |e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
+        let path = self
+            .get_catalog_path_for_blob(&dr.digest)
+            .map_err(|e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
 
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
-            Err(Status::failed_precondition(format!("No blob found matching {:?}", dr)))
-
+            Err(Status::failed_precondition(format!(
+                "No blob found matching {:?}",
+                dr
+            )))
         } else {
-            Ok(Response::new( BlobReadLocation {path: path.to_string_lossy().to_string() }))
+            Ok(Response::new(BlobReadLocation {
+                path: path.to_string_lossy().to_string(),
+            }))
         }
     }
 
-    async fn get_write_location_for_manifest(
+    async fn get_write_details_for_manifest(
         &self,
-        req: Request<ManifestRef>
-    ) -> Result<Response<WriteLocation>, Status> {
-        //BIG TODO: First save to temporary file and copy over after verify
+        _req: Request<ManifestRef>, // Expect to be used later in checks e.g. immutable tags
+    ) -> Result<Response<ManifestWriteDetails>, Status> {
+ 
+        //Give the manifest a UUID and save it to the uploads dir
+        let uuid = Uuid::new_v4().to_string();
 
-        let mr = req.into_inner();
-        let manifest_path = match self.get_path_for_manifest(&mr.repo_name, &mr.reference) {
-            Ok(p) => p,
-            Err(e) => return Err(Status::failed_precondition(format!("Failed to find manifest {:?}", e)))
-        };
-        let manifest_dir = manifest_path.parent().unwrap();
-
-        match fs::create_dir_all(manifest_dir) {
-            Ok(_) => {
-                Ok(Response::new(
-                    WriteLocation {path: manifest_path.to_string_lossy().to_string()}))
-            }
-            Err(e) => {
-                warn!("Internal error creating directory {:?}", e);
-                Err(Status::internal("Failed to create directory for manifest"))
-            }
-        }
+        let manifest_path = self.get_upload_path_for_blob(&uuid);
+        Ok(Response::new(ManifestWriteDetails {
+            path: manifest_path.to_string_lossy().to_string(),
+            uuid,
+        }))
     }
 
     async fn get_read_location_for_manifest(
         &self,
-        req: Request<ManifestRef>
+        req: Request<ManifestRef>,
     ) -> Result<Response<ManifestReadLocation>, Status> {
         //Don't actually need to verify here; could set to false
 
@@ -458,14 +454,13 @@ impl Registry for TrowServer {
 
     async fn complete_upload(
         &self,
-        req: Request<CompleteRequest>
+        req: Request<CompleteRequest>,
     ) -> Result<Response<CompletedUpload>, Status> {
-
         let cr = req.into_inner();
         let ret = match self.validate_and_save_blob(&cr.user_digest, &cr.uuid) {
-            Ok(_) => {
-                Ok(Response::new(CompletedUpload { digest: cr.user_digest.clone() }))
-            }
+            Ok(_) => Ok(Response::new(CompletedUpload {
+                digest: cr.user_digest.clone(),
+            })),
             Err(e) => {
                 warn!("Failure when saving layer: {:?}", e);
                 Err(Status::internal("Internal error saving layer"))
@@ -485,18 +480,48 @@ impl Registry for TrowServer {
         ret
     }
 
+    /**
+     * Take uploaded manifest (which should be uuid in uploads), check it, put in catalog and
+     * by blob digest
+     */
     async fn verify_manifest(
         &self,
-        req: Request<ManifestRef>
+        req: Request<VerifyManifestRequest>,
     ) -> Result<Response<VerifiedManifest>, Status> {
+        let req = req.into_inner();
+        let mr = req.manifest.unwrap(); // Pissed off that the manifest is optional!
+        let uploaded_manifest = self.get_upload_path_for_blob(&req.uuid);
 
-        let mr = req.into_inner();
-        match self.create_verified_manifest(
-            mr.repo_name.clone(),
-            mr.reference.clone(),
-            true,
-        ) {
-            Ok(vm) => Ok(Response::new(vm)),
+        match self.create_verified_manifest(&uploaded_manifest, true) {
+            Ok(vm) => {
+                //move file to digest location and repo/tag
+
+                let digest = vm.digest.clone();
+                let mut ret = Ok(Response::new(vm));
+
+                // TODO: can we simplify this with and_then?
+                match self.save_blob(&uploaded_manifest, &digest) {
+                    Ok(_) => {
+                        let repo_dir = self.manifests_path.join(mr.repo_name);
+                        let repo_path = repo_dir.join(mr.reference);
+                        match fs::create_dir_all(&repo_dir).and_then(|_| fs::copy(&uploaded_manifest, &repo_path)) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                error!("Failure copying manifest from {:?} to {:?} {:?}", 
+                                    &uploaded_manifest, &repo_path, e);
+                                ret = Err(Status::internal("Internal error copying manifest"));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failure saving blob {:?}", e);
+                        ret = Err(Status::internal("Internal error copying manifest"));
+                    }
+                }
+                fs::remove_file(&uploaded_manifest)
+                    .unwrap_or_else(|e| error!("Failure deleting uploaded manifest {:?}", e));
+                ret
+            }
             Err(e) => {
                 error!("Error verifying manifest {:?}", e);
                 Err(Status::internal("Internal error verifying manifest"))
@@ -510,16 +535,17 @@ impl Registry for TrowServer {
         &self,
         _request: Request<CatalogRequest>,
     ) -> Result<Response<Self::GetCatalogStream>, Status> {
-
         let (mut tx, rx) = mpsc::channel(4);
         let mut repos = HashSet::new();
         match visit_dirs(&self.manifests_path, &self.manifests_path, &mut repos) {
             Ok(_) => {
                 tokio::spawn(async move {
                     for r in repos.iter() {
-                        let ce = CatalogEntry { repo_name: r.to_string() };
+                        let ce = CatalogEntry {
+                            repo_name: r.to_string(),
+                        };
                         tx.send(Ok(ce)).await.expect("Error streaming catalog");
-                    };
+                    }
                 });
                 Ok(Response::new(rx))
             }
@@ -536,7 +562,6 @@ impl Registry for TrowServer {
         &self,
         request: Request<CatalogEntry>,
     ) -> Result<Response<Self::ListTagsStream>, Status> {
-
         let (mut tx, rx) = mpsc::channel(4);
         let mut path = PathBuf::from(&self.manifests_path);
         let ce = request.into_inner();
@@ -549,7 +574,9 @@ impl Registry for TrowServer {
                         let en_path = en.path();
                         if en_path.is_file() {
                             if let Some(tag_str) = en_path.file_name() {
-                                let  tag = Tag { tag: tag_str.to_string_lossy().to_string() };
+                                let tag = Tag {
+                                    tag: tag_str.to_string_lossy().to_string(),
+                                };
                                 tx.send(Ok(tag)).await.expect("Error streaming tags");
                             }
                         }
@@ -560,4 +587,3 @@ impl Registry for TrowServer {
         Ok(Response::new(rx))
     }
 }
-    

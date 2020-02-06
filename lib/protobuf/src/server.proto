@@ -29,6 +29,12 @@ message WriteLocation {
   string path = 1;
 }
 
+message ManifestWriteDetails {
+  string path = 1;
+  string uuid = 2;
+}
+
+
 //Could have a single "Location", but this allows divergence in the future
 message BlobReadLocation {
   string path = 1;
@@ -51,6 +57,11 @@ message ManifestRef {
   string reference = 2;
 }
 
+message VerifyManifestRequest {
+  ManifestRef manifest = 1;
+  string uuid = 2;
+
+}
 message VerifiedManifest {
   string digest = 1;
   //Version of manifest, used for media type return
@@ -97,13 +108,13 @@ service Registry {
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
   
-  rpc GetWriteLocationForManifest (ManifestRef) returns (WriteLocation) {}
+  rpc GetWriteDetailsForManifest (ManifestRef) returns (ManifestWriteDetails) {}
 
   rpc GetReadLocationForManifest (ManifestRef) returns (ManifestReadLocation) {}
   
   //Check the blobs exist and the digest is correct etc
   
-  rpc VerifyManifest (ManifestRef) returns (VerifiedManifest) {}
+  rpc VerifyManifest (VerifyManifestRequest) returns (VerifiedManifest) {}
 
   // Called once all blobs and manifest has been uploaded
   // Returns _server_ digest, which may differ to the _user_ digest (due to compression alg)
