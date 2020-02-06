@@ -4,7 +4,7 @@ pub mod trow_proto {
 
 use trow_proto::{
     registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, BlobRef, CatalogEntry, CatalogRequest,
-    CompleteRequest, DownloadRef, ManifestRef, UploadRequest, AdmissionRequest
+    CompleteRequest, DownloadRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest
 };
 use tonic::Request;
 use crate::types::{self, *};
@@ -140,13 +140,13 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-    ) -> Result<impl Write, Error> {
+    ) -> Result<(impl Write, String), Error> {
         let mr = ManifestRef {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone()
         };
     
-        let resp = self.connect_registry().await?.get_write_location_for_manifest(
+        let resp = self.connect_registry().await?.get_write_details_for_manifest(
             Request::new(mr)).await?.into_inner();
 
         //For the moment we know it's a file location
@@ -155,7 +155,7 @@ impl ClientInterface {
             .create(true)
             .write(true)
             .open(resp.path)?;
-        Ok(file)
+        Ok((file, resp.uuid))
     }
 
     pub async fn get_reader_for_manifest(
@@ -204,14 +204,15 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
+        uuid: &str
     ) -> Result<types::VerifiedManifest, Error> {
-        let mr = ManifestRef {
-            reference: reference.to_owned(),
-            repo_name: repo_name.0.clone()
+        let vmr = VerifyManifestRequest {
+            manifest : Some(ManifestRef { reference: reference.to_owned(), repo_name: repo_name.0.clone() }),
+            uuid: uuid.to_string()
         };
 
         let resp = self.connect_registry().await?.verify_manifest(
-            Request::new(mr)).await?.into_inner();
+            Request::new(vmr)).await?.into_inner();
 
         let vm = create_verified_manifest(
             repo_name.clone(),

@@ -490,13 +490,15 @@ fn put_image_manifest(
 ) -> Result<VerifiedManifest, Error> {
     let repo = RepoName(repo_name);
 
-    let sink_loc = ci.get_write_sink_for_manifest(&repo, &reference);
+    let write_deets = ci.get_write_sink_for_manifest(&repo, &reference);
     let mut rt = Runtime::new().unwrap();
-    match rt.block_on(sink_loc).map(|mut sink| chunk.stream_to(&mut sink))
+    let (mut sink_loc, uuid) = rt.block_on(write_deets).map_err(|_| Error::InternalError)?;
+    
+    match chunk.stream_to(&mut sink_loc)
     {
         Ok(_) => {
             //This can probably be moved to responder
-            let ver = ci.verify_manifest(&repo, &reference);
+            let ver = ci.verify_manifest(&repo, &reference, &uuid);
             match rt.block_on(ver) {
                 Ok(vm) => Ok(vm),
                 Err(_) => Err(Error::ManifestInvalid),
