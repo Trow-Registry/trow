@@ -3,8 +3,8 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, BlobRef, CatalogEntry, CatalogRequest,
-    CompleteRequest, DownloadRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogEntry, CatalogRequest,
+    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest
 };
 use tonic::Request;
 use crate::types::{self, *};
@@ -120,7 +120,7 @@ impl ClientInterface {
         repo_name: &RepoName,
         uuid: &Uuid,
     ) -> Result<impl Write, Error> {
-        let br = BlobRef {
+        let br = UploadRef {
             uuid: uuid.0.clone(),
             repo_name: repo_name.0.clone()
         };
@@ -186,18 +186,33 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobReader, Error> {
-        let dr = DownloadRef {
+        let br = BlobRef {
             digest: digest.0.clone(),
             repo_name: repo_name.0.clone()
         };
 
         let resp = self.connect_registry().await?.get_read_location_for_blob(
-            Request::new(dr)).await?.into_inner();
+            Request::new(br)).await?.into_inner();
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let br = create_blob_reader(Box::new(file), digest.clone());
-        Ok(br)
+        let reader = create_blob_reader(Box::new(file), digest.clone());
+        Ok(reader)
+    }
+
+    pub async fn delete_blob(
+        &self,
+        repo_name: &RepoName,
+        digest: &Digest,
+    ) -> Result<BlobDeleted, Error> {
+
+        let br = BlobRef {
+            digest: digest.0.clone(),
+            repo_name: repo_name.0.clone()
+        };
+
+        self.connect_registry().await?.delete_blob(Request::new(br)).await?.into_inner();
+        Ok(BlobDeleted {})
     }
 
     pub async fn verify_manifest(

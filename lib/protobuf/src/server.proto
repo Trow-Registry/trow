@@ -12,14 +12,12 @@ message UploadDetails {
   string uuid = 1;
 }
 
-//TODO: Should have been uploadref as it has the UUID
-message BlobRef {
+message UploadRef {
   string repo_name = 1;
   string uuid = 2;
 }
 
-//TODO: Maybe this should be blob ref. Groan.
-message DownloadRef {
+message BlobRef {
   string repo_name = 1;
   string digest = 2;
 }
@@ -89,6 +87,10 @@ message Tag {
   string tag = 1;
 }
 
+message BlobDeleted {
+
+}
+
 service Registry {
 
   //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
@@ -99,11 +101,13 @@ service Registry {
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
   
-  rpc GetWriteLocationForBlob (BlobRef) returns (WriteLocation) {}
+  rpc GetWriteLocationForBlob (UploadRef) returns (WriteLocation) {}
 
   //Given a digest and repo, get the download
   
-  rpc GetReadLocationForBlob (DownloadRef) returns (BlobReadLocation) {}
+  rpc GetReadLocationForBlob (BlobRef) returns (BlobReadLocation) {}
+
+  rpc DeleteBlob(BlobRef) returns (BlobDeleted) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path

@@ -5,6 +5,7 @@ use crate::TrowConfig;
 pub mod accepted_upload;
 pub mod authenticate;
 pub mod blob_reader;
+pub mod blob_deleted;
 pub mod empty;
 pub mod errors;
 pub mod html;

@@ -8,12 +8,12 @@ use crate::response::html::HTML;
 use crate::response::trow_token::ValidBasicToken;
 use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
+use crate::types::*;
+use crate::TrowConfig;
 use rocket;
 use rocket::request::Request;
 use rocket::State;
-use rocket_contrib::json::{Json,JsonValue};
-use crate::types::*;
-use crate::TrowConfig;
+use rocket_contrib::json::{Json, JsonValue};
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
@@ -49,13 +49,14 @@ pub fn routes() -> Vec<rocket::Route> {
         list_tags_3level,
         get_catalog,
         validate_image,
-        delete_blob
+        delete_blob,
+        delete_blob_2level,
+        delete_blob_3level,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
           get_upload_progress,
           delete_upload,
-          delete_blob,
           admin routes,
           admin_get_uuids
 
@@ -98,7 +99,6 @@ fn no_auth(_req: &Request) -> Authenticate {
     Authenticate {}
 }
 
-
 /* login should it be /v2/login?
  * this is where client will attempt to login
  *
@@ -136,12 +136,11 @@ fn get_manifest(
     onename: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
-
     let rn = RepoName(onename);
-    let f = ci.get_reader_for_manifest(
-            &rn, &reference);
+    let f = ci.get_reader_for_manifest(&rn, &reference);
     let mut rt = Runtime::new().unwrap();
-    rt.block_on(f).map_err(|_| Error::ManifestUnknown(reference))
+    rt.block_on(f)
+        .map_err(|_| Error::ManifestUnknown(reference))
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
@@ -152,7 +151,6 @@ fn get_manifest_2level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-
     let rn = RepoName(format!("{}/{}", user, repo));
     let r = ci.get_reader_for_manifest(&rn, &reference);
     let mut rt = Runtime::new().unwrap();
@@ -171,7 +169,6 @@ fn get_manifest_3level(
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
-
     let rn = RepoName(format!("{}/{}/{}", org, user, repo));
     let r = ci.get_reader_for_manifest(&rn, &reference);
     Runtime::new().unwrap().block_on(r).ok()
@@ -196,7 +193,6 @@ fn get_blob(
     name_repo: String,
     digest: String,
 ) -> Option<BlobReader> {
-
     let rn = RepoName(name_repo);
     let d = Digest(digest);
     let r = ci.get_reader_for_blob(&rn, &d);
@@ -257,7 +253,6 @@ fn put_blob(
     digest: String,
     chunk: rocket::data::Data,
 ) -> Result<AcceptedUpload, Error> {
-
     let repo = RepoName(repo_name);
     let uuid = Uuid(uuid);
 
@@ -268,7 +263,6 @@ fn put_blob(
 
     match sink {
         Ok(mut sink) => {
-
             // Puts should be monolithic uploads (all in go I belive)
             let len = chunk.stream_to(&mut sink);
             match len {
@@ -305,13 +299,23 @@ fn put_blob_2level(
     digest: String,
     chunk: rocket::data::Data,
 ) -> Result<AcceptedUpload, Error> {
-    put_blob(auth_user, config, format!("{}/{}", repo, name), uuid, digest, chunk)
+    put_blob(
+        auth_user,
+        config,
+        format!("{}/{}", repo, name),
+        uuid,
+        digest,
+        chunk,
+    )
 }
 
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
  */
-#[put("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
+#[put(
+    "/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
+    data = "<chunk>"
+)]
 fn put_blob_3level(
     auth_user: TrowToken,
     config: rocket::State<ClientInterface>,
@@ -322,7 +326,14 @@ fn put_blob_3level(
     digest: String,
     chunk: rocket::data::Data,
 ) -> Result<AcceptedUpload, Error> {
-    put_blob(auth_user, config, format!("{}/{}/{}", org, repo, name), uuid, digest, chunk)
+    put_blob(
+        auth_user,
+        config,
+        format!("{}/{}/{}", org, repo, name),
+        uuid,
+        digest,
+        chunk,
+    )
 }
 
 /*
@@ -408,7 +419,13 @@ fn patch_blob_3level(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    patch_blob(auth_user, handler, format!("{}/{}/{}", org, repo, name), uuid, chunk)
+    patch_blob(
+        auth_user,
+        handler,
+        format!("{}/{}/{}", org, repo, name),
+        uuid,
+        chunk,
+    )
 }
 
 /*
@@ -493,9 +510,8 @@ fn put_image_manifest(
     let write_deets = ci.get_write_sink_for_manifest(&repo, &reference);
     let mut rt = Runtime::new().unwrap();
     let (mut sink_loc, uuid) = rt.block_on(write_deets).map_err(|_| Error::InternalError)?;
-    
-    match chunk.stream_to(&mut sink_loc)
-    {
+
+    match chunk.stream_to(&mut sink_loc) {
         Ok(_) => {
             //This can probably be moved to responder
             let ver = ci.verify_manifest(&repo, &reference, &uuid);
@@ -520,7 +536,13 @@ fn put_image_manifest_2level(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(auth_user, ci, format!("{}/{}", user, repo), reference, chunk)
+    put_image_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}", user, repo),
+        reference,
+        chunk,
+    )
 }
 
 /*
@@ -536,7 +558,13 @@ fn put_image_manifest_3level(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), reference, chunk)
+    put_image_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}/{}", org, user, repo),
+        reference,
+        chunk,
+    )
 }
 
 /*
@@ -546,25 +574,63 @@ DELETE /v2/<name>/manifests/<reference>
 */
 
 #[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
-fn delete_image_manifest(_auth_user: TrowToken, _name: String, _repo: String, _reference: String) -> Result<Empty, Error> {
-    Err(Error::Unsupported)
-}
-
-
-#[delete("/v2/<_name>/<_repo>/blobs/<_reference>/<_uuid>?<_digest>")]
-fn delete_blob(_auth_user: TrowToken, 
-    _name: String, 
-    _repo: String, 
+fn delete_image_manifest(
+    _auth_user: TrowToken,
+    _name: String,
+    _repo: String,
     _reference: String,
-    _uuid: String,
-    _digest: String,
 ) -> Result<Empty, Error> {
     Err(Error::Unsupported)
 }
 
-#[get("/v2/_catalog")]
-fn get_catalog(_auth_user: TrowToken, ci: rocket::State<ClientInterface>) -> Result<RepoCatalog, Error> {
+/**
+ * Deletes the given blob.
+ *
+ * Really unsure about this method - why should the user delete a blob?
+ * TODO: This should probably be denied if the blob is referenced by any manifests
+ * (manifest should be deleted first)
+ */
+#[delete("/v2/<repo>/blobs/<digest>")]
+fn delete_blob(
+    _auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    repo: String,
+    digest: String,
+) -> Result<BlobDeleted, Error> {
+    let repo = RepoName(repo);
+    let digest = Digest(digest);
+    let r = ci.delete_blob(&repo, &digest);
+    Runtime::new().unwrap().block_on(r).map_err(|_| Error::BlobUnknown)
+}
 
+#[delete("/v2/<user>/<repo>/blobs/<digest>")]
+fn delete_blob_2level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<BlobDeleted, Error> {
+    delete_blob(auth_user, ci, format!("{}/{}", user, repo), digest)
+}
+
+#[delete("/v2/<org>/<user>/<repo>/blobs/<digest>")]
+fn delete_blob_3level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    org: String,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<BlobDeleted, Error> {
+    delete_blob(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
+}
+
+#[get("/v2/_catalog")]
+fn get_catalog(
+    _auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+) -> Result<RepoCatalog, Error> {
     let cat = ci.get_catalog();
     match Runtime::new().unwrap().block_on(cat) {
         Ok(c) => Ok(c),
@@ -573,11 +639,13 @@ fn get_catalog(_auth_user: TrowToken, ci: rocket::State<ClientInterface>) -> Res
 }
 
 #[get("/v2/<repo_name>/tags/list")]
-fn list_tags(_auth_user: TrowToken, ci: rocket::State<ClientInterface>, repo_name: String) -> Result<TagList, Error> {
-    
+fn list_tags(
+    _auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    repo_name: String,
+) -> Result<TagList, Error> {
     let rn = RepoName(repo_name);
     let tags = ci.list_tags(&rn);
-    
     match Runtime::new().unwrap().block_on(tags) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
@@ -624,28 +692,27 @@ fn validate_image(
      */
     let mut resp_data = image_data.clone();
     match image_data.0.request {
-        
         Some(req) => {
             let r = ci.validate_admission(&req, &tc.host_names);
             match Runtime::new().unwrap().block_on(r) {
-            Ok(res) => {
-                resp_data.response = Some(res);
-                Json(resp_data)
-            }
-            Err(e) => {
-                resp_data.response = Some(AdmissionResponse {
-                    uid: req.uid.clone(),
-                    allowed: false,
-                    status: Some(Status {
-                        status: "Failure".to_owned(),
-                        message: Some(format!("Internal Error {:?}", e).to_owned()),
-                        code: None,
-                    }),
-                });
-                Json(resp_data)
+                Ok(res) => {
+                    resp_data.response = Some(res);
+                    Json(resp_data)
+                }
+                Err(e) => {
+                    resp_data.response = Some(AdmissionResponse {
+                        uid: req.uid.clone(),
+                        allowed: false,
+                        status: Some(Status {
+                            status: "Failure".to_owned(),
+                            message: Some(format!("Internal Error {:?}", e).to_owned()),
+                            code: None,
+                        }),
+                    });
+                    Json(resp_data)
+                }
             }
         }
-        },
 
         None => {
             resp_data.response = Some(AdmissionResponse {
