@@ -18,10 +18,10 @@ pub mod trow_server {
 }
 
 use self::trow_server::{
-    registry_server::Registry, BlobReadLocation, BlobRef, CatalogEntry, CatalogRequest,
-    CompleteRequest, CompletedUpload, DownloadRef, ManifestReadLocation, ManifestRef,
+    registry_server::Registry, BlobReadLocation, UploadRef, CatalogEntry, CatalogRequest,
+    CompleteRequest, CompletedUpload, BlobRef, ManifestReadLocation, ManifestRef,
     ManifestWriteDetails, Tag, UploadDetails, UploadRequest, VerifiedManifest,
-    VerifyManifestRequest, WriteLocation,
+    VerifyManifestRequest, WriteLocation, BlobDeleted
 };
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -372,7 +372,7 @@ impl Registry for TrowServer {
 
     async fn get_write_location_for_blob(
         &self,
-        req: Request<BlobRef>,
+        req: Request<UploadRef>,
     ) -> Result<Response<WriteLocation>, Status> {
         let br = req.into_inner();
         let upload = Upload {
@@ -400,23 +400,47 @@ impl Registry for TrowServer {
 
     async fn get_read_location_for_blob(
         &self,
-        req: Request<DownloadRef>,
+        req: Request<BlobRef>,
     ) -> Result<Response<BlobReadLocation>, Status> {
-        let dr = req.into_inner();
+        let br = req.into_inner();
         let path = self
-            .get_catalog_path_for_blob(&dr.digest)
+            .get_catalog_path_for_blob(&br.digest)
             .map_err(|e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
 
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
             Err(Status::failed_precondition(format!(
                 "No blob found matching {:?}",
-                dr
+                br
             )))
         } else {
             Ok(Response::new(BlobReadLocation {
                 path: path.to_string_lossy().to_string(),
             }))
+        }
+    }
+
+    /**
+     * TODO: check if blob referenced by manifests. If so, refuse to delete.
+     */
+    async fn delete_blob(
+        &self,
+        req: Request<BlobRef>,
+    ) -> Result<Response<BlobDeleted>, Status> {
+
+        let br = req.into_inner();
+        let path = self.get_catalog_path_for_blob(&br.digest)
+            .map_err(|e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
+        
+        if !path.exists() {
+            warn!("Request for unknown blob: {:?}", path);
+            Err(Status::failed_precondition(format!("No blob found matching {:?}", br)))
+        } else {
+            fs::remove_file(&path).map_err(|e| {
+                    error!("Failed to delete blob {:?} {:?}", br, e);
+                    Status::internal("Internal error deleting blob")
+                }
+            ).and(Ok(Response::new( BlobDeleted { } )))
         }
     }
 

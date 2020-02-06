@@ -20,6 +20,8 @@ pub struct UploadInfo {
     range: (u32, u32),
 }
 
+pub struct BlobDeleted {}
+
 impl UploadInfo {
     pub fn uuid(&self) -> &Uuid {
         &self.uuid

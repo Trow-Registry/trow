@@ -172,7 +172,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
-    fn push_oci_manifest(cl: &reqwest::Client, name: &str) {
+    fn push_get_and_delete_oci_manifest(cl: &reqwest::Client, name: &str) {
 
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
@@ -200,11 +200,21 @@ mod interface_tests {
         
         let mut resp = cl
             .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, digest))
-        .send()
-        .unwrap();
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let mani: manifest::ManifestV2 = resp.json().unwrap();
         assert_eq!(mani.schema_version, 2);
+
+        //Delete blob
+        let resp = cl
+            .delete(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, digest))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+
+
+        //Delete manifest
     }
 
     #[test]
@@ -245,7 +255,7 @@ mod interface_tests {
         println!("Running upload_with_put()");
         upload_with_put(&client, "puttest");
         println!("Running push_oci_manifest()");
-        push_oci_manifest(&client, "puttest");
+        push_get_and_delete_oci_manifest(&client, "puttest");
 
         println!("Running get_manifest(onename:tag)");
         get_manifest(&client, "onename", "tag");
