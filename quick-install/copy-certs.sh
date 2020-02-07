@@ -3,10 +3,11 @@ set -eo pipefail
 unset CDPATH
 IFS=$'\n\t'
 
-namespace='kube-public'
-if [ ! -z "$1" ]
+if [ -n "$1" ]
 then
-	namespace=$1
+  namespace=$1
+else
+  namespace='kube-public'
 fi
 
 echo
