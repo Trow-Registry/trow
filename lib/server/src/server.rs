@@ -1,9 +1,9 @@
 use crate::manifest::{FromJson, Manifest};
 use failure::{self, Error};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::{self, File};
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
@@ -18,10 +18,10 @@ pub mod trow_server {
 }
 
 use self::trow_server::{
-    registry_server::Registry, BlobReadLocation, UploadRef, CatalogEntry, CatalogRequest,
-    CompleteRequest, CompletedUpload, BlobRef, ManifestReadLocation, ManifestRef,
-    ManifestWriteDetails, Tag, UploadDetails, UploadRequest, VerifiedManifest,
-    VerifyManifestRequest, WriteLocation, BlobDeleted
+    registry_server::Registry, BlobDeleted, BlobReadLocation, BlobRef, CatalogEntry,
+    CatalogRequest, CompleteRequest, CompletedUpload, ManifestDeleted, ManifestReadLocation,
+    ManifestRef, ManifestWriteDetails, Tag, UploadDetails, UploadRef, UploadRequest,
+    VerifiedManifest, VerifyManifestRequest, WriteLocation,
 };
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -118,6 +118,36 @@ fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<()
     Ok(())
 }
 
+fn visit_dirs2(
+    dir: &Path,
+    base: &Path,
+    repos: &mut HashMap<String, Vec<String>>,
+) -> Result<(), Error> {
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit_dirs2(&path, base, repos)?;
+            } else if let Some(d) = path.parent() {
+                let digest = fs::read_to_string(&path)?;
+                let repo = d.strip_prefix(base)?;
+                let r = repo.to_string_lossy().to_string();
+                match repos.get_mut(&digest) {
+                    Some(v) => v.push(r),
+                    None => {
+                        let mut val = Vec::new();
+                        val.push(r);
+                        repos.insert(digest, val);
+                        ()
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /**
  * Checks a file matches the given digest.
  *
@@ -205,11 +235,33 @@ impl TrowServer {
         Ok(self.blobs_path.join(alg).join(val))
     }
 
+    // Given a manifest digest, check if it is referenced by any tag in the repo
+    fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool, Error>  {
+
+        //TODO: change visit dirs to iter then can exit lazily if find digest
+        let mut manifests_by_digest = HashMap::new();
+        visit_dirs2(
+            &self.manifests_path.join(repo_name),
+            &self.manifests_path,
+            &mut manifests_by_digest,
+        )?;
+
+        Ok(manifests_by_digest.contains_key(digest))
+    }
+
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
-        if is_digest(reference) {
-            return self.get_catalog_path_for_blob(reference);
-        }
-        Ok(self.manifests_path.join(repo_name).join(reference))
+        let digest = if is_digest(reference) {
+            if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
+                error!("Digest {} not in repository {}", reference, repo_name);
+                return Err(failure::err_msg(format!("Digest {} not in repository {}", reference, repo_name)));
+            }
+            reference.to_string()
+        } else {
+            //Content of tag is the digest
+            fs::read_to_string(self.manifests_path.join(repo_name).join(reference))?
+        };
+
+        return self.get_catalog_path_for_blob(&digest);
     }
 
     fn create_verified_manifest(
@@ -423,32 +475,73 @@ impl Registry for TrowServer {
     /**
      * TODO: check if blob referenced by manifests. If so, refuse to delete.
      */
-    async fn delete_blob(
-        &self,
-        req: Request<BlobRef>,
-    ) -> Result<Response<BlobDeleted>, Status> {
-
+    async fn delete_blob(&self, req: Request<BlobRef>) -> Result<Response<BlobDeleted>, Status> {
         let br = req.into_inner();
-        let path = self.get_catalog_path_for_blob(&br.digest)
+        let path = self
+            .get_catalog_path_for_blob(&br.digest)
             .map_err(|e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
-        
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
-            Err(Status::failed_precondition(format!("No blob found matching {:?}", br)))
+            Err(Status::failed_precondition(format!(
+                "No blob found matching {:?}",
+                br
+            )))
         } else {
-            fs::remove_file(&path).map_err(|e| {
+            fs::remove_file(&path)
+                .map_err(|e| {
                     error!("Failed to delete blob {:?} {:?}", br, e);
                     Status::internal("Internal error deleting blob")
-                }
-            ).and(Ok(Response::new( BlobDeleted { } )))
+                })
+                .and(Ok(Response::new(BlobDeleted {})))
         }
+    }
+
+    async fn delete_manifest(
+        &self,
+        req: Request<ManifestRef>,
+    ) -> Result<Response<ManifestDeleted>, Status> {
+        let mr = req.into_inner();
+        if !is_digest(&mr.reference) {
+            return Err(Status::failed_precondition(format!(
+                "Manifests can only be deleted by digest. Got {}",
+                mr.reference
+            )));
+        }
+        let digest = mr.reference;
+        //For the repo, go through all tags and see if they reference the digest. Delete them.
+        //Can only delete manifest if no other tags in any repo reference it
+
+        let mut manifests_by_digest = HashMap::new();
+        visit_dirs2(
+            &self.manifests_path.join(&mr.repo_name),
+            &self.manifests_path,
+            &mut manifests_by_digest,
+        ).map_err(|e| {
+            error!("Problem reading manifest catalog {:?}", e);
+            Status::internal("Error reading repositories")
+        })?;
+
+        match manifests_by_digest.get(&digest) {
+            Some(mans) => {
+                mans.iter().for_each(|man| match fs::remove_file(&man) {
+                    Ok(_) => (),
+                    Err(e) => error!("Failed to delete manifest {:?} {:?}", &man, e)
+                });
+                Ok(Response::new(ManifestDeleted {}))
+            }
+            None => Err(Status::failed_precondition(format!(
+                "Found no tags in {} matching digest {}",
+                &mr.repo_name, digest
+            ))),
+        }
+        //TODO: delete blob if no manifests at all match, could do this as background gc sweep. Note there are race issues; may want to pause uploads
+        //resp
     }
 
     async fn get_write_details_for_manifest(
         &self,
         _req: Request<ManifestRef>, // Expect to be used later in checks e.g. immutable tags
     ) -> Result<Response<ManifestWriteDetails>, Status> {
- 
         //Give the manifest a UUID and save it to the uploads dir
         let uuid = Uuid::new_v4().to_string();
 
@@ -518,21 +611,27 @@ impl Registry for TrowServer {
 
         match self.create_verified_manifest(&uploaded_manifest, true) {
             Ok(vm) => {
-                //move file to digest location and repo/tag
+                // copy manifest to blobs and add tag
 
                 let digest = vm.digest.clone();
                 let mut ret = Ok(Response::new(vm));
 
-                // TODO: can we simplify this with and_then?
+                // TODO: can we simplify this with 'and_then'?
                 match self.save_blob(&uploaded_manifest, &digest) {
                     Ok(_) => {
+                        // Put digest as file contents of tag
                         let repo_dir = self.manifests_path.join(mr.repo_name);
                         let repo_path = repo_dir.join(mr.reference);
-                        match fs::create_dir_all(&repo_dir).and_then(|_| fs::copy(&uploaded_manifest, &repo_path)) {
+                        match fs::create_dir_all(&repo_dir)
+                            .and_then(|_| fs::File::create(&repo_path))
+                            .and_then(|mut f| f.write_all(digest.as_bytes()))
+                        {
                             Ok(_) => (),
                             Err(e) => {
-                                error!("Failure copying manifest from {:?} to {:?} {:?}", 
-                                    &uploaded_manifest, &repo_path, e);
+                                error!(
+                                    "Failure cataloguing manifest {:?} as {:?} {:?}",
+                                    &uploaded_manifest, &repo_path, e
+                                );
                                 ret = Err(Status::internal("Internal error copying manifest"));
                             }
                         }

@@ -107,15 +107,6 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    fn unsupported(cl: &reqwest::Client) {
-        //Delete currently unimplemented
-        let resp = cl
-            .delete(&(TROW_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
-            .send()
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
-    }
-
     fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
         //Might need accept headers here
         let mut resp = cl
@@ -207,14 +198,34 @@ mod interface_tests {
         assert_eq!(mani.schema_version, 2);
 
         //Delete blob
+        /*
         let resp = cl
             .delete(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, digest))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
-
+        */
 
         //Delete manifest
+        let resp = cl
+            .delete(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, digest))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+        
+        //Check can't get anymore
+        let resp = cl
+            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, "puttest1"))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        let resp = cl
+            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, digest))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
     }
 
     #[test]
@@ -242,8 +253,6 @@ mod interface_tests {
         get_main(&client);
         println!("Running get_blob()");
         get_non_existent_blob(&client);
-        println!("Running unsupported()");
-        unsupported(&client);
         println!("Running upload_layer(repo/image/test:tag)");
         common::upload_layer(&client, "repo/image/test", "tag");
         println!("Running upload_layer(image/test:latest)");
