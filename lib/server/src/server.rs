@@ -121,7 +121,7 @@ fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<()
 fn visit_dirs2(
     dir: &Path,
     base: &Path,
-    repos: &mut HashMap<String, Vec<String>>,
+    repos: &mut HashMap<String, Vec<PathBuf>>,
 ) -> Result<(), Error> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
@@ -129,15 +129,13 @@ fn visit_dirs2(
             let path = entry.path();
             if path.is_dir() {
                 visit_dirs2(&path, base, repos)?;
-            } else if let Some(d) = path.parent() {
+            } else {
                 let digest = fs::read_to_string(&path)?;
-                let repo = d.strip_prefix(base)?;
-                let r = repo.to_string_lossy().to_string();
                 match repos.get_mut(&digest) {
-                    Some(v) => v.push(r),
+                    Some(v) => v.push(path),
                     None => {
                         let mut val = Vec::new();
-                        val.push(r);
+                        val.push(path);
                         repos.insert(digest, val);
                         ()
                     }

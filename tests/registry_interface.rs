@@ -277,7 +277,6 @@ mod interface_tests {
         rc.insert(RepoName("repo/image/test".to_string()));
         rc.insert(RepoName("image/test".to_string()));
         rc.insert(RepoName("onename".to_string()));
-        rc.insert(RepoName("puttest".to_string()));
 
         check_repo_catalog(&client, &rc);
 
