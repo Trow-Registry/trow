@@ -1,6 +1,6 @@
 use crate::manifest::{FromJson, Manifest};
 use failure::{self, Error};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
 use std::io::{BufReader, Read, Write};
@@ -95,6 +95,17 @@ fn gen_digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.input(bytes);
     format!("sha256:{}", hasher.result_str())
+}
+
+fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
+    digest
+        == match fs::read_to_string(manifest.path()) {
+            Ok(test_digest) => test_digest,
+            Err(e) => {
+                warn!("Failure reading repo {:?}", e);
+                "NO_MATCH".to_string()
+            }
+        }
 }
 
 struct RepoIterator {
@@ -222,16 +233,7 @@ impl TrowServer {
     // Given a manifest digest, check if it is referenced by any tag in the repo
     fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool, Error> {
         let mut ri = RepoIterator::new(&self.manifests_path.join(repo_name))?;
-        let res = ri.find(|de| {
-            digest
-                == match fs::read_to_string(de.path()) {
-                    Ok(test_digest) => test_digest,
-                    Err(e) => {
-                        warn!("Failure reading repo {:?}", e);
-                        "NO_MATCH".to_string()
-                    }
-                }
-        });
+        let res = ri.find(|de| { does_manifest_match_digest(de, &digest) });
         Ok(res.is_some())
     }
 
@@ -505,22 +507,12 @@ impl Registry for TrowServer {
             Status::internal("Error reading repositories")
         })?;
 
-        //TODO: Pull the filter function out
         //TODO: error if no manifest matches?
-        ri.filter(|de| {
-            digest
-                == match fs::read_to_string(de.path()) {
-                    Ok(test_digest) => test_digest,
-                    Err(e) => {
-                        warn!("Failure reading repo {:?}", e);
-                        "NO_MATCH".to_string()
-                    }
-                }
-        })
-        .for_each(|man| match fs::remove_file(man.path()) {
-            Ok(_) => (),
-            Err(e) => error!("Failed to delete manifest {:?} {:?}", &man, e),
-        });
+        ri.filter(|de| does_manifest_match_digest(de, &digest))
+            .for_each(|man| match fs::remove_file(man.path()) {
+                Ok(_) => (),
+                Err(e) => error!("Failed to delete manifest {:?} {:?}", &man, e),
+            });
 
         Ok(Response::new(ManifestDeleted {}))
     }
@@ -647,13 +639,20 @@ impl Registry for TrowServer {
     ) -> Result<Response<Self::GetCatalogStream>, Status> {
         let (mut tx, rx) = mpsc::channel(4);
 
-        let catalog:HashSet<String> = RepoIterator::new(&self.manifests_path)
+        let catalog: HashSet<String> = RepoIterator::new(&self.manifests_path)
             .map_err(|e| {
                 error!("Error accessing catalog {:?}", e);
                 Status::internal("Internal error streaming catalog")
-            })?.map(|de| {
-                de.path().parent().unwrap().strip_prefix(&self.manifests_path).unwrap().to_string_lossy().to_string()
-            }).collect();
+            })?
+            .map(|de| de.path())
+            .filter_map(|p| p.parent().map(|p| p.to_path_buf()))
+            .filter_map(|r| {
+                r.strip_prefix(&self.manifests_path)
+                    .ok()
+                    .map(|p| p.to_path_buf())
+            })
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
 
         tokio::spawn(async move {
             for r in catalog {
