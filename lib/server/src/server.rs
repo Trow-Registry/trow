@@ -2,7 +2,7 @@ use crate::manifest::{FromJson, Manifest};
 use failure::{self, Error};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fs::{self, File};
+use std::fs::{self, DirEntry, File};
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -97,53 +97,39 @@ fn gen_digest(bytes: &[u8]) -> String {
     format!("sha256:{}", hasher.result_str())
 }
 
-/**
- * Visits each subdir and adds path to set if there are files in the directory.
- *
- * Could be made more generic by taking a function argument.
- */
-fn visit_dirs(dir: &Path, base: &Path, repos: &mut HashSet<String>) -> Result<(), Error> {
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                visit_dirs(&path, base, repos)?;
-            } else if let Some(d) = path.parent() {
-                let repo = d.strip_prefix(base)?;
-                repos.insert(repo.to_string_lossy().to_string());
-            }
-        }
-    }
-    Ok(())
+struct RepoIterator {
+    paths: Vec<Result<DirEntry, std::io::Error>>,
 }
 
-fn visit_dirs2(
-    dir: &Path,
-    base: &Path,
-    repos: &mut HashMap<String, Vec<PathBuf>>,
-) -> Result<(), Error> {
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                visit_dirs2(&path, base, repos)?;
-            } else {
-                let digest = fs::read_to_string(&path)?;
-                match repos.get_mut(&digest) {
-                    Some(v) => v.push(path),
-                    None => {
-                        let mut val = Vec::new();
-                        val.push(path);
-                        repos.insert(digest, val);
-                        ()
+impl RepoIterator {
+    fn new(base_dir: &Path) -> Result<RepoIterator, Error> {
+        let paths = fs::read_dir(base_dir)?.collect();
+        Ok(RepoIterator { paths })
+    }
+}
+
+impl Iterator for RepoIterator {
+    type Item = DirEntry;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.paths.pop() {
+            None => None,
+            Some(res_path) => match res_path {
+                Err(e) => {
+                    warn!("Error iterating over repos {:?}", e);
+                    self.next()
+                }
+                Ok(path) => {
+                    if path.file_type().unwrap().is_dir() {
+                        let new_paths = fs::read_dir(path.path()).unwrap();
+                        self.paths.extend(new_paths);
+                        self.next()
+                    } else {
+                        Some(path)
                     }
                 }
-            }
+            },
         }
     }
-    Ok(())
 }
 
 /**
@@ -234,24 +220,29 @@ impl TrowServer {
     }
 
     // Given a manifest digest, check if it is referenced by any tag in the repo
-    fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool, Error>  {
-
-        //TODO: change visit dirs to iter then can exit lazily if find digest
-        let mut manifests_by_digest = HashMap::new();
-        visit_dirs2(
-            &self.manifests_path.join(repo_name),
-            &self.manifests_path,
-            &mut manifests_by_digest,
-        )?;
-
-        Ok(manifests_by_digest.contains_key(digest))
+    fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool, Error> {
+        let mut ri = RepoIterator::new(&self.manifests_path.join(repo_name))?;
+        let res = ri.find(|de| {
+            digest
+                == match fs::read_to_string(de.path()) {
+                    Ok(test_digest) => test_digest,
+                    Err(e) => {
+                        warn!("Failure reading repo {:?}", e);
+                        "NO_MATCH".to_string()
+                    }
+                }
+        });
+        Ok(res.is_some())
     }
 
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
         let digest = if is_digest(reference) {
             if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
                 error!("Digest {} not in repository {}", reference, repo_name);
-                return Err(failure::err_msg(format!("Digest {} not in repository {}", reference, repo_name)));
+                return Err(failure::err_msg(format!(
+                    "Digest {} not in repository {}",
+                    reference, repo_name
+                )));
             }
             reference.to_string()
         } else {
@@ -509,31 +500,29 @@ impl Registry for TrowServer {
         //For the repo, go through all tags and see if they reference the digest. Delete them.
         //Can only delete manifest if no other tags in any repo reference it
 
-        let mut manifests_by_digest = HashMap::new();
-        visit_dirs2(
-            &self.manifests_path.join(&mr.repo_name),
-            &self.manifests_path,
-            &mut manifests_by_digest,
-        ).map_err(|e| {
+        let ri = RepoIterator::new(&self.manifests_path.join(&mr.repo_name)).map_err(|e| {
             error!("Problem reading manifest catalog {:?}", e);
             Status::internal("Error reading repositories")
         })?;
 
-        match manifests_by_digest.get(&digest) {
-            Some(mans) => {
-                mans.iter().for_each(|man| match fs::remove_file(&man) {
-                    Ok(_) => (),
-                    Err(e) => error!("Failed to delete manifest {:?} {:?}", &man, e)
-                });
-                Ok(Response::new(ManifestDeleted {}))
-            }
-            None => Err(Status::failed_precondition(format!(
-                "Found no tags in {} matching digest {}",
-                &mr.repo_name, digest
-            ))),
-        }
-        //TODO: delete blob if no manifests at all match, could do this as background gc sweep. Note there are race issues; may want to pause uploads
-        //resp
+        //TODO: Pull the filter function out
+        //TODO: error if no manifest matches?
+        ri.filter(|de| {
+            digest
+                == match fs::read_to_string(de.path()) {
+                    Ok(test_digest) => test_digest,
+                    Err(e) => {
+                        warn!("Failure reading repo {:?}", e);
+                        "NO_MATCH".to_string()
+                    }
+                }
+        })
+        .for_each(|man| match fs::remove_file(man.path()) {
+            Ok(_) => (),
+            Err(e) => error!("Failed to delete manifest {:?} {:?}", &man, e),
+        });
+
+        Ok(Response::new(ManifestDeleted {}))
     }
 
     async fn get_write_details_for_manifest(
@@ -657,24 +646,22 @@ impl Registry for TrowServer {
         _request: Request<CatalogRequest>,
     ) -> Result<Response<Self::GetCatalogStream>, Status> {
         let (mut tx, rx) = mpsc::channel(4);
-        let mut repos = HashSet::new();
-        match visit_dirs(&self.manifests_path, &self.manifests_path, &mut repos) {
-            Ok(_) => {
-                tokio::spawn(async move {
-                    for r in repos.iter() {
-                        let ce = CatalogEntry {
-                            repo_name: r.to_string(),
-                        };
-                        tx.send(Ok(ce)).await.expect("Error streaming catalog");
-                    }
-                });
-                Ok(Response::new(rx))
+
+        let catalog:HashSet<String> = RepoIterator::new(&self.manifests_path)
+            .map_err(|e| {
+                error!("Error accessing catalog {:?}", e);
+                Status::internal("Internal error streaming catalog")
+            })?.map(|de| {
+                de.path().parent().unwrap().strip_prefix(&self.manifests_path).unwrap().to_string_lossy().to_string()
+            }).collect();
+
+        tokio::spawn(async move {
+            for r in catalog {
+                let ce = CatalogEntry { repo_name: r };
+                tx.send(Ok(ce)).await.expect("Error streaming catalog");
             }
-            Err(e) => {
-                warn!("Error retreiving repository catalog {:?}", e);
-                Err(Status::internal("Internal error streaming catalog"))
-            }
-        }
+        });
+        Ok(Response::new(rx))
     }
 
     type ListTagsStream = mpsc::Receiver<Result<Tag, Status>>;
