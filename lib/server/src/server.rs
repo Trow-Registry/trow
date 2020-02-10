@@ -567,6 +567,8 @@ impl Registry for TrowServer {
                     for r in repos.iter() {
                         let ce = CatalogEntry {
                             repo_name: r.to_string(),
+                            limit: std::i32::MAX,
+                            last_tag: String::from("")
                         };
                         tx.send(Ok(ce)).await.expect("Error streaming catalog");
                     }
@@ -589,20 +591,26 @@ impl Registry for TrowServer {
         let (mut tx, rx) = mpsc::channel(4);
         let mut path = PathBuf::from(&self.manifests_path);
         let ce = request.into_inner();
+        let limit = ce.limit as usize;
         path.push(ce.repo_name);
 
         if let Ok(files) = fs::read_dir(path) {
             tokio::spawn(async move {
-                for entry in files {
-                    if let Ok(en) = entry {
-                        let en_path = en.path();
-                        if en_path.is_file() {
-                            if let Some(tag_str) = en_path.file_name() {
-                                let tag = Tag {
-                                    tag: tag_str.to_string_lossy().to_string(),
-                                };
-                                tx.send(Ok(tag)).await.expect("Error streaming tags");
-                            }
+                let mut paths: Vec<_> = files.map(|r| r.unwrap())
+                    .collect();
+                // sorting to adhere to spec:
+                // https://github.com/opencontainers/distribution-spec/blob/master/spec.md#pagination
+                paths.sort_by_key(|dir| dir.path());
+                let it = paths.iter().take(limit);
+
+                for entry in it {
+                    let en_path = entry.path();
+                    if en_path.is_file() {
+                        if let Some(tag_str) = en_path.file_name() {
+                            let tag = Tag {
+                                tag: tag_str.to_string_lossy().to_string(),
+                            };
+                            tx.send(Ok(tag)).await.expect("Error streaming tags");
                         }
                     }
                 }

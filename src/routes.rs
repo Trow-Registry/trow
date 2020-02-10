@@ -638,14 +638,21 @@ fn get_catalog(
     }
 }
 
-#[get("/v2/<repo_name>/tags/list")]
+#[get("/v2/<repo_name>/tags/list?<limit>")]
 fn list_tags(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
+    limit: Option<i32>
 ) -> Result<TagList, Error> {
     let rn = RepoName(repo_name);
-    let tags = ci.list_tags(&rn);
+    let mut lim = std::i32::MAX;
+    match limit {
+        Some(i) => lim = i,
+        None => {}
+    }
+
+    let tags = ci.list_tags(&rn, lim);
     match Runtime::new().unwrap().block_on(tags) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
@@ -659,7 +666,7 @@ fn list_tags_2level(
     user: String,
     repo: String,
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}", user, repo))
+    list_tags(auth_user, ci, format!("{}/{}", user, repo), Some(std::i32::MAX))
 }
 
 #[get("/v2/<org>/<user>/<repo>/tags/list")]
@@ -670,7 +677,7 @@ fn list_tags_3level(
     user: String,
     repo: String,
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo))
+    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), Some(std::i32::MAX))
 }
 
 //Might want to move this stuff somewhere else

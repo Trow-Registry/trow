@@ -255,9 +255,11 @@ impl ClientInterface {
         Ok(catalog)
     }
 
-    pub async fn list_tags(&self, repo_name: &RepoName) -> Result<TagList, Error> {
+    pub async fn list_tags(&self, repo_name: &RepoName, limit: i32) -> Result<TagList, Error> {
         let ce = CatalogEntry {
-            repo_name: repo_name.0.clone()
+            repo_name: repo_name.0.clone(),
+            limit: limit,
+            last_tag: String::from("")
         };
 
         let mut stream = self.connect_registry().await?
