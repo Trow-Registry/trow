@@ -22,6 +22,8 @@ pub struct UploadInfo {
 
 pub struct BlobDeleted {}
 
+pub struct ManifestDeleted {}
+
 impl UploadInfo {
     pub fn uuid(&self) -> &Uuid {
         &self.uuid
