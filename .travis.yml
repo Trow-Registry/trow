@@ -9,7 +9,7 @@ before_script:
   - cd quick-install/self-cert && ./make-certs.sh && cd ../.. 
   - mkdir certs && cp quick-install/self-cert/domain.crt ./certs/ 
   - cp quick-install/self-cert/domain.key ./certs/
-  - rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
+  - rustup default nightly-2020-02-07 && rustup component add rustfmt 
   - cargo update
   - export VCS_REF=$(git rev-parse HEAD)
 script:
