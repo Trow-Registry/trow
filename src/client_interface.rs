@@ -238,6 +238,22 @@ impl ClientInterface {
         Ok(vm)
     }
 
+
+    pub async fn delete_manifest(
+        &self,
+        repo_name: &RepoName,
+        digest: &Digest,
+    ) -> Result<ManifestDeleted, Error> {
+
+        let mr = ManifestRef {
+            reference: digest.0.clone(),
+            repo_name: repo_name.0.clone()
+        };
+
+        self.connect_registry().await?.delete_manifest(Request::new(mr)).await?.into_inner();
+        Ok(ManifestDeleted {})
+    }
+
     pub async fn get_catalog(&self) -> Result<RepoCatalog, Error> {
 
         let cr = CatalogRequest {};

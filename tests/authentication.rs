@@ -36,7 +36,7 @@ mod authentication_tests {
 
     fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
-            //.current_dir("../../")
+//            .current_dir("../../")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
@@ -59,14 +59,17 @@ mod authentication_tests {
         // get a client builder
         let client = reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
         let mut response = client.get(TROW_ADDRESS).send();
+
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
             response = client.get(TROW_ADDRESS).send();
             timeout -= 1;
+            println!("Response: {:?}", &response);
         }
         if timeout == 0 {
             child.kill().unwrap();
@@ -129,6 +132,7 @@ mod authentication_tests {
         // get a client builder
         let client = reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 

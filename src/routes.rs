@@ -2,7 +2,6 @@ use std::str;
 
 use crate::client_interface::ClientInterface;
 use crate::response::authenticate::Authenticate;
-use crate::response::empty::Empty;
 use crate::response::errors::Error;
 use crate::response::html::HTML;
 use crate::response::trow_token::ValidBasicToken;
@@ -31,7 +30,6 @@ pub fn routes() -> Vec<rocket::Route> {
         put_image_manifest,
         put_image_manifest_2level,
         put_image_manifest_3level,
-        delete_image_manifest,
         get_blob,
         get_blob_2level,
         get_blob_3level,
@@ -52,6 +50,10 @@ pub fn routes() -> Vec<rocket::Route> {
         delete_blob,
         delete_blob_2level,
         delete_blob_3level,
+        delete_image_manifest,
+        delete_image_manifest_2level,
+        delete_image_manifest_3level
+
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
@@ -573,14 +575,40 @@ Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
 */
 
-#[delete("/v2/<_name>/<_repo>/manifests/<_reference>")]
+#[delete("/v2/<repo>/manifests/<digest>")]
 fn delete_image_manifest(
     _auth_user: TrowToken,
-    _name: String,
-    _repo: String,
-    _reference: String,
-) -> Result<Empty, Error> {
-    Err(Error::Unsupported)
+    ci: rocket::State<ClientInterface>,
+    repo: String,
+    digest: String,
+) -> Result<ManifestDeleted, Error> {
+    let repo = RepoName(repo);
+    let digest = Digest(digest);
+    let r = ci.delete_manifest(&repo, &digest);
+    Runtime::new().unwrap().block_on(r).map_err(|_| Error::BlobUnknown)
+}
+
+#[delete("/v2/<user>/<repo>/manifests/<digest>")]
+fn delete_image_manifest_2level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<ManifestDeleted, Error> {
+    delete_image_manifest(auth_user, ci, format!("{}/{}", user, repo), digest)
+}
+
+#[delete("/v2/<org>/<user>/<repo>/manifests/<digest>")]
+fn delete_image_manifest_3level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    org: String,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<ManifestDeleted, Error> {
+    delete_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
 }
 
 /**
