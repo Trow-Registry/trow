@@ -18,3 +18,4 @@ quick-install/validate.yaml
 quick-install/copy-certs-tmpl-namespaced.yaml
 .idea
 .vs
+.DS_Store
