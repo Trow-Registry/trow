@@ -666,46 +666,48 @@ fn get_catalog(
     }
 }
 
-#[get("/v2/<repo_name>/tags/list?<n>")]
+#[get("/v2/<repo_name>/tags/list?<n>&<last_tag>")]
 fn list_tags(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
-    n: Option<i32>
+    n: Option<u32>,
+    last_tag: Option<String>
 ) -> Result<TagList, Error> {
     let rn = RepoName(repo_name);
-    let mut limit = std::i32::MAX;
-    match n {
-        Some(i) => limit = i,
-        None => {}
-    }
+    let limit = n.unwrap_or(std::u32::MAX);
+    let last_tag = last_tag.unwrap_or(String::new());
 
-    let tags = ci.list_tags(&rn, limit);
+    let tags = ci.list_tags(&rn, limit, &last_tag);
     match Runtime::new().unwrap().block_on(tags) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }
 }
 
-#[get("/v2/<user>/<repo>/tags/list")]
+#[get("/v2/<user>/<repo>/tags/list?<n>&<last_tag>")]
 fn list_tags_2level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
+    n: Option<u32>,
+    last_tag: Option<String>
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}", user, repo), Some(std::i32::MAX))
+    list_tags(auth_user, ci, format!("{}/{}", user, repo), n, last_tag)
 }
 
-#[get("/v2/<org>/<user>/<repo>/tags/list")]
+#[get("/v2/<org>/<user>/<repo>/tags/list?<n>&<last_tag>")]
 fn list_tags_3level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
+    n: Option<u32>,
+    last_tag: Option<String>
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), Some(std::i32::MAX))
+    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), n, last_tag)
 }
 
 //Might want to move this stuff somewhere else

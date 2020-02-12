@@ -19,9 +19,9 @@ pub mod trow_server {
 
 use self::trow_server::{
     registry_server::Registry, BlobDeleted, BlobReadLocation, BlobRef, CatalogEntry,
-    CatalogRequest, CompleteRequest, CompletedUpload, ManifestDeleted, ManifestReadLocation,
-    ManifestRef, ManifestWriteDetails, Tag, UploadDetails, UploadRef, UploadRequest,
-    VerifiedManifest, VerifyManifestRequest, WriteLocation,
+    CatalogRequest, CompleteRequest, CompletedUpload, ListTagsRequest, ManifestDeleted,
+    ManifestReadLocation, ManifestRef, ManifestWriteDetails, Tag, UploadDetails, UploadRef,
+    UploadRequest, VerifiedManifest, VerifyManifestRequest, WriteLocation,
 };
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -233,7 +233,7 @@ impl TrowServer {
     // Given a manifest digest, check if it is referenced by any tag in the repo
     fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool, Error> {
         let mut ri = RepoIterator::new(&self.manifests_path.join(repo_name))?;
-        let res = ri.find(|de| { does_manifest_match_digest(de, &digest) });
+        let res = ri.find(|de| does_manifest_match_digest(de, &digest));
         Ok(res.is_some())
     }
 
@@ -654,12 +654,8 @@ impl Registry for TrowServer {
             .collect();
 
         tokio::spawn(async move {
-            for r in catalog {
-                let ce = CatalogEntry {
-                    repo_name: r,
-                    limit: std::i32::MAX,
-                    last_tag: String::from("")
-                };
+            for repo_name in catalog {
+                let ce = CatalogEntry { repo_name };
                 tx.send(Ok(ce)).await.expect("Error streaming catalog");
             }
         });
@@ -670,36 +666,39 @@ impl Registry for TrowServer {
 
     async fn list_tags(
         &self,
-        request: Request<CatalogEntry>,
+        request: Request<ListTagsRequest>,
     ) -> Result<Response<Self::ListTagsStream>, Status> {
         let (mut tx, rx) = mpsc::channel(4);
         let mut path = PathBuf::from(&self.manifests_path);
-        let ce = request.into_inner();
-        let limit = ce.limit as usize;
-        path.push(ce.repo_name);
+        let ltr = request.into_inner();
+        let limit = ltr.limit as usize;
+        path.push(&ltr.repo_name);
 
-        if let Ok(files) = fs::read_dir(path) {
-            tokio::spawn(async move {
-                let mut paths: Vec<_> = files.map(|r| r.unwrap())
-                    .collect();
-                // sorting to adhere to spec:
-                // https://github.com/opencontainers/distribution-spec/blob/master/spec.md#pagination
-                paths.sort_by_key(|dir| dir.path());
-                let it = paths.iter().take(limit);
+        let mut catalog: Vec<String> = RepoIterator::new(&path)
+            .map_err(|e| {
+                error!("Error accessing catalog {:?}", e);
+                Status::internal("Internal error streaming catalog")
+            })?
+            .map(|de| de.path().file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        catalog.sort();
+        
+        let partial_catalog: Vec<String> = if ltr.last_tag.is_empty() {
+            catalog.into_iter().take(limit).collect()
+        } else {
+            catalog.into_iter().skip_while(|t| t != &ltr.last_tag).take(limit).collect()
+        };
 
-                for entry in it {
-                    let en_path = entry.path();
-                    if en_path.is_file() {
-                        if let Some(tag_str) = en_path.file_name() {
-                            let tag = Tag {
-                                tag: tag_str.to_string_lossy().to_string(),
-                            };
-                            tx.send(Ok(tag)).await.expect("Error streaming tags");
-                        }
-                    }
-                }
-            });
-        }
+        
+        tokio::spawn(async move {
+            for tag in partial_catalog {
+                tx.send(Ok(Tag {
+                    tag: tag.to_string(),
+                }))
+                .await
+                .expect("Error streaming tags");
+            }
+        });
         Ok(Response::new(rx))
     }
 }

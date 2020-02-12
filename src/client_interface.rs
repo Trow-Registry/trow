@@ -3,8 +3,8 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogEntry, CatalogRequest,
-    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogRequest,
+    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest, ListTagsRequest
 };
 use tonic::Request;
 use crate::types::{self, *};
@@ -271,16 +271,16 @@ impl ClientInterface {
         Ok(catalog)
     }
 
-    pub async fn list_tags(&self, repo_name: &RepoName, limit: i32) -> Result<TagList, Error> {
-        let ce = CatalogEntry {
+    pub async fn list_tags(&self, repo_name: &RepoName, limit: u32, last_tag: &str) -> Result<TagList, Error> {
+        let ltr = ListTagsRequest {
             repo_name: repo_name.0.clone(),
-            limit: limit,
-            last_tag: String::from("")
+            limit,
+            last_tag: last_tag.to_string()
         };
 
         let mut stream = self.connect_registry().await?
         .list_tags(
-            Request::new(ce))
+            Request::new(ltr))
             .await?
             .into_inner();
         let mut list = TagList::new(repo_name.clone());
