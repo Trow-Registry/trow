@@ -254,9 +254,9 @@ impl ClientInterface {
         Ok(ManifestDeleted {})
     }
 
-    pub async fn get_catalog(&self) -> Result<RepoCatalog, Error> {
+    pub async fn get_catalog(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog, Error> {
 
-        let cr = CatalogRequest {};
+        let cr = CatalogRequest { limit, last_repo: last_repo.to_string() };
         let mut stream = self.connect_registry().await?
             .get_catalog(
                 Request::new(cr))

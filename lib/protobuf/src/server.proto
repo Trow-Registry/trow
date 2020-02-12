@@ -74,9 +74,9 @@ message ManifestReadLocation {
   string content_type = 3;
 }
 
-
 message CatalogRequest {
-  //Currently empty, could ask for subset, auth will be necessary later
+  uint32 limit = 1;
+  string last_repo = 2;  
 }
 
 message ListTagsRequest {

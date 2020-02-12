@@ -635,8 +635,12 @@ impl Registry for TrowServer {
 
     async fn get_catalog(
         &self,
-        _request: Request<CatalogRequest>,
+        request: Request<CatalogRequest>,
     ) -> Result<Response<Self::GetCatalogStream>, Status> {
+
+        let cr = request.into_inner();
+        let limit = cr.limit as usize;
+
         let (mut tx, rx) = mpsc::channel(4);
         let catalog: HashSet<String> = RepoIterator::new(&self.manifests_path)
             .map_err(|e| {
@@ -652,9 +656,19 @@ impl Registry for TrowServer {
             })
             .map(|p| p.to_string_lossy().to_string())
             .collect();
+        
+        let partial_catalog: Vec<String> = if cr.last_repo.is_empty() {
+            catalog.into_iter().take(limit).collect()
+        } else {
+            catalog
+                .into_iter()
+                .skip_while(|t| t != &cr.last_repo)
+                .take(limit)
+                .collect()
+        };
 
         tokio::spawn(async move {
-            for repo_name in catalog {
+            for repo_name in partial_catalog {
                 let ce = CatalogEntry { repo_name };
                 tx.send(Ok(ce)).await.expect("Error streaming catalog");
             }
@@ -682,14 +696,16 @@ impl Registry for TrowServer {
             .map(|de| de.path().file_name().unwrap().to_string_lossy().to_string())
             .collect();
         catalog.sort();
-        
         let partial_catalog: Vec<String> = if ltr.last_tag.is_empty() {
             catalog.into_iter().take(limit).collect()
         } else {
-            catalog.into_iter().skip_while(|t| t != &ltr.last_tag).take(limit).collect()
+            catalog
+                .into_iter()
+                .skip_while(|t| t != &ltr.last_tag)
+                .take(limit)
+                .collect()
         };
 
-        
         tokio::spawn(async move {
             for tag in partial_catalog {
                 tx.send(Ok(Tag {

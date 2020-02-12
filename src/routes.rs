@@ -654,12 +654,17 @@ fn delete_blob_3level(
     delete_blob(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
 }
 
-#[get("/v2/_catalog")]
+#[get("/v2/_catalog?<n>&<last_repo>")]
 fn get_catalog(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    n: Option<u32>,
+    last_repo: Option<String>
 ) -> Result<RepoCatalog, Error> {
-    let cat = ci.get_catalog();
+
+    let limit = n.unwrap_or(std::u32::MAX);
+    let last_repo = last_repo.unwrap_or(String::new());
+    let cat = ci.get_catalog(limit, &last_repo);
     match Runtime::new().unwrap().block_on(cat) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
