@@ -61,6 +61,7 @@ mod validation_tests {
     // get a client builder
     let client = reqwest::Client::builder()
       .add_root_certificate(cert)
+      .danger_accept_invalid_certs(true)
       .build()
       .unwrap();
 
@@ -295,6 +296,7 @@ mod validation_tests {
     // get a client builder
     let client = reqwest::Client::builder()
       .add_root_certificate(cert)
+      .danger_accept_invalid_certs(true)
       .build()
       .unwrap();
 

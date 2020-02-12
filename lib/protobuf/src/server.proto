@@ -87,9 +87,10 @@ message Tag {
   string tag = 1;
 }
 
-message BlobDeleted {
+message BlobDeleted {}
+message ManifestDeleted {}
 
-}
+//TODO: can we type digests and references so that we can control if it's a digest or tag?
 
 service Registry {
 
@@ -108,6 +109,8 @@ service Registry {
   rpc GetReadLocationForBlob (BlobRef) returns (BlobReadLocation) {}
 
   rpc DeleteBlob(BlobRef) returns (BlobDeleted) {}
+
+  rpc DeleteManifest(ManifestRef) returns (ManifestDeleted) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path

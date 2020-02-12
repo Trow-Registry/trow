@@ -5,7 +5,6 @@ extern crate rand;
 extern crate reqwest;
 extern crate serde_json;
 
-
 #[cfg(test)]
 mod common;
 
@@ -15,15 +14,15 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
-    use reqwest::StatusCode;
+    use crypto::digest::Digest;
+    use crypto::sha2::Sha256;
     use reqwest;
+    use reqwest::StatusCode;
     use serde_json;
     use std::fs::{self, File};
     use std::io::Read;
     use std::process::Child;
     use std::process::Command;
-    use crypto::digest::Digest;
-    use crypto::sha2::Sha256;
     use std::thread;
     use std::time::Duration;
     use trow::types::{RepoCatalog, RepoName, TagList};
@@ -57,6 +56,7 @@ mod interface_tests {
         // get a client builder
         let client = reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
@@ -75,28 +75,19 @@ mod interface_tests {
 
     impl Drop for TrowInstance {
         fn drop(&mut self) {
-          common::kill_gracefully(&self.pid);
+            common::kill_gracefully(&self.pid);
         }
-      }
+    }
 
     fn get_main(cl: &reqwest::Client) {
         let resp = cl.get(TROW_ADDRESS).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.headers().get(DIST_API_HEADER).unwrap(),
-            "registry/2.0"
-        );
+        assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
 
         //All v2 registries should respond with a 200 to this
-        let resp = cl
-            .get(&(TROW_ADDRESS.to_owned() + "/v2/"))
-            .send()
-            .unwrap();
+        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/v2/")).send().unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.headers().get(DIST_API_HEADER).unwrap(),
-            "registry/2.0"
-        );
+        assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
     }
 
     fn get_non_existent_blob(cl: &reqwest::Client) {
@@ -105,15 +96,6 @@ mod interface_tests {
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    fn unsupported(cl: &reqwest::Client) {
-        //Delete currently unimplemented
-        let resp = cl
-            .delete(&(TROW_ADDRESS.to_owned() + "/v2/name/repo/manifests/ref"))
-            .send()
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
@@ -127,6 +109,15 @@ mod interface_tests {
         assert_eq!(mani.schema_version, 2);
     }
 
+    fn get_non_existent_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
+        //Might need accept headers here
+        let resp = cl
+            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
     fn check_repo_catalog(cl: &reqwest::Client, rc: &RepoCatalog) {
         let mut resp = cl
             .get(&format!("{}/v2/_catalog", TROW_ADDRESS))
@@ -138,11 +129,7 @@ mod interface_tests {
 
     fn check_tag_list(cl: &reqwest::Client, tl: &TagList) {
         let mut resp = cl
-            .get(&format!(
-                "{}/v2/{}/tags/list",
-                TROW_ADDRESS,
-                tl.repo_name()
-            ))
+            .get(&format!("{}/v2/{}/tags/list", TROW_ADDRESS, tl.repo_name()))
             .send()
             .unwrap();
         let tl_resp: TagList = serde_json::from_str(&resp.text().unwrap()).unwrap();
@@ -150,30 +137,34 @@ mod interface_tests {
     }
 
     fn upload_with_put(cl: &reqwest::Client, name: &str) {
-    
         let resp = cl
             .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
-        let uuid = resp.headers().get(common::UPLOAD_HEADER).unwrap().to_str().unwrap();
+        let uuid = resp
+            .headers()
+            .get(common::UPLOAD_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
 
         //used by oci_manifest_test
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
         let digest = format!("sha256:{}", hasher.result_str());
-        
         let loc = &format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
-            TROW_ADDRESS, name, uuid, digest);
+            TROW_ADDRESS, name, uuid, digest
+        );
 
         let resp = cl.put(loc).body(config.clone()).send().unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
-    fn push_get_and_delete_oci_manifest(cl: &reqwest::Client, name: &str) {
-
+    fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+        //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
@@ -184,37 +175,52 @@ mod interface_tests {
                  "config": {{ "digest": "{}", 
                              "mediaType": "application/vnd.oci.image.config.v1+json", 
                              "size": {} }}, 
-                 "layers": [], "schemaVersion": 2 }}"#, config_digest, config.len());
-        
+                 "layers": [], "schemaVersion": 2 }}"#,
+            config_digest,
+            config.len()
+        );
         let bytes = manifest.clone();
-        let resp = cl.put(&format!(
-            "{}/v2/{}/manifests/{}",
-            TROW_ADDRESS, name, "puttest1"
-            )).body(bytes).send().unwrap();
+        let resp = cl
+            .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
+            .body(bytes)
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
         hasher.reset();
         hasher.input(manifest.as_bytes());
-        let digest = format!("sha256:{}", hasher.result_str());
-        
-        let mut resp = cl
-            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, digest))
-            .send()
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let mani: manifest::ManifestV2 = resp.json().unwrap();
-        assert_eq!(mani.schema_version, 2);
 
-        //Delete blob
+        let digest = format!("sha256:{}", hasher.result_str());
+        digest
+
+    }
+
+    fn delete_manifest(cl: &reqwest::Client, name: &str, digest: &str) {
         let resp = cl
-            .delete(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, digest))
+            .delete(&format!(
+                "{}/v2/{}/manifests/{}",
+                TROW_ADDRESS, name, digest
+            ))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    }
 
+    fn delete_config_blob(cl: &reqwest::Client, name: &str) {
 
-        //Delete manifest
+        //Deletes blob uploaded in config test
+        let config = "{}\n".as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.input(&config);
+        let config_digest = format!("sha256:{}", hasher.result_str());
+        
+        let resp = cl
+            .delete(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, config_digest))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+        
     }
 
     #[test]
@@ -235,6 +241,7 @@ mod interface_tests {
         // get a client builder
         let client = reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
@@ -242,8 +249,6 @@ mod interface_tests {
         get_main(&client);
         println!("Running get_blob()");
         get_non_existent_blob(&client);
-        println!("Running unsupported()");
-        unsupported(&client);
         println!("Running upload_layer(repo/image/test:tag)");
         common::upload_layer(&client, "repo/image/test", "tag");
         println!("Running upload_layer(image/test:latest)");
@@ -254,8 +259,20 @@ mod interface_tests {
         common::upload_layer(&client, "onename", "latest");
         println!("Running upload_with_put()");
         upload_with_put(&client, "puttest");
+
         println!("Running push_oci_manifest()");
-        push_get_and_delete_oci_manifest(&client, "puttest");
+        let digest = push_oci_manifest(&client, "puttest", "puttest1");
+        println!("Running get_manifest(puttest:puttest1)");
+        get_manifest(&client, "puttest", "puttest1");
+        println!("Running delete_manifest(puttest:digest)");
+        delete_manifest(&client, "puttest", &digest);
+        println!("Running get_non_existent_manifest(puttest:puttest1)");
+        get_non_existent_manifest(&client, "puttest", "puttest1");
+        println!("Running get_non_existent_manifest(puttest:digest)");
+        get_non_existent_manifest(&client, "puttest", &digest);
+
+        println!("Running delete_config_blob");
+        delete_config_blob(&client, "puttest");
 
         println!("Running get_manifest(onename:tag)");
         get_manifest(&client, "onename", "tag");
@@ -268,7 +285,6 @@ mod interface_tests {
         rc.insert(RepoName("repo/image/test".to_string()));
         rc.insert(RepoName("image/test".to_string()));
         rc.insert(RepoName("onename".to_string()));
-        rc.insert(RepoName("puttest".to_string()));
 
         check_repo_catalog(&client, &rc);
 
