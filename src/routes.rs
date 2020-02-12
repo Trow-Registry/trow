@@ -666,21 +666,21 @@ fn get_catalog(
     }
 }
 
-#[get("/v2/<repo_name>/tags/list?<limit>")]
+#[get("/v2/<repo_name>/tags/list?<n>")]
 fn list_tags(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
-    limit: Option<i32>
+    n: Option<i32>
 ) -> Result<TagList, Error> {
     let rn = RepoName(repo_name);
-    let mut lim = std::i32::MAX;
-    match limit {
-        Some(i) => lim = i,
+    let mut limit = std::i32::MAX;
+    match n {
+        Some(i) => limit = i,
         None => {}
     }
 
-    let tags = ci.list_tags(&rn, lim);
+    let tags = ci.list_tags(&rn, limit);
     match Runtime::new().unwrap().block_on(tags) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
