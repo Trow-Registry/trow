@@ -136,6 +136,15 @@ mod interface_tests {
         assert_eq!(tl, &tl_resp);
     }
 
+    fn check_tag_list_n_last(cl: &reqwest::Client, n: u32, last: &str, tl: &TagList) {
+        let mut resp = cl
+            .get(&format!("{}/v2/{}/tags/list?last={}&n={}", TROW_ADDRESS, tl.repo_name(), last, n))
+            .send()
+            .unwrap();
+        let tl_resp: TagList = serde_json::from_str(&resp.text().unwrap()).unwrap();
+        assert_eq!(tl, &tl_resp);
+    }
+
     fn upload_with_put(cl: &reqwest::Client, name: &str) {
         let resp = cl
             .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
@@ -286,15 +295,41 @@ mod interface_tests {
         rc.insert(RepoName("image/test".to_string()));
         rc.insert(RepoName("onename".to_string()));
 
+
+        println!("Running check_repo_catalog");
         check_repo_catalog(&client, &rc);
 
         let mut tl = TagList::new(RepoName("repo/image/test".to_string()));
         tl.insert("tag".to_string());
+        println!("Running check_tag_list 1");
         check_tag_list(&client, &tl);
 
+        
+        common::upload_layer(&client, "onename", "three");
+        common::upload_layer(&client, "onename", "four");
+
+        // list, in order should be [four, latest, tag, three]
         let mut tl2 = TagList::new(RepoName("onename".to_string()));
-        tl2.insert("tag".to_string());
+        tl2.insert("four".to_string());
         tl2.insert("latest".to_string());
+        tl2.insert("tag".to_string());
+        tl2.insert("three".to_string());
+
+        println!("Running check_tag_list 2");
         check_tag_list(&client, &tl2);
+        
+        let mut tl3 = TagList::new(RepoName("onename".to_string()));
+        tl3.insert("four".to_string());
+        tl3.insert("latest".to_string());
+        
+
+        println!("Running check_tag_list_n_last 3");
+        check_tag_list_n_last(&client, 2, "", &tl3);
+        let mut tl4 = TagList::new(RepoName("onename".to_string()));
+        tl4.insert("tag".to_string());
+        tl4.insert("three".to_string());
+        
+        println!("Running check_tag_list_n_last 4");
+        check_tag_list_n_last(&client, 2, "latest", &tl4)
     }
 }

@@ -654,51 +654,65 @@ fn delete_blob_3level(
     delete_blob(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
 }
 
-#[get("/v2/_catalog")]
+#[get("/v2/_catalog?<n>&<last>")]
 fn get_catalog(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    n: Option<u32>,
+    last: Option<String>
 ) -> Result<RepoCatalog, Error> {
-    let cat = ci.get_catalog();
+
+    let limit = n.unwrap_or(std::u32::MAX);
+    let last_repo = last.unwrap_or(String::new());
+    let cat = ci.get_catalog(limit, &last_repo);
     match Runtime::new().unwrap().block_on(cat) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }
 }
 
-#[get("/v2/<repo_name>/tags/list")]
+#[get("/v2/<repo_name>/tags/list?<last>&<n>")]
 fn list_tags(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
+    last: Option<String>,
+    n: Option<u32>,
 ) -> Result<TagList, Error> {
     let rn = RepoName(repo_name);
-    let tags = ci.list_tags(&rn);
+    let limit = n.unwrap_or(std::u32::MAX);
+    let last_tag = last.unwrap_or(String::new());
+
+    let tags = ci.list_tags(&rn, limit, &last_tag);
     match Runtime::new().unwrap().block_on(tags) {
         Ok(c) => Ok(c),
         Err(_) => Err(Error::InternalError),
     }
 }
 
-#[get("/v2/<user>/<repo>/tags/list")]
+#[get("/v2/<user>/<repo>/tags/list?<last>&<n>")]
 fn list_tags_2level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
+    last: Option<String>,
+    n: Option<u32>,
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}", user, repo))
+    list_tags(auth_user, ci, format!("{}/{}", user, repo), last, n)
 }
 
-#[get("/v2/<org>/<user>/<repo>/tags/list")]
+#[get("/v2/<org>/<user>/<repo>/tags/list?<last>&<n>")]
 fn list_tags_3level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
+    last: Option<String>,
+    n: Option<u32>,
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo))
+    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), last, n)
 }
 
 //Might want to move this stuff somewhere else

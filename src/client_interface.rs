@@ -3,8 +3,8 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogEntry, CatalogRequest,
-    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogRequest,
+    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest, ListTagsRequest
 };
 use tonic::Request;
 use crate::types::{self, *};
@@ -254,9 +254,9 @@ impl ClientInterface {
         Ok(ManifestDeleted {})
     }
 
-    pub async fn get_catalog(&self) -> Result<RepoCatalog, Error> {
+    pub async fn get_catalog(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog, Error> {
 
-        let cr = CatalogRequest {};
+        let cr = CatalogRequest { limit, last_repo: last_repo.to_string() };
         let mut stream = self.connect_registry().await?
             .get_catalog(
                 Request::new(cr))
@@ -271,14 +271,16 @@ impl ClientInterface {
         Ok(catalog)
     }
 
-    pub async fn list_tags(&self, repo_name: &RepoName) -> Result<TagList, Error> {
-        let ce = CatalogEntry {
-            repo_name: repo_name.0.clone()
+    pub async fn list_tags(&self, repo_name: &RepoName, limit: u32, last_tag: &str) -> Result<TagList, Error> {
+        let ltr = ListTagsRequest {
+            repo_name: repo_name.0.clone(),
+            limit,
+            last_tag: last_tag.to_string()
         };
 
         let mut stream = self.connect_registry().await?
         .list_tags(
-            Request::new(ce))
+            Request::new(ltr))
             .await?
             .into_inner();
         let mut list = TagList::new(repo_name.clone());
