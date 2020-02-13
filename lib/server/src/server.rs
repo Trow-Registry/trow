@@ -663,6 +663,7 @@ impl Registry for TrowServer {
             catalog
                 .into_iter()
                 .skip_while(|t| t != &cr.last_repo)
+                .skip(1)
                 .take(limit)
                 .collect()
         };
@@ -684,7 +685,9 @@ impl Registry for TrowServer {
     ) -> Result<Response<Self::ListTagsStream>, Status> {
         let (mut tx, rx) = mpsc::channel(4);
         let mut path = PathBuf::from(&self.manifests_path);
+
         let ltr = request.into_inner();
+
         let limit = ltr.limit as usize;
         path.push(&ltr.repo_name);
 
@@ -701,7 +704,11 @@ impl Registry for TrowServer {
         } else {
             catalog
                 .into_iter()
-                .skip_while(|t| t != &ltr.last_tag)
+                .skip_while(|t| {
+                    error!("{} == {} {}", t, &ltr.last_tag, t==&ltr.last_tag);
+                    t != &ltr.last_tag
+                })
+                .skip(1)
                 .take(limit)
                 .collect()
         };

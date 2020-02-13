@@ -654,16 +654,16 @@ fn delete_blob_3level(
     delete_blob(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
 }
 
-#[get("/v2/_catalog?<n>&<last_repo>")]
+#[get("/v2/_catalog?<n>&<last>")]
 fn get_catalog(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     n: Option<u32>,
-    last_repo: Option<String>
+    last: Option<String>
 ) -> Result<RepoCatalog, Error> {
 
     let limit = n.unwrap_or(std::u32::MAX);
-    let last_repo = last_repo.unwrap_or(String::new());
+    let last_repo = last.unwrap_or(String::new());
     let cat = ci.get_catalog(limit, &last_repo);
     match Runtime::new().unwrap().block_on(cat) {
         Ok(c) => Ok(c),
@@ -671,17 +671,17 @@ fn get_catalog(
     }
 }
 
-#[get("/v2/<repo_name>/tags/list?<n>&<last_tag>")]
+#[get("/v2/<repo_name>/tags/list?<last>&<n>")]
 fn list_tags(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
+    last: Option<String>,
     n: Option<u32>,
-    last_tag: Option<String>
 ) -> Result<TagList, Error> {
     let rn = RepoName(repo_name);
     let limit = n.unwrap_or(std::u32::MAX);
-    let last_tag = last_tag.unwrap_or(String::new());
+    let last_tag = last.unwrap_or(String::new());
 
     let tags = ci.list_tags(&rn, limit, &last_tag);
     match Runtime::new().unwrap().block_on(tags) {
@@ -690,29 +690,29 @@ fn list_tags(
     }
 }
 
-#[get("/v2/<user>/<repo>/tags/list?<n>&<last_tag>")]
+#[get("/v2/<user>/<repo>/tags/list?<last>&<n>")]
 fn list_tags_2level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
+    last: Option<String>,
     n: Option<u32>,
-    last_tag: Option<String>
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}", user, repo), n, last_tag)
+    list_tags(auth_user, ci, format!("{}/{}", user, repo), last, n)
 }
 
-#[get("/v2/<org>/<user>/<repo>/tags/list?<n>&<last_tag>")]
+#[get("/v2/<org>/<user>/<repo>/tags/list?<last>&<n>")]
 fn list_tags_3level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
+    last: Option<String>,
     n: Option<u32>,
-    last_tag: Option<String>
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), n, last_tag)
+    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), last, n)
 }
 
 //Might want to move this stuff somewhere else
