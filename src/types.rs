@@ -191,26 +191,26 @@ pub struct TagList {
     #[serde(rename = "name")]
     repo: RepoName,
     #[serde(rename = "tags")]
-    list: HashSet<String>,
+    list: Vec<String>,
 }
 
 impl TagList {
     pub fn new(repo_name: RepoName) -> TagList {
         TagList {
             repo: repo_name,
-            list: HashSet::new(),
+            list: Vec::new(),
         }
     }
 
     pub fn insert(&mut self, tag: String) {
-        self.list.insert(tag);
+        self.list.push(tag);
     }
 
     pub fn repo_name(&self) -> &RepoName {
         &self.repo
     }
 
-    pub fn list(&self) -> &HashSet<String> {
+    pub fn list(&self) -> &Vec<String> {
         &self.list
     }
 }
