@@ -266,7 +266,7 @@ impl ClientInterface {
 
         while let Some(ce) = stream.message().await? {
             catalog.insert(RepoName(ce.repo_name.to_owned()));
-        }    
+        }
 
         Ok(catalog)
     }
