@@ -10,7 +10,7 @@ use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
 use rocket;
-use rocket::http::uri::Origin;
+use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
@@ -467,10 +467,9 @@ fn post_blob_upload(
         Error::InternalError
     })?;
     
-    if let Some(mut digest) = uri.query()  {
+    if let Some(digest) = uri.query()  {
         if digest.starts_with("digest=") {
-            digest = &digest["digest=".len()..];
-            println!("Doing post with data");
+            let digest = &Uri::percent_decode_lossy(&digest["digest=".len()..].as_bytes());
             let sink_f = ci.get_write_sink_for_upload(&repo_name, &up_info.uuid());
             let sink = rt.block_on(sink_f);
         
