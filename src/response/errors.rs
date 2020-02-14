@@ -41,7 +41,7 @@ pub enum Error {
 struct ErrorMsg {
     code: String,
     message: String,
-    detail: Value,
+    detail: Option<Value>,
 }
 
 //TODO: All errors should return JSON
@@ -49,24 +49,24 @@ struct ErrorMsg {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::Unsupported => format_error_json(f, "UNSUPPORTED", "Unsupported", json!({})),
-            Error::Unauthorized => format_error_json(f, "UNAUTHORIZED", "Authorization required", json!({})),
-            Error::BlobUnknown => format_error_json(f, "BLOB_UNKNOWN", "Blob Unknown", json!({})),
+            Error::Unsupported => format_error_json(f, "UNSUPPORTED", "Unsupported", None),
+            Error::Unauthorized => format_error_json(f, "UNAUTHORIZED", "Authorization required", None),
+            Error::BlobUnknown => format_error_json(f, "BLOB_UNKNOWN", "Blob Unknown", None),
             Error::BlobUploadUnknown => write!(f, "Blob Upload Unknown"),
             //TODO: INTERNAL_ERROR code is not in the distribution spec
-            Error::InternalError => format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", json!({})),
-            Error::DigestInvalid => format_error_json(f, "DIGEST_INVALID", "Provided digest did not match uploaded content", json!({})),
-            Error::ManifestInvalid => format_error_json(f, "MANIFEST_INVALID", "manifest invalid", json!({})),
-            Error::ManifestUnknown(ref tag) => format_error_json(f, "MANIFEST_UNKNOWN", "manifest unknown", json!({ "Tag": tag }))
+            Error::InternalError => format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", None),
+            Error::DigestInvalid => format_error_json(f, "DIGEST_INVALID", "Provided digest did not match uploaded content", None),
+            Error::ManifestInvalid => format_error_json(f, "MANIFEST_INVALID", "manifest invalid", None),
+            Error::ManifestUnknown(ref tag) => format_error_json(f, "MANIFEST_UNKNOWN", "manifest unknown", Some(json!({ "Tag": tag })))
         }
     }
 }
 
-fn format_error_json(f: &mut fmt::Formatter, code: &str, message: &str, detail: serde_json::Value) -> fmt::Result {
+fn format_error_json(f: &mut fmt::Formatter, code: &str, message: &str, detail: Option<Value>) -> fmt::Result {
     let emsg = ErrorMsg {
         code: code.to_string(),
         message: message.to_string(),
-        detail: detail,
+        detail: detail
     };
 
     write!(
