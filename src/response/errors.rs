@@ -49,28 +49,31 @@ struct ErrorMsg {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::Unsupported => write!(f, "Unsupported Operation"),
-            Error::Unauthorized => write!(f, "Authorization required"),
-            Error::BlobUnknown => write!(f, "Blob Unknown"),
+            Error::Unsupported => format_error_json(f, "UNSUPPORTED".to_string(), "Unsupported".to_string(), json!({})),
+            Error::Unauthorized => format_error_json(f, "UNAUTHORIZED".to_string(), "Authorization required".to_string(), json!({})),
+            Error::BlobUnknown => format_error_json(f, "BLOB_UNKNOWN".to_string(), "Blob Unknown".to_string(), json!({})),
             Error::BlobUploadUnknown => write!(f, "Blob Upload Unknown"),
-            Error::InternalError => write!(f, "Internal Error"),
-            Error::DigestInvalid => write!(f, "Provided digest did not match uploaded content"),
-            Error::ManifestInvalid => write!(f, "Manifest Invalid"),
-
-            Error::ManifestUnknown(ref tag) => {
-                let emsg = ErrorMsg {
-                    code: "MANIFEST_UNKNOWN".to_string(),
-                    message: "manifest unknown".to_string(),
-                    detail: json!({ "Tag": tag }),
-                };
-                write!(
-                    f,
-                    "{{\"errors\":[{}]}}",
-                    serde_json::to_string(&emsg).unwrap_or("MANIFEST_UNKNOWN".to_string())
-                )
-            }
+            //TODO: INTERNAL_ERROR code is not in the distribution spec
+            Error::InternalError => format_error_json(f, "INTERNAL_ERROR".to_string(), "Internal Server Error".to_string(), json!({})),
+            Error::DigestInvalid => format_error_json(f, "DIGEST_INVALID".to_string(), "Provided digest did not match uploaded content".to_string(), json!({})),
+            Error::ManifestInvalid => format_error_json(f, "MANIFEST_INVALID".to_string(), "manifest invalid".to_string(), json!({})),
+            Error::ManifestUnknown(ref tag) => format_error_json(f, "MANIFEST_UNKNOWN".to_string(), "manifest unknown".to_string(), json!({ "Tag": tag }))
         }
     }
+}
+
+fn format_error_json(f: &mut fmt::Formatter, code: String, message: String, detail: serde_json::Value) -> fmt::Result {
+    let emsg = ErrorMsg {
+        code: code,
+        message: message,
+        detail: detail,
+    };
+
+    write!(
+        f,
+        "{{\"errors\":[{}]}}",
+        serde_json::to_string(&emsg).unwrap()
+    )
 }
 
 impl error::Error for Error {
