@@ -10,6 +10,7 @@ use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
 use rocket;
+use rocket::http::uri::Origin;
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
@@ -437,12 +438,14 @@ fn patch_blob_3level(
 
  No data is being transferred yet.
 */
-#[post("/v2/<repo_name>/blobs/uploads")]
+#[post("/v2/<repo_name>/blobs/uploads", data = "<data>")]
 fn post_blob_upload(
+    uri: &Origin, // This is a mess, but needed to check for ?digest
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
-) -> Result<UploadInfo, Error> {
+    data: rocket::data::Data,
+) -> Result<Upload, Error> {
     /*
     Ask the backend for a UUID.
 
@@ -454,41 +457,84 @@ fn post_blob_upload(
     optimisation, but is arguably less flexible.
     */
 
-    let rn = RepoName(repo_name);
-    let r = ci.request_upload(&rn);
-    Runtime::new().unwrap().block_on(r).map_err(|e| {
+    let repo_name = RepoName(repo_name);
+    let mut rt = Runtime::new().unwrap();
+
+    let req = ci.request_upload(&repo_name);
+
+    let up_info = rt.block_on(req).map_err(|e| {
         warn!("Error getting ref from backend: {}", e);
         Error::InternalError
-    })
+    })?;
+    
+    if let Some(mut digest) = uri.query()  {
+        if digest.starts_with("digest=") {
+            digest = &digest["digest=".len()..];
+            println!("Doing post with data");
+            let sink_f = ci.get_write_sink_for_upload(&repo_name, &up_info.uuid());
+            let sink = rt.block_on(sink_f);
+        
+            return match sink {
+                Ok(mut sink) => {
+                    // We have a monolithic upload
+                    let len = data.stream_to(&mut sink);
+                    match len {
+                        Ok(len) => {
+                            let digest = Digest(digest.to_string());
+                            let r = ci.complete_upload(&repo_name, &up_info.uuid(), &digest, len);
+                            rt.block_on(r).map_err(|_| Error::InternalError).map(|au| Upload::Accepted(au))
+                        }
+                        Err(_) => Err(Error::InternalError),
+                    }
+                }
+                Err(_) => {
+                    // TODO: this conflates rpc errors with uuid not existing
+                    // TODO: pipe breaks if we don't accept the whole file
+                    // Possibly makes us prone to DOS attack?
+                    warn!("Uuid {} does not exist, piping to /dev/null", &up_info.uuid());
+                    let _ = data.stream_to_file("/dev/null");
+                    Err(Error::BlobUnknown)
+                }
+            }
+        }
+    }
+    
+    Ok(Upload::Info(up_info))
 }
 
 /*
  * Parse 2 level <repo>/<name> style path and pass it to put_blob_upload_onename
  */
-#[post("/v2/<repo>/<name>/blobs/uploads")]
+#[post("/v2/<repo>/<name>/blobs/uploads", data="<data>")]
 fn post_blob_upload_2level(
+    //digest: PossibleDigest, //create requestguard to handle /?digest
+    uri: &Origin,
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
-) -> Result<UploadInfo, Error> {
+    data: rocket::data::Data,
+) -> Result<Upload, Error> {
     info!("upload {}/{}", repo, name);
-    post_blob_upload(auth_user, ci, format!("{}/{}", repo, name))
+    post_blob_upload(uri, auth_user, ci, format!("{}/{}", repo, name), data)
 }
 
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
  */
-#[post("/v2/<org>/<repo>/<name>/blobs/uploads")]
+#[post("/v2/<org>/<repo>/<name>/blobs/uploads", data="<data>")]
 fn post_blob_upload_3level(
+    //digest: PossibleDigest, //create requestguard to handle /?digest
+    uri: &Origin,
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
-) -> Result<UploadInfo, Error> {
+    data: rocket::data::Data,
+) -> Result<Upload, Error> {
     info!("upload 3 way {}/{}/{}", org, repo, name);
-    post_blob_upload(auth_user, ci, format!("{}/{}/{}", org, repo, name))
+    post_blob_upload(uri, auth_user, ci, format!("{}/{}/{}", org, repo, name), data)
 }
 
 /*
