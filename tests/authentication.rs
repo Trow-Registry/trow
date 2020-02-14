@@ -69,7 +69,6 @@ mod authentication_tests {
             thread::sleep(Duration::from_millis(100));
             response = client.get(TROW_ADDRESS).send();
             timeout -= 1;
-            println!("Response: {:?}", &response);
         }
         if timeout == 0 {
             child.kill().unwrap();

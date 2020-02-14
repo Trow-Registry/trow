@@ -705,7 +705,6 @@ impl Registry for TrowServer {
             catalog
                 .into_iter()
                 .skip_while(|t| {
-                    error!("{} == {} {}", t, &ltr.last_tag, t==&ltr.last_tag);
                     t != &ltr.last_tag
                 })
                 .skip(1)

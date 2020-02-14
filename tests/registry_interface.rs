@@ -172,6 +172,20 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
+    fn upload_with_post(cl: &reqwest::Client, name: &str) {
+
+        let config = "{ }\n".as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.input(&config);
+        let digest = format!("sha256:{}", hasher.result_str());
+        let resp = cl
+            .post(&format!("{}/v2/{}/blobs/uploads/?digest={}", TROW_ADDRESS, name, digest))
+            .body(config.clone())
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+    }
+
     fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
@@ -268,6 +282,8 @@ mod interface_tests {
         common::upload_layer(&client, "onename", "latest");
         println!("Running upload_with_put()");
         upload_with_put(&client, "puttest");
+        println!("Running upload_with_post");
+        upload_with_post(&client, "posttest");
 
         println!("Running push_oci_manifest()");
         let digest = push_oci_manifest(&client, "puttest", "puttest1");
