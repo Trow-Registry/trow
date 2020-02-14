@@ -1,5 +1,4 @@
 use std::str;
-
 use crate::client_interface::ClientInterface;
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
@@ -11,9 +10,10 @@ use crate::types::*;
 use crate::TrowConfig;
 use rocket;
 use rocket::http::uri::{Origin, Uri};
-use rocket::request::Request;
+use rocket::request::{self, Request, FromRequest};
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
+use std::io::Seek;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
@@ -339,6 +339,55 @@ fn put_blob_3level(
     )
 }
 
+struct ContentInfo {
+    length: u64,
+    range: Option<(u64, u64)>,
+    content_type: rocket::http::ContentType
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
+
+    type Error = ();
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, ()> {
+
+        let content_type = match request.content_type() {
+            Some(ct) => ct.clone(),
+            None => {
+                warn!("Recieved request without Content-Type header, assuming binary");
+                rocket::http::ContentType::Binary
+            }
+        };
+        let length = match request.headers().get_one("Content-Length") {
+            Some(l) => match l.parse::<u64>() {
+                Ok(i) => i,
+                Err(_) => return rocket::Outcome::Failure((rocket::http::Status::BadRequest, ())) 
+            },
+            None => return rocket::Outcome::Failure((rocket::http::Status::BadRequest, ())) 
+        };
+        let range = match request.headers().get_one("Content-Range") {
+            Some(r) => {
+                let parts: Vec<&str> = r.split('-').collect();
+                if parts.len() == 2 {
+                    if let Ok(l) = parts[0].parse::<u64>() {
+                        if let Ok(r) = parts[1].parse::<u64>() {
+                            Some((l, r))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+                
+            },
+            None => None
+        };
+
+        rocket::Outcome::Success( ContentInfo { length, range, content_type })
+    }
+}
 /*
 
 ---
@@ -360,6 +409,7 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 #[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
     _auth_user: TrowToken,
+    info: ContentInfo,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
@@ -373,13 +423,43 @@ fn patch_blob(
 
     match sink {
         Ok(mut sink) => {
-            //TODO: for the moment we'll just append, but this should seek to correct position
-            //according to spec shouldn't allow out-of-order uploads, so verify start address (from header)
-            //is same as current address
+
+
+            //Uploads must be in order, so length should match start
+            let start_len = sink.stream_len().unwrap_or(0);
+            if let Some((l, _)) = info.range {
+                if start_len != l {
+                    warn!("start_len {} l {}", start_len, l);
+                    return Err(Error::BlobUploadInvalid);
+                }
+            }
+            // Chunked uploads must be in order according to spec.
+            // Therefore just ensure start matches existing len.
+            // Throw error if not, just append to file (no need to seek!)
+            
             let len = chunk.stream_to(&mut sink);
+            //Check len matches how much we were told
             match len {
-                //TODO: For chunked upload this should be start pos to end pos
-                Ok(len) => Ok(create_upload_info(uuid, repo, (0, len as u32))),
+                Ok(len) => {
+
+                    // We want total length of file so far, regardless of
+                    // chunk length
+                    let total = sink.stream_len().unwrap_or(len);
+
+                    // Right of range should equal total
+                    if let Some((_, r)) = info.range {
+                        if total != (r + 1) {
+                            warn!("total {} r + 1 {}", total, r + 1);
+                            return Err(Error::BlobUploadInvalid);
+                        }
+                    } else {
+                        if len != info.length {
+                            warn!("info.length {} len {}", info.length, len);
+                            return Err(Error::BlobUploadInvalid);
+                        }
+                    }
+                    Ok(create_upload_info(uuid, repo, (0, total as u32)))
+                },
                 Err(_) => Err(Error::InternalError),
             }
         }
@@ -400,13 +480,14 @@ fn patch_blob(
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_2level(
     auth_user: TrowToken,
+    info: ContentInfo,
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    patch_blob(auth_user, ci, format!("{}/{}", repo, name), uuid, chunk)
+    patch_blob(auth_user, info, ci, format!("{}/{}", repo, name), uuid, chunk)
 }
 
 /*
@@ -415,6 +496,7 @@ fn patch_blob_2level(
 #[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_3level(
     auth_user: TrowToken,
+    info: ContentInfo,
     handler: rocket::State<ClientInterface>,
     org: String,
     repo: String,
@@ -424,6 +506,7 @@ fn patch_blob_3level(
 ) -> Result<UploadInfo, Error> {
     patch_blob(
         auth_user,
+        info,
         handler,
         format!("{}/{}/{}", org, repo, name),
         uuid,

@@ -13,7 +13,7 @@ use std::io::Cursor;
 pub enum Error {
     /*
     BLOB_UNKNOWN,
-    BLOB_UPLOAD_INVALID,
+
     BLOB_UPLOAD_UNKNOWN,
     DIGEST_INVALID,
     MANIFEST_BLOB_UNKNOWN,
@@ -26,6 +26,7 @@ pub enum Error {
     UNAUTHORIZED,
     DENIED,
     */
+    BlobUploadInvalid,
     ManifestUnknown(String),
     ManifestInvalid,
     Unauthorized,
@@ -44,8 +45,6 @@ struct ErrorMsg {
     detail: Option<Value>,
 }
 
-//TODO: All errors should return JSON
-//This needs refactored.
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -53,6 +52,7 @@ impl fmt::Display for Error {
             Error::Unauthorized => format_error_json(f, "UNAUTHORIZED", "Authorization required", None),
             Error::BlobUnknown => format_error_json(f, "BLOB_UNKNOWN", "Blob Unknown", None),
             Error::BlobUploadUnknown => write!(f, "Blob Upload Unknown"),
+            Error::BlobUploadInvalid => format_error_json(f, "BLOB_UPLOAD_INVALID", "Invalid request to blob upload", None),
             //TODO: INTERNAL_ERROR code is not in the distribution spec
             Error::InternalError => format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", None),
             Error::DigestInvalid => format_error_json(f, "DIGEST_INVALID", "Provided digest did not match uploaded content", None),
@@ -83,6 +83,7 @@ impl error::Error for Error {
             Error::Unauthorized => "The operation requires authorization.",
             Error::BlobUnknown => "Reference made to an unknown blob (e.g. invalid UUID)",
             Error::BlobUploadUnknown => "If a blob upload has been cancelled or was never started, this error code may be returned.",
+            Error::BlobUploadInvalid => "The blob upload encountered an error and can no longer proceed.",
             Error::InternalError => "An internal error occured, please consult the logs for more details.",
             Error::DigestInvalid => "When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key \"digest\", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest.",
             Error::ManifestInvalid => "During upload, manifests undergo several checks ensuring validity. If those checks fail, this error may be returned, unless a more specific error is included. The detail will contain information the failed validation.",
@@ -101,6 +102,7 @@ impl<'r> Responder<'r> for Error {
             Error::Unauthorized => Status::Unauthorized,
             Error::BlobUploadUnknown | Error::ManifestUnknown(_) => Status::NotFound,
             Error::InternalError => Status::InternalServerError,
+            Error::BlobUploadInvalid => Status::RangeNotSatisfiable,
             Error::DigestInvalid | Error::ManifestInvalid | Error::BlobUnknown => {
                 Status::BadRequest
             }
