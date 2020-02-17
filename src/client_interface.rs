@@ -119,7 +119,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
-    ) -> Result<impl Write, Error> {
+    ) -> Result<impl Write + Seek, Error> {
         let br = UploadRef {
             uuid: uuid.0.clone(),
             repo_name: repo_name.0.clone()

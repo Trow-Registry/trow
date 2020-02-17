@@ -13,10 +13,11 @@ pub mod html;
 pub mod manifest_reader;
 pub mod repo_catalog;
 pub mod tag_list;
-mod test_helper;
+pub mod content_info;
 pub mod trow_token;
 pub mod upload_info;
 pub mod verified_manifest;
+mod test_helper;
 
 /// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
 /// Falls back to hostname if it doesn't exist.

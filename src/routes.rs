@@ -1,5 +1,3 @@
-use std::str;
-
 use crate::client_interface::ClientInterface;
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
@@ -14,6 +12,8 @@ use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
+use std::io::Seek;
+use std::str;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
@@ -54,7 +54,6 @@ pub fn routes() -> Vec<rocket::Route> {
         delete_image_manifest,
         delete_image_manifest_2level,
         delete_image_manifest_3level
-
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
@@ -339,6 +338,8 @@ fn put_blob_3level(
     )
 }
 
+
+
 /*
 
 ---
@@ -360,6 +361,7 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 #[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
     _auth_user: TrowToken,
+    info: Option<ContentInfo>,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
@@ -371,15 +373,43 @@ fn patch_blob(
     let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
     let sink = Runtime::new().unwrap().block_on(sink_f);
 
+    let have_chunked_upload = info.is_some();
+    let info = info.unwrap_or(ContentInfo {
+        length: 0,
+        range: (0, 0),
+    });
+
     match sink {
         Ok(mut sink) => {
-            //TODO: for the moment we'll just append, but this should seek to correct position
-            //according to spec shouldn't allow out-of-order uploads, so verify start address (from header)
-            //is same as current address
+            // Uploads must be in order, so length should match start
+            // Note chunked uploads must be in order according to spec.
+            let start_index = sink.stream_len().unwrap_or(0);
+            if start_index != info.range.0 {
+                warn!("start_len {} l {}", start_index, info.range.0);
+                return Err(Error::BlobUploadInvalid);
+            }
+
             let len = chunk.stream_to(&mut sink);
+            //Check len matches how much we were told
             match len {
-                //TODO: For chunked upload this should be start pos to end pos
-                Ok(len) => Ok(create_upload_info(uuid, repo, (0, len as u32))),
+                Ok(len) => {
+                    // Get total bytes written so far, including any previous chunks
+                    let total = sink.stream_len().unwrap_or(len);
+
+                    // Right of range should equal total if doing a chunked upload
+                    if have_chunked_upload {
+                        if (info.range.1 + 1) != total {
+                            warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
+                            return Err(Error::BlobUploadInvalid);
+                        }
+                        //Check length if chunked upload
+                        if info.length != len {
+                            warn!("info.length {} len {}", info.length, len);
+                            return Err(Error::BlobUploadInvalid);
+                        }
+                    }
+                    Ok(create_upload_info(uuid, repo, (0, total as u32)))
+                }
                 Err(_) => Err(Error::InternalError),
             }
         }
@@ -400,13 +430,21 @@ fn patch_blob(
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_2level(
     auth_user: TrowToken,
+    info: Option<ContentInfo>,
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    patch_blob(auth_user, ci, format!("{}/{}", repo, name), uuid, chunk)
+    patch_blob(
+        auth_user,
+        info,
+        ci,
+        format!("{}/{}", repo, name),
+        uuid,
+        chunk,
+    )
 }
 
 /*
@@ -415,6 +453,7 @@ fn patch_blob_2level(
 #[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_3level(
     auth_user: TrowToken,
+    info: Option<ContentInfo>,
     handler: rocket::State<ClientInterface>,
     org: String,
     repo: String,
@@ -424,6 +463,7 @@ fn patch_blob_3level(
 ) -> Result<UploadInfo, Error> {
     patch_blob(
         auth_user,
+        info,
         handler,
         format!("{}/{}/{}", org, repo, name),
         uuid,
@@ -466,13 +506,12 @@ fn post_blob_upload(
         warn!("Error getting ref from backend: {}", e);
         Error::InternalError
     })?;
-    
-    if let Some(digest) = uri.query()  {
+
+    if let Some(digest) = uri.query() {
         if digest.starts_with("digest=") {
             let digest = &Uri::percent_decode_lossy(&digest["digest=".len()..].as_bytes());
             let sink_f = ci.get_write_sink_for_upload(&repo_name, &up_info.uuid());
             let sink = rt.block_on(sink_f);
-        
             return match sink {
                 Ok(mut sink) => {
                     // We have a monolithic upload
@@ -481,7 +520,9 @@ fn post_blob_upload(
                         Ok(len) => {
                             let digest = Digest(digest.to_string());
                             let r = ci.complete_upload(&repo_name, &up_info.uuid(), &digest, len);
-                            rt.block_on(r).map_err(|_| Error::InternalError).map(|au| Upload::Accepted(au))
+                            rt.block_on(r)
+                                .map_err(|_| Error::InternalError)
+                                .map(|au| Upload::Accepted(au))
                         }
                         Err(_) => Err(Error::InternalError),
                     }
@@ -490,21 +531,23 @@ fn post_blob_upload(
                     // TODO: this conflates rpc errors with uuid not existing
                     // TODO: pipe breaks if we don't accept the whole file
                     // Possibly makes us prone to DOS attack?
-                    warn!("Uuid {} does not exist, piping to /dev/null", &up_info.uuid());
+                    warn!(
+                        "Uuid {} does not exist, piping to /dev/null",
+                        &up_info.uuid()
+                    );
                     let _ = data.stream_to_file("/dev/null");
                     Err(Error::BlobUnknown)
                 }
-            }
+            };
         }
     }
-    
     Ok(Upload::Info(up_info))
 }
 
 /*
  * Parse 2 level <repo>/<name> style path and pass it to put_blob_upload_onename
  */
-#[post("/v2/<repo>/<name>/blobs/uploads", data="<data>")]
+#[post("/v2/<repo>/<name>/blobs/uploads", data = "<data>")]
 fn post_blob_upload_2level(
     //digest: PossibleDigest, //create requestguard to handle /?digest
     uri: &Origin,
@@ -521,7 +564,7 @@ fn post_blob_upload_2level(
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
  */
-#[post("/v2/<org>/<repo>/<name>/blobs/uploads", data="<data>")]
+#[post("/v2/<org>/<repo>/<name>/blobs/uploads", data = "<data>")]
 fn post_blob_upload_3level(
     //digest: PossibleDigest, //create requestguard to handle /?digest
     uri: &Origin,
@@ -533,7 +576,13 @@ fn post_blob_upload_3level(
     data: rocket::data::Data,
 ) -> Result<Upload, Error> {
     info!("upload 3 way {}/{}/{}", org, repo, name);
-    post_blob_upload(uri, auth_user, ci, format!("{}/{}/{}", org, repo, name), data)
+    post_blob_upload(
+        uri,
+        auth_user,
+        ci,
+        format!("{}/{}/{}", org, repo, name),
+        data,
+    )
 }
 
 /*
@@ -630,7 +679,10 @@ fn delete_image_manifest(
     let repo = RepoName(repo);
     let digest = Digest(digest);
     let r = ci.delete_manifest(&repo, &digest);
-    Runtime::new().unwrap().block_on(r).map_err(|_| Error::BlobUnknown)
+    Runtime::new()
+        .unwrap()
+        .block_on(r)
+        .map_err(|_| Error::BlobUnknown)
 }
 
 #[delete("/v2/<user>/<repo>/manifests/<digest>")]
@@ -673,7 +725,10 @@ fn delete_blob(
     let repo = RepoName(repo);
     let digest = Digest(digest);
     let r = ci.delete_blob(&repo, &digest);
-    Runtime::new().unwrap().block_on(r).map_err(|_| Error::BlobUnknown)
+    Runtime::new()
+        .unwrap()
+        .block_on(r)
+        .map_err(|_| Error::BlobUnknown)
 }
 
 #[delete("/v2/<user>/<repo>/blobs/<digest>")]
@@ -704,9 +759,8 @@ fn get_catalog(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     n: Option<u32>,
-    last: Option<String>
+    last: Option<String>,
 ) -> Result<RepoCatalog, Error> {
-
     let limit = n.unwrap_or(std::u32::MAX);
     let last_repo = last.unwrap_or(String::new());
     let cat = ci.get_catalog(limit, &last_repo);
