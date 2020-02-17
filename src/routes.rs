@@ -279,10 +279,7 @@ fn put_blob(
         }
         Err(_) => {
             // TODO: this conflates rpc errors with uuid not existing
-            // TODO: pipe breaks if we don't accept the whole file
-            // Possibly makes us prone to DOS attack?
-            warn!("Uuid {} does not exist, piping to /dev/null", uuid);
-            let _ = chunk.stream_to_file("/dev/null");
+            warn!("Uuid {} does not exist, dropping connection", uuid);
             Err(Error::BlobUnknown)
         }
     }
@@ -415,10 +412,7 @@ fn patch_blob(
         }
         Err(_) => {
             // TODO: this conflates rpc errors with uuid not existing
-            // TODO: pipe breaks if we don't accept the whole file
-            // Possibly makes us prone to DOS attack?
-            warn!("Uuid {} does not exist, piping to /dev/null", uuid);
-            let _ = chunk.stream_to_file("/dev/null");
+            warn!("Uuid {} does not exist, dropping connection", uuid);
             Err(Error::BlobUnknown)
         }
     }
@@ -529,13 +523,10 @@ fn post_blob_upload(
                 }
                 Err(_) => {
                     // TODO: this conflates rpc errors with uuid not existing
-                    // TODO: pipe breaks if we don't accept the whole file
-                    // Possibly makes us prone to DOS attack?
                     warn!(
-                        "Uuid {} does not exist, piping to /dev/null",
+                        "Uuid {} does not exist, dropping connection",
                         &up_info.uuid()
                     );
-                    let _ = data.stream_to_file("/dev/null");
                     Err(Error::BlobUnknown)
                 }
             };
