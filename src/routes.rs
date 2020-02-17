@@ -341,14 +341,18 @@ fn put_blob_3level(
 
 struct ContentInfo {
     length: u64,
-    range: Option<(u64, u64)>,
+    range: (u64, u64),
     content_type: rocket::http::ContentType
 }
 
+/**
+ * This should always be used as an Option in routes to avoid failure returns.
+ */
 impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
 
-    type Error = ();
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, ()> {
+    type Error = Error;
+ 
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Error> {
 
         let content_type = match request.content_type() {
             Some(ct) => ct.clone(),
@@ -360,9 +364,15 @@ impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
         let length = match request.headers().get_one("Content-Length") {
             Some(l) => match l.parse::<u64>() {
                 Ok(i) => i,
-                Err(_) => return rocket::Outcome::Failure((rocket::http::Status::BadRequest, ())) 
+                Err(_) => {
+                    warn!("Recieved request with invalid Content-Length header, abandoning");
+                    return rocket::Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid)) 
+                }
             },
-            None => return rocket::Outcome::Failure((rocket::http::Status::BadRequest, ())) 
+            None => {
+                warn!("Recieved request without required Content-Length header, abandoning");
+                return rocket::Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid)) 
+            }
         };
         let range = match request.headers().get_one("Content-Range") {
             Some(r) => {
@@ -370,21 +380,26 @@ impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
                 if parts.len() == 2 {
                     if let Ok(l) = parts[0].parse::<u64>() {
                         if let Ok(r) = parts[1].parse::<u64>() {
-                            Some((l, r))
+                            (l, r)
                         } else {
-                            None
+                            warn!("Recieved request without invalid Content-Range header, abandoning");
+                            return rocket::Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid)) 
                         }
                     } else {
-                        None
+                        warn!("Recieved request without invalid Content-Range header, abandoning");
+                        return rocket::Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid)) 
                     }
                 } else {
-                    None
+                    warn!("Recieved request without invalid Content-Range header, abandoning");
+                    return rocket::Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid)) 
                 }
                 
             },
-            None => None
+            None => {                           
+                warn!("Recieved request without invalid Content-Range header, abandoning");
+                return rocket::Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid)) 
+            }
         };
-
         rocket::Outcome::Success( ContentInfo { length, range, content_type })
     }
 }
@@ -409,7 +424,7 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 #[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
     _auth_user: TrowToken,
-    info: ContentInfo,
+    info: Option<ContentInfo>,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
@@ -421,18 +436,20 @@ fn patch_blob(
     let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
     let sink = Runtime::new().unwrap().block_on(sink_f);
 
+    let have_chunked_upload = info.is_some();
+    let info = info.unwrap_or(ContentInfo{length:0, range: (0,0), content_type: rocket::http::ContentType::Binary});
+
     match sink {
         Ok(mut sink) => {
 
-
             //Uploads must be in order, so length should match start
-            let start_len = sink.stream_len().unwrap_or(0);
-            if let Some((l, _)) = info.range {
-                if start_len != l {
-                    warn!("start_len {} l {}", start_len, l);
+            let start_index = sink.stream_len().unwrap_or(0);
+                if start_index != info.range.0 {
+                    warn!("start_len {} l {}", start_index, info.range.0);
                     return Err(Error::BlobUploadInvalid);
                 }
-            }
+
+            
             // Chunked uploads must be in order according to spec.
             // Therefore just ensure start matches existing len.
             // Throw error if not, just append to file (no need to seek!)
@@ -446,15 +463,14 @@ fn patch_blob(
                     // chunk length
                     let total = sink.stream_len().unwrap_or(len);
 
-                    // Right of range should equal total
-                    if let Some((_, r)) = info.range {
-                        if total != (r + 1) {
-                            warn!("total {} r + 1 {}", total, r + 1);
+                    // Right of range should equal total if doing a chunked upload
+                    if have_chunked_upload && (info.range.1 + 1) != total {
+                            warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
                             return Err(Error::BlobUploadInvalid);
-                        }
                     } else {
-                        if len != info.length {
-                            warn!("info.length {} len {}", info.length, len);
+                        //Check length if chunked upload
+                        if have_chunked_upload && info.length != len {
+                                warn!("info.length {} len {}", info.length, len);
                             return Err(Error::BlobUploadInvalid);
                         }
                     }
@@ -480,7 +496,7 @@ fn patch_blob(
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_2level(
     auth_user: TrowToken,
-    info: ContentInfo,
+    info: Option<ContentInfo>,
     ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
@@ -496,7 +512,7 @@ fn patch_blob_2level(
 #[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_3level(
     auth_user: TrowToken,
-    info: ContentInfo,
+    info: Option<ContentInfo>,
     handler: rocket::State<ClientInterface>,
     org: String,
     repo: String,
