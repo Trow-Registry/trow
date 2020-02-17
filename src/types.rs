@@ -20,6 +20,11 @@ pub struct UploadInfo {
     range: (u32, u32),
 }
 
+pub struct ContentInfo {
+    pub length: u64,
+    pub range: (u64, u64),
+}
+
 pub struct BlobDeleted {}
 
 pub struct ManifestDeleted {}
