@@ -43,7 +43,7 @@ image into the host Docker image cache.
 
 If you get an error about an unsupported platform, you may need to install binfmt handlers. This can
 be done for common platforms with `docker run --rm
-docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28` (also see [qus](https://github.com/dbhi/qus)
+docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64` (also see [qus](https://github.com/dbhi/qus)
 for an alternative approach and explanation of what is happening here). Restart docker or create a
-    new builder instance after doing this.
+new builder instance after doing this.
 
