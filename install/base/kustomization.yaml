@@ -21,7 +21,7 @@ resources:
   
 images:
 - name: containersol/trow
-  newTag: "0.1"
+  newTag: "0.2"
 
 # The following patches update the domain name in the trow argument and validator without editing the yaml. 
 # Create your own version of the patch file with your domain name and reference in your overlay as

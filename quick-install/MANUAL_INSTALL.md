@@ -1,7 +1,12 @@
 # Manual Installation
 
-The following walks through the steps in the automatic installer. If you need to
-customise Trow for any reason, this is a good place to start.
+In general it is recommend to use the [standard install with Kustomize](../install/INSTALL.md)). In
+some cases - particularly where domain names and certs are not available - you may want to use the
+quick-install method documented here, which uses the Kubernetes CA to generate certs, copies them to
+the correct locations and sets up routing via /etc/hosts.
+
+This document manually walks through the steps taken by the installer and may be of use if you need
+to customise installation. Most people should be able to just run the `install.sh` script directly.
 
  - Apply the `trow.yaml` file from the quick-install directory:
 
@@ -84,4 +89,4 @@ validatingwebhookconfiguration.admissionregistration.k8s.io "trow-validator" con
 ```
 
 You can test everything worked correctly by following the instructions in [the
-main install guide](../INSTALL.md).
+quick install guide](../QUICK-INSTALL.md).

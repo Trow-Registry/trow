@@ -9,7 +9,7 @@ obtained automatically via [cert-manager](https://github.com/jetstack/cert-manag
 [ManagedCertificate](https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs) if
 running on GKE), but does require a (sub)domain whose DNS can be pointed at the cluster.
 
-The standard install instructions are based on Kustomize (see [Scot Lowe's
+The standard install instructions are based on Kustomize (see [Scott Lowe's
 blog](https://blog.scottlowe.org/2019/09/13/an-introduction-to-kustomize/) for a good introduction).
 You will need to create a new overlay for your cluster, containing your domain name and any special
 configuration (e.g. ingress). The overlay will refer to other configuration files. By keeping all
@@ -87,5 +87,5 @@ this.
 
 ## Troubleshooting
 
-See the User Guide.
+See the [User Guide](../docs/USER_GUIDE.md).
 
