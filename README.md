@@ -27,6 +27,7 @@ images from touching your cluster.
 
 Features include:
 
+ - [x] conforms to the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec) for registries
  - [x] allowing operations such as approve/deny lists for images and external registries
    _(implemented)_
  - [ ] full auditing and authentication of image access _(in progress)_
