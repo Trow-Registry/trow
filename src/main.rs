@@ -5,6 +5,7 @@ use clap::{Arg, ArgMatches};
 use trow::{NetAddr, TrowBuilder};
 use std::fs::File;
 use std::io::prelude::*;
+use std::env;
 
 const PROGRAM_NAME: &str = "Trow";
 const PROGRAM_DESC: &str = "\nThe Cluster Registry";
@@ -179,7 +180,8 @@ fn main() {
     let matches = parse_args();
 
     if matches.is_present("version") {
-        println!("Trow version {} Commit {:#?}", env!("CARGO_PKG_VERSION"), option_env!("VCS_REF"));
+        let vcs_ref = env::var("VCS_REF").unwrap_or("".to_string());
+        println!("Trow version {} {}", env!("CARGO_PKG_VERSION"), vcs_ref);
         std::process::exit(0);
     }
 
