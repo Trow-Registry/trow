@@ -10,7 +10,6 @@ if [[ $@ != *"--no-tls"* && ! -f ./certs/domain.key && ! -f ./certs/domain.crt ]
   ./make-certs.sh
   cd /
 fi
-echo "Running /trow $@"
 
 exec env RUST_LOG="warn" /trow "$@"
 

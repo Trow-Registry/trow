@@ -23,7 +23,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
                 }
             },
             None => {
-                warn!("Recieved request without required Content-Length header");
+                // This probably just means we don't have ContentInfo
+                // Should be caught by an option in the RequestGuard
                 return Outcome::Failure((
                     Status::BadRequest,
                     Error::BlobUploadInvalid,

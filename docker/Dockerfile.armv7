@@ -45,6 +45,8 @@ ARG VERSION
 ARG REPO
 ARG TAG
 ENV CREATED=$DATE
+ENV VCS_REF=$VCS_REF
+ENV VERSION=$VERSION
 
 LABEL org.opencontainers.image.created=$DATE \
   org.opencontainers.image.authors="Container Solutions Labs" \
