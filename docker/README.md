@@ -1,4 +1,4 @@
-#Building Trow
+# Building Trow
 
 The easiest way to build Trow is via Dockerfile. Either run `build.sh` from this directory or run
 something similar to following:
@@ -42,7 +42,7 @@ Note that `--pull` avoids an issue whereby Docker can use the wrong base image a
 image into the host Docker image cache.
 
 If you get an error about an unsupported platform, you may need to install binfmt handlers. This can
-be done for common platforms with `docker run --rm
+be done for common platforms with `docker run --privileged --rm
 docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64` (also see [qus](https://github.com/dbhi/qus)
 for an alternative approach and explanation of what is happening here). Restart docker or create a
 new builder instance after doing this.
