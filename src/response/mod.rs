@@ -1,5 +1,6 @@
 use hostname;
 use rocket::request::Request;
+use rocket::http::HeaderMap;
 use crate::TrowConfig;
 
 pub mod accepted_upload;
@@ -23,8 +24,8 @@ mod test_helper;
 /// Falls back to hostname if it doesn't exist.
 ///
 /// Move this.
-fn get_base_url(req: &Request) -> String {
-    let host = get_domain_name(req);
+pub fn get_base_url_from_req(req: &Request) -> String {
+    let host = get_domain_name(req.headers());
 
     let config = req
         .guard::<rocket::State<TrowConfig>>()
@@ -47,8 +48,33 @@ fn get_base_url(req: &Request) -> String {
     }
 }
 
-fn get_domain_name(req: &Request) -> String {
-    match req.headers().get("HOST").next() {
+pub fn get_base_url(headers: &HeaderMap, config: &TrowConfig, with_proto: bool) -> String {
+    let host = get_domain_name(headers);
+
+    // Check if we have an upstream load balancer doing TLS termination
+    let (proto, host) = match headers.get("X-Forwarded-Proto").next() {
+        None => {
+            match config.tls {
+                None => ("http://", host),
+                Some(_) => ("https://", host),
+            }        
+        }
+        Some(proto) => {
+            if proto == "http" {
+                warn!("Security issue! Upstream proxy is using HTTP");
+            }
+            (proto, host)
+        }
+    };
+    if with_proto {
+        format!("{}{}", proto, host)
+    } else {
+        host
+    }
+}
+
+fn get_domain_name(headers: &HeaderMap) -> String {
+    match headers.get("HOST").next() {
         None => {
             hostname::get_hostname().expect("Server has no name; cannot give clients my address")
         }

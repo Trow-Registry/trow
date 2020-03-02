@@ -9,7 +9,8 @@ use crate::types::*;
 use crate::TrowConfig;
 use rocket;
 use rocket::http::uri::{Origin, Uri};
-use rocket::request::Request;
+use rocket::http::HeaderMap;
+use rocket::request::{self, Request, Outcome, FromRequest};
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
 use std::io::Seek;
@@ -53,7 +54,10 @@ pub fn routes() -> Vec<rocket::Route> {
         delete_blob_3level,
         delete_image_manifest,
         delete_image_manifest_2level,
-        delete_image_manifest_3level
+        delete_image_manifest_3level,
+        get_trivy_report,
+        get_trivy_report_2level,
+        get_trivy_report_3level,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
@@ -160,7 +164,7 @@ fn get_manifest_2level(
 }
 
 /*
- * Process 3 level manifest path - not sure this one is needed
+ * Process 3 level manifest path
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(
@@ -860,4 +864,79 @@ fn validate_image(
             Json(resp_data)
         }
     }
+}
+
+struct EasyHeaders<'a> {
+    headers: HeaderMap<'a>,
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for EasyHeaders<'a> {
+    type Error = ();
+
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<EasyHeaders<'a>, ()> {
+        
+            Outcome::Success(EasyHeaders{headers: request.headers().clone()})       
+    }
+}
+
+#[get("/<onename>/trivy/<reference>")]
+fn get_trivy_report(
+    _auth_user: TrowToken,
+    tc: State<TrowConfig>,
+    ci: rocket::State<ClientInterface>,
+    headers: EasyHeaders,
+    onename: String,
+    reference: String,
+) -> Option<String> {
+
+    // Verify image exists
+    warn!("here");
+    let rn = RepoName(onename.clone());
+    let f = ci.get_reader_for_manifest(&rn, &reference);
+    let mut rt = Runtime::new().unwrap();
+    match rt.block_on(f) {
+        Ok(_) => { // This will change to call an external service
+            std::process::Command::new("trivy")
+                .arg("-q")
+                .arg("-f")
+                .arg("json")
+                .arg(format!("{}/{}:{}", crate::response::get_base_url(&headers.headers, &tc, false), &onename, &reference))
+                .output().ok().map(|c| 
+                    String::from_utf8_lossy(&c.stdout).to_string())
+            
+        },
+        Err(_e) => {
+            warn!("here2");
+            None
+        }
+    }
+    // Just call trivy; work out how to split into separate service later
+    // Need to figure out how to authenticate
+}
+
+#[get("/<user>/<repo>/trivy/<reference>")]
+fn get_trivy_report_2level(
+    auth_user: TrowToken,
+    tc: State<TrowConfig>,
+    ci: rocket::State<ClientInterface>,
+    headers: EasyHeaders,
+    user: String,
+    repo: String,
+    reference: String,
+) -> Option<String> {
+    get_trivy_report(auth_user, tc, ci, headers, format!("{}/{}", user, repo), reference)
+}
+
+#[get("/<org>/<user>/<repo>/trivy/<reference>")]
+fn get_trivy_report_3level(
+    auth_user: TrowToken,
+    tc: State<TrowConfig>,
+    ci: rocket::State<ClientInterface>,
+    headers: EasyHeaders,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+) -> Option<String> {
+    get_trivy_report(auth_user, tc, ci, headers, format!("{}/{}/{}", org, user, repo), reference)
 }

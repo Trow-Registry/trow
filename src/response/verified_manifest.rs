@@ -1,4 +1,4 @@
-use crate::response::get_base_url;
+use crate::response::get_base_url_from_req;
 use rocket::http::Header;
 use rocket::http::Status;
 use rocket::request::Request;
@@ -10,7 +10,7 @@ impl<'r> Responder<'r> for VerifiedManifest {
         //The front end is responsible for assembling URLs, backend should deal in arguments
         let location = format!(
             "{}/v2/{}/manifests/{}",
-            get_base_url(req),
+            get_base_url_from_req(req),
             self.repo_name(),
             self.tag()
         );

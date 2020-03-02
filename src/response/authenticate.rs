@@ -1,4 +1,4 @@
-use crate::response::get_base_url;
+use crate::response::get_base_url_from_req;
 use rocket::http::ContentType;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
@@ -12,7 +12,7 @@ pub struct Authenticate {}
 
 impl<'r> Responder<'r> for Authenticate {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
-        let realm = get_base_url(req);
+        let realm = get_base_url_from_req(req);
         let authenticate_header = Header::new(
             "www-authenticate",
             format!(

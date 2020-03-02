@@ -1,4 +1,4 @@
-use crate::response::get_base_url;
+use crate::response::get_base_url_from_req;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
@@ -8,7 +8,7 @@ impl<'r> Responder<'r> for UploadInfo {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
         let location_url = format!(
             "{}/v2/{}/blobs/uploads/{}",
-            get_base_url(req),
+            get_base_url_from_req(req),
             self.repo_name(),
             self.uuid()
         );

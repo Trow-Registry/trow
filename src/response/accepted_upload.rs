@@ -1,14 +1,14 @@
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-use crate::response::get_base_url;
+use crate::response::get_base_url_from_req;
 use crate::types::AcceptedUpload;
 
 
 impl<'r> Responder<'r> for AcceptedUpload {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
 
-        let location = format!("{}/v2/{}/blobs/{}", get_base_url(req), self.repo_name(), self.digest());
+        let location = format!("{}/v2/{}/blobs/{}", get_base_url_from_req(req), self.repo_name(), self.digest());
         debug!("accepted upload response");
         let location_header = Header::new("Location", location);
         let digest_header = Header::new("Docker-Content-Digest", self.digest().0.clone());
