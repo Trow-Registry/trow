@@ -3,8 +3,8 @@ kind: Kustomization
 
 namespace: trow
 
-# This will bring up the main trow pod as StatefulService, a persistent volume for data, and a
-# service that routes to it. 
+# This will start Trow in a StatefulSet along with a persistent volume for data and a service that
+# routes to it. 
 #
 # A working install will require an ingress forwarding a (sub)domain you control to this service.
 # This install assumes the ingress terminates TLS; internally Trow is running over http only.
