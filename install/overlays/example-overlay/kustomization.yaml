@@ -29,8 +29,8 @@ patchesJson6902:
       version: v1beta1
   - path: patch-trow-arg.yaml
     target:
-      kind: Deployment
-      name: trow-deploy
+      kind: StatefulSet
+      name: trow-set
       group: apps
       version: v1
 
