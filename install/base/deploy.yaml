@@ -1,11 +1,12 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: trow-deploy
+  name: trow-set
 spec:
   selector:
     matchLabels:
       app: trow
+  serviceName: trow
   template:
     metadata:
       labels:
@@ -32,16 +33,21 @@ spec:
           mountPath: /etc/trow
           readOnly: true
       volumes:
-        - name: data-vol
-          persistentVolumeClaim:
-              claimName: trow-data-claim
         - name: trow-pass
           secret:
-              secretName: trow-pass
-              items:
-                  - key: pass
-                    path: pass
+            secretName: trow-pass
+            items:
+              - key: pass
+                path: pass
       securityContext:             
         runAsUser: 999
         runAsGroup: 999
         fsGroup: 999
+  volumeClaimTemplates:
+    - metadata:
+        name: data-vol
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 20Gi

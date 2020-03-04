@@ -190,6 +190,11 @@ impl TrowBuilder {
     }
 
     pub fn with_user(&mut self, user: String, pass: String) -> &mut TrowBuilder {
+
+        //HACK FOR TRIVY INTEGRATION! DELETE ME!
+        env::set_var("TRIVY_USERNAME", &user);
+        env::set_var("TRIVY_PASSWORD", &pass);
+        
         let hash_config = argon2::Config::default();
         let hash_encoded =
             argon2::hash_encoded(pass.as_bytes(), Uuid::new_v4().as_bytes(), &hash_config)

@@ -15,13 +15,12 @@ namespace: trow
 resources: 
 - deploy.yaml 
 - service.yaml 
-- pvc.yaml
 
 #- validate.yaml # Enable for validation webhook
   
 images:
 - name: containersol/trow
-  newTag: "0.2"
+  newTag: "trivy7"
 
 # The following patches update the domain name in the trow argument and validator without editing the yaml. 
 # Create your own version of the patch file with your domain name and reference in your overlay as
@@ -30,8 +29,8 @@ images:
 patchesJson6902:
 #    - path: patch-trow-arg.yaml
 #      target:
-#        kind: Deployment
-#        name: trow-deploy
+#        kind: StatefulSet
+#        name: trow-set
 #        group: apps
 #        version: v1
 #

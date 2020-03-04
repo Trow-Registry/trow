@@ -879,9 +879,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for EasyHeaders<'a> {
     }
 }
 
+//WARNING - currnetly removed auth from this endpoint to make testing easy
 #[get("/<onename>/trivy/<reference>")]
 fn get_trivy_report(
-    _auth_user: TrowToken,
     tc: State<TrowConfig>,
     ci: rocket::State<ClientInterface>,
     headers: EasyHeaders,
@@ -890,23 +890,23 @@ fn get_trivy_report(
 ) -> Option<String> {
 
     // Verify image exists
-    warn!("here");
     let rn = RepoName(onename.clone());
     let f = ci.get_reader_for_manifest(&rn, &reference);
     let mut rt = Runtime::new().unwrap();
     match rt.block_on(f) {
-        Ok(_) => { // This will change to call an external service
+        Ok(_) => { // This will change to call an external service //
+
+            warn!("Scanning {}/{}:{}", crate::response::get_base_url(&headers.headers, &tc, false), &onename, &reference);
             std::process::Command::new("trivy")
                 .arg("-q")
                 .arg("-f")
                 .arg("json")
                 .arg(format!("{}/{}:{}", crate::response::get_base_url(&headers.headers, &tc, false), &onename, &reference))
                 .output().ok().map(|c| 
-                    String::from_utf8_lossy(&c.stdout).to_string())
+                    format!("{}\n{}\n", String::from_utf8_lossy(&c.stdout), String::from_utf8_lossy(&c.stderr))) 
             
         },
         Err(_e) => {
-            warn!("here2");
             None
         }
     }
@@ -916,7 +916,6 @@ fn get_trivy_report(
 
 #[get("/<user>/<repo>/trivy/<reference>")]
 fn get_trivy_report_2level(
-    auth_user: TrowToken,
     tc: State<TrowConfig>,
     ci: rocket::State<ClientInterface>,
     headers: EasyHeaders,
@@ -924,12 +923,11 @@ fn get_trivy_report_2level(
     repo: String,
     reference: String,
 ) -> Option<String> {
-    get_trivy_report(auth_user, tc, ci, headers, format!("{}/{}", user, repo), reference)
+    get_trivy_report(tc, ci, headers, format!("{}/{}", user, repo), reference)
 }
 
 #[get("/<org>/<user>/<repo>/trivy/<reference>")]
 fn get_trivy_report_3level(
-    auth_user: TrowToken,
     tc: State<TrowConfig>,
     ci: rocket::State<ClientInterface>,
     headers: EasyHeaders,
@@ -938,5 +936,5 @@ fn get_trivy_report_3level(
     repo: String,
     reference: String,
 ) -> Option<String> {
-    get_trivy_report(auth_user, tc, ci, headers, format!("{}/{}/{}", org, user, repo), reference)
+    get_trivy_report(tc, ci, headers, format!("{}/{}/{}", org, user, repo), reference)
 }
