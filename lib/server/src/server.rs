@@ -99,7 +99,7 @@ fn gen_digest(bytes: &[u8]) -> String {
 
 fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
     digest
-        == match fs::read_to_string(manifest.path()) {
+        == match get_digest_from_manifest_path(manifest.path()) {
             Ok(test_digest) => test_digest,
             Err(e) => {
                 warn!("Failure reading repo {:?}", e);
@@ -185,6 +185,11 @@ fn is_digest(maybe_digest: &str) -> bool {
     false
 }
 
+fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
+    let ret = fs::read_to_string(path)?;
+    Ok(ret)
+}
+
 impl TrowServer {
     pub fn new(
         data_path: &str,
@@ -237,6 +242,10 @@ impl TrowServer {
         Ok(res.is_some())
     }
 
+    fn get_digest_from_manifest(&self, repo_name: &str, tag: &str) -> Result<String, Error> {
+        get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(tag))
+    }
+
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
         let digest = if is_digest(reference) {
             if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
@@ -249,7 +258,7 @@ impl TrowServer {
             reference.to_string()
         } else {
             //Content of tag is the digest
-            fs::read_to_string(self.manifests_path.join(repo_name).join(reference))?
+            self.get_digest_from_manifest(repo_name, reference)?
         };
 
         return self.get_catalog_path_for_blob(&digest);
@@ -390,6 +399,16 @@ impl TrowServer {
         }
 
         false
+    }
+
+    fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<(), Error> {
+        // Put digest as file contents of tag
+        let repo_dir = self.manifests_path.join(repo_name);
+        let repo_path = repo_dir.join(tag);
+        fs::create_dir_all(&repo_dir)
+            .and_then(|_| fs::File::create(&repo_path))
+            .and_then(|mut f| f.write_all(digest.as_bytes()))?;
+        Ok(())
     }
 }
 
@@ -593,35 +612,22 @@ impl Registry for TrowServer {
                 // copy manifest to blobs and add tag
 
                 let digest = vm.digest.clone();
-                let mut ret = Ok(Response::new(vm));
 
-                // TODO: can we simplify this with 'and_then'?
-                match self.save_blob(&uploaded_manifest, &digest) {
-                    Ok(_) => {
-                        // Put digest as file contents of tag
-                        let repo_dir = self.manifests_path.join(mr.repo_name);
-                        let repo_path = repo_dir.join(mr.reference);
-                        match fs::create_dir_all(&repo_dir)
-                            .and_then(|_| fs::File::create(&repo_path))
-                            .and_then(|mut f| f.write_all(digest.as_bytes()))
-                        {
-                            Ok(_) => (),
-                            Err(e) => {
-                                error!(
-                                    "Failure cataloguing manifest {:?} as {:?} {:?}",
-                                    &uploaded_manifest, &repo_path, e
-                                );
-                                ret = Err(Status::internal("Internal error copying manifest"));
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failure saving blob {:?}", e);
-                        ret = Err(Status::internal("Internal error copying manifest"));
-                    }
-                }
+                let ret = self
+                    .save_blob(&uploaded_manifest, &digest)
+                    .and(self.save_tag(&digest, &mr.repo_name, &mr.reference))
+                    .map(|_| Response::new(vm))
+                    .map_err(|e| {
+                        error!(
+                            "Failure cataloguing manifest {}/{} {:?}",
+                            &mr.repo_name, &mr.reference, e
+                        );
+                        Status::internal("Internal error copying manifest")
+                    });
+
                 fs::remove_file(&uploaded_manifest)
                     .unwrap_or_else(|e| error!("Failure deleting uploaded manifest {:?}", e));
+                    
                 ret
             }
             Err(e) => {
@@ -637,7 +643,6 @@ impl Registry for TrowServer {
         &self,
         request: Request<CatalogRequest>,
     ) -> Result<Response<Self::GetCatalogStream>, Status> {
-
         let cr = request.into_inner();
         let limit = cr.limit as usize;
 
@@ -656,7 +661,6 @@ impl Registry for TrowServer {
             })
             .map(|p| p.to_string_lossy().to_string())
             .collect();
-        
         let partial_catalog: Vec<String> = if cr.last_repo.is_empty() {
             catalog.into_iter().take(limit).collect()
         } else {
@@ -704,9 +708,7 @@ impl Registry for TrowServer {
         } else {
             catalog
                 .into_iter()
-                .skip_while(|t| {
-                    t != &ltr.last_tag
-                })
+                .skip_while(|t| t != &ltr.last_tag)
                 .skip(1)
                 .take(limit)
                 .collect()
