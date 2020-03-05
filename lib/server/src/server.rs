@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+use chrono::prelude::*;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -186,8 +187,9 @@ fn is_digest(maybe_digest: &str) -> bool {
 }
 
 fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
-    let ret = fs::read_to_string(path)?;
-    Ok(ret)
+    let digest_date = fs::read_to_string(path)?;
+    //Should be digest followed by date, but allow for digest only
+    Ok(digest_date.split(' ').next().unwrap_or(&digest_date).to_string())
 }
 
 impl TrowServer {
@@ -244,6 +246,34 @@ impl TrowServer {
 
     fn get_digest_from_manifest(&self, repo_name: &str, tag: &str) -> Result<String, Error> {
         get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(tag))
+    }
+
+
+    fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<(), Error> {
+
+        // Tag files should contain list of digests with timestamp
+        // First line should always be the current digest
+
+        let repo_dir = self.manifests_path.join(repo_name);
+        let repo_path = repo_dir.join(tag);
+        fs::create_dir_all(&repo_dir)?;
+        
+        let utc: DateTime<Utc> = Utc::now(); 
+        let contents = format!("{} {}\n", digest, utc);
+
+        if let Ok(mut f) = fs::File::open(&repo_path) {
+            
+            let mut buf = Vec::new();
+            buf.extend(contents.as_bytes().iter());
+            f.read_to_end(&mut buf)?;
+            // TODO: Probably best to write to temporary file and then copy over.
+            // Will be closer to atomic 
+            fs::write(&repo_path, buf)?;
+
+        } else {
+            fs::File::create(&repo_path).and_then(|mut f| f.write_all(contents.as_bytes()))?;
+        }
+        Ok(())
     }
 
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
@@ -399,16 +429,6 @@ impl TrowServer {
         }
 
         false
-    }
-
-    fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<(), Error> {
-        // Put digest as file contents of tag
-        let repo_dir = self.manifests_path.join(repo_name);
-        let repo_path = repo_dir.join(tag);
-        fs::create_dir_all(&repo_dir)
-            .and_then(|_| fs::File::create(&repo_path))
-            .and_then(|mut f| f.write_all(digest.as_bytes()))?;
-        Ok(())
     }
 }
 
@@ -627,7 +647,7 @@ impl Registry for TrowServer {
 
                 fs::remove_file(&uploaded_manifest)
                     .unwrap_or_else(|e| error!("Failure deleting uploaded manifest {:?}", e));
-                    
+
                 ret
             }
             Err(e) => {
