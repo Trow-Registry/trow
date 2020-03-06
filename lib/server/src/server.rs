@@ -1,15 +1,16 @@
 use crate::manifest::{FromJson, Manifest};
+use chrono::prelude::*;
 use failure::{self, Error};
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
-use std::io::{BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
-use chrono::prelude::*;
+use prost_types::Timestamp;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -21,8 +22,9 @@ pub mod trow_server {
 use self::trow_server::{
     registry_server::Registry, BlobDeleted, BlobReadLocation, BlobRef, CatalogEntry,
     CatalogRequest, CompleteRequest, CompletedUpload, ListTagsRequest, ManifestDeleted,
-    ManifestReadLocation, ManifestRef, ManifestWriteDetails, Tag, UploadDetails, UploadRef,
-    UploadRequest, VerifiedManifest, VerifyManifestRequest, WriteLocation,
+    ManifestHistoryEntry, ManifestReadLocation, ManifestRef, ManifestWriteDetails, Tag,
+    UploadDetails, UploadRef, UploadRequest, VerifiedManifest, VerifyManifestRequest,
+    WriteLocation,
 };
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -189,7 +191,11 @@ fn is_digest(maybe_digest: &str) -> bool {
 fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
     let digest_date = fs::read_to_string(path)?;
     //Should be digest followed by date, but allow for digest only
-    Ok(digest_date.split(' ').next().unwrap_or(&digest_date).to_string())
+    Ok(digest_date
+        .split(' ')
+        .next()
+        .unwrap_or(&digest_date)
+        .to_string())
 }
 
 impl TrowServer {
@@ -248,28 +254,24 @@ impl TrowServer {
         get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(tag))
     }
 
-
     fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<(), Error> {
-
         // Tag files should contain list of digests with timestamp
         // First line should always be the current digest
 
         let repo_dir = self.manifests_path.join(repo_name);
         let repo_path = repo_dir.join(tag);
         fs::create_dir_all(&repo_dir)?;
-        
-        let utc: DateTime<Utc> = Utc::now(); 
-        let contents = format!("{} {}\n", digest, utc);
+
+        let ts = Utc::now().to_rfc3339();
+        let contents = format!("{} {}\n", digest, ts);
 
         if let Ok(mut f) = fs::File::open(&repo_path) {
-            
             let mut buf = Vec::new();
             buf.extend(contents.as_bytes().iter());
             f.read_to_end(&mut buf)?;
             // TODO: Probably best to write to temporary file and then copy over.
-            // Will be closer to atomic 
+            // Will be closer to atomic
             fs::write(&repo_path, buf)?;
-
         } else {
             fs::File::create(&repo_path).and_then(|mut f| f.write_all(contents.as_bytes()))?;
         }
@@ -741,6 +743,60 @@ impl Registry for TrowServer {
                 }))
                 .await
                 .expect("Error streaming tags");
+            }
+        });
+        Ok(Response::new(rx))
+    }
+
+    type GetManifestHistoryStream = mpsc::Receiver<Result<ManifestHistoryEntry, Status>>;
+
+    async fn get_manifest_history(
+        &self,
+        request: Request<ManifestRef>,
+    ) -> Result<Response<Self::GetManifestHistoryStream>, Status> {
+        let mr = request.into_inner();
+        if is_digest(&mr.reference) {
+            //error, only works for tags
+        }
+
+        let file = File::open(self.manifests_path.join(mr.repo_name).join(mr.reference))?;
+        let reader = BufReader::new(file);
+
+        let (mut tx, rx) = mpsc::channel(4);
+        tokio::spawn(async move {
+            for line in reader.lines() {
+                if line.is_ok() {
+
+                    let line = line.unwrap();
+
+                    let (digest, date) = match line.find(' ') {
+                        Some(ind) => {
+                            let (digest_str, date_str) = line.split_at(ind);
+                            let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
+
+                            let ts = if let Ok(dt) = dt_r {
+                                Some(Timestamp { seconds: dt.timestamp(), nanos: 0})
+                            } else {
+                                warn!("Failed to parse timestamp {}", date_str);
+                                None
+                            };
+                            (digest_str, ts)
+                        },
+                        None => {
+                            warn!("No timestamp found in manifest");
+                            (line.as_ref(), None)
+                        }
+                    };
+
+                    
+                    let entry = ManifestHistoryEntry {
+                        digest: digest.to_string(),
+                        date
+                    };
+                    tx.send(Ok(entry))
+                        .await
+                        .expect("Error streaming manifest history");
+                }
             }
         });
         Ok(Response::new(rx))

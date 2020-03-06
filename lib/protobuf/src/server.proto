@@ -1,4 +1,5 @@
 syntax = "proto3";
+import "google/protobuf/timestamp.proto";
 
 package trow;
 
@@ -96,6 +97,12 @@ message Tag {
 message BlobDeleted {}
 message ManifestDeleted {}
 
+message ManifestHistoryEntry {
+  string digest = 1;
+  google.protobuf.Timestamp date = 2;
+
+}
+
 //TODO: can we type digests and references so that we can control if it's a digest or tag?
 
 service Registry {
@@ -137,6 +144,8 @@ service Registry {
   rpc GetCatalog (CatalogRequest) returns (stream CatalogEntry) {}
 
   rpc ListTags (ListTagsRequest) returns (stream Tag) {}
+
+  rpc GetManifestHistory(ManifestRef) returns (stream ManifestHistoryEntry) {}
 
 }
 

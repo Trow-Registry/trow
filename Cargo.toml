@@ -37,6 +37,7 @@ failure_derive = "^0.1"
 tokio = "0.2"
 tonic = "0.1"
 prost = "0.6"
+prost-types = "0.6"
 bytes = "0.4"
 
 trow-protobuf = { path = "./lib/protobuf" }

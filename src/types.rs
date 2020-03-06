@@ -197,6 +197,30 @@ impl RepoCatalog {
     }
 }
 
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ManifestHistory {
+    #[serde(rename = "manifest")]
+    tag: String,
+    history: Vec<(String, String)>,
+}
+
+impl ManifestHistory {
+    pub fn new(tag: String) -> ManifestHistory {
+        ManifestHistory {
+            tag,
+            history: Vec::new(),
+        }
+    }
+
+    pub fn insert(&mut self, digest_time: (String, String)) {
+        self.history.push(digest_time);
+    }
+
+    pub fn catalog(&self) -> &Vec<(String, String)> {
+        &self.history
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TagList {
     #[serde(rename = "name")]

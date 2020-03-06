@@ -12,6 +12,8 @@ use failure::Error;
 use serde_json::Value;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use crate::chrono::TimeZone;
+use std::convert::TryInto;
 
 pub struct ClientInterface {
     server: String,
@@ -179,6 +181,36 @@ impl ClientInterface {
             Digest(resp.digest.to_owned()),
         );
         Ok(mr)
+    }
+
+    pub async fn get_manifest_history(
+        &self,
+        repo_name: &RepoName,
+        reference: &str,
+    ) -> Result<ManifestHistory, Error> {
+        
+        let mr = ManifestRef {
+            reference: reference.to_owned(),
+            repo_name: repo_name.0.clone()
+        };
+        let mut stream = self.connect_registry().await?
+        .get_manifest_history(
+            Request::new(mr))
+            .await?
+            .into_inner();
+        let mut history = ManifestHistory::new(format!("{}:{}", repo_name, reference));
+
+        while let Some(entry) = stream.message().await? {
+
+            let ts = if let Some(date) = entry.date {
+                chrono::Utc.timestamp(date.seconds, date.nanos.try_into().unwrap()).to_string()
+            } else {
+                "None".to_string()
+            };
+            history.insert((entry.digest, ts));
+        }
+
+        Ok(history)
     }
 
     pub async fn get_reader_for_blob(
