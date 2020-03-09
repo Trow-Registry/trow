@@ -219,6 +219,48 @@ mod interface_tests {
 
     }
 
+    fn push_oci_manifest_with_foreign_blob(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+        //Note config was uploaded as blob in earlier test
+        let config = "{}\n".as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.input(&config);
+        let config_digest = format!("sha256:{}", hasher.result_str());
+
+        let manifest = format!(
+            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
+                 "config": {{ "digest": "{}", 
+                             "mediaType": "application/vnd.oci.image.config.v1+json", 
+                             "size": {} }}, 
+                 "layers": [
+                    {{
+                              "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+                              "size": 1612893008,
+                              "digest": "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2",
+                              "urls": [
+                                 "https://mcr.microsoft.com/v2/windows/servercore/blobs/sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
+                              ]
+                           }}
+                 ], "schemaVersion": 2 }}"#,
+            config_digest,
+            config.len()
+        );
+        let bytes = manifest.clone();
+        let resp = cl
+            .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
+            .body(bytes)
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+
+        // Try pulling by digest
+        hasher.reset();
+        hasher.input(manifest.as_bytes());
+
+        let digest = format!("sha256:{}", hasher.result_str());
+        digest
+
+    }
+
     fn delete_manifest(cl: &reqwest::Client, name: &str, digest: &str) {
         let resp = cl
             .delete(&format!(
@@ -295,6 +337,10 @@ mod interface_tests {
         get_non_existent_manifest(&client, "puttest", "puttest1");
         println!("Running get_non_existent_manifest(puttest:digest)");
         get_non_existent_manifest(&client, "puttest", &digest);
+
+        println!("Running push_oci_manifest_with_foreign_blob()");
+        let digest = push_oci_manifest_with_foreign_blob(&client, "foreigntest", "blobtest1");
+        delete_manifest(&client, "foreigntest", &digest);
 
         println!("Running delete_config_blob");
         delete_config_blob(&client, "puttest");
