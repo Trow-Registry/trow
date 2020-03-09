@@ -265,8 +265,7 @@ impl TrowServer {
         let manifest = Manifest::from_json(&manifest_json)?;
 
         if verify_assets_exist {
-            //TODO: Need to make sure we find things indexed by digest or tag
-            for digest in manifest.get_asset_digests() {
+            for digest in manifest.get_local_asset_digests() {
                 let path = self.get_catalog_path_for_blob(digest)?;
 
                 if !path.exists() {
@@ -278,7 +277,7 @@ impl TrowServer {
             }
 
             // TODO: check signature and names are correct on v1 manifests
-            // AM: Actually can we just nuke v1 support?
+            // AM: Actually we should nuke v1 support
         }
 
         //For performance, could generate only if verification is on, otherwise copy from somewhere
