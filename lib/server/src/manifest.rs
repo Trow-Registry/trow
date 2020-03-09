@@ -124,11 +124,14 @@ impl FromJson for Manifest {
 
 impl Manifest {
     /// Returns a Vector of the digests of all assets referenced in the Manifest
-    pub fn get_asset_digests(&self) -> Vec<&str> {
+    /// With the exception of digests for "foreign blobs"
+    pub fn get_local_asset_digests(&self) -> Vec<&str> {
         match *self {
             Manifest::V1(ref m1) => m1.fs_layers.iter().map(|x| x.blob_sum.as_str()).collect(),
             Manifest::V2(ref m2) => {
-                let mut digests: Vec<&str> = m2.layers.iter().map(|x| x.digest.as_str()).collect();
+                let mut digests: Vec<&str> = m2.layers.iter().filter(
+                    |x| x.media_type != "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
+                ).map(|x| x.digest.as_str()).collect();
                 digests.push(&m2.config.digest);
                 digests
             }
@@ -277,6 +280,15 @@ mod test {
          "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
          "size": 5876721,
          "digest": "sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826"
+      },
+      {
+          "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+          "size": 1612893008,
+          "digest": "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2",
+          "urls": [
+                    "https://mcr.microsoft.com/v2/windows/servercore/blobs/sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
+          ]
+         
       }
    ]
 }"#;
@@ -315,12 +327,12 @@ mod test {
             "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
         );
 
-        assert_eq!(mani.get_asset_digests().len(), 3);
+        assert_eq!(mani.get_local_asset_digests().len(), 3);
         assert!(mani
-            .get_asset_digests()
+            .get_local_asset_digests()
             .contains(&"sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"));
         assert!(mani
-            .get_asset_digests()
+            .get_local_asset_digests()
             .contains(&"sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826"));
     }
     #[test]
@@ -375,12 +387,12 @@ mod test {
             "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
         );
 
-        assert_eq!(mani.get_asset_digests().len(), 2);
+        assert_eq!(mani.get_local_asset_digests().len(), 2);
         assert!(mani
-            .get_asset_digests()
+            .get_local_asset_digests()
             .contains(&"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"));
         assert!(mani
-            .get_asset_digests()
+            .get_local_asset_digests()
             .contains(&"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"));
     }
 
@@ -441,4 +453,5 @@ mod test {
         assert!(Manifest::from_json(&v).is_ok());
 
     }
+
 }
