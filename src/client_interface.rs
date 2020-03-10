@@ -203,11 +203,12 @@ impl ClientInterface {
         while let Some(entry) = stream.message().await? {
 
             let ts = if let Some(date) = entry.date {
-                chrono::Utc.timestamp(date.seconds, date.nanos.try_into().unwrap()).to_string()
+                chrono::Utc.timestamp(date.seconds, date.nanos.try_into().unwrap())
             } else {
-                "None".to_string()
+                warn!("Manifest digest stored without timestamp. Using Epoch.");
+                chrono::Utc.timestamp(0, 0)
             };
-            history.insert((entry.digest, ts));
+            history.insert(entry.digest, ts);
         }
 
         Ok(history)

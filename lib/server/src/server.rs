@@ -262,7 +262,7 @@ impl TrowServer {
         let repo_path = repo_dir.join(tag);
         fs::create_dir_all(&repo_dir)?;
 
-        let ts = Utc::now().to_rfc3339();
+        let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
         let contents = format!("{} {}\n", digest, ts);
 
         if let Ok(mut f) = fs::File::open(&repo_path) {
@@ -774,7 +774,7 @@ impl Registry for TrowServer {
                             let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
 
                             let ts = if let Ok(dt) = dt_r {
-                                Some(Timestamp { seconds: dt.timestamp(), nanos: 0})
+                                Some(Timestamp { seconds: dt.timestamp(), nanos: dt.timestamp_subsec_nanos() as i32})
                             } else {
                                 warn!("Failed to parse timestamp {}", date_str);
                                 None
