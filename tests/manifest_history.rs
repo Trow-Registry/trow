@@ -1,0 +1,197 @@
+#[cfg(test)]
+mod common;
+
+#[cfg(test)]
+mod interface_tests {
+
+    use environment::Environment;
+
+    use crate::common;
+    use reqwest;
+    use reqwest::StatusCode;
+    use std::fs::{self, File};
+    use std::io::Read;
+    use std::process::Child;
+    use std::process::Command;
+    use std::thread;
+    use std::time::Duration;
+    use crypto::sha2::Sha256;
+    use crypto::digest::Digest;
+    use rand::Rng;  
+    
+    const TROW_ADDRESS: &str = "https://trow.test:8443";
+
+    struct TrowInstance {
+        pid: Child,
+    }
+    /// Call out to cargo to start trow.
+    /// Seriously considering moving to docker run.
+
+    fn start_trow() -> TrowInstance {
+        let mut child = Command::new("cargo")
+            .arg("run")
+            .env_clear()
+            .envs(Environment::inherit().compile())
+            .spawn()
+            .expect("failed to start");
+
+        let mut timeout = 20;
+
+        let mut buf = Vec::new();
+        File::open("./certs/domain.crt")
+            .unwrap()
+            .read_to_end(&mut buf)
+            .unwrap();
+        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
+        // get a client builder
+        let client = reqwest::Client::builder()
+            .add_root_certificate(cert)
+            .build()
+            .unwrap();
+
+        let mut response = client.get(TROW_ADDRESS).send();
+        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
+            thread::sleep(Duration::from_millis(100));
+            response = client.get(TROW_ADDRESS).send();
+            timeout -= 1;
+        }
+        if timeout == 0 {
+            child.kill().unwrap();
+            panic!("Failed to start Trow");
+        }
+        TrowInstance { pid: child }
+    }
+
+    impl Drop for TrowInstance {
+        fn drop(&mut self) {
+            common::kill_gracefully(&self.pid);
+        }
+    }
+
+    fn upload_config(cl: &reqwest::Client) {
+
+        let config = "{}\n".as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.input(&config);
+        let digest = format!("sha256:{}", hasher.result_str());
+        let resp = cl
+            .post(&format!("{}/v2/{}/blobs/uploads/?digest={}", TROW_ADDRESS, "config", digest))
+            .body(config.clone())
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+    }
+
+    fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+        //Note config was uploaded as blob earlier 
+        let config = "{}\n".as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.input(&config);
+        let config_digest = format!("sha256:{}", hasher.result_str());
+
+        //To ensure each manifest is different, just use foreign content with random contents
+        let mut rng = rand::thread_rng();
+        let ran_size:u32 = rng.gen();
+        let mut digest = [0u8; 32];
+        rng.fill(&mut digest[..]);
+        let mut ran_digest = "".to_string();
+        for b in &digest {
+            ran_digest.push_str(&format!("{:x}", b).to_string());
+        }
+        println!("digest: {}", ran_digest);
+        let manifest = format!(
+            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
+                 "config": {{ "digest": "{}", 
+                             "mediaType": "application/vnd.oci.image.config.v1+json", 
+                             "size": {} }}, 
+                 "layers": [
+                    {{
+                              "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+                              "size": {},
+                              "digest": "sha256:{}",
+                              "urls": [
+                                 "https://mcr.microsoft.com/v2/windows/servercore/blobs/sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
+                              ]
+                           }}
+                 ], "schemaVersion": 2 }}"#,
+            config_digest,
+            config.len(),
+            ran_size,
+            ran_digest
+        );
+        let bytes = manifest.clone();
+        let resp = cl
+            .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
+            .body(bytes)
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+
+        hasher.reset();
+        hasher.input(manifest.as_bytes());
+
+        let digest = format!("sha256:{}", hasher.result_str());
+        digest
+    }
+
+    fn get_history(cl: &reqwest::Client, repo: &str, tag: &str) -> serde_json::Value {
+
+        let mut resp = cl
+            .get(&format!("{}/{}/manifest_history/{}", TROW_ADDRESS, repo, tag))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // type should be decided by caller, but this is just a test
+        let x: serde_json::Value = resp.json().unwrap();
+
+        return x
+    }
+
+    /**
+     * Tests of Trow's support for manifest history. 
+     * 
+     * Given a tag, we should be able to get the digest it currently points to and all previous digests, with dates.
+     * 
+     */
+    #[test]
+    fn manifest_test() {
+        //Need to start with empty repo
+        fs::remove_dir_all("./data").unwrap_or(());
+
+        let _trow = start_trow();
+
+        let mut buf = Vec::new();
+        File::open("./certs/domain.crt")
+            .unwrap()
+            .read_to_end(&mut buf)
+            .unwrap();
+        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
+        // get a client builder
+        let client = reqwest::Client::builder()
+            .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
+
+        upload_config(&client);
+
+        //Following is intentionally interleaved to add delays
+        let mut history_one = Vec::new();
+        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
+        let mut history_two = Vec::new();
+        history_two.push(push_random_foreign_manifest(&client, "history", "two"));
+        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
+        history_two.push(push_random_foreign_manifest(&client, "history", "two"));
+        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
+
+        let json = get_history(&client, "history", "one");
+        assert_eq!(json["image"], "history:one");
+        assert_eq!(json["history"].as_array().unwrap().len(), 3);
+
+        let json = get_history(&client, "history", "two");
+        assert_eq!(json["image"], "history:two");
+        assert_eq!(json["history"].as_array().unwrap().len(), 2);
+        
+    }
+}
