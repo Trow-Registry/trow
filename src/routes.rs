@@ -53,7 +53,10 @@ pub fn routes() -> Vec<rocket::Route> {
         delete_blob_3level,
         delete_image_manifest,
         delete_image_manifest_2level,
-        delete_image_manifest_3level
+        delete_image_manifest_3level,
+        get_manifest_history,
+        get_manifest_history_2level,
+        get_manifest_history_3level,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
@@ -334,8 +337,6 @@ fn put_blob_3level(
         chunk,
     )
 }
-
-
 
 /*
 
@@ -803,6 +804,68 @@ fn list_tags_3level(
     n: Option<u32>,
 ) -> Result<TagList, Error> {
     list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), last, n)
+}
+
+// TODO add support for pagination
+#[get("/<onename>/manifest_history/<reference>?<last>&<n>")]
+fn get_manifest_history(
+    _auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    onename: String,
+    reference: String,
+    last: Option<String>,
+    n: Option<u32>,
+) -> Result<ManifestHistory, Error> {
+
+    let limit = n.unwrap_or(std::u32::MAX);
+    let last_digest = last.unwrap_or(String::new());
+
+    let rn = RepoName(onename);
+    let f = ci.get_manifest_history(&rn, &reference, limit, &last_digest);
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on(f)
+        .map_err(|_| Error::ManifestUnknown(reference))
+}
+
+#[get("/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
+fn get_manifest_history_2level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    user: String,
+    repo: String,
+    reference: String,
+    last: Option<String>,
+    n: Option<u32>,
+) -> Result<ManifestHistory, Error> {
+    get_manifest_history(
+        auth_user,
+        ci,
+        format!("{}/{}", user, repo),
+        reference,
+        last,
+        n,
+    )
+}
+
+#[get("/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
+fn get_manifest_history_3level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+    last: Option<String>,
+    n: Option<u32>,
+) -> Result<ManifestHistory, Error> {
+    get_manifest_history(
+        auth_user,
+        ci,
+        format!("{}/{}/{}", org, user, repo),
+        reference,
+        last,
+        n,
+    )
 }
 
 //Might want to move this stuff somewhere else

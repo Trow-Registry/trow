@@ -17,6 +17,7 @@ pub mod content_info;
 pub mod trow_token;
 pub mod upload_info;
 pub mod verified_manifest;
+pub mod manifest_history;
 mod test_helper;
 
 /// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.

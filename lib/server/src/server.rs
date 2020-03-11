@@ -1,14 +1,16 @@
 use crate::manifest::{FromJson, Manifest};
+use chrono::prelude::*;
 use failure::{self, Error};
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
-use std::io::{BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+use prost_types::Timestamp;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -17,12 +19,9 @@ pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
 
-use self::trow_server::{
-    registry_server::Registry, BlobDeleted, BlobReadLocation, BlobRef, CatalogEntry,
-    CatalogRequest, CompleteRequest, CompletedUpload, ListTagsRequest, ManifestDeleted,
-    ManifestReadLocation, ManifestRef, ManifestWriteDetails, Tag, UploadDetails, UploadRef,
-    UploadRequest, VerifiedManifest, VerifyManifestRequest, WriteLocation,
-};
+use self::trow_server::*;
+use crate::server::trow_server::registry_server::Registry;
+
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -99,7 +98,7 @@ fn gen_digest(bytes: &[u8]) -> String {
 
 fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
     digest
-        == match fs::read_to_string(manifest.path()) {
+        == match get_digest_from_manifest_path(manifest.path()) {
             Ok(test_digest) => test_digest,
             Err(e) => {
                 warn!("Failure reading repo {:?}", e);
@@ -185,6 +184,16 @@ fn is_digest(maybe_digest: &str) -> bool {
     false
 }
 
+fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
+    let digest_date = fs::read_to_string(path)?;
+    //Should be digest followed by date, but allow for digest only
+    Ok(digest_date
+        .split(' ')
+        .next()
+        .unwrap_or(&digest_date)
+        .to_string())
+}
+
 impl TrowServer {
     pub fn new(
         data_path: &str,
@@ -237,6 +246,34 @@ impl TrowServer {
         Ok(res.is_some())
     }
 
+    fn get_digest_from_manifest(&self, repo_name: &str, tag: &str) -> Result<String, Error> {
+        get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(tag))
+    }
+
+    fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<(), Error> {
+        // Tag files should contain list of digests with timestamp
+        // First line should always be the current digest
+
+        let repo_dir = self.manifests_path.join(repo_name);
+        let repo_path = repo_dir.join(tag);
+        fs::create_dir_all(&repo_dir)?;
+
+        let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
+        let contents = format!("{} {}\n", digest, ts);
+
+        if let Ok(mut f) = fs::File::open(&repo_path) {
+            let mut buf = Vec::new();
+            buf.extend(contents.as_bytes().iter());
+            f.read_to_end(&mut buf)?;
+            // TODO: Probably best to write to temporary file and then copy over.
+            // Will be closer to atomic
+            fs::write(&repo_path, buf)?;
+        } else {
+            fs::File::create(&repo_path).and_then(|mut f| f.write_all(contents.as_bytes()))?;
+        }
+        Ok(())
+    }
+
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
         let digest = if is_digest(reference) {
             if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
@@ -249,7 +286,7 @@ impl TrowServer {
             reference.to_string()
         } else {
             //Content of tag is the digest
-            fs::read_to_string(self.manifests_path.join(repo_name).join(reference))?
+            self.get_digest_from_manifest(repo_name, reference)?
         };
 
         return self.get_catalog_path_for_blob(&digest);
@@ -592,35 +629,22 @@ impl Registry for TrowServer {
                 // copy manifest to blobs and add tag
 
                 let digest = vm.digest.clone();
-                let mut ret = Ok(Response::new(vm));
 
-                // TODO: can we simplify this with 'and_then'?
-                match self.save_blob(&uploaded_manifest, &digest) {
-                    Ok(_) => {
-                        // Put digest as file contents of tag
-                        let repo_dir = self.manifests_path.join(mr.repo_name);
-                        let repo_path = repo_dir.join(mr.reference);
-                        match fs::create_dir_all(&repo_dir)
-                            .and_then(|_| fs::File::create(&repo_path))
-                            .and_then(|mut f| f.write_all(digest.as_bytes()))
-                        {
-                            Ok(_) => (),
-                            Err(e) => {
-                                error!(
-                                    "Failure cataloguing manifest {:?} as {:?} {:?}",
-                                    &uploaded_manifest, &repo_path, e
-                                );
-                                ret = Err(Status::internal("Internal error copying manifest"));
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failure saving blob {:?}", e);
-                        ret = Err(Status::internal("Internal error copying manifest"));
-                    }
-                }
+                let ret = self
+                    .save_blob(&uploaded_manifest, &digest)
+                    .and(self.save_tag(&digest, &mr.repo_name, &mr.reference))
+                    .map(|_| Response::new(vm))
+                    .map_err(|e| {
+                        error!(
+                            "Failure cataloguing manifest {}/{} {:?}",
+                            &mr.repo_name, &mr.reference, e
+                        );
+                        Status::internal("Internal error copying manifest")
+                    });
+
                 fs::remove_file(&uploaded_manifest)
                     .unwrap_or_else(|e| error!("Failure deleting uploaded manifest {:?}", e));
+
                 ret
             }
             Err(e) => {
@@ -636,7 +660,6 @@ impl Registry for TrowServer {
         &self,
         request: Request<CatalogRequest>,
     ) -> Result<Response<Self::GetCatalogStream>, Status> {
-
         let cr = request.into_inner();
         let limit = cr.limit as usize;
 
@@ -655,7 +678,6 @@ impl Registry for TrowServer {
             })
             .map(|p| p.to_string_lossy().to_string())
             .collect();
-        
         let partial_catalog: Vec<String> = if cr.last_repo.is_empty() {
             catalog.into_iter().take(limit).collect()
         } else {
@@ -703,9 +725,7 @@ impl Registry for TrowServer {
         } else {
             catalog
                 .into_iter()
-                .skip_while(|t| {
-                    t != &ltr.last_tag
-                })
+                .skip_while(|t| t != &ltr.last_tag)
                 .skip(1)
                 .take(limit)
                 .collect()
@@ -718,6 +738,78 @@ impl Registry for TrowServer {
                 }))
                 .await
                 .expect("Error streaming tags");
+            }
+        });
+        Ok(Response::new(rx))
+    }
+
+    type GetManifestHistoryStream = mpsc::Receiver<Result<ManifestHistoryEntry, Status>>;
+
+    async fn get_manifest_history(
+        &self,
+        request: Request<ManifestHistoryRequest>,
+    ) -> Result<Response<Self::GetManifestHistoryStream>, Status> {
+
+        let mr = request.into_inner();
+        if is_digest(&mr.tag) {
+            return Err(Status::invalid_argument("Require valid tag (not digest) to search for history"));
+        }
+
+        let file = File::open(self.manifests_path.join(&mr.repo_name).join(&mr.tag))?;
+        let reader = BufReader::new(file);
+
+        let (mut tx, rx) = mpsc::channel(4);
+        tokio::spawn(async move {
+
+            let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
+  
+            let mut sent = 0;
+            for line in reader.lines() {
+                if line.is_ok() {
+
+                    let line = line.unwrap();
+                    let (digest, date) = match line.find(' ') {
+
+                        Some(ind) => {
+                            let (digest_str, date_str) = line.split_at(ind);
+
+                            if searching_for_digest {
+                                if digest_str == mr.last_digest {
+                                    searching_for_digest = false;
+                                }
+                                //Remember we want digest following matched digest
+                                continue;
+                            }
+
+                            let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
+
+                            let ts = if let Ok(dt) = dt_r {
+                                Some(Timestamp { seconds: dt.timestamp(), nanos: dt.timestamp_subsec_nanos() as i32})
+                            } else {
+                                warn!("Failed to parse timestamp {}", date_str);
+                                None
+                            };
+                            (digest_str, ts)
+                        },
+                        None => {
+                            warn!("No timestamp found in manifest");
+                            (line.as_ref(), None)
+                        }
+                    };
+
+                    let entry = ManifestHistoryEntry {
+                        digest: digest.to_string(),
+                        date
+                    };
+                    tx.send(Ok(entry))
+                        .await
+                       .expect("Error streaming manifest history");
+
+                    sent = sent + 1;
+                    if sent >= mr.limit {
+                        break;
+                    }
+                }
             }
         });
         Ok(Response::new(rx))

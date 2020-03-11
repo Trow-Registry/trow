@@ -9,6 +9,7 @@ extern crate crypto;
 extern crate failure_derive;
 #[macro_use]
 extern crate failure;
+extern crate chrono;
 
 use tonic::transport::Server;
 mod server;

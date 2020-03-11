@@ -37,6 +37,7 @@ failure_derive = "^0.1"
 tokio = "0.2"
 tonic = "0.1"
 prost = "0.6"
+prost-types = "0.6"
 bytes = "0.4"
 
 trow-protobuf = { path = "./lib/protobuf" }
@@ -44,7 +45,7 @@ trow-server = { path = "./lib/server" }
 
 base64 = "0.10.0"
 data-encoding = "2.1.2"
-chrono = "^0.4"
+chrono = { version="^0.4", features = ["serde"] }
 rand = "^0.7.2"
 
 [build-dependencies]
