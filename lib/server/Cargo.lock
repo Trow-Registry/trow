@@ -1051,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "trow-protobuf"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-stream 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1069,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "trow-server"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-stream 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1090,7 +1090,7 @@ dependencies = [
  "tokio 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "trow-protobuf 0.2.0",
+ "trow-protobuf 0.3.0",
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

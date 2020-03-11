@@ -4,7 +4,7 @@ pub mod trow_proto {
 
 use trow_proto::{
     registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogRequest,
-    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest, ListTagsRequest
+    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
 };
 use tonic::Request;
 use crate::types::{self, *};
@@ -187,11 +187,15 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
+        limit: u32,
+        last_digest: &str
     ) -> Result<ManifestHistory, Error> {
         
-        let mr = ManifestRef {
-            reference: reference.to_owned(),
-            repo_name: repo_name.0.clone()
+        let mr = ManifestHistoryRequest {
+            tag: reference.to_owned(),
+            repo_name: repo_name.0.clone(),
+            limit,
+            last_digest: last_digest.to_owned()
         };
         let mut stream = self.connect_registry().await?
         .get_manifest_history(

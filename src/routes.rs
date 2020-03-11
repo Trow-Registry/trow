@@ -338,8 +338,6 @@ fn put_blob_3level(
     )
 }
 
-
-
 /*
 
 ---
@@ -809,34 +807,47 @@ fn list_tags_3level(
 }
 
 // TODO add support for pagination
-#[get("/<onename>/manifest_history/<reference>")]
+#[get("/<onename>/manifest_history/<reference>?<last>&<n>")]
 fn get_manifest_history(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     onename: String,
     reference: String,
+    last: Option<String>,
+    n: Option<u32>,
 ) -> Result<ManifestHistory, Error> {
+
+    let limit = n.unwrap_or(std::u32::MAX);
+    let last_digest = last.unwrap_or(String::new());
+
     let rn = RepoName(onename);
-    let f = ci.get_manifest_history(&rn, &reference);
+    let f = ci.get_manifest_history(&rn, &reference, limit, &last_digest);
     let mut rt = Runtime::new().unwrap();
     rt.block_on(f)
         .map_err(|_| Error::ManifestUnknown(reference))
 }
 
-
-#[get("/<user>/<repo>/manifest_history/<reference>")]
+#[get("/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 fn get_manifest_history_2level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
+    last: Option<String>,
+    n: Option<u32>,
 ) -> Result<ManifestHistory, Error> {
-    get_manifest_history(auth_user, ci, format!("{}/{}", user, repo), reference)
+    get_manifest_history(
+        auth_user,
+        ci,
+        format!("{}/{}", user, repo),
+        reference,
+        last,
+        n,
+    )
 }
 
-
-#[get("/<org>/<user>/<repo>/manifest_history/<reference>")]
+#[get("/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 fn get_manifest_history_3level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
@@ -844,8 +855,17 @@ fn get_manifest_history_3level(
     user: String,
     repo: String,
     reference: String,
+    last: Option<String>,
+    n: Option<u32>,
 ) -> Result<ManifestHistory, Error> {
-    get_manifest_history(auth_user, ci, format!("{}/{}/{}", org, user, repo), reference)
+    get_manifest_history(
+        auth_user,
+        ci,
+        format!("{}/{}/{}", org, user, repo),
+        reference,
+        last,
+        n,
+    )
 }
 
 //Might want to move this stuff somewhere else

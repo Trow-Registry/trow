@@ -19,13 +19,9 @@ pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
 
-use self::trow_server::{
-    registry_server::Registry, BlobDeleted, BlobReadLocation, BlobRef, CatalogEntry,
-    CatalogRequest, CompleteRequest, CompletedUpload, ListTagsRequest, ManifestDeleted,
-    ManifestHistoryEntry, ManifestReadLocation, ManifestRef, ManifestWriteDetails, Tag,
-    UploadDetails, UploadRef, UploadRequest, VerifiedManifest, VerifyManifestRequest,
-    WriteLocation,
-};
+use self::trow_server::*;
+use crate::server::trow_server::registry_server::Registry;
+
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -751,26 +747,40 @@ impl Registry for TrowServer {
 
     async fn get_manifest_history(
         &self,
-        request: Request<ManifestRef>,
+        request: Request<ManifestHistoryRequest>,
     ) -> Result<Response<Self::GetManifestHistoryStream>, Status> {
+
         let mr = request.into_inner();
-        if is_digest(&mr.reference) {
-            //error, only works for tags
+        if is_digest(&mr.tag) {
+            return Err(Status::invalid_argument("Require valid tag (not digest) to search for history"));
         }
 
-        let file = File::open(self.manifests_path.join(mr.repo_name).join(mr.reference))?;
+        let file = File::open(self.manifests_path.join(&mr.repo_name).join(&mr.tag))?;
         let reader = BufReader::new(file);
 
         let (mut tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
+
+            let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
+  
+            let mut sent = 0;
             for line in reader.lines() {
                 if line.is_ok() {
 
                     let line = line.unwrap();
-
                     let (digest, date) = match line.find(' ') {
+
                         Some(ind) => {
                             let (digest_str, date_str) = line.split_at(ind);
+
+                            if searching_for_digest {
+                                if digest_str == mr.last_digest {
+                                    searching_for_digest = false;
+                                }
+                                //Remember we want digest following matched digest
+                                continue;
+                            }
+
                             let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
 
                             let ts = if let Ok(dt) = dt_r {
@@ -787,14 +797,18 @@ impl Registry for TrowServer {
                         }
                     };
 
-                    
                     let entry = ManifestHistoryEntry {
                         digest: digest.to_string(),
                         date
                     };
                     tx.send(Ok(entry))
                         .await
-                        .expect("Error streaming manifest history");
+                       .expect("Error streaming manifest history");
+
+                    sent = sent + 1;
+                    if sent >= mr.limit {
+                        break;
+                    }
                 }
             }
         });

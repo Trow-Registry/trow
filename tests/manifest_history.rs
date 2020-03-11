@@ -98,7 +98,7 @@ mod interface_tests {
         for b in &digest {
             ran_digest.push_str(&format!("{:x}", b).to_string());
         }
-        println!("digest: {}", ran_digest);
+    
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
                  "config": {{ "digest": "{}", 
@@ -134,10 +134,21 @@ mod interface_tests {
         digest
     }
 
-    fn get_history(cl: &reqwest::Client, repo: &str, tag: &str) -> serde_json::Value {
+    fn get_history(cl: &reqwest::Client, repo: &str, tag: &str, limit:  Option<u32>, digest: Option<String>) -> serde_json::Value {
+
+        let mut options = "".to_owned();
+        if let Some(val) = digest {
+            options = format!("?last={}", val);
+
+            if let Some(val) = limit {
+                options = format!("{}&{}", options, val);
+            }
+        } else if let Some(val) = limit {
+            options = format!("?n={}", val);
+        }
 
         let mut resp = cl
-            .get(&format!("{}/{}/manifest_history/{}", TROW_ADDRESS, repo, tag))
+            .get(&format!("{}/{}/manifest_history/{}{}", TROW_ADDRESS, repo, tag, options))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -185,12 +196,19 @@ mod interface_tests {
         history_two.push(push_random_foreign_manifest(&client, "history", "two"));
         history_one.push(push_random_foreign_manifest(&client, "history", "one"));
 
-        let json = get_history(&client, "history", "one");
+        let json = get_history(&client, "history", "one", None, None);
         assert_eq!(json["image"], "history:one");
         assert_eq!(json["history"].as_array().unwrap().len(), 3);
 
-        let json = get_history(&client, "history", "two");
+        let json = get_history(&client, "history", "two", None, None);
         assert_eq!(json["image"], "history:two");
+        assert_eq!(json["history"].as_array().unwrap().len(), 2);
+
+        let json = get_history(&client, "history", "one", Some(1), None);
+        assert_eq!(json["history"].as_array().unwrap().len(), 1);
+
+        let start = json["history"][0]["digest"].as_str().unwrap();
+        let json = get_history(&client, "history", "one", Some(20), Some(start.to_string()));
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
         
     }

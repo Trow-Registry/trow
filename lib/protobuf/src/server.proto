@@ -97,6 +97,16 @@ message Tag {
 message BlobDeleted {}
 message ManifestDeleted {}
 
+message ManifestHistoryRequest {
+  string repo_name = 1;
+  //Always tag, not digest
+  string tag = 2;
+
+  //For pagination can pass the last digest we saw and how many results we want
+  uint32 limit = 3;
+  string last_digest = 4;
+}
+
 message ManifestHistoryEntry {
   string digest = 1;
   google.protobuf.Timestamp date = 2;
@@ -145,7 +155,7 @@ service Registry {
 
   rpc ListTags (ListTagsRequest) returns (stream Tag) {}
 
-  rpc GetManifestHistory(ManifestRef) returns (stream ManifestHistoryEntry) {}
+  rpc GetManifestHistory(ManifestHistoryRequest) returns (stream ManifestHistoryEntry) {}
 
 }
 
