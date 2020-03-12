@@ -24,8 +24,38 @@ pub trait FromJson {
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Manifest {
-    //List(ManifestList),
+    List(ManifestList),
     V2(ManifestV2),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestList {
+    pub schema_version: u8,
+    pub media_type: String, //TODO: make enum
+    pub manifests: Vec<ManifestListEntry>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestListEntry {
+    pub media_type: String, //TODO: make enum
+    pub size: u32,
+    pub digest: String,
+    pub platform: Platform,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Platform {
+    pub architecture: String,
+    pub os: String,
+    #[serde(rename = "os.version")]
+    pub os_version: Option<String>,
+    #[serde(rename = "os.features")]
+    pub os_features: Option<String>,
+    pub variant: Option<String>,
+    pub features: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -56,17 +86,20 @@ fn schema_2(raw: &Value) -> Result<Manifest, Error> {
         err: "mediaType is required".to_owned(),
     })?;
 
-    if mt != "application/vnd.docker.distribution.manifest.v2+json"
-        && mt != "application/vnd.oci.image.manifest.v1+json"
-    {
-        return Err(InvalidManifest {
-            err: format!("Unexpected mediaType {}", mt).to_owned(),
-        })?;
+    match mt {
+        "application/vnd.docker.distribution.manifest.v2+json" => {
+            Ok(Manifest::V2(serde_json::from_value(raw.clone())?))
+        }
+        "application/vnd.docker.distribution.manifest.list.v2+json" => {
+            Ok(Manifest::List(serde_json::from_value(raw.clone())?))
+        }
+        "application/vnd.oci.image.manifest.v1+json" => {
+            Ok(Manifest::V2(serde_json::from_value(raw.clone())?))
+        }
+        x => Err(InvalidManifest {
+            err: format!("Media Type {} is not supported.", x),
+        })?,
     }
-
-    let m: ManifestV2 = serde_json::from_value(raw.clone())?;
-
-    Ok(Manifest::V2(m))
 }
 
 impl FromJson for Manifest {
@@ -103,21 +136,27 @@ impl Manifest {
                 digests.push(&m2.config.digest);
                 digests
             }
+            Manifest::List(ref list) => {
+                // Just return the manifest digests.
+                // We could recurse into the manifests, but they should have been checked already.
+
+                list.manifests.iter().map(|x| x.digest.as_str()).collect()
+            }
         }
     }
 
     pub fn get_media_type(&self) -> &str {
         match *self {
             Manifest::V2(ref m2) => &m2.media_type,
+            Manifest::List(ref list) => &list.media_type,
         }
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::FromJson;
-    use super::Manifest;
+    use super::{Manifest};
     use crypto::digest::Digest;
     use crypto::sha2::Sha256;
     use serde_json::{self, Value};
@@ -161,6 +200,7 @@ mod test {
         // There's probably an easier way to do this
         let m_v2 = match mani {
             Manifest::V2(ref m2) => m2,
+            Manifest::List(_) => panic!(),
         };
 
         assert_eq!(
@@ -220,6 +260,7 @@ mod test {
         // There's probably an easier way to do this
         let m_v2 = match mani {
             Manifest::V2(ref m2) => m2,
+            Manifest::List(_) => panic!(),
         };
 
         assert_eq!(
@@ -255,7 +296,6 @@ mod test {
             .contains(&"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"));
     }
 
-
     #[test]
     fn valid_oci() {
         let config = "{}\n".as_bytes();
@@ -276,16 +316,10 @@ mod test {
         assert!(Manifest::from_json(&v).is_ok());
     }
 
-    /*
-        #[test]
-        fn valid_manifest_list() {
-            let config = "{}\n".as_bytes();
-            let mut hasher = Sha256::new();
-            hasher.input(&config);
-            let config_digest = hasher.result_str();
+    #[test]
+    fn valid_manifest_list() {
 
-            let data = format!(
-                r#"{
+        let data = r#"{
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
                     "manifests": [
@@ -295,7 +329,7 @@ mod test {
                         "digest": "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
                         "platform": {
                           "architecture": "ppc64le",
-                          "os": "linux",
+                          "os": "linux"
                         }
                       },
                       {
@@ -312,11 +346,9 @@ mod test {
                       }
                     ]
                   }
-                  "#, config_digest, config.len());
+                  "#;
 
-            let v: Value = serde_json::from_str(&data).unwrap();
-            assert!(Manifest::from_json(&v).is_ok());
-
-        }
-    */
+        let v: Value = serde_json::from_str(&data).unwrap();
+        assert!(Manifest::from_json(&v).is_ok());
+    }
 }
