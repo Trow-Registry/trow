@@ -312,9 +312,6 @@ impl TrowServer {
                     ));
                 }
             }
-
-            // TODO: check signature and names are correct on v1 manifests
-            // AM: Actually we should nuke v1 support
         }
 
         //For performance, could generate only if verification is on, otherwise copy from somewhere
