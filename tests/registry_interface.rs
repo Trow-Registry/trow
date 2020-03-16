@@ -216,6 +216,42 @@ mod interface_tests {
 
         let digest = format!("sha256:{}", hasher.result_str());
         digest
+    }
+
+    fn push_manifest_list(cl: &reqwest::Client, digest: &str, name: &str, tag: &str) -> String {
+     
+        let manifest = format!(
+            r#"{{
+                "schemaVersion": 2,
+                "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+                "manifests": [
+                  {{
+                    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+                    "size": 7143,
+                    "digest": "{}",
+                    "platform": {{
+                      "architecture": "ppc64le",
+                      "os": "linux"
+                    }}
+                  }}
+                ]
+              }}
+              "#,
+            digest);
+        let bytes = manifest.clone();
+        let resp = cl
+            .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
+            .body(bytes)
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+
+        // Try pulling by digest
+        let mut hasher = Sha256::new();
+        hasher.input(manifest.as_bytes());
+
+        let digest = format!("sha256:{}", hasher.result_str());
+        digest
 
     }
 
@@ -329,10 +365,14 @@ mod interface_tests {
 
         println!("Running push_oci_manifest()");
         let digest = push_oci_manifest(&client, "puttest", "puttest1");
+        println!("Running push_manifest_list()");
+        let digest_list = push_manifest_list(&client, &digest, "listtest", "listtest1");
         println!("Running get_manifest(puttest:puttest1)");
         get_manifest(&client, "puttest", "puttest1");
         println!("Running delete_manifest(puttest:digest)");
         delete_manifest(&client, "puttest", &digest);
+        println!("Running delete_manifest(listtest)");
+        delete_manifest(&client, "listtest", &digest_list);
         println!("Running get_non_existent_manifest(puttest:puttest1)");
         get_non_existent_manifest(&client, "puttest", "puttest1");
         println!("Running get_non_existent_manifest(puttest:digest)");
