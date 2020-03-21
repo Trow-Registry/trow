@@ -14,6 +14,7 @@ use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
 use std::io::Seek;
 use std::str;
+use tonic::Code;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
@@ -668,13 +669,28 @@ fn delete_image_manifest(
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
+
+    let repo_str = repo.clone();
     let repo = RepoName(repo);
     let digest = Digest(digest);
     let r = ci.delete_manifest(&repo, &digest);
     Runtime::new()
         .unwrap()
         .block_on(r)
-        .map_err(|_| Error::BlobUnknown)
+        .map_err(|e| {
+
+            let e = e.downcast::<tonic::Status>();
+            if let Ok(ts) = e {
+                match ts.code() {
+                    Code::InvalidArgument => Error::Unsupported,
+                    Code::NotFound => Error::ManifestUnknown(repo_str),
+                    _ => Error::InternalError
+                }
+            } else {
+                Error::InternalError
+            }
+
+        })
 }
 
 #[delete("/v2/<user>/<repo>/manifests/<digest>")]

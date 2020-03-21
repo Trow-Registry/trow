@@ -481,11 +481,11 @@ impl Registry for TrowServer {
         let br = req.into_inner();
         let path = self
             .get_catalog_path_for_blob(&br.digest)
-            .map_err(|e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
+            .map_err(|e| Status::invalid_argument(format!("Error parsing digest {:?}", e)))?;
 
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
-            Err(Status::failed_precondition(format!(
+            Err(Status::not_found(format!(
                 "No blob found matching {:?}",
                 br
             )))
@@ -503,10 +503,10 @@ impl Registry for TrowServer {
         let br = req.into_inner();
         let path = self
             .get_catalog_path_for_blob(&br.digest)
-            .map_err(|e| Status::failed_precondition(format!("Error parsing digest {:?}", e)))?;
+            .map_err(|e| Status::invalid_argument(format!("Error parsing digest {:?}", e)))?;
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
-            Err(Status::failed_precondition(format!(
+            Err(Status::not_found(format!(
                 "No blob found matching {:?}",
                 br
             )))
@@ -526,7 +526,7 @@ impl Registry for TrowServer {
     ) -> Result<Response<ManifestDeleted>, Status> {
         let mr = req.into_inner();
         if !is_digest(&mr.reference) {
-            return Err(Status::failed_precondition(format!(
+            return Err(Status::invalid_argument(format!(
                 "Manifests can only be deleted by digest. Got {}",
                 mr.reference
             )));
@@ -537,7 +537,7 @@ impl Registry for TrowServer {
 
         let ri = RepoIterator::new(&self.manifests_path.join(&mr.repo_name)).map_err(|e| {
             error!("Problem reading manifest catalog {:?}", e);
-            Status::internal("Error reading repositories")
+            Status::failed_precondition("Repository not found")
         })?;
 
         //TODO: error if no manifest matches?

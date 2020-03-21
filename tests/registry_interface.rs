@@ -308,6 +308,29 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
+    fn delete_non_existent_manifest(cl: &reqwest::Client, name: &str) {
+        let resp = cl
+            .delete(&format!(
+                "{}/v2/{}/manifests/{}",
+                TROW_ADDRESS, name, "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
+            ))
+            .send()
+            .unwrap();
+        // If it doesn't exist, that's kinda the same as deleted, right?
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    }
+    
+    fn attempt_delete_by_tag(cl: &reqwest::Client, name: &str, tag: &str) {
+        let resp = cl
+            .delete(&format!(
+                "{}/v2/{}/manifests/{}",
+                TROW_ADDRESS, name, tag
+            ))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
     fn delete_config_blob(cl: &reqwest::Client, name: &str) {
 
         //Deletes blob uploaded in config test
@@ -373,6 +396,10 @@ mod interface_tests {
         delete_manifest(&client, "puttest", &digest);
         println!("Running delete_manifest(listtest)");
         delete_manifest(&client, "listtest", &digest_list);
+        println!("Running delete_non_existent_manifest(onename)");
+        delete_non_existent_manifest(&client, "onename");
+        println!("Running attempt_delete_by_tag(onename:tag)");
+        attempt_delete_by_tag(&client, "onename", "tag");
         println!("Running get_non_existent_manifest(puttest:puttest1)");
         get_non_existent_manifest(&client, "puttest", "puttest1");
         println!("Running get_non_existent_manifest(puttest:digest)");
