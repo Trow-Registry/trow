@@ -36,7 +36,6 @@ mod authentication_tests {
 
     fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
-//            .current_dir("../../")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
