@@ -31,6 +31,15 @@ If you're running on the Google cloud, the following should work:
 
 EOF
 
+runtime=$(kubectl get node -o=jsonpath='{.items[0].status.nodeInfo.containerRuntimeVersion}')
+if [[ $runtime != docker* ]]
+then
+    echo "ERROR: Currently Docker is the only supported container runtime on nodes for the quick install."
+    echo "Your cluster appears to be using $runtime."
+    echo "Please refer to the standard install instructions to install Trow."
+    exit 1
+fi
+
 namespace='kube-public'
 if [ ! -z "$1" ]
 then
