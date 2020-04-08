@@ -1,6 +1,12 @@
 name: Run tests
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
 
 jobs:
   run_tests:
@@ -11,9 +17,10 @@ jobs:
     - name: Install latest nightly
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly-2020-02-29
+        toolchain: nightly-2020-04-07
         override: true
         default: true
+        components: rustfmt
     - name: Install certs
       run: |
         cd quick-install/self-cert && ./make-certs.sh && cd ../..
