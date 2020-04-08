@@ -11,7 +11,7 @@ jobs:
     - name: Install latest nightly
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly-2020-02-29
+        toolchain: nightly-2020-04-07
         override: true
         default: true
     - name: Install certs
