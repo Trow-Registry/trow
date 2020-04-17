@@ -236,3 +236,14 @@ possible that Trow can't write to the data directory. Please verify that the dat
 accessible and writeable by the Trow user. If not, please use `chown` or `chmod` to give the Trow
 user access. As the Trow user only exists in the container, you will likely need to use it's
 equivalent UID e.g. `chown 999 /data`.
+
+### Errors When Pushing or Pulling Large Images
+
+If you get errors when dealing with large images, but not with smaller images, you may need to
+configure your ingress to explicitly allow large transfers. For example, if you are using the
+NGINX ingress, add the following annotation to the Kubernetes configuration:
+
+
+```
+nginx.ingress.kubernetes.io/proxy-body-size: "0"
+```

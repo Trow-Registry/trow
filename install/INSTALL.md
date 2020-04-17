@@ -76,6 +76,23 @@ It would be better to point Kubernetes at the internal Trow service in step 2, b
 running over TLS within the internal network in the default install, we need to use the external
 URL. We intend to address this in a future release.
 
+## Ingress Configuration.
+
+Make sure your ingress is configured to allow large files to be transferred, or you may hit HTTP errors
+such as `413 - Request Entity Too Large`. For the NGINX Ingress, make sure the following annotation is
+present:
+
+```
+nginx.ingress.kubernetes.io/proxy-body-size: "0"
+```
+
+This will disable the transfer limit (it can alternatively be set to a large value such as `1000m`
+to allow blobs up to 1000 MB in size). More details can be found in the [NGINX Ingress
+guide](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#custom-max-body-size).
+There is also an [Trow kustomize overlay with an NGINX
+ingress](https://github.com/ContainerSolutions/trow/blob/master/install/overlays/cert-manager-nginx/ingress.yaml)
+that may be useful.
+
 ## Full TLS
 
 The default install will result in TLS being used between the registry client (Docker) and the
