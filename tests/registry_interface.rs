@@ -373,6 +373,9 @@ mod interface_tests {
         get_main(&client);
         println!("Running get_blob()");
         get_non_existent_blob(&client);
+
+        println!("Running upload_layer(fourth/repo/image/test:tag)");
+        common::upload_layer(&client, "fourth/repo/image/test", "tag");
         println!("Running upload_layer(repo/image/test:tag)");
         common::upload_layer(&client, "repo/image/test", "tag");
         println!("Running upload_layer(image/test:latest)");
@@ -420,6 +423,7 @@ mod interface_tests {
         get_manifest(&client, "repo/image/test", "tag");
 
         let mut rc = RepoCatalog::new();
+        rc.insert(RepoName("fourth/repo/image/test".to_string()));
         rc.insert(RepoName("repo/image/test".to_string()));
         rc.insert(RepoName("image/test".to_string()));
         rc.insert(RepoName("onename".to_string()));

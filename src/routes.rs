@@ -29,35 +29,45 @@ pub fn routes() -> Vec<rocket::Route> {
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
+        get_manifest_4level,
         put_image_manifest,
         put_image_manifest_2level,
         put_image_manifest_3level,
+        put_image_manifest_4level,
         get_blob,
         get_blob_2level,
         get_blob_3level,
+        get_blob_4level,
         put_blob,
         put_blob_2level,
         put_blob_3level,
+        put_blob_4level,
         patch_blob,
         patch_blob_2level,
         patch_blob_3level,
+        patch_blob_4level,
         post_blob_upload,
         post_blob_upload_2level,
         post_blob_upload_3level,
+        post_blob_upload_4level,
         list_tags,
         list_tags_2level,
         list_tags_3level,
+        list_tags_4level,
         get_catalog,
         validate_image,
         delete_blob,
         delete_blob_2level,
         delete_blob_3level,
+        delete_blob_4level,
         delete_image_manifest,
         delete_image_manifest_2level,
         delete_image_manifest_3level,
+        delete_image_manifest_4level,
         get_manifest_history,
         get_manifest_history_2level,
         get_manifest_history_3level,
+        get_manifest_history_4level,
     ]
     /* The following routes used to have stub methods, but I removed them as they were cluttering the code
           post_blob_uuid,
@@ -164,7 +174,7 @@ fn get_manifest_2level(
 }
 
 /*
- * Process 3 level manifest path - not sure this one is needed
+ * Process 3 level manifest path 
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(
@@ -176,6 +186,24 @@ fn get_manifest_3level(
     reference: String,
 ) -> Option<ManifestReader> {
     let rn = RepoName(format!("{}/{}/{}", org, user, repo));
+    let r = ci.get_reader_for_manifest(&rn, &reference);
+    Runtime::new().unwrap().block_on(r).ok()
+}
+
+/*
+ * Process 4 level manifest path
+ */
+#[get("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
+fn get_manifest_4level(
+    _auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+) -> Option<ManifestReader> {
+    let rn = RepoName(format!("{}/{}/{}/{}", fourth, org, user, repo));
     let r = ci.get_reader_for_manifest(&rn, &reference);
     Runtime::new().unwrap().block_on(r).ok()
 }
@@ -234,6 +262,23 @@ fn get_blob_3level(
 ) -> Option<BlobReader> {
     get_blob(auth_user, ci, format!("{}/{}/{}", org, name, repo), digest)
 }
+
+/*
+ * Parse 4 level <org>/<repo>/<name> style path and pass it to get_blob
+ */
+#[get("/v2/<fourth>/<org>/<name>/<repo>/blobs/<digest>")]
+fn get_blob_4level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    name: String,
+    repo: String,
+    digest: String,
+) -> Option<BlobReader> {
+    get_blob(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, name, repo), digest)
+}
+
 /*
 ---
 Monolithic Upload
@@ -333,6 +378,34 @@ fn put_blob_3level(
         auth_user,
         config,
         format!("{}/{}/{}", org, repo, name),
+        uuid,
+        digest,
+        chunk,
+    )
+}
+
+/*
+ * Parse 4 level <org>/<repo>/<name> style path and pass it to put_blob
+ */
+#[put(
+    "/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
+    data = "<chunk>"
+)]
+fn put_blob_4level(
+    auth_user: TrowToken,
+    config: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    repo: String,
+    name: String,
+    uuid: String,
+    digest: String,
+    chunk: rocket::data::Data,
+) -> Result<AcceptedUpload, Error> {
+    put_blob(
+        auth_user,
+        config,
+        format!("{}/{}/{}/{}", fourth, org, repo, name),
         uuid,
         digest,
         chunk,
@@ -468,6 +541,31 @@ fn patch_blob_3level(
 }
 
 /*
+ * Parse 4 level <org>/<repo>/<name> style path and pass it to patch_blob
+ */
+#[patch("/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
+fn patch_blob_4level(
+    auth_user: TrowToken,
+    info: Option<ContentInfo>,
+    handler: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    repo: String,
+    name: String,
+    uuid: String,
+    chunk: rocket::data::Data,
+) -> Result<UploadInfo, Error> {
+    patch_blob(
+        auth_user,
+        info,
+        handler,
+        format!("{}/{}/{}/{}", fourth, org, repo, name),
+        uuid,
+        chunk,
+    )
+}
+
+/*
  Starting point for an uploading a new image or new version of an image.
 
  We respond with details of location and UUID to upload to with patch/put.
@@ -550,7 +648,7 @@ fn post_blob_upload_2level(
     name: String,
     data: rocket::data::Data,
 ) -> Result<Upload, Error> {
-    info!("upload {}/{}", repo, name);
+    
     post_blob_upload(uri, auth_user, ci, format!("{}/{}", repo, name), data)
 }
 
@@ -568,12 +666,37 @@ fn post_blob_upload_3level(
     name: String,
     data: rocket::data::Data,
 ) -> Result<Upload, Error> {
-    info!("upload 3 way {}/{}/{}", org, repo, name);
+    
     post_blob_upload(
         uri,
         auth_user,
         ci,
         format!("{}/{}/{}", org, repo, name),
+        data,
+    )
+}
+
+/*
+ * Parse 4 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
+ */
+#[post("/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads", data = "<data>")]
+fn post_blob_upload_4level(
+    //digest: PossibleDigest, //create requestguard to handle /?digest
+    uri: &Origin,
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    repo: String,
+    name: String,
+    data: rocket::data::Data,
+) -> Result<Upload, Error> {
+    
+    post_blob_upload(
+        uri,
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, repo, name),
         data,
     )
 }
@@ -657,6 +780,29 @@ fn put_image_manifest_3level(
 }
 
 /*
+ * Parse 4 level <fourth>/<org>/<user>/<repo> style path and pass it to put_image_manifest
+ */
+#[put("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
+fn put_image_manifest_4level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+    chunk: rocket::data::Data,
+) -> Result<VerifiedManifest, Error> {
+    put_image_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, user, repo),
+        reference,
+        chunk,
+    )
+}
+
+/*
 ---
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
@@ -716,6 +862,19 @@ fn delete_image_manifest_3level(
     delete_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
 }
 
+#[delete("/v2/<fourth>/<org>/<user>/<repo>/manifests/<digest>")]
+fn delete_image_manifest_4level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<ManifestDeleted, Error> {
+    delete_image_manifest(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, user, repo), digest)
+}
+
 /**
  * Deletes the given blob.
  *
@@ -761,6 +920,20 @@ fn delete_blob_3level(
 ) -> Result<BlobDeleted, Error> {
     delete_blob(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
 }
+
+#[delete("/v2/<fourth>/<org>/<user>/<repo>/blobs/<digest>")]
+fn delete_blob_4level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<BlobDeleted, Error> {
+    delete_blob(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, user, repo), digest)
+}
+
 
 #[get("/v2/_catalog?<n>&<last>")]
 fn get_catalog(
@@ -822,6 +995,20 @@ fn list_tags_3level(
     list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), last, n)
 }
 
+#[get("/v2/<fourth>/<org>/<user>/<repo>/tags/list?<last>&<n>")]
+fn list_tags_4level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    last: Option<String>,
+    n: Option<u32>,
+) -> Result<TagList, Error> {
+    list_tags(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, user, repo), last, n)
+}
+
 // TODO add support for pagination
 #[get("/<onename>/manifest_history/<reference>?<last>&<n>")]
 fn get_manifest_history(
@@ -878,6 +1065,28 @@ fn get_manifest_history_3level(
         auth_user,
         ci,
         format!("{}/{}/{}", org, user, repo),
+        reference,
+        last,
+        n,
+    )
+}
+
+#[get("/<fourth>/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
+fn get_manifest_history_4level(
+    auth_user: TrowToken,
+    ci: rocket::State<ClientInterface>,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+    last: Option<String>,
+    n: Option<u32>,
+) -> Result<ManifestHistory, Error> {
+    get_manifest_history(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
         last,
         n,
