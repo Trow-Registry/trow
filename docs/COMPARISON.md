@@ -5,8 +5,6 @@ Most registries can be categorised into one or more of the following buckets:
  - Public registries such as Docker Hub and Quay.io
  - Cloud Provider registries such as GCR, ECR, ACR etc. 
  - Self-hosted registries such as Docker Distribution and Harbor.
- - Generic software artifact solutions that have added support for container images such as Nexus
-   and Artifactory.
 
 Trow is very much in the self-hosted registry bucket, but has a different focus to the other
 solutions. Notably, it is expected that Trow would be used alongside one or more of the other
@@ -36,10 +34,8 @@ through from Harbor for use in the cluster. There a lot of potential benefits fr
 
  - Images can be distributed faster - the Trow registries are local to the cluster which means a
    shorter network trip - they effectively act as a local cache for the central registry.  
-
  - Less stress on the central registries, which now only needs to serve the Trow registries,
    rather than every node in the cluster. 
-
  - Individual clusters can have differently configured registries which meet their distinct needs.
    For example, a development cluster may have looser restrictions on where images can come from or
    how to handle vulnerability scans than a production cluster.

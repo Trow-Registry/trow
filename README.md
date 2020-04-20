@@ -32,6 +32,10 @@ Features include:
  - [ ] full auditing and authentication of image access _(in progress)_
  - [ ] distributed architecture for HA and scalability _(planned)_
 
+## Comparison to Other Registries
+
+There is a [short article on how Trow compares to other registries](docs/COMPARISON.md), including Harbor.
+
 ## Install
 
 If you want to quickly try out Trow on a development cluster (either local or remote), follow the
