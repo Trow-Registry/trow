@@ -28,7 +28,7 @@ docker buildx build \
   --build-arg DATE="$DATE" \
   --build-arg VERSION="$VERSION" \
   --pull --load --platform linux/arm/v7 \
-  -f "Dockerfile.$TAG" -t $IMAGE ../
+  -f "Dockerfile.armv7" -t $IMAGE ../
 
 PLATFORM="linux/arm64"
 TAG=${DOCKER_TAG:-"$VERSION-arm64"}
@@ -43,4 +43,4 @@ docker buildx build \
   --build-arg DATE="$DATE" \
   --build-arg VERSION="$VERSION" \
   --pull --load --platform $PLATFORM \
-  -f "Dockerfile.$TAG" -t $IMAGE ../
+  -f "Dockerfile.arm64" -t $IMAGE ../
