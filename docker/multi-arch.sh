@@ -7,14 +7,26 @@ cd "$src_dir"
 
 # Register binfmt handlers
 docker run --rm --privileged aptman/qus -s -- -p arm aarch64
-#docker run --rm docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
 # Create new build instance
 docker buildx rm trow-multi
 docker buildx create --name trow-multi
 docker buildx use trow-multi
 
-REPO=${DOCKER_REPO:-"containersol/trow"}
-VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
+if [[ "$ci" = true ]]
+then
+    REPO=${DOCKER_REPO:-"docker.pkg.github.com/containersolutions/trow/trow"}
+else
+    REPO=${DOCKER_REPO:-"containersol/trow"}
+fi
+
+# If we're in a github action, set the image name differently
+if [[ "$ci" = true ]]
+then
+    VERSION="$(date +"%Y-%m-%d")-${{ github.run.id }}"
+else
+    VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
+fi
+
 TAG=${DOCKER_TAG:-"$VERSION-armv7"}
 IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
 DATE="$(date --rfc-3339=seconds)"
@@ -30,6 +42,11 @@ docker buildx build \
   --pull --load --platform linux/arm/v7 \
   -f "Dockerfile.armv7" -t $IMAGE ../
 
+if [[ -z $ci ]]
+then
+    docker push $IMAGE
+fi
+
 PLATFORM="linux/arm64"
 TAG=${DOCKER_TAG:-"$VERSION-arm64"}
 IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
@@ -44,3 +61,8 @@ docker buildx build \
   --build-arg VERSION="$VERSION" \
   --pull --load --platform $PLATFORM \
   -f "Dockerfile.arm64" -t $IMAGE ../
+
+if [[ "$ci" = true ]]
+then
+    docker push $IMAGE
+fi
