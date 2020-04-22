@@ -15,12 +15,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Login to package repo
-      env: 
-        USERNAME: amouat
       run: |
-        mkdir ~/.docker
-        echo '{ "experimental": "enabled" }' > ~/.docker/config.json
-        docker login docker.pkg.github.com -u $USERNAME -p ${{ secrets.GITHUB_TOKEN }}
+        docker login docker.pkg.github.com -u ${{ GITHUB_ACTOR }} -p ${{ secrets.GITHUB_TOKEN }}
+    - name: Build multi-arch
+      run: |
+          export DOCKER_BUILDKIT=1
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+          docker version
+          docker/multi-arch.sh
     - name: Build amd64 default target
       run: |
         docker/build.sh
@@ -28,7 +30,4 @@ jobs:
       run: |
         docker tag containersol/trow:default docker.pkg.github.com/containersolutions/trow/trow:default
         docker push docker.pkg.github.com/containersolutions/trow/trow:default
-    - name: Build multi-arch
-      run: |
-          docker/multi-arch.sh
 
