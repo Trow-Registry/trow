@@ -9,13 +9,24 @@ on:
     - master
 
 jobs:
-  build_images:
+  default_image:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-    - name: Default build
+    - name: Login to package repo
+      env: USERNAME: amouat
+      run: |
+        docker login docker.pkg.github.com -u $USERNAME -password ${{ secrets.GITHUB_TOKEN }}
+    - name: Build amd64 default target
       run: |
         docker/build.sh
+    - name: Push amd64 default 
+        docker tag containersol/trow:default docker.pkg.github.com/containersolutions/trow/trow:default
+        docker push docker.pkg.github.com/containersolutions/trow/trow:default
+
+
+
+
       
       
