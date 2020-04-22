@@ -1,0 +1,16 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+    - master
+jobs:
+  build_images:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Default build
+      run: |
+        docker/build.sh
+      
+      
