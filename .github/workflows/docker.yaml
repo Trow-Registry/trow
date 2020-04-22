@@ -26,9 +26,7 @@ jobs:
       run: |
         docker tag containersol/trow:default docker.pkg.github.com/containersolutions/trow/trow:default
         docker push docker.pkg.github.com/containersolutions/trow/trow:default
+    - name: Build multi-arch
+      run: |
+          docker/multi-arch.sh
 
-
-
-
-      
-      
