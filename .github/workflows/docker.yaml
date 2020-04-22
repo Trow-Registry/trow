@@ -19,10 +19,10 @@ jobs:
         docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
     - name: Build multi-arch
       run: |
-          export DOCKER_BUILDKIT=1
-          export DOCKER_CLI_EXPERIMENTAL=enabled
-          docker version
-          docker/multi-arch.sh
+          mkdir -p ~/.docker/cli-plugins
+          curl -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
+          chmod +x ~/.docker/cli-plugins/docker-buildx
+          ./docker/multi-arch.sh
     - name: Build amd64 default target
       run: |
         docker/build.sh
