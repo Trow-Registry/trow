@@ -12,7 +12,7 @@ docker buildx rm trow-multi
 docker buildx create --name trow-multi
 docker buildx use trow-multi
 
-if [[ "$ci" = true ]]
+if [[ "$CI" = true ]]
 then
     REPO=${DOCKER_REPO:-"docker.pkg.github.com/containersolutions/trow/trow"}
 else
@@ -20,7 +20,7 @@ else
 fi
 
 # If we're in a github action, set the image name differently
-if [[ "$ci" = true ]]
+if [[ "$CI" = true ]]
 then
     VERSION="$(date +"%Y-%m-%d")-${{ github.run.id }}"
 else
@@ -42,7 +42,7 @@ docker buildx build \
   --pull --load --platform linux/arm/v7 \
   -f "Dockerfile.armv7" -t $IMAGE ../
 
-if [[ -z $ci ]]
+if [[ "$CI" = true ]]
 then
     docker push $IMAGE
 fi
@@ -62,7 +62,7 @@ docker buildx build \
   --pull --load --platform $PLATFORM \
   -f "Dockerfile.arm64" -t $IMAGE ../
 
-if [[ "$ci" = true ]]
+if [[ "$CI" = true ]]
 then
     docker push $IMAGE
 fi

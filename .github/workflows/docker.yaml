@@ -17,9 +17,11 @@ jobs:
     - name: Login to package repo
       run: |
         docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-    - name: Build multi-arch
+    - name: Get env
       run: |
           env
+    - name: Build multi-arch
+      run: |
           mkdir -p ~/.docker/cli-plugins
           curl -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
           chmod +x ~/.docker/cli-plugins/docker-buildx
