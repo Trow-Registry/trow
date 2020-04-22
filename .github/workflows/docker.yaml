@@ -23,6 +23,7 @@ jobs:
       run: |
         docker/build.sh
     - name: Push amd64 default 
+      run: |
         docker tag containersol/trow:default docker.pkg.github.com/containersolutions/trow/trow:default
         docker push docker.pkg.github.com/containersolutions/trow/trow:default
 
