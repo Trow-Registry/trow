@@ -50,6 +50,7 @@ pub fn routes() -> Vec<rocket::Route> {
         post_blob_upload_2level,
         post_blob_upload_3level,
         post_blob_upload_4level,
+        post_blob_upload_5level,
         list_tags,
         list_tags_2level,
         list_tags_3level,
@@ -174,7 +175,7 @@ fn get_manifest_2level(
 }
 
 /*
- * Process 3 level manifest path 
+ * Process 3 level manifest path
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(
@@ -276,7 +277,12 @@ fn get_blob_4level(
     repo: String,
     digest: String,
 ) -> Option<BlobReader> {
-    get_blob(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, name, repo), digest)
+    get_blob(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, name, repo),
+        digest,
+    )
 }
 
 /*
@@ -543,7 +549,10 @@ fn patch_blob_3level(
 /*
  * Parse 4 level <org>/<repo>/<name> style path and pass it to patch_blob
  */
-#[patch("/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
+#[patch(
+    "/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>",
+    data = "<chunk>"
+)]
 fn patch_blob_4level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
@@ -648,7 +657,6 @@ fn post_blob_upload_2level(
     name: String,
     data: rocket::data::Data,
 ) -> Result<Upload, Error> {
-    
     post_blob_upload(uri, auth_user, ci, format!("{}/{}", repo, name), data)
 }
 
@@ -666,7 +674,6 @@ fn post_blob_upload_3level(
     name: String,
     data: rocket::data::Data,
 ) -> Result<Upload, Error> {
-    
     post_blob_upload(
         uri,
         auth_user,
@@ -677,7 +684,7 @@ fn post_blob_upload_3level(
 }
 
 /*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
+ * Parse 4 level <fourth>/<org>/<repo>/<name> style path
  */
 #[post("/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads", data = "<data>")]
 fn post_blob_upload_4level(
@@ -691,7 +698,6 @@ fn post_blob_upload_4level(
     name: String,
     data: rocket::data::Data,
 ) -> Result<Upload, Error> {
-    
     post_blob_upload(
         uri,
         auth_user,
@@ -699,6 +705,33 @@ fn post_blob_upload_4level(
         format!("{}/{}/{}/{}", fourth, org, repo, name),
         data,
     )
+}
+
+/*
+ * Parse 5 level path and error.
+ *
+ * We really shouldn't error any number of paths, but it doesn't seem easy with Rocket.
+ *
+ * This should return a proper JSON error such as NAME_INVALID, but that causes the Docker
+ * client to retry. Passing non-json causes an error and a reasonable message to the user.
+ */
+#[post(
+    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads",
+    data = "<_data>"
+)]
+fn post_blob_upload_5level(
+    _auth_user: TrowToken,
+    fifth: String,
+    fourth: String,
+    org: String,
+    repo: String,
+    name: String,
+    _data: rocket::data::Data,
+) -> rocket::response::status::BadRequest<String> {
+    rocket::response::status::BadRequest(Some(format!(
+        "Repository names are limited to 4 levels: {}/{}/{}/{}/{} is not allowed",
+        fifth, fourth, org, repo, name
+    )))
 }
 
 /*
@@ -782,7 +815,10 @@ fn put_image_manifest_3level(
 /*
  * Parse 4 level <fourth>/<org>/<user>/<repo> style path and pass it to put_image_manifest
  */
-#[put("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
+#[put(
+    "/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>",
+    data = "<chunk>"
+)]
 fn put_image_manifest_4level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
@@ -815,28 +851,22 @@ fn delete_image_manifest(
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
-
     let repo_str = repo.clone();
     let repo = RepoName(repo);
     let digest = Digest(digest);
     let r = ci.delete_manifest(&repo, &digest);
-    Runtime::new()
-        .unwrap()
-        .block_on(r)
-        .map_err(|e| {
-
-            let e = e.downcast::<tonic::Status>();
-            if let Ok(ts) = e {
-                match ts.code() {
-                    Code::InvalidArgument => Error::Unsupported,
-                    Code::NotFound => Error::ManifestUnknown(repo_str),
-                    _ => Error::InternalError
-                }
-            } else {
-                Error::InternalError
+    Runtime::new().unwrap().block_on(r).map_err(|e| {
+        let e = e.downcast::<tonic::Status>();
+        if let Ok(ts) = e {
+            match ts.code() {
+                Code::InvalidArgument => Error::Unsupported,
+                Code::NotFound => Error::ManifestUnknown(repo_str),
+                _ => Error::InternalError,
             }
-
-        })
+        } else {
+            Error::InternalError
+        }
+    })
 }
 
 #[delete("/v2/<user>/<repo>/manifests/<digest>")]
@@ -872,7 +902,12 @@ fn delete_image_manifest_4level(
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, user, repo), digest)
+    delete_image_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, user, repo),
+        digest,
+    )
 }
 
 /**
@@ -931,9 +966,13 @@ fn delete_blob_4level(
     repo: String,
     digest: String,
 ) -> Result<BlobDeleted, Error> {
-    delete_blob(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, user, repo), digest)
+    delete_blob(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, user, repo),
+        digest,
+    )
 }
-
 
 #[get("/v2/_catalog?<n>&<last>")]
 fn get_catalog(
@@ -1006,7 +1045,13 @@ fn list_tags_4level(
     last: Option<String>,
     n: Option<u32>,
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}/{}/{}", fourth, org, user, repo), last, n)
+    list_tags(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, user, repo),
+        last,
+        n,
+    )
 }
 
 // TODO add support for pagination
@@ -1019,7 +1064,6 @@ fn get_manifest_history(
     last: Option<String>,
     n: Option<u32>,
 ) -> Result<ManifestHistory, Error> {
-
     let limit = n.unwrap_or(std::u32::MAX);
     let last_digest = last.unwrap_or(String::new());
 

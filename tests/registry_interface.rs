@@ -138,7 +138,13 @@ mod interface_tests {
 
     fn check_tag_list_n_last(cl: &reqwest::Client, n: u32, last: &str, tl: &TagList) {
         let mut resp = cl
-            .get(&format!("{}/v2/{}/tags/list?last={}&n={}", TROW_ADDRESS, tl.repo_name(), last, n))
+            .get(&format!(
+                "{}/v2/{}/tags/list?last={}&n={}",
+                TROW_ADDRESS,
+                tl.repo_name(),
+                last,
+                n
+            ))
             .send()
             .unwrap();
         let tl_resp: TagList = serde_json::from_str(&resp.text().unwrap()).unwrap();
@@ -173,13 +179,15 @@ mod interface_tests {
     }
 
     fn upload_with_post(cl: &reqwest::Client, name: &str) {
-
         let config = "{ }\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
         let digest = format!("sha256:{}", hasher.result_str());
         let resp = cl
-            .post(&format!("{}/v2/{}/blobs/uploads/?digest={}", TROW_ADDRESS, name, digest))
+            .post(&format!(
+                "{}/v2/{}/blobs/uploads/?digest={}",
+                TROW_ADDRESS, name, digest
+            ))
             .body(config.clone())
             .send()
             .unwrap();
@@ -219,7 +227,6 @@ mod interface_tests {
     }
 
     fn push_manifest_list(cl: &reqwest::Client, digest: &str, name: &str, tag: &str) -> String {
-     
         let manifest = format!(
             r#"{{
                 "schemaVersion": 2,
@@ -237,7 +244,8 @@ mod interface_tests {
                 ]
               }}
               "#,
-            digest);
+            digest
+        );
         let bytes = manifest.clone();
         let resp = cl
             .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
@@ -252,7 +260,6 @@ mod interface_tests {
 
         let digest = format!("sha256:{}", hasher.result_str());
         digest
-
     }
 
     fn push_oci_manifest_with_foreign_blob(cl: &reqwest::Client, name: &str, tag: &str) -> String {
@@ -294,7 +301,6 @@ mod interface_tests {
 
         let digest = format!("sha256:{}", hasher.result_str());
         digest
-
     }
 
     fn delete_manifest(cl: &reqwest::Client, name: &str, digest: &str) {
@@ -312,39 +318,46 @@ mod interface_tests {
         let resp = cl
             .delete(&format!(
                 "{}/v2/{}/manifests/{}",
-                TROW_ADDRESS, name, "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
+                TROW_ADDRESS,
+                name,
+                "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
             ))
             .send()
             .unwrap();
         // If it doesn't exist, that's kinda the same as deleted, right?
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
-    
     fn attempt_delete_by_tag(cl: &reqwest::Client, name: &str, tag: &str) {
         let resp = cl
-            .delete(&format!(
-                "{}/v2/{}/manifests/{}",
-                TROW_ADDRESS, name, tag
-            ))
+            .delete(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     fn delete_config_blob(cl: &reqwest::Client, name: &str) {
-
         //Deletes blob uploaded in config test
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
         let config_digest = format!("sha256:{}", hasher.result_str());
-        
         let resp = cl
-            .delete(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, config_digest))
+            .delete(&format!(
+                "{}/v2/{}/blobs/{}",
+                TROW_ADDRESS, name, config_digest
+            ))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
-        
+    }
+
+    fn test_5level_error(cl: &reqwest::Client) {
+        let name = "one/two/three/four/five";
+        let resp = cl
+            .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
+            .send()
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[test]
@@ -389,6 +402,9 @@ mod interface_tests {
         println!("Running upload_with_post");
         upload_with_post(&client, "posttest");
 
+        println!("Running test_5level_error()");
+        test_5level_error(&client);
+
         println!("Running push_oci_manifest()");
         let digest = push_oci_manifest(&client, "puttest", "puttest1");
         println!("Running push_manifest_list()");
@@ -428,7 +444,6 @@ mod interface_tests {
         rc.insert(RepoName("image/test".to_string()));
         rc.insert(RepoName("onename".to_string()));
 
-
         println!("Running check_repo_catalog");
         check_repo_catalog(&client, &rc);
 
@@ -437,7 +452,6 @@ mod interface_tests {
         println!("Running check_tag_list 1");
         check_tag_list(&client, &tl);
 
-        
         common::upload_layer(&client, "onename", "three");
         common::upload_layer(&client, "onename", "four");
 
@@ -450,18 +464,15 @@ mod interface_tests {
 
         println!("Running check_tag_list 2");
         check_tag_list(&client, &tl2);
-        
         let mut tl3 = TagList::new(RepoName("onename".to_string()));
         tl3.insert("four".to_string());
         tl3.insert("latest".to_string());
-        
 
         println!("Running check_tag_list_n_last 3");
         check_tag_list_n_last(&client, 2, "", &tl3);
         let mut tl4 = TagList::new(RepoName("onename".to_string()));
         tl4.insert("tag".to_string());
         tl4.insert("three".to_string());
-        
         println!("Running check_tag_list_n_last 4");
         check_tag_list_n_last(&client, 2, "latest", &tl4)
     }
