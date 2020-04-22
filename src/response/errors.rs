@@ -19,13 +19,13 @@ pub enum Error {
     MANIFEST_BLOB_UNKNOWN,
     ,
     MANIFEST_UNVERIFIED,
-    NAME_INVALID,
     NAME_UNKNOWN,
     SIZE_INVALID,
     TAG_INVALID,
     UNAUTHORIZED,
     DENIED,
     */
+    NameInvalid(String),
     BlobUploadInvalid,
     ManifestUnknown(String),
     ManifestInvalid,
@@ -57,7 +57,8 @@ impl fmt::Display for Error {
             Error::InternalError => format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", None),
             Error::DigestInvalid => format_error_json(f, "DIGEST_INVALID", "Provided digest did not match uploaded content", None),
             Error::ManifestInvalid => format_error_json(f, "MANIFEST_INVALID", "manifest invalid", None),
-            Error::ManifestUnknown(ref tag) => format_error_json(f, "MANIFEST_UNKNOWN", "manifest unknown", Some(json!({ "Tag": tag })))
+            Error::ManifestUnknown(ref tag) => format_error_json(f, "MANIFEST_UNKNOWN", "manifest unknown", Some(json!({ "Tag": tag }))),
+            Error::NameInvalid(ref name) => format_error_json(f, "NAME_INVALID","Invalid repository name", Some(json!({ "Repository": name })))
         }
     }
 }
@@ -88,6 +89,7 @@ impl error::Error for Error {
             Error::DigestInvalid => "When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key \"digest\", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest.",
             Error::ManifestInvalid => "During upload, manifests undergo several checks ensuring validity. If those checks fail, this error may be returned, unless a more specific error is included. The detail will contain information the failed validation.",
             Error::ManifestUnknown(_) => "This error is returned when the manifest, identified by name and tag is unknown to the repository.",
+            Error::NameInvalid(_) => "Invalid repository name encountered either during manifest validation or any API operation."
 
         }
     }
@@ -98,12 +100,12 @@ impl<'r> Responder<'r> for Error {
         let json = format!("{}", self);
 
         let status = match self {
-            Error::Unsupported => Status::MethodNotAllowed,
+            Error::Unsupported  => Status::MethodNotAllowed,
             Error::Unauthorized => Status::Unauthorized,
-            Error::BlobUploadUnknown | Error::ManifestUnknown(_) => Status::NotFound,
-            Error::InternalError => Status::InternalServerError,
+            Error::BlobUploadUnknown | Error::ManifestUnknown(_)  => Status::NotFound,
+            Error::InternalError  => Status::InternalServerError,
             Error::BlobUploadInvalid => Status::RangeNotSatisfiable,
-            Error::DigestInvalid | Error::ManifestInvalid | Error::BlobUnknown => {
+            Error::DigestInvalid | Error::ManifestInvalid | Error::BlobUnknown | Error::NameInvalid(_) => {
                 Status::BadRequest
             }
         };
