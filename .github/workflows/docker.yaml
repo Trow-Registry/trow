@@ -15,7 +15,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Login to package repo
-      env: USERNAME: amouat
+      env: 
+        USERNAME: amouat
       run: |
         docker login docker.pkg.github.com -u $USERNAME -password ${{ secrets.GITHUB_TOKEN }}
     - name: Build amd64 default target
