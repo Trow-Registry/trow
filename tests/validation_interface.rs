@@ -50,7 +50,7 @@ mod validation_tests {
       .spawn()
       .expect("failed to start");
 
-    let mut timeout = 20;
+    let mut timeout = 30;
 
     let mut buf = Vec::new();
     File::open("./certs/domain.crt")
