@@ -4,9 +4,6 @@ on:
   push:
     branches:
     - master
-  pull_request:
-    branches:
-    - master
 
 jobs:
   default_image:
@@ -17,11 +14,13 @@ jobs:
     - name: Login to package repo
       run: |
           docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-    - name: Build and push multi-arch
+    - name: Install buildx
       run: |
           mkdir -p ~/.docker/cli-plugins
           curl -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64
           chmod +x ~/.docker/cli-plugins/docker-buildx
+    - name: Build and push multi-arch
+      run: |
           ./docker/multi-arch.sh
     - name: Build and push amd64 default target
       run: |
