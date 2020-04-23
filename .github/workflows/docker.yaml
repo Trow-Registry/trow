@@ -22,7 +22,7 @@ jobs:
     - name: Build and push multi-arch
       run: |
           ./docker/multi-arch.sh
-          docker prune --all
+          docker image prune --all
     - name: Build and push amd64 default target
       run: |
           ./docker/build.sh
