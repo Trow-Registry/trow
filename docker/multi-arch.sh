@@ -22,7 +22,7 @@ fi
 # If we're in a github action, set the image name differently
 if [[ "$CI" = true ]]
 then
-    VERSION=$(date +"%Y-%m-%d")-$GITHUB_RUN_ID
+    VERSION=$(date +"%Y-%m-%d")-$GITHUB_RUN_NUMBER
 else
     VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 fi

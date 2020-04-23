@@ -8,7 +8,7 @@ cd "$src_dir"
 if [[ "$CI" = true ]]
 then
     REPO=${DOCKER_REPO:-"docker.pkg.github.com/containersolutions/trow/trow"}
-    VERSION=$(date +"%Y-%m-%d")-$GITHUB_RUN_ID
+    VERSION=$(date +"%Y-%m-%d")-$GITHUB_RUN_NUMBER
 else
     REPO=${DOCKER_REPO:-"containersol/trow"}
     VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
@@ -29,4 +29,8 @@ docker build \
 if [[ "$CI" = true ]]
 then
     docker push $IMAGE
+    docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:latest 
+    docker push docker.pkg.github.com/containersolutions/trow/trow:latest 
+    docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:default 
+    docker push docker.pkg.github.com/containersolutions/trow/trow:default 
 fi

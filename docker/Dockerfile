@@ -51,12 +51,14 @@ USER trow
 ENTRYPOINT ["/start-trow.sh"]
 
 ARG VCS_REF
+ARG VCS_BRANCH
 ARG DATE
 ARG VERSION
 ARG REPO
 ARG TAG
 ENV CREATED=$DATE
 ENV VCS_REF=$VCS_REF
+ENV VCS_BRANCH=$VCS_BRANCH
 ENV VERSION=$VERSION
 
 LABEL org.opencontainers.image.created=$DATE \
@@ -65,6 +67,7 @@ LABEL org.opencontainers.image.created=$DATE \
   org.opencontainers.image.source="https://github.com/ContainerSolutions/trow" \
   org.opencontainers.image.version=$VERSION \
   org.opencontainers.image.revision=$VCS_REF \
+  git.branch=$VCS_BRANCH \
   org.opencontainers.image.title="Trow Cluster Registry" \
   repository=$REPO \
   tag=$TAG
