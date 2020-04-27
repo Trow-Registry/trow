@@ -36,9 +36,10 @@ might therefore be closed. In particular, please don't start work on a new featu
 discussing it first to avoid wasting effort. We do commit to listening to all proposals and will do
 our best to work something out!
 
-Once you've got the go ahead to work on a feature, you can start work. Feel free to communicate with
-team via updates on the issue tracker and ask for feedback, pointers etc. Once you're happy with
-your code, go ahead and open a Pull Request.
+Once you've got the go ahead to work on a feature, you can start work. See
+[DEVELOPING.md](DEVELOPING.md) for advice on building and testing Trow. Feel free to communicate
+with team via updates on the issue tracker and ask for feedback, pointers etc. Once you're happy
+with your code, go ahead and open a Pull Request.
 
 ## Pull Request Process
 
@@ -46,8 +47,7 @@ Most of the code is written in Rust and uses the standard style guidelines - ple
 through `rustfmt` prior to opening a PR.
 
 On opening a PR, a GitHub action will execute the test suite against the new code. All code is
-required to pass the tests, and new code must be accompanied by new tests. See
-[DEVELOPING.md](DEVELOPING.md) for advice on building and testing Trow.
+required to pass the tests, and new code must be accompanied by new tests. 
 
 All PRs have to be reviewed and signed off by another developer before being merged to the master
 branch. This review will likely ask for some changes to the code - please don't be alarmed or upset
