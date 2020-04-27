@@ -60,6 +60,16 @@ There is a reasonably large test suite, which can be run with the `docker/test.s
 Work has started on a [User Guide](docs/USER_GUIDE.md). Currently this explains
 how to persist images and how to list repositories and tags via curl.
 
+## Contributing
+
+Please take a look at [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to help out and
+[DEVELOPING.md](DEVELOPING.md) for how to get started compiling and running Trow.
+
+## Code of Conduct
+
+All participants in the Trow project are expected to comply with the [code of
+conduct](CODE_OF_CONDUCT.md).
+
 ## Notes
 
 - The project currently runs on Rust Nightly.
