@@ -159,6 +159,28 @@ $ docker pull ...
 
 Trow also accepts a pointer to a file containing the password via the `--password-file` argument instead of `-p`. This allows the password to be stored in a Kubernetes secret that can be mounted into a volume inside the container.
 
+### Uninstall
+
+To uninstall the Trow Kubernetes components run the following from the `quick-install` directory:
+
+```
+sed "s/{{namespace}}/kube-public/" trow.yaml | kubectl delete -f -
+```
+
+This assumes you installed Trow to the default namespace of `kube-public`. If you installed Trow to
+a different namespace than `kube-public`, replace as appropriate.
+
+If you enabled validation, remove the webhook with:
+
+```
+kubectl delete -f validate.yaml
+```
+
+This will not remove the Trow certificates or revert the changes to `/etc/hosts` on the nodes or
+client. Leaving these changes shouldn't cause any problems. If you would like to remove them, the
+lines in `/etc/hosts` are clearly marked, and the certs should be found under `/etc/docker/certs.d/`
+on both the the nodes and client.
+
 ### Troubleshooting
 
 See the [User Guide](docs/USER_GUIDE.md#Troubleshooting)
