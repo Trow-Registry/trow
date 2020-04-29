@@ -102,6 +102,11 @@ certificates to achieve full end-to-end TLS.
 NB if you use a service mesh, you may already have mutual TLS between pods and can safely ignore
 this.
 
+## Uninstall
+
+This should be as simple as `kubectl delete -k overlays/mycluster`  (changing `overlays/mycluster`
+to the name of your overlay).
+
 ## Troubleshooting
 
 See the [User Guide](../docs/USER_GUIDE.md).
