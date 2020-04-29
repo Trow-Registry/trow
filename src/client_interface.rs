@@ -340,11 +340,10 @@ impl ClientInterface {
 
         
         //TODO: write something to convert automatically (into()) between AdmissionRequest types
-        //let mut a_req = AdmissionRequest::new();
         // TODO: we should really be sending the full object to the backend.
         let mut images = Vec::new();
         extract_images(&req.object, &mut images);
-        let ar = AdmissionRequest {
+        let ar = trow_proto::AdmissionRequest {
             images,
             namespace: req.namespace.clone(),
             operation: req.operation.clone(),
