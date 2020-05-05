@@ -17,8 +17,8 @@ COPY lib lib
 COPY src src
 
 # Must build protobuf first for generated code
-RUN cd lib/protobuf && cargo build --target aarch64-unknown-linux-gnu
-RUN cargo build --target aarch64-unknown-linux-gnu -Z unstable-options --out-dir ./out
+RUN cd lib/protobuf && cargo build --release --target aarch64-unknown-linux-gnu
+RUN cargo build --release --target aarch64-unknown-linux-gnu -Z unstable-options --out-dir ./out
 
 FROM --platform=linux/arm64 debian:stable-slim
 

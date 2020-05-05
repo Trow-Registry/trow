@@ -4,7 +4,7 @@ pub mod trow_proto {
 
 use trow_proto::{
     registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogRequest,
-    CompleteRequest, BlobRef, ManifestRef, UploadRequest, AdmissionRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
+    CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
 };
 use tonic::Request;
 use crate::types::{self, *};
@@ -56,18 +56,18 @@ impl ClientInterface {
     async fn connect_registry(&self) -> 
     Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
 
-        warn!("Connecting to {}", self.server);
+        debug!("Connecting to {}", self.server);
         let x = RegistryClient::connect(self.server.to_string()).await;
-        warn!("Connected to {}", self.server);
+        debug!("Connected to {}", self.server);
         x
     }
 
     async fn connect_admission_controller(&self) -> 
     Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
 
-        warn!("Connecting to {}", self.server);
+        debug!("Connecting to {}", self.server);
         let x = AdmissionControllerClient::connect(self.server.to_string()).await;
-        warn!("Connected to {}", self.server);
+        debug!("Connected to {}", self.server);
         x
     }
 

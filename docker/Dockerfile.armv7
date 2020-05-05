@@ -18,8 +18,8 @@ COPY lib lib
 COPY src src
 
 # Must build protobuf first for generated code
-RUN cd lib/protobuf && cargo build --target armv7-unknown-linux-gnueabihf
-RUN cargo build --target armv7-unknown-linux-gnueabihf -Z unstable-options --out-dir ./out
+RUN cd lib/protobuf && cargo build --release --target armv7-unknown-linux-gnueabihf
+RUN cargo build --release --target armv7-unknown-linux-gnueabihf -Z unstable-options --out-dir ./out
 
 FROM --platform=linux/arm/v7 debian:stable-slim
 
