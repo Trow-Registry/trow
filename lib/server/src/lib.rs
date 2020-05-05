@@ -81,12 +81,12 @@ impl TrowServerBuilder {
             .add_service(AdmissionControllerServer::new(ts))
             .serve(self.listen_addr);
         
-        warn!("Server listening on {}", self.listen_addr);
+        debug!("Trow backend service running");
 
         match rt.block_on(server)
         {
             Ok(()) => {
-                warn!("Server shutting down");
+                warn!("Trow backend shutting down");
             }
             Err(e) => {
                 eprintln!("Failure in Trow server: {:?}", e);

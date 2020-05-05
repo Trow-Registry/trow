@@ -24,13 +24,13 @@ RUN echo "fn main() {}" > lib/protobuf/build.rs
 RUN mkdir -p lib/protobuf/src
 RUN touch lib/protobuf/src/lib.rs
 
-RUN cargo build # should cache all build deps
+RUN cargo build --release # should cache all build deps
 
 COPY lib lib
 COPY src src
 # Must build protobuf first for generated code
-RUN cd lib/protobuf && cargo build
-RUN cargo build -Z unstable-options --out-dir ./out
+RUN cd lib/protobuf && cargo build --release
+RUN cargo build --release -Z unstable-options --out-dir ./out
 
 FROM debian:stable-slim
 
