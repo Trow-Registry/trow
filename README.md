@@ -1,4 +1,5 @@
-[![Actions Status](https://github.com/containersolutions/trow/workflows/Run%20Tests/badge.svg)](https://github.com/containersolutions/trow/actions)
+[![Actions Status](https://github.com/containersolutions/trow/workflows/Tests/badge.svg)](https://github.com/containersolutions/trow/actions)
+[![Actions Status](https://github.com/containersolutions/trow/workflows/Docker%20Images/badge.svg)](https://github.com/containersolutions/trow/actions)
 
 # Trow
 Image Management for Kubernetes
