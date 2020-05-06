@@ -9,7 +9,7 @@ on:
     - master
 
 jobs:
-  run_tests:
+  trow.test:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,9 +27,9 @@ jobs:
         mkdir certs
         cp quick-install/self-cert/domain.crt ./certs/
         cp quick-install/self-cert/domain.key ./certs/
-    - name: Add trow.test to hosts
+    - name: Test trow.test is accessible
       run: |
-        echo "127.0.0.1 trow.test" | sudo tee -a /etc/hosts        
+          curl trow.test
     - name: Run Cargo build
       uses: actions-rs/cargo@v1
       with:
