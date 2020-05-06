@@ -27,7 +27,7 @@ jobs:
         mkdir certs
         cp quick-install/self-cert/domain.crt ./certs/
         cp quick-install/self-cert/domain.key ./certs/
-    - name: Add trow.test to hosts
+    - name: Test trow.test is accessible
       run: |
         echo "127.0.0.1 trow.test" | sudo tee -a /etc/hosts  
     - name: Check trow.test is accessible
