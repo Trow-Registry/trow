@@ -31,8 +31,6 @@ docker tag $IMAGE $REPO:default
 if [[ "$CI" = true ]]
 then
     docker push $IMAGE
-    #docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:latest 
-    #docker push docker.pkg.github.com/containersolutions/trow/trow:latest 
     docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:default 
     docker push docker.pkg.github.com/containersolutions/trow/trow:default 
 
