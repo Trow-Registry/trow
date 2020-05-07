@@ -34,7 +34,7 @@ jobs:
          gpg --batch --keyserver ha.pool.sks-keyservers.net --recv-keys 27F3EA268A97867EAF0BD05C0F386284C03A1162
          gpg --batch --verify manifest-tool.asc manifest-tool
          chmod +x ./manifest-tool
-         rm -r "$GNUPGHOME" manifest-tool.asc
+         rm manifest-tool.asc
     - name: Build and push multi-arch
       run: |
           ./docker/multi-arch.sh
