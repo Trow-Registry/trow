@@ -37,5 +37,5 @@ then
     docker push docker.pkg.github.com/containersolutions/trow/trow:default 
 
     # Add new image name to manifest template
-    sed -i "s/{{TROW_AMD64_IMAGE}}/${IMAGE}/" ./manifest.tmpl
+    sed -i "s|{{TROW_AMD64_IMAGE}}|${IMAGE}|" ./manifest.tmpl
 fi
