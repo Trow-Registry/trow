@@ -3,12 +3,14 @@ manifests:
   -
     image: {{TROW_ARMV7_IMAGE}}
     platform:
-      architecture: armv7
+      architecture: arm
+      variant: v7
       os: linux
   -
     image: {{TROW_ARM64_IMAGE}}
     platform:
       architecture: arm64
+      variant: v8
       os: linux
   -
     image: {{TROW_AMD64_IMAGE}}
