@@ -1,0 +1,17 @@
+image: docker.pkg.github.com/containersolutions/trow/trow:latest
+manifests:
+  -
+    image: {{TROW_ARMV7_IMAGE}}
+    platform:
+      architecture: armv7
+      os: linux
+  -
+    image: {{TROW_ARM64_IMAGE}}
+    platform:
+      architecture: arm64
+      os: linux
+  -
+    image: {{TROW_AMD64_IMAGE}}
+    platform:
+      architecture: amd64
+      os: linux

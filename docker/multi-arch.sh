@@ -45,6 +45,8 @@ docker buildx build \
 if [[ "$CI" = true ]]
 then
     docker push $IMAGE
+    # Add new image name to manifest template
+    sed -i "s/{{TROW_ARMV7_IMAGE}}/${IMAGE}/" ./manifest.tmpl
 fi
 
 PLATFORM="linux/arm64"
@@ -65,4 +67,6 @@ docker buildx build \
 if [[ "$CI" = true ]]
 then
     docker push $IMAGE
+    # Add new image name to manifest template
+    sed -i "s/{{TROW_ARM64_IMAGE}}/${IMAGE}/" ./manifest.tmpl
 fi

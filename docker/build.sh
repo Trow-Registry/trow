@@ -13,7 +13,7 @@ else
     REPO=${DOCKER_REPO:-"containersol/trow"}
     VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 fi
-TAG=${DOCKER_TAG:-"default"}
+TAG=${DOCKER_TAG:-"$VERSION-arm64"}
 IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
 DATE="$(date --rfc-3339=seconds)"
 
@@ -26,11 +26,16 @@ docker build \
   --build-arg VERSION="$VERSION" \
   -f Dockerfile -t $IMAGE ../
 
+docker tag $IMAGE $REPO:default
+
 if [[ "$CI" = true ]]
 then
     docker push $IMAGE
-    docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:latest 
-    docker push docker.pkg.github.com/containersolutions/trow/trow:latest 
+    #docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:latest 
+    #docker push docker.pkg.github.com/containersolutions/trow/trow:latest 
     docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:default 
     docker push docker.pkg.github.com/containersolutions/trow/trow:default 
+
+    # Add new image name to manifest template
+    sed -i "s/{{TROW_AMD64_IMAGE}}/${IMAGE}/" ./manifest.tmpl
 fi

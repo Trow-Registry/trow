@@ -4,6 +4,9 @@ on:
   push:
     branches:
     - master
+  pull_request:
+    branches:
+    - master
 
 jobs:
   default_image:
@@ -26,4 +29,11 @@ jobs:
     - name: Build and push amd64 default target
       run: |
           ./docker/build.sh
+    - name: Push multi-arch image
+      run: |
+         curl -L -o ./manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.2/manifest-tool-linux-amd64
+         chmod +x ./manifest-tool
+         ./manifest-tool push from-spec manifest.tmpl
+
+
 
