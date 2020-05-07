@@ -12,12 +12,9 @@ docker buildx rm trow-multi
 docker buildx create --name trow-multi
 docker buildx use trow-multi
 
-if [[ "$CI" = true ]]
-then
-    REPO=${DOCKER_REPO:-"docker.pkg.github.com/containersolutions/trow/trow"}
-else
-    REPO=${DOCKER_REPO:-"containersol/trow"}
-fi
+# Github Package Repository doesn't support multi-arch images currently, so on hold
+GH_REPO=${DOCKER_REPO:-"docker.pkg.github.com/containersolutions/trow/trow"}
+REPO=${DOCKER_REPO:-"containersol/trow"}
 
 # If we're in a github action, set the image name differently
 if [[ "$CI" = true ]]
@@ -45,6 +42,8 @@ docker buildx build \
 if [[ "$CI" = true ]]
 then
     docker push $IMAGE
+    # Add new image name to manifest template
+    sed -i "s|{{TROW_ARMV7_IMAGE}}|${IMAGE}|" ./manifest.tmpl
 fi
 
 PLATFORM="linux/arm64"
@@ -65,4 +64,6 @@ docker buildx build \
 if [[ "$CI" = true ]]
 then
     docker push $IMAGE
+    # Add new image name to manifest template
+    sed -i "s|{{TROW_ARM64_IMAGE}}|${IMAGE}|" ./manifest.tmpl
 fi
