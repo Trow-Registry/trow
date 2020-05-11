@@ -4,9 +4,6 @@ on:
   push:
     branches:
     - master
-  pull_request:
-    branches:
-    - master
 
 jobs:
   default_image:
@@ -45,4 +42,3 @@ jobs:
     - name: Push multi-arch image
       run: |
          ./manifest-tool push from-spec ./docker/manifest.tmpl
-
