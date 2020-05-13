@@ -97,7 +97,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
     layers.push(layer);
     let mani = manifest::ManifestV2 {
         schema_version: 2,
-        media_type: "application/vnd.docker.distribution.manifest.v2+json".to_owned(),
+        media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
         config,
         layers,
     };
