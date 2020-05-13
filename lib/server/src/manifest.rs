@@ -62,7 +62,7 @@ pub struct Platform {
 #[serde(rename_all = "camelCase")]
 pub struct ManifestV2 {
     pub schema_version: u8,
-    pub media_type: String, //TODO: make enum
+    pub media_type: Option<String>, //TODO: make enum
     pub config: Object,
     pub layers: Vec<Object>,
 }
@@ -81,23 +81,34 @@ pub struct InvalidManifest {
     err: String,
 }
 
+// TODO: Consider changing this to enum with as_str() impl?
+pub mod manifest_media_type {
+    pub const DOCKER_V1: &'static str = "application/vnd.docker.distribution.manifest.v1+json";
+    pub const DOCKER_V2: &'static str = "application/vnd.docker.distribution.manifest.v2+json";
+    pub const OCI_V1: &'static str = "application/vnd.oci.image.manifest.v1+json";
+    pub const DOCKER_LIST: &'static str = "application/vnd.docker.distribution.manifest.list.v2+json";
+    pub const OCI_INDEX: &'static str = "application/vnd.oci.image.index.v1+json";
+
+    // Weirdly the media type is optional in the JSON, so assume OCI_V1.
+    // TODO: Check if we should be falling back to mime type
+    pub const DEFAULT: &'static str = OCI_V1;
+}
+
 fn schema_2(raw: &Value) -> Result<Manifest, Error> {
-    let mt = raw["mediaType"].as_str().ok_or(InvalidManifest {
-        err: "mediaType is required".to_owned(),
-    })?;
+
+    // According to the spec, manifests don't have to have a mediaType (?!).
+    // Assume V2 if not present.
+    let mt = raw["mediaType"].as_str().unwrap_or(manifest_media_type::DEFAULT);
 
     match mt {
-        "application/vnd.docker.distribution.manifest.v2+json" => {
-            Ok(Manifest::V2(serde_json::from_value(raw.clone())?))
-        }
-        "application/vnd.docker.distribution.manifest.list.v2+json" => {
-            Ok(Manifest::List(serde_json::from_value(raw.clone())?))
-        }
-        "application/vnd.oci.image.manifest.v1+json" => {
-            Ok(Manifest::V2(serde_json::from_value(raw.clone())?))
-        }
-        x => Err(InvalidManifest {
-            err: format!("Media Type {} is not supported.", x),
+        manifest_media_type::DOCKER_V2 | manifest_media_type::OCI_V1 =>
+            Ok(Manifest::V2(serde_json::from_value(raw.clone())?)),
+
+        manifest_media_type::DOCKER_LIST | manifest_media_type::OCI_INDEX => 
+            Ok(Manifest::List(serde_json::from_value(raw.clone())?)),
+
+        unknown => Err(InvalidManifest {
+            err: format!("Media Type {} is not supported.", unknown),
         })?,
     }
 }
@@ -145,10 +156,12 @@ impl Manifest {
         }
     }
 
-    pub fn get_media_type(&self) -> &str {
+    // TODO: use proper enums and return &str
+    pub fn get_media_type(&self) -> String {
         match *self {
-            Manifest::V2(ref m2) => &m2.media_type,
-            Manifest::List(ref list) => &list.media_type,
+            Manifest::V2(ref m2) => m2.media_type.as_ref().unwrap_or(
+                &manifest_media_type::DEFAULT.to_string()).to_string(),
+            Manifest::List(ref list) => list.media_type.clone(),
         }
     }
 }
@@ -205,7 +218,7 @@ mod test {
 
         assert_eq!(
             m_v2.media_type,
-            "application/vnd.docker.distribution.manifest.v2+json"
+            Some("application/vnd.docker.distribution.manifest.v2+json".to_string())
         );
         assert_eq!(m_v2.schema_version, 2);
         assert_eq!(
@@ -265,7 +278,7 @@ mod test {
 
         assert_eq!(
             m_v2.media_type,
-            "application/vnd.docker.distribution.manifest.v2+json"
+            Some("application/vnd.docker.distribution.manifest.v2+json".to_string())
         );
         assert_eq!(m_v2.schema_version, 2);
         assert_eq!(
