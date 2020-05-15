@@ -2,7 +2,6 @@ name: Conformance
 on:
     registry_package:
         types: [published,updated]
-        # Think GITHUB_REF is now the tag?!
     
     # For testing
     pull_request:
