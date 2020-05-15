@@ -19,7 +19,7 @@ jobs:
       - name: Run OCI Distribution Spec conformance tests
         uses: opencontainers/distribution-spec@master
         env:
-          OCI_ROOT_URL: https://trow:8000
+          OCI_ROOT_URL: http://trow:8000
           OCI_NAMESPACE: oci-conformance/distribution-test
           OCI_TEST_PULL: 1
           OCI_TEST_PUSH: 1
