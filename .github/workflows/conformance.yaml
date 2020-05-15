@@ -14,7 +14,7 @@ jobs:
     services:
       trow:
         image: containersol/trow:default
-        options: --entrypoint="/trow --no-tls"
+        options: --entrypoint=["/trow","--no-tls"]
         
     runs-on: ubuntu-latest
     steps:
