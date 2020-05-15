@@ -29,7 +29,7 @@ jobs:
           OCI_TEST_CONTENT_MANAGEMENT: 1
           OCI_HIDE_SKIPPED_WORKFLOWS: 0
           OCI_DEBUG: 0
-    - run: mkdir -p .out/ && mv {report.html,junit.xml} .out/
+        run: mkdir -p .out/ && mv {report.html,junit.xml} .out/
         if: always()
       - name: Upload test results zip as build artifact
         uses: actions/upload-artifact@v1
