@@ -13,9 +13,9 @@ jobs:
   run:
     services:
       trow:
-        image: 
+        image: docker.pkg.github.com/containersolutions/trow/trow:default
         #- docker.pkg.github.com/containersolutions/trow/trow:$GITHUB_REF
-        - docker.pkg.github.com/containersolutions/trow/trow:default
+        
     runs-on: ubuntu-latest
     steps:
       - name: Run OCI Distribution Spec conformance tests
