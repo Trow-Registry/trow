@@ -1,0 +1,39 @@
+name: Conformance
+on:
+    registry_package:
+        types: [published,updated]
+        # Think GITHUB_REF is now the tag?!
+    
+    # For testing
+    pull_request:
+        branches:
+            - master
+
+jobs:
+  run:
+    services:
+      trow:
+        image: 
+        #- docker.pkg.github.com/containersolutions/trow/trow:$GITHUB_REF
+        - docker.pkg.github.com/containersolutions/trow/trow:default
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run OCI Distribution Spec conformance tests
+        uses: opencontainers/distribution-spec@master
+        env:
+          OCI_ROOT_URL: https://trow:8443
+          OCI_NAMESPACE: oci-conformance/distribution-test
+          OCI_TEST_PULL: 1
+          OCI_TEST_PUSH: 1
+          OCI_TEST_CONTENT_DISCOVERY: 1
+          OCI_TEST_CONTENT_MANAGEMENT: 1
+          OCI_HIDE_SKIPPED_WORKFLOWS: 0
+          OCI_DEBUG: 0
+    - run: mkdir -p .out/ && mv {report.html,junit.xml} .out/
+        if: always()
+      - name: Upload test results zip as build artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: oci-test-results-${{ github.sha }}
+          path: .out/
+        if: always()
