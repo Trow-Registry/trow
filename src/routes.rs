@@ -25,6 +25,7 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
+        get_healthz,
         login,
         get_manifest,
         get_manifest_2level,
@@ -103,6 +104,15 @@ fn get_homepage<'a>() -> HTML<'a> {
 </body></html>";
 
     HTML(ROOT_RESPONSE)
+}
+
+/*
+* Trow health endpoint
+* GET /healthz
+ */
+#[get("/healthz")]
+fn get_healthz() -> JsonValue {
+    json!({ "status": "ok" })
 }
 
 // Want non HTML return for 404 for docker client
@@ -400,6 +410,7 @@ fn put_blob_3level(
 fn put_blob_4level(
     auth_user: TrowToken,
     config: rocket::State<ClientInterface>,
+
     fourth: String,
     org: String,
     repo: String,
