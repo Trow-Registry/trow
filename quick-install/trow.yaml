@@ -101,6 +101,25 @@ spec:
           name: cert-vol
         - mountPath: /data
           name: data-vol
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+            scheme: HTTPS
+            httpHeaders:
+            - name: HEALTH
+              value: "True"
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+            scheme: HTTPS
+            httpHeaders:
+            - name: READINESS
+              value: "True"
+
+          initialDelaySeconds: 3
+          periodSeconds: 3
       initContainers:
       - name: trow-init
         image: containersol/trow:init
@@ -147,4 +166,3 @@ spec:
     port: 443
     targetPort: 8443
     nodePort: 31000
-
