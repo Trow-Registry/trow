@@ -6,6 +6,7 @@ src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
 # Github Package Repository doesn't support multi-arch images currently, so on hold
+# Or pulls without authentication...
 GH_REPO=${DOCKER_REPO:-"docker.pkg.github.com/containersolutions/trow/trow"}
 REPO=${DOCKER_REPO:-"containersol/trow"}
 
@@ -33,7 +34,17 @@ docker tag $IMAGE $REPO:default
 
 if [[ "$CI" = true ]]
 then
+
     docker push $IMAGE
+    docker tag $IMAGE containersol/trow:default
+    docker push containersol/trow:default
+
+    # To run the Conformance tests in github actions, we need an image with --no-tls configured
+    docker build -f Dockerfile.notls -t containersol/trow:notls ../
+    docker push containersol/trow:notls
+
+    docker tag $IMAGE containersol/trow:latest
+    docker push containersol/trow:latest
     docker tag $IMAGE docker.pkg.github.com/containersolutions/trow/trow:default 
     docker push docker.pkg.github.com/containersolutions/trow/trow:default 
 
