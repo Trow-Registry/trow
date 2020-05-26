@@ -1,7 +1,9 @@
 name: Conformance
 on:
-    registry_package:
-        types: [published,updated]
+  registry_package:
+    action:
+      - published
+      - updated
     
 jobs:
   run:
