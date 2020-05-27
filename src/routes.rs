@@ -25,7 +25,7 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
-        get_healthz,
+        healthz,
         login,
         get_manifest,
         get_manifest_2level,
@@ -111,7 +111,7 @@ fn get_homepage<'a>() -> HTML<'a> {
 * GET /healthz
  */
 #[get("/healthz")]
-fn get_healthz() -> JsonValue {
+fn healthz() -> JsonValue {
     json!({ "status": "ok" })
 }
 
