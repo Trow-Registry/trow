@@ -1,3 +1,4 @@
+{{ if .Values.trow.webhooks }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
@@ -18,3 +19,4 @@ webhooks:
       service:
         name: trow
         path: "/validate-image"
+{{ end }}
