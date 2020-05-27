@@ -1,7 +1,7 @@
 name: Conformance
 on:
   registry_package:
-    action:
+    types:
       - published
       - updated
     
