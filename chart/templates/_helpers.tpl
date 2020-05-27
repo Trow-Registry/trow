@@ -51,13 +51,3 @@ app.kubernetes.io/name: {{ include "trow.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "trow.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create -}}
-    {{ default (include "trow.fullname" .) .Values.serviceAccount.name }}
-{{- else -}}
-    {{ default "default" .Values.serviceAccount.name }}
-{{- end -}}
-{{- end -}}
