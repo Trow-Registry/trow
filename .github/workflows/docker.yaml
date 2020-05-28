@@ -1,4 +1,5 @@
-name: Docker Images
+# Also builds the Docker images, but we want this name on the badge
+name: OCI Conformance
 
 on:
   push:
