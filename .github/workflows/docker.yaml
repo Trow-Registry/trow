@@ -28,7 +28,7 @@ jobs:
          curl -fSL -o ./manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.2/manifest-tool-linux-amd64
          curl -fSL -o ./manifest-tool.asc https://github.com/estesp/manifest-tool/releases/download/v1.0.2/manifest-tool-linux-amd64.asc
          export GNUPGHOME="$(mktemp -d)"
-         gpg --batch --keyserver pool.sks-keyservers.net --recv-keys 27F3EA268A97867EAF0BD05C0F386284C03A1162
+         gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys 27F3EA268A97867EAF0BD05C0F386284C03A1162
          gpg --batch --verify manifest-tool.asc manifest-tool
          chmod +x ./manifest-tool
          rm manifest-tool.asc
