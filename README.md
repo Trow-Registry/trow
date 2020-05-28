@@ -1,6 +1,6 @@
 [![](https://github.com/containersolutions/trow/workflows/Tests/badge.svg)](https://github.com/containersolutions/trow/actions)
 
-[![OCI Conformance](https://github.com/containersolutions/trow/workflows/Docker%20Images/badge.svg)](https://github.com/containersolutions/trow/actions)
+[![](https://github.com/containersolutions/trow/workflows/OCI%20Conformance/badge.svg)](https://github.com/containersolutions/trow/actions)
 
 # Trow
 Image Management for Kubernetes
