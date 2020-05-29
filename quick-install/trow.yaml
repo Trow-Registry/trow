@@ -107,6 +107,11 @@ spec:
             path: /healthz
             port: trow-port
             scheme: HTTPS
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: trow-port
+            scheme: HTTPS
       initContainers:
       - name: trow-init
         image: containersol/trow:init
