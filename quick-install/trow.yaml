@@ -95,7 +95,8 @@ spec:
         args: ["-n", "trow:31000 trow.{{namespace}}:31000", "-c", "/certs/domain.crt"]
         imagePullPolicy: Always
         ports:
-        - containerPort: 8443
+        - name: trow-port
+          containerPort: 8443
         volumeMounts:
         - mountPath: /certs
           name: cert-vol
@@ -104,22 +105,8 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8443
+            port: trow-port
             scheme: HTTPS
-            httpHeaders:
-            - name: HEALTH
-              value: "True"
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 8443
-            scheme: HTTPS
-            httpHeaders:
-            - name: READINESS
-              value: "True"
-
-          initialDelaySeconds: 3
-          periodSeconds: 3
       initContainers:
       - name: trow-init
         image: containersol/trow:init
