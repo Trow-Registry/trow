@@ -15,7 +15,8 @@ use rocket_contrib::json::{Json, JsonValue};
 use std::io::Seek;
 use std::str;
 use tonic::Code;
-
+use std::io;
+use std::fs::File;
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
 //for each runtime or move to Warp and share the runtime.
@@ -26,6 +27,7 @@ pub fn routes() -> Vec<rocket::Route> {
         get_v2root,
         get_homepage,
         healthz,
+        readiness,
         login,
         get_manifest,
         get_manifest_2level,
@@ -114,6 +116,35 @@ fn get_homepage<'a>() -> HTML<'a> {
 fn healthz() -> JsonValue {
     json!({ "status": "ok" })
 }
+
+
+/*
+* Trow readiness endpoint
+* GET /readiness
+ */
+fn check_data_dir_perm(data_path: &String) -> io::Result<bool> {
+    let file = File::open(data_path)?;
+    let metadata = file.metadata()?;
+    let permissions = metadata.permissions();
+    Ok(permissions.readonly())
+}
+
+#[get("/readiness")]
+fn readiness(tc: State<TrowConfig>) ->  JsonValue {
+    match  check_data_dir_perm(&tc.data_dir) {
+        Err(why) => { panic!("{:?}", why) }
+        Ok(bool) => {
+            if bool {
+                json!({"status": "error" ,"code": "400" ,"success": false, "reason": "data directory is readonly" })
+            } else {
+                json!({"status": "ok"})
+            }
+        }
+
+    }
+
+}
+
 
 // Want non HTML return for 404 for docker client
 #[catch(404)]
