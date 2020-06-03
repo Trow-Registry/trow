@@ -1,6 +1,9 @@
+#![feature(str_strip)]
+
 use crate::manifest::{FromJson, Manifest};
 use chrono::prelude::*;
 use failure::{self, Error};
+use prost_types::Timestamp;
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
@@ -10,7 +13,6 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
-use prost_types::Timestamp;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -21,7 +23,6 @@ pub mod trow_server {
 
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
-
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -48,7 +49,15 @@ pub struct TrowServer {
     allow_images: Vec<String>,
     deny_local_prefixes: Vec<String>,
     deny_local_images: Vec<String>,
+    forwards: Vec<Forward>
 }
+
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
+struct Forward {
+    repo_to_foward: String, // e.g. docker or forward/docker etc
+    destination: String, // e.g. docker.io or docker.io/library etc 
+}
+
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 struct Upload {
@@ -274,22 +283,62 @@ impl TrowServer {
         Ok(())
     }
 
-    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
-        let digest = if is_digest(reference) {
-            if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
-                error!("Digest {} not in repository {}", reference, repo_name);
-                return Err(failure::err_msg(format!(
-                    "Digest {} not in repository {}",
-                    reference, repo_name
-                )));
-            }
-            reference.to_string()
-        } else {
-            //Content of tag is the digest
-            self.get_digest_from_manifest(repo_name, reference)?
-        };
+    fn get_forward(&self, repo_name: &str) -> Option<Forward> {
 
-        return self.get_catalog_path_for_blob(&digest);
+        for fwd in self.forwards {
+            if repo_name.starts_with(&fwd.repo_to_foward) { // TODO: Check ends with / ?
+                return Some(fwd);
+            }
+        }
+
+        None
+    }
+
+    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
+        // This is doing a slow, synchronous d/l of blobs.
+        // In the long run, it should be replaced with an async version that tracks blobs to be downloaded
+        // so that client gets for blobs not fully downloaded can wait rather than 404
+        // (note that clients should *not* be able to download blobs before they are verified)
+
+        let path = if let Some(fwd) = self.get_forward(repo_name) {
+
+            let suffix = repo_name.strip_prefix(&fwd.repo_to_foward).unwrap();
+            let real_repo = fwd.repo_to_foward.to_string().push_str(suffix);
+
+            if is_digest(reference) {
+                //check if it's in forwards
+                // if it is return it
+                // else download it
+            }
+            
+            let manifest = download_remote_manifest(real_repo, reference); //Always downloaded unless digest we already have to make sure up-to-date
+            save_tag_to_forwards(manifest); // Think we should also have a tag if it's a digest
+            for layer in manifest {
+                if !in_blobs(layer) {
+                    // do all layers at same time
+                    download_layer();
+                }
+            }
+
+            self.get_forward_path_for_manifest(&digest)
+        } else {
+            let digest = if is_digest(reference) {
+                if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
+                    error!("Digest {} not in repository {}", reference, repo_name);
+                    return Err(failure::err_msg(format!(
+                        "Digest {} not in repository {}",
+                        reference, repo_name
+                    )));
+                }
+                reference.to_string()
+            } else {
+                //Content of tag is the digest
+                self.get_digest_from_manifest(repo_name, reference)?
+            };
+
+            self.get_catalog_path_for_blob(&digest)
+        };
+        return path;
     }
 
     fn create_verified_manifest(
@@ -746,10 +795,11 @@ impl Registry for TrowServer {
         &self,
         request: Request<ManifestHistoryRequest>,
     ) -> Result<Response<Self::GetManifestHistoryStream>, Status> {
-
         let mr = request.into_inner();
         if is_digest(&mr.tag) {
-            return Err(Status::invalid_argument("Require valid tag (not digest) to search for history"));
+            return Err(Status::invalid_argument(
+                "Require valid tag (not digest) to search for history",
+            ));
         }
 
         let file = File::open(self.manifests_path.join(&mr.repo_name).join(&mr.tag))?;
@@ -757,16 +807,13 @@ impl Registry for TrowServer {
 
         let (mut tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
-
             let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
-  
+
             let mut sent = 0;
             for line in reader.lines() {
                 if line.is_ok() {
-
                     let line = line.unwrap();
                     let (digest, date) = match line.find(' ') {
-
                         Some(ind) => {
                             let (digest_str, date_str) = line.split_at(ind);
 
@@ -781,13 +828,16 @@ impl Registry for TrowServer {
                             let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
 
                             let ts = if let Ok(dt) = dt_r {
-                                Some(Timestamp { seconds: dt.timestamp(), nanos: dt.timestamp_subsec_nanos() as i32})
+                                Some(Timestamp {
+                                    seconds: dt.timestamp(),
+                                    nanos: dt.timestamp_subsec_nanos() as i32,
+                                })
                             } else {
                                 warn!("Failed to parse timestamp {}", date_str);
                                 None
                             };
                             (digest_str, ts)
-                        },
+                        }
                         None => {
                             warn!("No timestamp found in manifest");
                             (line.as_ref(), None)
@@ -796,11 +846,11 @@ impl Registry for TrowServer {
 
                     let entry = ManifestHistoryEntry {
                         digest: digest.to_string(),
-                        date
+                        date,
                     };
                     tx.send(Ok(entry))
                         .await
-                       .expect("Error streaming manifest history");
+                        .expect("Error streaming manifest history");
 
                     sent = sent + 1;
                     if sent >= mr.limit {
