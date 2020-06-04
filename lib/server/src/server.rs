@@ -13,6 +13,7 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+use reqwest::{self, Client, };
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -49,13 +50,15 @@ pub struct TrowServer {
     allow_images: Vec<String>,
     deny_local_prefixes: Vec<String>,
     deny_local_images: Vec<String>,
-    forwards: Vec<Forward>
+    forwards: Vec<Forward>,
+    http_client: Client,
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 struct Forward {
     repo_to_foward: String, // e.g. docker or forward/docker etc
-    destination: String, // e.g. docker.io or docker.io/library etc 
+    destination_host: String, // e.g. docker.io
+    destination_repo: Option<String> // e.g. library
 }
 
 
@@ -223,6 +226,7 @@ impl TrowServer {
             allow_images,
             deny_local_prefixes,
             deny_local_images,
+            Client.new(),
         };
         Ok(svc)
     }
@@ -294,6 +298,24 @@ impl TrowServer {
         None
     }
 
+    fn download_remote_manifest(&self, host: &str, repo: &str, reference: &str) -> Result<Manifest, Error> {
+       
+        self.http_client
+           .get(&format!("{}/v2/{}/manifests/{}", host, repo, reference))
+           .send();
+       //check this resp.status(), StatusCode::OK
+       let mani: Manifest = resp.json().unwrap();
+       Ok(mani)
+    }
+
+
+    // Now thinking we need to do this right from the start
+    // Download manifest to scratch dir (this should block)
+    // Get all the blobs from manifest
+    // Add each digest to active_downloads
+    // Copy over when completed (how do we know when this is?!)
+
+    //check name still makes sense after fwd implementation
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
         // This is doing a slow, synchronous d/l of blobs.
         // In the long run, it should be replaced with an async version that tracks blobs to be downloaded
@@ -303,7 +325,7 @@ impl TrowServer {
         let path = if let Some(fwd) = self.get_forward(repo_name) {
 
             let suffix = repo_name.strip_prefix(&fwd.repo_to_foward).unwrap();
-            let real_repo = fwd.repo_to_foward.to_string().push_str(suffix);
+            let real_repo = fwd.destination_repo.to_string().push_str(suffix);
 
             if is_digest(reference) {
                 //check if it's in forwards
@@ -311,7 +333,7 @@ impl TrowServer {
                 // else download it
             }
             
-            let manifest = download_remote_manifest(real_repo, reference); //Always downloaded unless digest we already have to make sure up-to-date
+            let manifest = self.download_remote_manifest(&fwd.destination_host, real_repo, reference); //Always download unless digest we already have to make sure up-to-date
             save_tag_to_forwards(manifest); // Think we should also have a tag if it's a digest
             for layer in manifest {
                 if !in_blobs(layer) {

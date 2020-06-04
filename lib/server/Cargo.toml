@@ -22,6 +22,7 @@ log = "^0.3"
 uuid = { version = "^0.5", features = ["v4", "rustc-serialize"] }
 failure = "^0.1"
 failure_derive = "^0.1"
+reqwest = "^0.10"
 
 rust-crypto = "^0.2"
 
