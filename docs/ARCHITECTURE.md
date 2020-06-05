@@ -4,7 +4,7 @@ The following diagram depicts Trow running standalone (outside of a cluster).
 
 ![](diagrams/trow_arch.png)
 
-It's worth noting the following:
+Note:
 
  1. All interaction with clients (normally the Docker Daemon, but also podman, CI/CD tools etc) is
     currently via a RESTful (ish) API interface. The interface is defined by the OCI Distribution
@@ -56,14 +56,16 @@ but is a hack that shouldn't be used in production.
 
 The plan for the future is to have something more like this:
 
+![](diagrams/advanced_distribution.png)
 
 Every (or most) nodes run an instance of the Trow Back End. These instances communicate and share
 files with each other in a P2P style (similar to BitTorrent). This should provide an enormous speed
 in up in image deployment time for the cluster. It should also be designed to place minimal extra
 load on nodes.
 
-There is a single (or perhaps several) Front End instances for talking to clients. 
+There is a single (or perhaps several to allow for HA) Front End instances for talking to clients. 
 
 ## Upload/Download Tracking and File Layout
 
+To come.
 
