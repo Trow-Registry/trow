@@ -12,7 +12,8 @@ trow:
   domain: myregistry.mydomain.io
   user: user
   password: password
-  webhooks: false
+  webhooks:
+    enabled: false
 
 imagePullSecrets: []
 nameOverride: ""
