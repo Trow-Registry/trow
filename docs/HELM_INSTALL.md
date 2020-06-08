@@ -30,6 +30,7 @@ and annotate the ingress using the value `ingress.annotations`:
 # values.yaml
 ingress:
     enabled: true
+    gke: true
     annotations: 
         networking.gke.io/managed-certificates: trow
 ```
@@ -77,13 +78,14 @@ helm install \
 | ingress.enabled            | Enable the ingress setup                                                                          | false                                                                      |
 | ingress.annotations        | List of annotations to set on the ingress                                                         | {}                                                                         |
 | ingress.hosts              | Host configuration for the ingress                                                                | [{host: null, paths: ['/']}}                                               |
+| ingress.gke                | Set to true if you are using GKE's managed SSL certificates                                       | false                                                                      |
 | ingress.tls                | TLS configuration for the Ingress                                                                 | []                                                                         |
 | resources                  | Resource Limits and quotas (currently no limits or requests set)                                  | {}                                                                         |
-| nodeSelector               | Selector to define which nodes to put the pods on                                                  | {}                                                                         |
+| nodeSelector               | Selector to define which nodes to put the pods on                                                 | {}                                                                         |
 | tolerations                | Any toleration values to be set on the pods                                                       | []                                                                         |
 | affinity                   | Any affinity rules to be set on the pod                                                           | {}                                                                         |
 | volumeClaim                | As trow uses a statefulset and uses a volume to store data this can be configured accordingly     | {accessModes: ["ReadWriteOnce"], resources: {requests: {storage: "20Gi"}}} |
 | replicaCount               | Amount of replicas of trow to run                                                                 | 1                                                                          |
-| securityContext.fsGroup    | specifies supplimentary group ID                                                                                         | 999                                                                        |
+| securityContext.fsGroup    | specifies supplimentary group ID                                                                  | 999                                                                        |
 | securityContext.runAsGroup | Specifies the group that the trow container is run as                                             | 999                                                                        |
 | securityContext.runAsUser  | Specifies the user that the trow container is run as                                              | 999                                                                        |

@@ -17,6 +17,11 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+{{- if .Values.ingress.gke -}}
+  backend:
+    serviceName: {{ $fullName }}
+    servicePort: {{ $svcPort }}
+{{- else }}
 {{- if .Values.ingress.tls }}
   tls:
   {{- range .Values.ingress.tls }}
@@ -39,4 +44,5 @@ spec:
               servicePort: {{ $svcPort }}
         {{- end }}
   {{- end }}
+{{- end}}
 {{- end }}
