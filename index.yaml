@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  trow:
+  - apiVersion: v2
+    appVersion: 0.2.0
+    created: "2020-06-08T10:07:29.052532+02:00"
+    description: A Helm chart for Trow Registry
+    digest: 1e262eda5d26ced0aa01c63c51b872c492905de9342242b6ac69800f27a5864a
+    name: trow
+    type: application
+    urls:
+    - https://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.0.tgz
+    version: 0.1.0
+generated: "2020-06-08T10:07:29.051783+02:00"
