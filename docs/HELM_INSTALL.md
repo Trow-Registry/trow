@@ -65,7 +65,7 @@ helm install \
 
 ## Configuration
 
-| Parameter                  | Description |                                                                            |
+| Parameter                  | Description | Default                                                                    |
 |----------------------------|-------------|----------------------------------------------------------------------------|
 | trow.domain                |             | myregistry.mydomain.io                                                     |
 | trow.user                  |             | user                                                                       |
