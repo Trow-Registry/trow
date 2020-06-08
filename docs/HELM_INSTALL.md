@@ -65,25 +65,25 @@ helm install \
 
 ## Configuration
 
-| Parameter                  | Description | Default                                                                    |
-|----------------------------|-------------|----------------------------------------------------------------------------|
-| trow.domain                |             | myregistry.mydomain.io                                                     |
-| trow.user                  |             | user                                                                       |
-| trow.password              |             | password                                                                   |
-| trow.webhooks.enabled      |             | false                                                                      |
-| imagePullSecrets           |             | []                                                                         |
-| service.type               |             | NodePort                                                                   |
-| service.port               |             | 8000                                                                       |
-| ingress.enabled            |             | false                                                                      |
-| ingress.annotations        |             | {}                                                                         |
-| ingress.hosts              |             | [{host: null, paths: ['/']}}                                               |
-| ingress.tls                |             | []                                                                         |
-| resources                  |             | {}                                                                         |
-| nodeSelector               |             | {}                                                                         |
-| tolerations                |             | []                                                                         |
-| affinity                   |             | {}                                                                         |
-| volumeClaim                |             | {accessModes: ["ReadWriteOnce"], resources: {requests: {storage: "20Gi"}}} |
-| replicaCount               |             | 1                                                                          |
-| securityContext.fsGroup    |             | 999                                                                        |
-| securityContext.runAsGroup |             | 999                                                                        |
-| securityContext.runAsUser  |             | 999                                                                        |
+| Parameter                  | Description                                                                                       | Default                                                                    |
+|----------------------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| trow.domain                | The Domain that Trow will be served on, you will need to setup the DNS to point to the correct IP | myregistry.mydomain.io                                                     |
+| trow.user                  | admin user name                                                                                   | user                                                                       |
+| trow.password              | admin password                                                                                    | password                                                                   |
+| trow.webhooks.enabled      | enable the validation webhooks that block unauthorized images                                     | false                                                                      |
+| imagePullSecrets           | secret used to pull the image (not needed if using the default image)                             | []                                                                         |
+| service.type               | type on the service ( ClusterIP, NodePort, LoadBalancer)                                          | NodePort                                                                   |
+| service.port               | Port to expose the service on                                                                     | 8000                                                                       |
+| ingress.enabled            | Enable the ingress setup                                                                          | false                                                                      |
+| ingress.annotations        | List of annotations to set on the ingress                                                         | {}                                                                         |
+| ingress.hosts              | Host configuration for the ingress                                                                | [{host: null, paths: ['/']}}                                               |
+| ingress.tls                | TLS configuration for the Ingress                                                                 | []                                                                         |
+| resources                  | Resource Limits and quotas (currently no limits or requests set)                                  | {}                                                                         |
+| nodeSelector               | Selector to define which nodes to put the pods on                                                  | {}                                                                         |
+| tolerations                | Any toleration values to be set on the pods                                                       | []                                                                         |
+| affinity                   | Any affinity rules to be set on the pod                                                           | {}                                                                         |
+| volumeClaim                | As trow uses a statefulset and uses a volume to store data this can be configured accordingly     | {accessModes: ["ReadWriteOnce"], resources: {requests: {storage: "20Gi"}}} |
+| replicaCount               | Amount of replicas of trow to run                                                                 | 1                                                                          |
+| securityContext.fsGroup    | specifies supplimentary group ID                                                                                         | 999                                                                        |
+| securityContext.runAsGroup | Specifies the group that the trow container is run as                                             | 999                                                                        |
+| securityContext.runAsUser  | Specifies the user that the trow container is run as                                              | 999                                                                        |
