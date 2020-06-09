@@ -23,7 +23,7 @@ RUN cargo build --release --target armv7-unknown-linux-gnueabihf -Z unstable-opt
 
 FROM --platform=linux/arm/v7 debian:stable-slim
 
-RUN groupadd -r -g 999 trow && useradd -r -g trow -u 999 trow
+RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl libssl-dev \

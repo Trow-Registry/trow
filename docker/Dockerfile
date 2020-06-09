@@ -34,7 +34,7 @@ RUN cargo build --release -Z unstable-options --out-dir ./out
 
 FROM debian:stable-slim
 
-RUN groupadd -r -g 999 trow && useradd -r -g trow -u 999 trow
+RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl libssl-dev \
