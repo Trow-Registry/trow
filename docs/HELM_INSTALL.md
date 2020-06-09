@@ -71,7 +71,7 @@ helm install \
 | trow.domain                | The Domain that Trow will be served on, you will need to setup the DNS to point to the correct IP | myregistry.mydomain.io                                                     |
 | trow.user                  | admin user name                                                                                   | user                                                                       |
 | trow.password              | admin password                                                                                    | password                                                                   |
-| trow.webhooks.enabled      | enable the validation webhooks that block unauthorized images                                     | false                                                                      |
+| trow.validatingWebhooks.enabled  | enable the validation webhooks that block unauthorized images                                     | false                                                                      |
 | imagePullSecrets           | secret used to pull the image (not needed if using the default image)                             | []                                                                         |
 | service.type               | type on the service ( ClusterIP, NodePort, LoadBalancer)                                          | NodePort                                                                   |
 | service.port               | Port to expose the service on                                                                     | 8000                                                                       |
