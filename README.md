@@ -55,11 +55,16 @@ and maintain, and ideal for clusters following the
 
 Note that Trow is currently alpha and you can expect to find rough edges.
 
+## Architecture and Design
+
+If you're interested in the design of Trow please take a look at the [Architecture
+Guide](docs/ARCHITECTURE.md). 
+
 ## Tests
 
 There is a reasonably large test suite, which can be run with the `docker/test.sh` script.
 
-## Docs
+## User Guide
 
 Work has started on a [User Guide](docs/USER_GUIDE.md). Currently this explains
 how to persist images and how to list repositories and tags via curl.
@@ -67,7 +72,8 @@ how to persist images and how to list repositories and tags via curl.
 ## Contributing
 
 Please take a look at [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to help out and
-[DEVELOPING.md](DEVELOPING.md) for how to get started compiling and running Trow.
+[DEVELOPING.md](DEVELOPING.md) for how to get started compiling and running Trow. See also the
+[Architecture Guide](docs/ARCHITECTURE.md). 
 
 ## Code of Conduct
 

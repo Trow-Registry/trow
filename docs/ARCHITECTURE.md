@@ -98,12 +98,12 @@ To understand how this is used, consider the process of uploading a new image:
 
 So this means:
 
- - files in the `blobs` directory represent not just image layers, but also manifests and config
+ - Files in the `blobs` directory represent not just image layers, but also manifests and config
    data referred to from manifests.
- - the files in scratch _are not_ digests. They are UUIDs used for temporary tracking of uploads.
- - the manifests folder more or less indexes the blobs; it lets us find the data associated with a
+ - The files in scratch _are not_ digests. They are UUIDs used for temporary tracking of uploads.
+ - The manifests folder more or less indexes the blobs; it lets us find the data associated with a
    named tag.
- - doing a "GC sweep" to get rid of unused blobs means going through the manifests directory and
+ - Doing a "GC sweep" to get rid of unused blobs means going through the manifests directory and
    creating an inventory of digests referred to by the manifests. Any blobs that aren't on the final
    list can be safely deleted without breaking an image. The current plan is to avoid doing this in
    a "pause-the-world" GC pass and instead continually ensure the file system is synchronised.
