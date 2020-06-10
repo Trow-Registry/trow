@@ -48,8 +48,10 @@ spec:
             items:
               - key: pass
                 path: pass
-      securityContext:             
-        {{- toYaml .Values.securityContext | nindent 8 }}
+      securityContext:
+        runAsUser: 333333
+        runAsGroup: 333333
+        fsGroup: 333333
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

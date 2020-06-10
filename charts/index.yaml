@@ -9,7 +9,7 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.0/trow-0.3.0.tgz/trow-0.3.0.tgz
+    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.0/trow-0.3.0.tgz
     version: 0.3.0
   - apiVersion: v2
     appVersion: 0.2.0
@@ -19,7 +19,7 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.0/trow-0.3.0.tgz/trow-0.1.1.tgz
+    - https://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.1.tgz
     version: 0.1.1
   - apiVersion: v2
     appVersion: 0.2.0
@@ -29,6 +29,6 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.0/trow-0.3.0.tgz/trow-0.1.0.tgz
+    - https://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.0.tgz
     version: 0.1.0
 generated: "2020-06-10T09:49:07.244565+02:00"

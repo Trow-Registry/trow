@@ -19,10 +19,6 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-securityContext:
-  runAsUser: 999
-  runAsGroup: 999
-  fsGroup: 999
 
 service:
   type: NodePort
