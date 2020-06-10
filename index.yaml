@@ -2,23 +2,33 @@ apiVersion: v1
 entries:
   trow:
   - apiVersion: v2
+    appVersion: 0.3.0
+    created: "2020-06-10T09:49:07.248818+02:00"
+    description: A Helm chart for Trow Registry
+    digest: e3b5edcffc082dbdc0b42d5353fd46e7f6984dee1542615bfe351f41eb82178a
+    name: trow
+    type: application
+    urls:
+    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.0/trow-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v2
     appVersion: 0.2.0
-    created: "2020-06-08T15:47:11.818583+02:00"
+    created: "2020-06-10T09:49:07.248114+02:00"
     description: A Helm chart for Trow Registry
     digest: 4674f2dc7a6ce700b27b322d16df31c6db38fdf4dcaacba685892483a34b57bc
     name: trow
     type: application
     urls:
-    - hhttps://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.1.tgz/trow-0.1.1.tgz
+    - https://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.1.tgz
     version: 0.1.1
   - apiVersion: v2
     appVersion: 0.2.0
-    created: "2020-06-08T15:47:11.817689+02:00"
+    created: "2020-06-10T09:49:07.246813+02:00"
     description: A Helm chart for Trow Registry
     digest: 1e262eda5d26ced0aa01c63c51b872c492905de9342242b6ac69800f27a5864a
     name: trow
     type: application
     urls:
-    - hhttps://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.1.tgz/trow-0.1.0.tgz
+    - https://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.0.tgz
     version: 0.1.0
-generated: "2020-06-08T15:47:11.808248+02:00"
+generated: "2020-06-10T09:49:07.244565+02:00"
