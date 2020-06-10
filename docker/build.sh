@@ -17,7 +17,7 @@ else
     VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 fi
 
-TAG=${DOCKER_TAG:-"$VERSION-arm64"}
+TAG=${DOCKER_TAG:-"$VERSION-amd64"}
 IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
 DATE="$(date --rfc-3339=seconds)"
 

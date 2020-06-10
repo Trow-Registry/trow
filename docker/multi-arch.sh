@@ -5,11 +5,15 @@
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-# Register binfmt handlers
-docker run --rm --privileged aptman/qus -s -- -p arm aarch64
-# Create new build instance
-docker buildx rm trow-multi
-docker buildx create --name trow-multi
+# Use trow-multi builder if it exists, otherwise create it
+
+if [[ $(docker buildx ls | grep -s trow-multi) != 0 ]]
+then
+    # Register binfmt handlers
+    docker run --rm --privileged aptman/qus -s -- -p arm aarch64
+    # Create new build instance
+    docker buildx create --name trow-multi
+fi
 docker buildx use trow-multi
 
 # Github Package Repository doesn't support multi-arch images currently, so on hold
