@@ -140,9 +140,9 @@ spec:
         - name: data-vol
           emptyDir: {}
       securityContext:
-        runAsUser: 999
-        runAsGroup: 999
-        fsGroup: 999
+        runAsUser: 333333
+        runAsGroup: 333333
+        fsGroup: 333333
 ---
 apiVersion: v1
 kind: Service

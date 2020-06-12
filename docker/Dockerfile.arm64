@@ -2,8 +2,9 @@
 #This can be a lot faster than compiling directly on slow hw.
 
 #Not a big fan of using nightly, but such is our lot currently
+#Note we build on amd64 and cross-compile to arch
 FROM --platform=linux/amd64 rust:latest as builder
-RUN rustup update nightly && rustup default nightly && \
+RUN rustup update nightly-2020-05-15 && rustup default nightly-2020-05-15 && \
     rustup component add rustfmt && rustup target install aarch64-unknown-linux-gnu && \
     rustup toolchain install nightly-aarch64-unknown-linux-gnu
 RUN apt-get update && apt-get install -y unzip gcc-aarch64-linux-gnu
@@ -22,7 +23,7 @@ RUN cargo build --release --target aarch64-unknown-linux-gnu -Z unstable-options
 
 FROM --platform=linux/arm64 debian:stable-slim
 
-RUN groupadd -r -g 999 trow && useradd -r -g trow -u 999 trow
+RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl libssl-dev \

@@ -4,7 +4,7 @@
 #Not a big fan of using nightly, but such is our lot currently
 FROM --platform=linux/amd64 rust:latest as builder
 
-RUN rustup update nightly && rustup default nightly && \
+RUN rustup update nightly-2020-05-15 && rustup default nightly-2020-05-15 && \
     rustup component add rustfmt && rustup target install armv7-unknown-linux-gnueabihf && \
     rustup toolchain install nightly-armv7-unknown-linux-gnueabihf
 RUN apt-get update && apt-get install -y unzip gcc-arm-linux-gnueabihf
@@ -23,7 +23,7 @@ RUN cargo build --release --target armv7-unknown-linux-gnueabihf -Z unstable-opt
 
 FROM --platform=linux/arm/v7 debian:stable-slim
 
-RUN groupadd -r -g 999 trow && useradd -r -g trow -u 999 trow
+RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl libssl-dev \
