@@ -21,6 +21,8 @@ pub mod trow_server {
 
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
+use crate::server::trow_server::health_service_server::HealthService;
+use crate::server::trow_server::readiness_service_server::ReadinessService;
 
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -427,6 +429,39 @@ impl TrowServer {
 }
 
 #[tonic::async_trait]
+impl ReadinessService for  TrowServer {
+    async fn is_ready(
+        &self,
+        request: Request<ReadinessRequest>,
+    ) -> Result<Response<ReadyStatus>, Status> {
+        println!("Got a request from {:?}", request.remote_addr());
+
+        let reply = trow_server::ReadyStatus {
+            message: format!("Hello!"),
+            is_ready: true
+        };
+        Ok(Response::new(reply))
+    }
+}
+
+
+#[tonic::async_trait]
+impl HealthService for  TrowServer {
+    async fn is_healthy(
+        &self,
+        request: Request<HealthRequest>,
+    ) -> Result<Response<HealthStatus>, Status> {
+        println!("Got a request from {:?}", request.remote_addr());
+
+        let reply = trow_server::HealthStatus {
+            message: format!("Hello!"),
+            is_healthy: true
+        };
+        Ok(Response::new(reply))
+    }
+}
+
+#[tonic::async_trait]
 impl Registry for TrowServer {
     async fn request_upload(
         &self,
@@ -759,7 +794,7 @@ impl Registry for TrowServer {
         tokio::spawn(async move {
 
             let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
-  
+
             let mut sent = 0;
             for line in reader.lines() {
                 if line.is_ok() {
