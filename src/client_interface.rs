@@ -3,10 +3,15 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogRequest,
-    CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, health_service_client::HealthServiceClient,
+     readiness_service_client::ReadinessServiceClient, HealthRequest, HealthStatus, UploadRef, CatalogRequest,
+     CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
 };
-use tonic::Request;
+
+use tonic::{Request, Response};
+use tonic::transport::Channel;
+// use std::error::Error;
+
 use crate::types::{self, *};
 use failure::Error;
 use serde_json::Value;
@@ -53,7 +58,7 @@ impl ClientInterface {
         Ok(ClientInterface { server })
     }
 
-    async fn connect_registry(&self) -> 
+    async fn connect_registry(&self) ->
     Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
 
         debug!("Connecting to {}", self.server);
@@ -62,7 +67,7 @@ impl ClientInterface {
         x
     }
 
-    async fn connect_admission_controller(&self) -> 
+    async fn connect_admission_controller(&self) ->
     Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
 
         debug!("Connecting to {}", self.server);
@@ -70,6 +75,25 @@ impl ClientInterface {
         debug!("Connected to {}", self.server);
         x
     }
+
+    async fn connect_health_service(&self) ->
+    Result<HealthServiceClient<Channel>, tonic::transport::Error> {
+
+        debug!("Connecting to {}", self.server);
+        let x = HealthServiceClient::connect(self.server.to_string()).await;
+        debug!("Connected to {}", self.server);
+        x
+    }
+
+    async fn connect_readiness_service(&self) ->
+    Result<ReadinessServiceClient<Channel>, tonic::transport::Error> {
+
+        debug!("Connecting to {}", self.server);
+        let x = ReadinessServiceClient::connect(self.server.to_string()).await;
+        debug!("Connected to {}", self.server);
+        x
+    }
+
 
     /**
      * Ok so these functions are largely boilerplate to call the GRPC backend.
@@ -81,7 +105,7 @@ impl ClientInterface {
      **/
 
     pub async fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
-        
+
         let req = UploadRequest{
             repo_name: repo_name.0.clone()
         };
@@ -147,7 +171,7 @@ impl ClientInterface {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone()
         };
-    
+
         let resp = self.connect_registry().await?.get_write_details_for_manifest(
             Request::new(mr)).await?.into_inner();
 
@@ -165,7 +189,7 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<ManifestReader, Error> {
-        
+
         let mr = ManifestRef {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone()
@@ -190,7 +214,7 @@ impl ClientInterface {
         limit: u32,
         last_digest: &str
     ) -> Result<ManifestHistory, Error> {
-        
+
         let mr = ManifestHistoryRequest {
             tag: reference.to_owned(),
             repo_name: repo_name.0.clone(),
@@ -324,7 +348,7 @@ impl ClientInterface {
 
         while let Some(tag) = stream.message().await? {
             list.insert(tag.tag.to_owned());
-        }    
+        }
 
         Ok(list)
     }
@@ -338,7 +362,7 @@ impl ClientInterface {
         host_names: &[String],
     ) -> Result<types::AdmissionResponse, Error> {
 
-        
+
         //TODO: write something to convert automatically (into()) between AdmissionRequest types
         // TODO: we should really be sending the full object to the backend.
         let mut images = Vec::new();
@@ -373,6 +397,37 @@ impl ClientInterface {
             allowed: resp.is_allowed,
             status: Some(st),
         })
-        
+
+    }
+
+
+    /**
+     Health
+    */
+    pub async fn is_healthy(
+        &self,
+    ) -> Result<Response<HealthStatus>,Error>
+    {
+        let mut client = self.connect_health_service().await?;
+        let req = Request::new(HealthRequest{});
+        let resp  = client.is_healthy(req).await?;
+        let value = resp.into_inner();
+        // check with Adrian why this should be automatic
+        println!("HealthStatus = {:?}", value);
+
+        Ok(Response::new(value))
+    }
+
+
+    /**
+     Readiness
+    */
+
+    pub async fn is_ready(
+        &self,
+        req: trow_proto::ReadyStatus
+    ) -> Result<trow_proto::ReadyStatus, Error>
+    {
+        unimplemented!()
     }
 }
