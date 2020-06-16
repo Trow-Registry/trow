@@ -77,7 +77,7 @@ message ManifestReadLocation {
 
 message CatalogRequest {
   uint32 limit = 1;
-  string last_repo = 2;  
+  string last_repo = 2;
 }
 
 message ListTagsRequest {
@@ -119,16 +119,16 @@ service Registry {
 
   //Note UUID is really just a reference number, doesn't have to be a UUID. Blame Docker.
   //Assigns a "UUID" to a Upload that is then used to track it
-  
+
   rpc RequestUpload (UploadRequest) returns (UploadDetails) {}
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
-  
+
   rpc GetWriteLocationForBlob (UploadRef) returns (WriteLocation) {}
 
   //Given a digest and repo, get the download
-  
+
   rpc GetReadLocationForBlob (BlobRef) returns (BlobReadLocation) {}
 
   rpc DeleteBlob(BlobRef) returns (BlobDeleted) {}
@@ -137,18 +137,18 @@ service Registry {
 
   //Given a UUID, return where to write the upload to
   //For the moment this is just a file path
-  
+
   rpc GetWriteDetailsForManifest (ManifestRef) returns (ManifestWriteDetails) {}
 
   rpc GetReadLocationForManifest (ManifestRef) returns (ManifestReadLocation) {}
-  
+
   //Check the blobs exist and the digest is correct etc
-  
+
   rpc VerifyManifest (VerifyManifestRequest) returns (VerifiedManifest) {}
 
   // Called once all blobs and manifest has been uploaded
   // Returns _server_ digest, which may differ to the _user_ digest (due to compression alg)
-  
+
   rpc CompleteUpload (CompleteRequest) returns (CompletedUpload) {}
 
   rpc GetCatalog (CatalogRequest) returns (stream CatalogEntry) {}
@@ -187,4 +187,26 @@ service AdmissionController{
   //TODO mutating admission controller to pin digests
   //rpc MutateAdmission (AdmissionRequest) returns (AdmissionResponse) {}
 
+}
+
+message HealthRequest {}
+
+message HealthStatus {
+  string message = 1;
+  bool is_healthy = 2;
+}
+
+service HealthService {
+  rpc IsHealthy(HealthRequest) returns (HealthStatus) {}
+}
+
+message ReadinessRequest {}
+
+message ReadyStatus {
+  string message = 1;
+  bool is_ready = 2;
+}
+
+service ReadinessService {
+  rpc IsReady (ReadinessRequest) returns (ReadyStatus) {}
 }
