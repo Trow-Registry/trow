@@ -7,7 +7,7 @@ use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
-use rocket;
+use rocket::*;
 use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
@@ -15,8 +15,18 @@ use rocket_contrib::json::{Json, JsonValue};
 use std::io::Seek;
 use std::str;
 use tonic::Code;
-use std::io;
-use std::fs::File;
+
+// use std::io;
+// use std::fs::File;
+
+// route
+// TODO: use routes when its available
+// mod health;
+mod health;
+// mod readiness;
+
+// use readiness::readiness;
+
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
 //for each runtime or move to Warp and share the runtime.
@@ -26,8 +36,8 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
-        healthz,
-        readiness,
+        health::healthz,
+        // routes::readiness::readiness,
         login,
         get_manifest,
         get_manifest_2level,
@@ -112,38 +122,46 @@ fn get_homepage<'a>() -> HTML<'a> {
 * Trow health endpoint
 * GET /healthz
  */
-#[get("/healthz")]
-fn healthz() -> JsonValue {
-    json!({ "status": "ok" })
-}
 
 
-/*
-* Trow readiness endpoint
-* GET /readiness
- */
-fn check_data_dir_perm(data_path: &String) -> io::Result<bool> {
-    let file = File::open(data_path)?;
-    let metadata = file.metadata()?;
-    let permissions = metadata.permissions();
-    Ok(permissions.readonly())
-}
+// #[get("/healthz")]
+// fn healthz(
+//     ci: rocket::State<ClientInterface>,
+//     tc: rocket::State<TrowConfig>,
+// ) -> JsonValue {
+//     let re = ci.is_healthy();
+//     let mut rt = Runtime::new().unwrap();
+//     rt.block_on(re).ok();
+//     json!({ "status": "ok" })
+// }
 
-#[get("/readiness")]
-fn readiness(tc: State<TrowConfig>) ->  JsonValue {
-    match  check_data_dir_perm(&tc.data_dir) {
-        Err(why) => { panic!("{:?}", why) }
-        Ok(bool) => {
-            if bool {
-                json!({"status": "error" ,"code": "400" ,"success": false, "reason": "data directory is readonly" })
-            } else {
-                json!({"status": "ok"})
-            }
-        }
 
-    }
+// /*
+// * Trow readiness endpoint
+// * GET /readiness
+//  */
+// fn check_data_dir_perm(data_path: &String) -> io::Result<bool> {
+//     let file = File::open(data_path)?;
+//     let metadata = file.metadata()?;
+//     let permissions = metadata.permissions();
+//     Ok(permissions.readonly())
+// }
 
-}
+// #[get("/readiness")]
+// fn readiness(tc: State<TrowConfig>) ->  JsonValue {
+//     match  check_data_dir_perm(&tc.data_dir) {
+//         Err(why) => { panic!("{:?}", why) }
+//         Ok(bool) => {
+//             if bool {
+//                 json!({"status": "error" ,"code": "400" ,"success": false, "reason": "data directory is readonly" })
+//             } else {
+//                 json!({"status": "ok"})
+//             }
+//         }
+
+//     }
+
+// }
 
 
 // Want non HTML return for 404 for docker client
