@@ -1,6 +1,6 @@
 apiVersion: v2
 name: trow
-description: A Helm chart for Trow Registry
+description: Helm chart for Trow registry
 
 type: application
 version: 0.3.0

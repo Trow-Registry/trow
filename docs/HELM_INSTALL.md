@@ -12,9 +12,9 @@ helm repo add trow https://trow.io
 helm install trow trow/trow
 ```
 ## Notes on installation
-Trow needs to be served Via `TLS`, by default the ingress is disabled and the pod runs without TLS, so you would need to expose the trow pod (the prefered method is via ingress) and add TLS to this, the default way using:
-### GKE
-create a managed certificate as followed:
+Trow needs to be served Via `TLS`, by default the ingress is disabled, so you would need to expose the trow pod (the prefered method is via ingress) and add TLS to this, the default way using:
+### Google Managed Certificates on GKE
+create a managed certificate as follows:
 ```yaml
 apiVersion: networking.gke.io/v1beta1
 kind: ManagedCertificate
@@ -86,6 +86,3 @@ helm install \
 | affinity                   | Any affinity rules to be set on the pod                                                           | {}                                                                         |
 | volumeClaim                | As trow uses a statefulset and uses a volume to store data this can be configured accordingly     | {accessModes: ["ReadWriteOnce"], resources: {requests: {storage: "20Gi"}}} |
 | replicaCount               | Amount of replicas of trow to run                                                                 | 1                                                                          |
-| securityContext.fsGroup    | specifies supplimentary group ID                                                                  | 999                                                                        |
-| securityContext.runAsGroup | Specifies the group that the trow container is run as                                             | 999                                                                        |
-| securityContext.runAsUser  | Specifies the user that the trow container is run as                                              | 999                                                                        |
