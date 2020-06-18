@@ -10,4 +10,4 @@ To test you can run and login with the credentials for {{ .Values.trow.user }}
 $ docker login https://{{ .Values.trow.domain }}
 
 
-Please Contribute To the Trow Project at https://github.com/ContainerSolutions/trow/
+please contribute to the Trow project at https://github.com/ContainerSolutions/trow/
