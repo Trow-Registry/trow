@@ -1,4 +1,4 @@
-Welcome to Trow:
+Welcome to Trow!
 
 Setup your DNS to point at Trow
 
