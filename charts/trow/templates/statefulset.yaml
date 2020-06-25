@@ -1,0 +1,73 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "trow.fullname" . }}
+  labels:
+    {{- include "trow.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "trow.selectorLabels" . | nindent 6 }}
+  serviceName: trow
+  template:
+    metadata:
+      labels:
+        {{- include "trow.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      containers:
+      - name: trow-pod
+        image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: 
+          - "--no-tls" 
+          - "-n" 
+          - {{ .Values.trow.domain | quote }}
+          - "-u" 
+          - {{ .Values.trow.user | quote }} 
+          - "--password-file" 
+          - "/etc/trow/pass"
+        ports:
+        - name: http
+          containerPort: 8000
+        volumeMounts:
+        - name: data-vol
+          mountPath: /data
+        - name: trow-pass
+          mountPath: /etc/trow
+          readOnly: true
+      volumes:
+        - name: trow-pass
+          secret:
+            secretName: {{ include "trow.fullname" . }}-password
+            items:
+              - key: pass
+                path: pass
+      securityContext:
+        runAsUser: 333333
+        runAsGroup: 333333
+        fsGroup: 333333
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- with .Values.volumeClaim }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data-vol
+      spec:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
