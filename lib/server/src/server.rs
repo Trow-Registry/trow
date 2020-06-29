@@ -12,6 +12,8 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use prost_types::Timestamp;
 
+use std::io;
+
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
@@ -50,6 +52,7 @@ pub struct TrowServer {
     allow_images: Vec<String>,
     deny_local_prefixes: Vec<String>,
     deny_local_images: Vec<String>,
+    data_dir_path: String
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
@@ -186,6 +189,13 @@ fn is_digest(maybe_digest: &str) -> bool {
     false
 }
 
+fn check_data_dir_perm(data_path: &String) -> io::Result<bool> {
+    let file = File::open(data_path)?;
+    let metadata = file.metadata()?;
+    let permissions = metadata.permissions();
+    Ok(permissions.readonly())
+}
+
 fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
     let digest_date = fs::read_to_string(path)?;
     //Should be digest followed by date, but allow for digest only
@@ -207,6 +217,7 @@ impl TrowServer {
         let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
         let scratch_path = create_path(data_path, UPLOADS_DIR)?;
         let blobs_path = create_path(data_path, BLOBS_DIR)?;
+        let data_dir_path = data_path.to_string();
         let svc = TrowServer {
             active_uploads: Arc::new(RwLock::new(HashSet::new())),
             manifests_path,
@@ -216,6 +227,7 @@ impl TrowServer {
             allow_images,
             deny_local_prefixes,
             deny_local_images,
+            data_dir_path
         };
         Ok(svc)
     }
@@ -429,18 +441,36 @@ impl TrowServer {
 }
 
 #[tonic::async_trait]
-impl ReadinessService for  TrowServer {
+impl ReadinessService for TrowServer {
     async fn is_ready(
         &self,
         request: Request<ReadinessRequest>,
     ) -> Result<Response<ReadyStatus>, Status> {
         println!("Got a request from {:?}", request.remote_addr());
-
-        let reply = trow_server::ReadyStatus {
-            message: format!("Hello!"),
-            is_ready: true
-        };
-        Ok(Response::new(reply))
+        match check_data_dir_perm(&self.data_dir_path) {
+            Ok(bool) => {
+                if bool {
+                    let reply = trow_server::ReadyStatus {
+                        message: format!("Data directory is read only!"),
+                        is_ready: false,
+                        status: "Error".to_string()
+                    };
+                
+                    Ok(Response::new(reply))
+               } else {
+                    let reply = trow_server::ReadyStatus {
+                        message: format!("Trow is ready."),
+                        is_ready: true,
+                        status: "Ready".to_string()
+                    };
+                    Ok(Response::new(reply))
+               }
+            },
+            Err(error) => {
+                // debug!("Error reading data dir")
+                panic!()
+            }
+        } 
     }
 }
 
@@ -454,8 +484,9 @@ impl HealthService for  TrowServer {
         println!("Got a request from {:?}", request.remote_addr());
 
         let reply = trow_server::HealthStatus {
-            message: format!("Hello!"),
-            is_healthy: true
+            message: format!("Healthy"),
+            is_healthy: true,
+            status: "OK".to_string()
         };
         Ok(Response::new(reply))
     }
