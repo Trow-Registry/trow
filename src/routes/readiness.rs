@@ -1,37 +1,36 @@
-use std::io;
-use std::fs::File;
-
 use rocket::{get};
-use rocket_contrib::json::{Json, JsonValue};
+use rocket::State;
+use rocket_contrib::json::{Json};
+use crate::client_interface::ClientInterface;
+use tokio::runtime::Runtime;
+use crate::types::ReadinessResponse;
 
-pub mod readiness {
-    /*
-    * Trow readiness endpoint
-    * GET /readiness
-    */
-    fn check_data_dir_perm(data_path: &String) -> io::Result<bool> {
-        let file = File::open(data_path)?;
-        let metadata = file.metadata()?;
-        let permissions = metadata.permissions();
-        Ok(permissions.readonly())
-    }
-    
-    #[get("/readiness")]
-    pub fn readiness(
-        // tc: State<TrowConfig>
-    
-    ) ->  JsonValue {
-        match  check_data_dir_perm(&tc.data_dir) {
-            Err(why) => { panic!("{:?}", why) }
-            Ok(bool) => {
-                if bool {
-                    json!({"status": "error" ,"code": "400" ,"success": false, "reason": "data directory is readonly" })
-                } else {
-                    json!({"status": "ok"})
-                }
-            }
-    
+
+/*
+* Trow readiness endpoint
+* GET /readiness
+*/
+
+#[get("/readiness")]
+pub fn readiness(
+    ci: State<ClientInterface>,
+) ->  Json<ReadinessResponse> {
+    let request = ci.is_ready();
+    let mut rt = Runtime::new().unwrap();
+    match rt.block_on(request) {
+        Ok(response) => {
+            Json(ReadinessResponse{
+                message: response.message,
+                status: response.status,
+                is_ready: response.is_ready
+            })
+        },
+        Err(error) => {
+            Json(ReadinessResponse{
+                message: "Error".to_string(),
+                status: error.to_string(),
+                is_ready: false
+            })
         }
-    
-    }
+    }    
 }
