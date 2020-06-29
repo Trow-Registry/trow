@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::io::Read;
 use chrono::{DateTime, Utc};
 
+
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]
 pub struct Uuid(pub String);
@@ -323,4 +324,20 @@ pub struct AdmissionReview {
     pub kind: String,
     pub request: Option<AdmissionRequest>,
     pub response: Option<AdmissionResponse>,
+}
+
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct HealthResponse {
+    pub message: String,
+    pub is_healthy: bool,
+    pub status: String
+
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize ,PartialEq)]
+pub struct ReadinessResponse {
+    pub message: String,
+    pub is_ready: bool,
+    pub status: String
 }
