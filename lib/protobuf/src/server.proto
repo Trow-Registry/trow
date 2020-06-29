@@ -194,17 +194,21 @@ message HealthRequest {}
 message HealthStatus {
   string message = 1;
   bool is_healthy = 2;
+  string status = 3;
 }
 
 service HealthService {
   rpc IsHealthy(HealthRequest) returns (HealthStatus) {}
 }
 
-message ReadinessRequest {}
+message ReadinessRequest {
+}
 
 message ReadyStatus {
   string message = 1;
   bool is_ready = 2;
+  string status = 3;
+
 }
 
 service ReadinessService {
