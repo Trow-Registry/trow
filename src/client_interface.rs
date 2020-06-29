@@ -4,9 +4,10 @@ pub mod trow_proto {
 
 use trow_proto::{
     registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, health_service_client::HealthServiceClient,
-     readiness_service_client::ReadinessServiceClient, HealthRequest, HealthStatus, UploadRef, CatalogRequest,
+     readiness_service_client::ReadinessServiceClient, HealthRequest, ReadinessRequest, UploadRef, CatalogRequest,
      CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
 };
+
 
 use tonic::{Request, Response};
 use tonic::transport::Channel;
@@ -404,18 +405,22 @@ impl ClientInterface {
     /**
      Health
     */
+
     pub async fn is_healthy(
         &self,
-    ) -> Result<Response<HealthStatus>,Error>
+    ) -> Result<types::HealthResponse,Error>
     {
         let mut client = self.connect_health_service().await?;
         let req = Request::new(HealthRequest{});
         let resp  = client.is_healthy(req).await?;
-        let value = resp.into_inner();
-        // check with Adrian why this should be automatic
-        println!("HealthStatus = {:?}", value);
+        let response_value = resp.into_inner();
+        println!("HealthStatus = {:?}", response_value);
 
-        Ok(Response::new(value))
+        Ok(types::HealthResponse {
+            is_healthy: response_value.is_healthy,
+            message: response_value.message, 
+            status: response_value.status
+        })
     }
 
 
@@ -425,9 +430,18 @@ impl ClientInterface {
 
     pub async fn is_ready(
         &self,
-        req: trow_proto::ReadyStatus
-    ) -> Result<trow_proto::ReadyStatus, Error>
-    {
-        unimplemented!()
+    ) -> Result<types::ReadinessResponse, Error>
+    {   
+        let mut client = self.connect_readiness_service().await?;
+        let req = Request::new(ReadinessRequest{});
+        let resp  = client.is_ready(req).await?;
+        let response_value = resp.into_inner();
+        println!("ReadyStatus = {:?}", response_value);
+
+        Ok(types::ReadinessResponse {
+            is_ready: response_value.is_ready,
+            message: response_value.message,
+            status: response_value.status
+        })
     }
 }
