@@ -23,7 +23,7 @@ use tonic::Code;
 // TODO: use routes when its available
 // mod health;
 mod health;
-// mod readiness;
+mod readiness;
 
 // use readiness::readiness;
 
@@ -37,7 +37,7 @@ pub fn routes() -> Vec<rocket::Route> {
         get_v2root,
         get_homepage,
         health::healthz,
-        // routes::readiness::readiness,
+        readiness::readiness,
         login,
         get_manifest,
         get_manifest_2level,
@@ -117,52 +117,6 @@ fn get_homepage<'a>() -> HTML<'a> {
 
     HTML(ROOT_RESPONSE)
 }
-
-/*
-* Trow health endpoint
-* GET /healthz
- */
-
-
-// #[get("/healthz")]
-// fn healthz(
-//     ci: rocket::State<ClientInterface>,
-//     tc: rocket::State<TrowConfig>,
-// ) -> JsonValue {
-//     let re = ci.is_healthy();
-//     let mut rt = Runtime::new().unwrap();
-//     rt.block_on(re).ok();
-//     json!({ "status": "ok" })
-// }
-
-
-// /*
-// * Trow readiness endpoint
-// * GET /readiness
-//  */
-// fn check_data_dir_perm(data_path: &String) -> io::Result<bool> {
-//     let file = File::open(data_path)?;
-//     let metadata = file.metadata()?;
-//     let permissions = metadata.permissions();
-//     Ok(permissions.readonly())
-// }
-
-// #[get("/readiness")]
-// fn readiness(tc: State<TrowConfig>) ->  JsonValue {
-//     match  check_data_dir_perm(&tc.data_dir) {
-//         Err(why) => { panic!("{:?}", why) }
-//         Ok(bool) => {
-//             if bool {
-//                 json!({"status": "error" ,"code": "400" ,"success": false, "reason": "data directory is readonly" })
-//             } else {
-//                 json!({"status": "ok"})
-//             }
-//         }
-
-//     }
-
-// }
-
 
 // Want non HTML return for 404 for docker client
 #[catch(404)]
