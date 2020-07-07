@@ -38,7 +38,7 @@ mod test {
     use crate::types::{HealthResponse};
     use crate::response::test_helper::test_route;
     
-    fn build_response() -> HealthResponse {
+    fn build_healthy_response() -> HealthResponse {
         HealthResponse {
             status: String::from("OK"),
             message: String::from("Healthy"),
@@ -46,10 +46,24 @@ mod test {
         }
     }
 
+    fn build_unhealthy_response() -> HealthResponse {
+        HealthResponse {
+            status: String::from("OK"),
+            message: String::from("Healthy"),
+            is_healthy: false
+        }
+    }
+
     #[test]
-    fn test_resp() {
-        let response = test_route(build_response());
+    fn test_healthy_resp() {
+        let response = test_route(build_healthy_response());
         assert_eq!(response.status(), Status::Ok);
       
+    }
+
+    #[test]
+    fn test_unhealthy_response() {
+        let response = test_route(build_unhealthy_response());
+        assert_eq!(response.status(), Status::ServiceUnavailable);
     }
 }
