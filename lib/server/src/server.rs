@@ -453,7 +453,7 @@ impl ReadinessService for TrowServer {
                     let reply = trow_server::ReadyStatus {
                         message: format!("Data directory is read only!"),
                         is_ready: false,
-                        status: "Error".to_string()
+                        status: String::from("Error")
                     };
                 
                     Ok(Response::new(reply))
@@ -461,14 +461,20 @@ impl ReadinessService for TrowServer {
                     let reply = trow_server::ReadyStatus {
                         message: format!("Trow is ready."),
                         is_ready: true,
-                        status: "Ready".to_string()
+                        status: String::from("Ready!")
                     };
                     Ok(Response::new(reply))
                }
             },
             Err(error) => {
-                // debug!("Error reading data dir")
-                panic!()
+                let reply = trow_server::ReadyStatus {
+                    message: error.to_string(),
+                    is_ready: false,
+                    status: String::from("Error")
+                };
+            
+                Ok(Response::new(reply))
+                
             }
         } 
     }
