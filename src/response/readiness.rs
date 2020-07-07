@@ -36,7 +36,7 @@ mod test {
     use crate::types::{ReadinessResponse};
     use crate::response::test_helper::test_route;
     
-    fn build_response() -> ReadinessResponse {
+    fn build_ready_response() -> ReadinessResponse {
         ReadinessResponse {
             status: String::from("Ready"),
             message: String::from("Is Ready"),
@@ -44,10 +44,25 @@ mod test {
         }
     }
 
+    fn build_not_ready_response() -> ReadinessResponse  {
+        ReadinessResponse {
+            status: String::from("Not Ready"),
+            message: String::from("Is Not Ready"),
+            is_ready: false
+        }
+    }
+
     #[test]
-    fn test_resp() {
-        let response = test_route(build_response());
+    fn test_ready_resp() {
+        let response = test_route(build_ready_response());
         assert_eq!(response.status(), Status::Ok);
+      
+    }
+
+    #[test]
+    fn test_not_ready_resp() {
+        let response = test_route(build_not_ready_response());
+        assert_eq!(response.status(), Status::ServiceUnavailable);
       
     }
 }
