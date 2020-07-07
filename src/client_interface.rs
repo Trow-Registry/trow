@@ -414,7 +414,6 @@ impl ClientInterface {
         let req = Request::new(HealthRequest{});
         let resp  = client.is_healthy(req).await?;
         let response_value = resp.into_inner();
-        println!("HealthStatus = {:?}", response_value);
 
         Ok(types::HealthResponse {
             is_healthy: response_value.is_healthy,
@@ -436,7 +435,6 @@ impl ClientInterface {
         let req = Request::new(ReadinessRequest{});
         let resp  = client.is_ready(req).await?;
         let response_value = resp.into_inner();
-        println!("ReadyStatus = {:?}", response_value);
 
         Ok(types::ReadinessResponse {
             is_ready: response_value.is_ready,

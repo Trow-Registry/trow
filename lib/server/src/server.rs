@@ -444,9 +444,9 @@ impl TrowServer {
 impl ReadinessService for TrowServer {
     async fn is_ready(
         &self,
-        request: Request<ReadinessRequest>,
+        _request: Request<ReadinessRequest>,
     ) -> Result<Response<ReadyStatus>, Status> {
-        println!("Got a request from {:?}", request.remote_addr());
+
         match check_data_dir_perm(&self.data_dir_path) {
             Ok(bool) => {
                 if bool {
@@ -485,10 +485,9 @@ impl ReadinessService for TrowServer {
 impl HealthService for  TrowServer {
     async fn is_healthy(
         &self,
-        request: Request<HealthRequest>,
+        _request: Request<HealthRequest>,
     ) -> Result<Response<HealthStatus>, Status> {
-        println!("Got a request from {:?}", request.remote_addr());
-
+        
         let reply = trow_server::HealthStatus {
             message: format!("Healthy"),
             is_healthy: true,
