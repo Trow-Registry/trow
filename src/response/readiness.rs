@@ -1,22 +1,53 @@
+use std::io::Cursor;
+
 use rocket::http::ContentType;
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
+
 use crate::types::ReadinessResponse;
 
-
 impl<'r> Responder<'r> for ReadinessResponse {
-    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
-        if self.is_ready {
-            Response::build()
-                .status(Status::Ok)
+    fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
+       
+        let json = serde_json::to_string(&self).unwrap_or_default();
+
+        match self.is_ready {
+            true => {
+                Response::build()
                 .header(ContentType::JSON)
+                .sized_body(Cursor::new(json))
+                .status(Status::Ok)
                 .ok()
-        } else {
-            Response::build()
-            .status(Status::BadRequest)
-            .header(ContentType::JSON)
-            .ok()
+            },
+            false => {
+                Response::build()
+                .header(ContentType::JSON)
+                .sized_body(Cursor::new(json))
+                .status(Status::ServiceUnavailable)
+                .ok()
+            }
         }
+    }
+}
+#[cfg(test)]
+mod test {
+    use rocket::http::Status;
+    use crate::types::{ReadinessResponse};
+    use crate::response::test_helper::test_route;
+    
+    fn build_response() -> ReadinessResponse {
+        ReadinessResponse {
+            status: String::from("Ready"),
+            message: String::from("Is Ready"),
+            is_ready: true
+        }
+    }
+
+    #[test]
+    fn test_resp() {
+        let response = test_route(build_response());
+        assert_eq!(response.status(), Status::Ok);
+      
     }
 }
