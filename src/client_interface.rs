@@ -9,7 +9,7 @@ use trow_proto::{
 };
 
 
-use tonic::{Request, Response};
+use tonic::{Request};
 use tonic::transport::Channel;
 // use std::error::Error;
 
