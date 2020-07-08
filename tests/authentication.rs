@@ -12,6 +12,7 @@ mod common;
 #[cfg(test)]
 mod authentication_tests {
 
+    use crate::common;
     use environment::Environment;
 
     use reqwest::StatusCode;
@@ -78,8 +79,7 @@ mod authentication_tests {
 
     impl Drop for TrowInstance {
         fn drop(&mut self) {
-            //Y U NO HV STOP?
-            self.pid.kill().unwrap();
+            common::kill_gracefully(&self.pid);
         }
     }
 

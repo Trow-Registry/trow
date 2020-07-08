@@ -94,12 +94,23 @@ spec:
         args: ["-n", "trow:31000 trow.kube-public:31000"]
         imagePullPolicy: Always
         ports:
-        - containerPort: 8443
+        - name: trow-port
+          containerPort: 8443
         volumeMounts:
         - mountPath: /certs
           name: cert-vol
         - mountPath: /data
           name: data-vol
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: trow-port
+            scheme: HTTPS
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: trow-port
+            scheme: HTTPS
       initContainers:
       - name: trow-init
         command: ["/init.sh"]
@@ -154,4 +165,3 @@ spec:
     port: 443
     targetPort: 8443
     nodePort: 31000
-

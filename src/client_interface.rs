@@ -3,10 +3,13 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, UploadRef, CatalogRequest,
-    CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, HealthRequest, ReadinessRequest, UploadRef, CatalogRequest,
+     CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
 };
-use tonic::Request;
+
+
+use tonic::{Request};
+
 use crate::types::{self, *};
 use failure::Error;
 use serde_json::Value;
@@ -53,7 +56,7 @@ impl ClientInterface {
         Ok(ClientInterface { server })
     }
 
-    async fn connect_registry(&self) -> 
+    async fn connect_registry(&self) ->
     Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
 
         debug!("Connecting to {}", self.server);
@@ -62,7 +65,7 @@ impl ClientInterface {
         x
     }
 
-    async fn connect_admission_controller(&self) -> 
+    async fn connect_admission_controller(&self) ->
     Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
 
         debug!("Connecting to {}", self.server);
@@ -81,7 +84,7 @@ impl ClientInterface {
      **/
 
     pub async fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
-        
+
         let req = UploadRequest{
             repo_name: repo_name.0.clone()
         };
@@ -147,7 +150,7 @@ impl ClientInterface {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone()
         };
-    
+
         let resp = self.connect_registry().await?.get_write_details_for_manifest(
             Request::new(mr)).await?.into_inner();
 
@@ -165,7 +168,7 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<ManifestReader, Error> {
-        
+
         let mr = ManifestRef {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone()
@@ -190,7 +193,7 @@ impl ClientInterface {
         limit: u32,
         last_digest: &str
     ) -> Result<ManifestHistory, Error> {
-        
+
         let mr = ManifestHistoryRequest {
             tag: reference.to_owned(),
             repo_name: repo_name.0.clone(),
@@ -324,7 +327,7 @@ impl ClientInterface {
 
         while let Some(tag) = stream.message().await? {
             list.insert(tag.tag.to_owned());
-        }    
+        }
 
         Ok(list)
     }
@@ -338,7 +341,7 @@ impl ClientInterface {
         host_names: &[String],
     ) -> Result<types::AdmissionResponse, Error> {
 
-        
+
         //TODO: write something to convert automatically (into()) between AdmissionRequest types
         // TODO: we should really be sending the full object to the backend.
         let mut images = Vec::new();
@@ -373,6 +376,73 @@ impl ClientInterface {
             allowed: resp.is_allowed,
             status: Some(st),
         })
+
+    }
+
+
+    /**
+     Health check.
+
+    Note that the server will indicate unhealthy by returning an error.
+    */
+    pub async fn is_healthy(
+        &self,
+    ) -> types::HealthResponse
+    {
+        let mut client = match self.connect_registry().await {
+            Ok(cl) => cl,
+            Err(_) => return types::HealthResponse {
+                is_healthy: false,
+                message: "Failed to connect to registry".to_string(),
+            }
+        };
         
+        let req = Request::new(HealthRequest{});
+        let resp = match client.is_healthy(req).await {
+            Ok(r) => r,
+            Err(e) => return types::HealthResponse {
+                is_healthy: false,
+                message: e.to_string(),
+            }
+        };
+        let response_value = resp.into_inner();
+
+        types::HealthResponse {
+            is_healthy: true,
+            message: response_value.message
+        }
+    }
+
+
+    /**
+     Readiness check.
+
+     Note that the server will indicate not ready by returning an error.
+    */
+    pub async fn is_ready(
+        &self,
+    ) -> types::ReadinessResponse
+    {   
+        let mut client = match self.connect_registry().await {
+            Ok(cl) => cl,
+            Err(_) => return types::ReadinessResponse {
+                is_ready: false,
+                message: "Failed to connect to registry".to_string(),
+            }
+        };
+        
+        let req = Request::new(ReadinessRequest{});
+        let resp = match client.is_ready(req).await {
+            Ok(r) => r,
+            Err(e) => return types::ReadinessResponse {
+                is_ready: false,
+                message: e.to_string(),
+            }
+        };
+        let response_value = resp.into_inner();
+        types::ReadinessResponse {
+            is_ready: true,
+            message: response_value.message,
+        }
     }
 }

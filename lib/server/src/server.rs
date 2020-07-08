@@ -12,6 +12,8 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use prost_types::Timestamp;
 
+use std::io;
+
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
@@ -182,6 +184,13 @@ fn is_digest(maybe_digest: &str) -> bool {
     }
 
     false
+}
+
+fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
+    let file = File::open(path)?;
+    let metadata = file.metadata()?;
+    let permissions = metadata.permissions();
+    Ok(!permissions.readonly())
 }
 
 fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
@@ -759,7 +768,7 @@ impl Registry for TrowServer {
         tokio::spawn(async move {
 
             let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
-  
+
             let mut sent = 0;
             for line in reader.lines() {
                 if line.is_ok() {
@@ -810,5 +819,44 @@ impl Registry for TrowServer {
             }
         });
         Ok(Response::new(rx))
+    }
+
+     // Readiness check
+     async fn is_ready(
+        &self,
+        _request: Request<ReadinessRequest>,
+    ) -> Result<Response<ReadyStatus>, Status> {
+
+        for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
+            
+            match is_path_writable(path) {
+                Ok(true) => {},
+                Ok(false) => {
+                    return Err(Status::unavailable(format!("{} is not writable", path.to_string_lossy())));
+                    },
+                Err(error) => {
+                    return Err(Status::unavailable(error.to_string()));
+                }
+            }
+        }
+
+        //All paths writable
+        let reply = trow_server::ReadyStatus {
+            message: String::from("Ready"),
+        };
+
+        return Ok(Response::new(reply));
+            
+    }
+
+    async fn is_healthy(
+        &self,
+        _request: Request<HealthRequest>,
+    ) -> Result<Response<HealthStatus>, Status> {
+        
+        let reply = trow_server::HealthStatus {
+            message: String::from("Healthy")
+        };
+        Ok(Response::new(reply))
     }
 }

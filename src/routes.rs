@@ -7,7 +7,6 @@ use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
-use rocket;
 use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
@@ -15,6 +14,9 @@ use rocket_contrib::json::{Json, JsonValue};
 use std::io::Seek;
 use std::str;
 use tonic::Code;
+
+mod health;
+mod readiness;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
@@ -25,6 +27,8 @@ pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
         get_homepage,
+        health::healthz,
+        readiness::readiness,
         login,
         get_manifest,
         get_manifest_2level,
@@ -400,6 +404,7 @@ fn put_blob_3level(
 fn put_blob_4level(
     auth_user: TrowToken,
     config: rocket::State<ClientInterface>,
+
     fourth: String,
     org: String,
     repo: String,

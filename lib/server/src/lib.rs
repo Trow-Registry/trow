@@ -67,20 +67,20 @@ impl TrowServerBuilder {
     }
 
     pub fn start_trow_sync(self) -> () {
-        
+
         let mut rt = Runtime::new().expect("Failed to start Tokio runtime");
-        let ts = TrowServer::new( 
-            &self.data_path, 
-            self.allow_prefixes, 
-            self.allow_images, 
-            self.deny_prefixes, 
+        let ts = TrowServer::new(
+            &self.data_path,
+            self.allow_prefixes,
+            self.allow_images,
+            self.deny_prefixes,
             self.deny_images).expect("Failure configuring Trow Server");
-    
+
         let server = Server::builder()
             .add_service(RegistryServer::new(ts.clone()))
             .add_service(AdmissionControllerServer::new(ts))
             .serve(self.listen_addr);
-        
+
         debug!("Trow backend service running");
 
         match rt.block_on(server)
