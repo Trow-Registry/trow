@@ -39,7 +39,6 @@ mod test {
     
     fn build_healthy_response() -> HealthResponse {
         HealthResponse {
-            status: String::from("OK"),
             message: String::from("Healthy"),
             is_healthy: true
         }
@@ -47,7 +46,6 @@ mod test {
 
     fn build_unhealthy_response() -> HealthResponse {
         HealthResponse {
-            status: String::from("OK"),
             message: String::from("Healthy"),
             is_healthy: false
         }

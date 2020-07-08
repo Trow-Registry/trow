@@ -15,20 +15,5 @@ pub fn readiness(
 ) -> ReadinessResponse {
     let request = ci.is_ready();
     let mut rt = Runtime::new().unwrap();
-    match rt.block_on(request) {
-        Ok(response) => {
-            ReadinessResponse{
-                message: response.message,
-                status: response.status,
-                is_ready: response.is_ready
-            }
-        },
-        Err(error) => {
-            ReadinessResponse{
-                message: String::from("Error"),
-                status: error.to_string(),
-                is_ready: false
-            }
-        }
-    }    
+    rt.block_on(request) 
 }

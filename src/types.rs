@@ -330,14 +330,12 @@ pub struct AdmissionReview {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct HealthResponse {
     pub message: String,
-    pub is_healthy: bool,
-    pub status: String
+    pub is_healthy: bool
 
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize ,PartialEq)]
 pub struct ReadinessResponse {
     pub message: String,
-    pub is_ready: bool,
-    pub status: String
+    pub is_ready: bool
 }

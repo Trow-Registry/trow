@@ -381,41 +381,68 @@ impl ClientInterface {
 
 
     /**
-     Health check
+     Health check.
+
+    Note that the server will indicate unhealthy by returning an error.
     */
     pub async fn is_healthy(
         &self,
-    ) -> Result<types::HealthResponse,Error>
+    ) -> types::HealthResponse
     {
-        let mut client = self.connect_registry().await?;
+        let mut client = match self.connect_registry().await {
+            Ok(cl) => cl,
+            Err(_) => return types::HealthResponse {
+                is_healthy: false,
+                message: "Failed to connect to registry".to_string(),
+            }
+        };
+        
         let req = Request::new(HealthRequest{});
-        let resp  = client.is_healthy(req).await?;
+        let resp = match client.is_healthy(req).await {
+            Ok(r) => r,
+            Err(e) => return types::HealthResponse {
+                is_healthy: false,
+                message: e.to_string(),
+            }
+        };
         let response_value = resp.into_inner();
 
-        Ok(types::HealthResponse {
-            is_healthy: response_value.is_healthy,
-            message: response_value.message, 
-            status: response_value.status
-        })
+        types::HealthResponse {
+            is_healthy: true,
+            message: response_value.message
+        }
     }
 
 
     /**
      Readiness check.
+
+     Note that the server will indicate not ready by returning an error.
     */
     pub async fn is_ready(
         &self,
-    ) -> Result<types::ReadinessResponse, Error>
+    ) -> types::ReadinessResponse
     {   
-        let mut client = self.connect_registry().await?;
+        let mut client = match self.connect_registry().await {
+            Ok(cl) => cl,
+            Err(_) => return types::ReadinessResponse {
+                is_ready: false,
+                message: "Failed to connect to registry".to_string(),
+            }
+        };
+        
         let req = Request::new(ReadinessRequest{});
-        let resp  = client.is_ready(req).await?;
+        let resp = match client.is_ready(req).await {
+            Ok(r) => r,
+            Err(e) => return types::ReadinessResponse {
+                is_ready: false,
+                message: e.to_string(),
+            }
+        };
         let response_value = resp.into_inner();
-
-        Ok(types::ReadinessResponse {
-            is_ready: response_value.is_ready,
+        types::ReadinessResponse {
+            is_ready: true,
             message: response_value.message,
-            status: response_value.status
-        })
+        }
     }
 }

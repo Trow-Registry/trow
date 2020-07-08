@@ -832,29 +832,17 @@ impl Registry for TrowServer {
             match is_path_writable(path) {
                 Ok(true) => {},
                 Ok(false) => {
-                    let reply = trow_server::ReadyStatus {
-                            message: format!("{} is not writable", path.to_string_lossy()),
-                            is_ready: false,
-                            status: String::from("Error")
-                        };
-                    return Ok(Response::new(reply));
+                    return Err(Status::unavailable(format!("{} is not writable", path.to_string_lossy())));
                     },
                 Err(error) => {
-                    let reply = trow_server::ReadyStatus {
-                        message: error.to_string(),
-                        is_ready: false,
-                        status: String::from("Error")
-                    };
-                    return Ok(Response::new(reply));
+                    return Err(Status::unavailable(error.to_string()));
                 }
             }
         }
 
         //All paths writable
         let reply = trow_server::ReadyStatus {
-            message: format!("Ready"),
-            is_ready: true,
-            status: String::from("OK")
+            message: String::from("Ready"),
         };
 
         return Ok(Response::new(reply));
@@ -867,9 +855,7 @@ impl Registry for TrowServer {
     ) -> Result<Response<HealthStatus>, Status> {
         
         let reply = trow_server::HealthStatus {
-            message: format!("Healthy"),
-            is_healthy: true,
-            status: "OK".to_string()
+            message: String::from("Healthy")
         };
         Ok(Response::new(reply))
     }

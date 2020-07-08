@@ -78,7 +78,7 @@ impl TrowServerBuilder {
 
         let server = Server::builder()
             .add_service(RegistryServer::new(ts.clone()))
-            .add_service(AdmissionControllerServer::new(ts.clone()))
+            .add_service(AdmissionControllerServer::new(ts))
             .serve(self.listen_addr);
 
         debug!("Trow backend service running");

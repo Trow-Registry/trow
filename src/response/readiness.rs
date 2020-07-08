@@ -38,16 +38,14 @@ mod test {
     
     fn build_ready_response() -> ReadinessResponse {
         ReadinessResponse {
-            status: String::from("Ready"),
-            message: String::from("Is Ready"),
+            message: String::from("Ready"),
             is_ready: true
         }
     }
 
     fn build_not_ready_response() -> ReadinessResponse  {
         ReadinessResponse {
-            status: String::from("Not Ready"),
-            message: String::from("Is Not Ready"),
+            message: String::from("Not Ready"),
             is_ready: false
         }
     }

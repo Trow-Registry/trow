@@ -115,19 +115,17 @@ message ManifestHistoryEntry {
 
 message HealthRequest {}
 
+
+//Unhealthy Status is indicated by return code e.g. unavailableh
 message HealthStatus {
   string message = 1;
-  bool is_healthy = 2;
-  string status = 3;
 }
 
 message ReadinessRequest {}
 
+//Not Ready Status is indicated by return code e.g. unavailable
 message ReadyStatus {
   string message = 1;
-  bool is_ready = 2;
-  string status = 3;
-
 }
 
 //TODO: can we type digests and references so that we can control if it's a digest or tag?
