@@ -11,7 +11,6 @@ use trow_proto::{
 
 use tonic::{Request};
 use tonic::transport::Channel;
-// use std::error::Error;
 
 use crate::types::{self, *};
 use failure::Error;

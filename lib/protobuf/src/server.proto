@@ -201,8 +201,7 @@ service HealthService {
   rpc IsHealthy(HealthRequest) returns (HealthStatus) {}
 }
 
-message ReadinessRequest {
-}
+message ReadinessRequest {}
 
 message ReadyStatus {
   string message = 1;

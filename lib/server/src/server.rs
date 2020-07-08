@@ -189,11 +189,11 @@ fn is_digest(maybe_digest: &str) -> bool {
     false
 }
 
-fn check_data_dir_perm(data_path: &String) -> io::Result<bool> {
+fn is_data_dir_writable(data_path: &String) -> io::Result<bool> {
     let file = File::open(data_path)?;
     let metadata = file.metadata()?;
     let permissions = metadata.permissions();
-    Ok(permissions.readonly())
+    Ok(!permissions.readonly())
 }
 
 fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
@@ -447,36 +447,31 @@ impl ReadinessService for TrowServer {
         _request: Request<ReadinessRequest>,
     ) -> Result<Response<ReadyStatus>, Status> {
 
-        match check_data_dir_perm(&self.data_dir_path) {
-            Ok(bool) => {
-                if bool {
-                    let reply = trow_server::ReadyStatus {
+        let reply = match is_data_dir_writable(&self.data_dir_path) {
+
+            Ok(true) => {
+                trow_server::ReadyStatus {
+                    message: format!("Trow is ready."),
+                    is_ready: true,
+                    status: String::from("Ready!")
+                }   
+           },
+           Ok(false) => {
+                trow_server::ReadyStatus {
                         message: format!("Data directory is read only!"),
                         is_ready: false,
                         status: String::from("Error")
-                    };
-                
-                    Ok(Response::new(reply))
-               } else {
-                    let reply = trow_server::ReadyStatus {
-                        message: format!("Trow is ready."),
-                        is_ready: true,
-                        status: String::from("Ready!")
-                    };
-                    Ok(Response::new(reply))
-               }
-            },
+                    }
+                },
             Err(error) => {
-                let reply = trow_server::ReadyStatus {
+                trow_server::ReadyStatus {
                     message: error.to_string(),
                     is_ready: false,
                     status: String::from("Error")
-                };
-            
-                Ok(Response::new(reply))
-                
+                }
             }
-        } 
+        };
+        Ok(Response::new(reply))
     }
 }
 
