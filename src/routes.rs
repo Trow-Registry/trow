@@ -7,7 +7,6 @@ use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
-use rocket::*;
 use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
@@ -16,16 +15,8 @@ use std::io::Seek;
 use std::str;
 use tonic::Code;
 
-// use std::io;
-// use std::fs::File;
-
-// route
-// TODO: use routes when its available
-// mod health;
 mod health;
 mod readiness;
-
-// use readiness::readiness;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local

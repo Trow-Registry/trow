@@ -16,8 +16,6 @@ mod server;
 mod validate;
 use server::trow_server::registry_server::RegistryServer;
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
-use server::trow_server::health_service_server::HealthServiceServer;
-use server::trow_server::readiness_service_server::ReadinessServiceServer;
 use server::TrowServer;
 use tokio::runtime::Runtime;
 
@@ -81,8 +79,6 @@ impl TrowServerBuilder {
         let server = Server::builder()
             .add_service(RegistryServer::new(ts.clone()))
             .add_service(AdmissionControllerServer::new(ts.clone()))
-            .add_service(HealthServiceServer::new(ts.clone()))
-            .add_service(ReadinessServiceServer::new(ts.clone()))
             .serve(self.listen_addr);
 
         debug!("Trow backend service running");

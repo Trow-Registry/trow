@@ -3,14 +3,12 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, health_service_client::HealthServiceClient,
-     readiness_service_client::ReadinessServiceClient, HealthRequest, ReadinessRequest, UploadRef, CatalogRequest,
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, HealthRequest, ReadinessRequest, UploadRef, CatalogRequest,
      CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
 };
 
 
 use tonic::{Request};
-use tonic::transport::Channel;
 
 use crate::types::{self, *};
 use failure::Error;
@@ -75,25 +73,6 @@ impl ClientInterface {
         debug!("Connected to {}", self.server);
         x
     }
-
-    async fn connect_health_service(&self) ->
-    Result<HealthServiceClient<Channel>, tonic::transport::Error> {
-
-        debug!("Connecting to {}", self.server);
-        let x = HealthServiceClient::connect(self.server.to_string()).await;
-        debug!("Connected to {}", self.server);
-        x
-    }
-
-    async fn connect_readiness_service(&self) ->
-    Result<ReadinessServiceClient<Channel>, tonic::transport::Error> {
-
-        debug!("Connecting to {}", self.server);
-        let x = ReadinessServiceClient::connect(self.server.to_string()).await;
-        debug!("Connected to {}", self.server);
-        x
-    }
-
 
     /**
      * Ok so these functions are largely boilerplate to call the GRPC backend.
@@ -402,14 +381,13 @@ impl ClientInterface {
 
 
     /**
-     Health
+     Health check
     */
-
     pub async fn is_healthy(
         &self,
     ) -> Result<types::HealthResponse,Error>
     {
-        let mut client = self.connect_health_service().await?;
+        let mut client = self.connect_registry().await?;
         let req = Request::new(HealthRequest{});
         let resp  = client.is_healthy(req).await?;
         let response_value = resp.into_inner();
@@ -423,14 +401,13 @@ impl ClientInterface {
 
 
     /**
-     Readiness
+     Readiness check.
     */
-
     pub async fn is_ready(
         &self,
     ) -> Result<types::ReadinessResponse, Error>
     {   
-        let mut client = self.connect_readiness_service().await?;
+        let mut client = self.connect_registry().await?;
         let req = Request::new(ReadinessRequest{});
         let resp  = client.is_ready(req).await?;
         let response_value = resp.into_inner();

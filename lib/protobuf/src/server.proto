@@ -113,6 +113,23 @@ message ManifestHistoryEntry {
 
 }
 
+message HealthRequest {}
+
+message HealthStatus {
+  string message = 1;
+  bool is_healthy = 2;
+  string status = 3;
+}
+
+message ReadinessRequest {}
+
+message ReadyStatus {
+  string message = 1;
+  bool is_ready = 2;
+  string status = 3;
+
+}
+
 //TODO: can we type digests and references so that we can control if it's a digest or tag?
 
 service Registry {
@@ -157,6 +174,11 @@ service Registry {
 
   rpc GetManifestHistory(ManifestHistoryRequest) returns (stream ManifestHistoryEntry) {}
 
+  // Health and Readiness Checks
+  // These should be part of the core service, not a separate service
+  rpc IsHealthy(HealthRequest) returns (HealthStatus) {}
+
+  rpc IsReady (ReadinessRequest) returns (ReadyStatus) {}
 }
 
 /* These types are largely stripped down versions of the Kubernetes types.
@@ -187,29 +209,4 @@ service AdmissionController{
   //TODO mutating admission controller to pin digests
   //rpc MutateAdmission (AdmissionRequest) returns (AdmissionResponse) {}
 
-}
-
-message HealthRequest {}
-
-message HealthStatus {
-  string message = 1;
-  bool is_healthy = 2;
-  string status = 3;
-}
-
-service HealthService {
-  rpc IsHealthy(HealthRequest) returns (HealthStatus) {}
-}
-
-message ReadinessRequest {}
-
-message ReadyStatus {
-  string message = 1;
-  bool is_ready = 2;
-  string status = 3;
-
-}
-
-service ReadinessService {
-  rpc IsReady (ReadinessRequest) returns (ReadyStatus) {}
 }

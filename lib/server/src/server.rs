@@ -23,8 +23,6 @@ pub mod trow_server {
 
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
-use crate::server::trow_server::health_service_server::HealthService;
-use crate::server::trow_server::readiness_service_server::ReadinessService;
 
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -441,58 +439,6 @@ impl TrowServer {
 }
 
 #[tonic::async_trait]
-impl ReadinessService for TrowServer {
-    async fn is_ready(
-        &self,
-        _request: Request<ReadinessRequest>,
-    ) -> Result<Response<ReadyStatus>, Status> {
-
-        let reply = match is_data_dir_writable(&self.data_dir_path) {
-
-            Ok(true) => {
-                trow_server::ReadyStatus {
-                    message: format!("Trow is ready."),
-                    is_ready: true,
-                    status: String::from("Ready!")
-                }   
-           },
-           Ok(false) => {
-                trow_server::ReadyStatus {
-                        message: format!("Data directory is read only!"),
-                        is_ready: false,
-                        status: String::from("Error")
-                    }
-                },
-            Err(error) => {
-                trow_server::ReadyStatus {
-                    message: error.to_string(),
-                    is_ready: false,
-                    status: String::from("Error")
-                }
-            }
-        };
-        Ok(Response::new(reply))
-    }
-}
-
-
-#[tonic::async_trait]
-impl HealthService for  TrowServer {
-    async fn is_healthy(
-        &self,
-        _request: Request<HealthRequest>,
-    ) -> Result<Response<HealthStatus>, Status> {
-        
-        let reply = trow_server::HealthStatus {
-            message: format!("Healthy"),
-            is_healthy: true,
-            status: "OK".to_string()
-        };
-        Ok(Response::new(reply))
-    }
-}
-
-#[tonic::async_trait]
 impl Registry for TrowServer {
     async fn request_upload(
         &self,
@@ -876,5 +822,51 @@ impl Registry for TrowServer {
             }
         });
         Ok(Response::new(rx))
+    }
+
+     // Readiness check
+     async fn is_ready(
+        &self,
+        _request: Request<ReadinessRequest>,
+    ) -> Result<Response<ReadyStatus>, Status> {
+
+        let reply = match is_data_dir_writable(&self.data_dir_path) {
+
+            Ok(true) => {
+                trow_server::ReadyStatus {
+                    message: format!("Trow is ready."),
+                    is_ready: true,
+                    status: String::from("Ready!")
+                }   
+           },
+           Ok(false) => {
+                trow_server::ReadyStatus {
+                        message: format!("Data directory is read only!"),
+                        is_ready: false,
+                        status: String::from("Error")
+                    }
+                },
+            Err(error) => {
+                trow_server::ReadyStatus {
+                    message: error.to_string(),
+                    is_ready: false,
+                    status: String::from("Error")
+                }
+            }
+        };
+        Ok(Response::new(reply))
+    }
+
+    async fn is_healthy(
+        &self,
+        _request: Request<HealthRequest>,
+    ) -> Result<Response<HealthStatus>, Status> {
+        
+        let reply = trow_server::HealthStatus {
+            message: format!("Healthy"),
+            is_healthy: true,
+            status: "OK".to_string()
+        };
+        Ok(Response::new(reply))
     }
 }
