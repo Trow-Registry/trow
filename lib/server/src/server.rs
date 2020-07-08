@@ -50,7 +50,6 @@ pub struct TrowServer {
     allow_images: Vec<String>,
     deny_local_prefixes: Vec<String>,
     deny_local_images: Vec<String>,
-    data_dir_path: String
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
@@ -187,8 +186,8 @@ fn is_digest(maybe_digest: &str) -> bool {
     false
 }
 
-fn is_data_dir_writable(data_path: &String) -> io::Result<bool> {
-    let file = File::open(data_path)?;
+fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
+    let file = File::open(path)?;
     let metadata = file.metadata()?;
     let permissions = metadata.permissions();
     Ok(!permissions.readonly())
@@ -215,7 +214,6 @@ impl TrowServer {
         let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
         let scratch_path = create_path(data_path, UPLOADS_DIR)?;
         let blobs_path = create_path(data_path, BLOBS_DIR)?;
-        let data_dir_path = data_path.to_string();
         let svc = TrowServer {
             active_uploads: Arc::new(RwLock::new(HashSet::new())),
             manifests_path,
@@ -225,7 +223,6 @@ impl TrowServer {
             allow_images,
             deny_local_prefixes,
             deny_local_images,
-            data_dir_path
         };
         Ok(svc)
     }
@@ -830,31 +827,38 @@ impl Registry for TrowServer {
         _request: Request<ReadinessRequest>,
     ) -> Result<Response<ReadyStatus>, Status> {
 
-        let reply = match is_data_dir_writable(&self.data_dir_path) {
-
-            Ok(true) => {
-                trow_server::ReadyStatus {
-                    message: format!("Trow is ready."),
-                    is_ready: true,
-                    status: String::from("Ready!")
-                }   
-           },
-           Ok(false) => {
-                trow_server::ReadyStatus {
-                        message: format!("Data directory is read only!"),
+        for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
+            
+            match is_path_writable(path) {
+                Ok(true) => {},
+                Ok(false) => {
+                    let reply = trow_server::ReadyStatus {
+                            message: format!("{} is not writable", path.to_string_lossy()),
+                            is_ready: false,
+                            status: String::from("Error")
+                        };
+                    return Ok(Response::new(reply));
+                    },
+                Err(error) => {
+                    let reply = trow_server::ReadyStatus {
+                        message: error.to_string(),
                         is_ready: false,
                         status: String::from("Error")
-                    }
-                },
-            Err(error) => {
-                trow_server::ReadyStatus {
-                    message: error.to_string(),
-                    is_ready: false,
-                    status: String::from("Error")
+                    };
+                    return Ok(Response::new(reply));
                 }
             }
+        }
+
+        //All paths writable
+        let reply = trow_server::ReadyStatus {
+            message: format!("Ready"),
+            is_ready: true,
+            status: String::from("OK")
         };
-        Ok(Response::new(reply))
+
+        return Ok(Response::new(reply));
+            
     }
 
     async fn is_healthy(

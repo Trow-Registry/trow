@@ -19,7 +19,7 @@ pub fn healthz(
     match rt.block_on(request) {
         Ok(res) => {
             HealthResponse{
-                status: String::from("OK"),
+                status: res.status,
                 message: res.message,
                 is_healthy: res.is_healthy
             }
