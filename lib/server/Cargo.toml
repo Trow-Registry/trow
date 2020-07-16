@@ -29,5 +29,9 @@ rustc-serialize = "^0.3"
 serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
 
+prometheus = { version = "0.9"}
+lazy_static = "1.4.0"
+fs2 = "0.4.3"
+
 [build-dependencies]
 tonic-build = "0.1"
