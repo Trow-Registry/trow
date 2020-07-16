@@ -13,6 +13,7 @@ use uuid::Uuid;
 use prost_types::Timestamp;
 
 use std::io;
+use fs2; 
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -20,6 +21,28 @@ use crypto::sha2::Sha256;
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
+
+
+use prometheus::{Gauge, TextEncoder, Encoder};
+
+lazy_static! {
+    static ref TOTAL_SPACE: Gauge = register_gauge!(opts!(
+        "total_space",
+        "available space in bytes in the filesystem containing the data_path",
+        labels! {"disk" => "true",}
+    )).unwrap();
+    static ref FREE_SPACE: Gauge = register_gauge!(opts!(
+        "free_space",
+        "free space in bytes in the filesystem containing the data_path",
+        labels! {"disk" => "true",}
+    )).unwrap();
+    static ref AVAILABLE_SPACE: Gauge = register_gauge!(opts!(
+        "available_space",
+        "available space to non-privileged users in bytes in the filesystem containing the data_path",
+        labels! {"disk" => "true",}
+    )).unwrap();
+}
+
 
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
@@ -201,6 +224,17 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
         .next()
         .unwrap_or(&digest_date)
         .to_string())
+}
+
+// Query disk metrics
+fn query_disk(path: &PathBuf){
+    let data_path = path.parent().unwrap();
+    let available_space =  fs2::available_space(data_path).unwrap_or(0);
+    AVAILABLE_SPACE.set(available_space as f64);
+    let free_space  =  fs2::free_space(data_path).unwrap_or(0);
+    FREE_SPACE.set(free_space as f64);
+    let total_space =  fs2::total_space(data_path).unwrap_or(0);
+    TOTAL_SPACE.set(total_space as f64);
 }
 
 impl TrowServer {
@@ -857,6 +891,26 @@ impl Registry for TrowServer {
         let reply = trow_server::HealthStatus {
             message: String::from("Healthy")
         };
+        Ok(Response::new(reply))
+    }
+
+    async fn get_metrics(
+        &self,
+        _request: Request<MetricsRequest>,
+    ) -> Result<Response<MetricsResponse>, Status> {
+        query_disk(&mut self.blobs_path.clone());
+        
+        let encoder = TextEncoder::new();
+    
+        let metric_families = prometheus::gather();
+        let mut buffer = vec![];
+        encoder.encode(&metric_families, &mut buffer).unwrap();
+        let metrics = String::from_utf8(buffer).unwrap();
+
+        let reply = trow_server::MetricsResponse {
+            metrics: metrics.clone()
+        };
+        
         Ok(Response::new(reply))
     }
 }
