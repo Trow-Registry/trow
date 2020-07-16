@@ -3,7 +3,7 @@ pub mod trow_proto {
 }
 
 use trow_proto::{
-    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, HealthRequest, ReadinessRequest, UploadRef, CatalogRequest,
+    registry_client::RegistryClient, admission_controller_client::AdmissionControllerClient, HealthRequest, ReadinessRequest, MetricsRequest, UploadRef, CatalogRequest,
      CompleteRequest, BlobRef, ManifestRef, UploadRequest, VerifyManifestRequest, ListTagsRequest, ManifestHistoryRequest
 };
 
@@ -443,6 +443,35 @@ impl ClientInterface {
         types::ReadinessResponse {
             is_ready: true,
             message: response_value.message,
+        }
+    }
+
+    /**
+     Metrics call.
+
+     Note that the server will indicate not ready by returning an error.
+    */
+    pub async fn get_metrics(
+        &self,
+    ) -> types::MetricsResponse
+    {   
+        let mut client = match self.connect_registry().await {
+            Ok(cl) => cl,
+            Err(_) => return types::MetricsResponse {
+                metrics: "Failed to connect to registry".to_string(),
+            }
+        };
+        
+        let req = Request::new(MetricsRequest{});
+        let resp = match client.get_metrics(req).await {
+            Ok(r) => r,
+            Err(e) => return types::MetricsResponse {
+                metrics: e.to_string(),
+            }
+        };
+        let response_value = resp.into_inner();
+        types::MetricsResponse {
+            metrics: response_value.metrics
         }
     }
 }
