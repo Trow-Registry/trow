@@ -11,6 +11,11 @@ extern crate failure_derive;
 extern crate failure;
 extern crate chrono;
 
+#[macro_use]
+extern crate prometheus;
+#[macro_use]
+extern crate lazy_static;
+
 use tonic::transport::Server;
 mod server;
 mod validate;
