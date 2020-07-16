@@ -905,10 +905,11 @@ impl Registry for TrowServer {
         let metric_families = prometheus::gather();
         let mut buffer = vec![];
         encoder.encode(&metric_families, &mut buffer).unwrap();
+        
         let metrics = String::from_utf8(buffer).unwrap();
 
         let reply = trow_server::MetricsResponse {
-            metrics: metrics.clone()
+            metrics: metrics
         };
         
         Ok(Response::new(reply))
