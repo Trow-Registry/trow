@@ -132,6 +132,9 @@ message MetricsRequest {}
 
 message MetricsResponse {
   string metrics = 1;
+  bool   errored = 2;
+  string message = 3;
+
 }
 
 //TODO: can we type digests and references so that we can control if it's a digest or tag?
