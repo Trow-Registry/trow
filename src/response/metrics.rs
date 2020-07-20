@@ -10,12 +10,25 @@ use crate::types::MetricsResponse;
 
 impl<'r> Responder<'r> for MetricsResponse {
     fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
-        let text = self.metrics;
-
-        Response::build()
-        .header(ContentType::Plain)
-        .sized_body(Cursor::new(text))
-        .status(Status::Ok)
-        .ok()
+        match self.errored {
+            false => {
+                let text = self.metrics;
+        
+                Response::build()
+                .header(ContentType::Plain)
+                .sized_body(Cursor::new(text))
+                .status(Status::Ok)
+                .ok()
+            },
+            true => {
+                let text = self.message;
+        
+                Response::build()
+                .header(ContentType::Plain)
+                .sized_body(Cursor::new(text))
+                .status(Status::ServiceUnavailable)
+                .ok()
+            }   
+        }
     }
 }
