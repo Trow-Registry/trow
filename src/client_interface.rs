@@ -449,7 +449,7 @@ impl ClientInterface {
     /**
      Metrics call.
 
-     Note that the server will indicate not ready by returning an error.
+     Note that the server will indicate unreachable by returning an error.
     */
     pub async fn get_metrics(
         &self,
@@ -458,7 +458,9 @@ impl ClientInterface {
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
             Err(_) => return types::MetricsResponse {
-                metrics: "Failed to connect to registry".to_string(),
+                metrics: "None".to_string(),
+                errored: true,
+                message: "Failed to connect to registry".to_string()
             }
         };
         
@@ -466,12 +468,16 @@ impl ClientInterface {
         let resp = match client.get_metrics(req).await {
             Ok(r) => r,
             Err(e) => return types::MetricsResponse {
-                metrics: e.to_string(),
+                metrics: "None".to_string(),
+                message: e.to_string(),
+                errored: true
             }
         };
         let response_value = resp.into_inner();
         types::MetricsResponse {
-            metrics: response_value.metrics
+            metrics: response_value.metrics,
+            message: String::from(""),
+            errored: false
         }
     }
 }
