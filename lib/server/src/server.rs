@@ -227,7 +227,7 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
 }
 
 // Query disk metrics
-fn query_disk(path: &PathBuf){
+fn query_disk_metrics(path: &PathBuf){
     let data_path = path.parent().unwrap();
     let available_space =  fs2::available_space(data_path).unwrap_or(0);
     AVAILABLE_SPACE.set(available_space as f64);
@@ -898,7 +898,7 @@ impl Registry for TrowServer {
         &self,
         _request: Request<MetricsRequest>,
     ) -> Result<Response<MetricsResponse>, Status> {
-        query_disk(&mut self.blobs_path.clone());
+        query_disk_metrics(&mut self.blobs_path.clone());
         
         let encoder = TextEncoder::new();
     
@@ -907,9 +907,11 @@ impl Registry for TrowServer {
         encoder.encode(&metric_families, &mut buffer).unwrap();
         
         let metrics = String::from_utf8(buffer).unwrap();
-
+        // Todo handle error responses
         let reply = trow_server::MetricsResponse {
-            metrics: metrics
+            metrics: metrics,
+            errored: false,
+            message: String::from("")
         };
         
         Ok(Response::new(reply))
