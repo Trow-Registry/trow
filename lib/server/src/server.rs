@@ -23,7 +23,7 @@ pub mod trow_server {
 }
 
 
-use prometheus::{Gauge, TextEncoder, Encoder};
+use prometheus::{Counter, Gauge, TextEncoder, Encoder};
 
 lazy_static! {
     static ref TOTAL_SPACE: Gauge = register_gauge!(opts!(
@@ -40,6 +40,11 @@ lazy_static! {
         "available_space",
         "available space to non-privileged users in bytes in the filesystem containing the data_path",
         labels! {"disk" => "true",}
+    )).unwrap();
+    static ref TOTAL_MANIFEST_REQUESTS: Counter  = register_counter!(opts!(
+        "total_manifest_requests",
+        "total manifest requests made to trow",
+        labels! {"manifest" => "true",}
     )).unwrap();
 }
 
@@ -614,6 +619,8 @@ impl Registry for TrowServer {
         //Don't actually need to verify here; could set to false
 
         let mr = req.into_inner();
+        // Increase manifest request metrics counter
+        TOTAL_MANIFEST_REQUESTS.inc();
         // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
             Ok(vm) => Ok(Response::new(vm)),
@@ -732,6 +739,7 @@ impl Registry for TrowServer {
         tokio::spawn(async move {
             for repo_name in partial_catalog {
                 let ce = CatalogEntry { repo_name };
+
                 tx.send(Ok(ce)).await.expect("Error streaming catalog");
             }
         });
@@ -901,7 +909,10 @@ impl Registry for TrowServer {
         query_disk_metrics(&mut self.blobs_path.clone());
         
         let encoder = TextEncoder::new();
-    
+        
+        // Gather all prometheus metrics 
+        // * disk
+        // * manifest requests
         let metric_families = prometheus::gather();
         let mut buffer = vec![];
         encoder.encode(&metric_families, &mut buffer).unwrap();
