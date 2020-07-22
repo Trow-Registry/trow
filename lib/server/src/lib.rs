@@ -13,10 +13,9 @@ extern crate chrono;
 
 #[macro_use]
 extern crate prometheus;
-#[macro_use]
-extern crate lazy_static;
 
 use tonic::transport::Server;
+mod statics;
 mod server;
 mod validate;
 use server::trow_server::registry_server::RegistryServer;
