@@ -31,7 +31,7 @@ trow-protobuf = { path = "../protobuf" }
 
 prometheus = { version = "0.9"}
 lazy_static = "1.4.0"
-fs2 = "0.4.3"
+fs3 = "0.5.0"
 
 [build-dependencies]
 tonic-build = "0.1"
