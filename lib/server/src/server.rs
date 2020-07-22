@@ -13,7 +13,7 @@ use uuid::Uuid;
 use prost_types::Timestamp;
 
 use std::io;
-use fs2; 
+use fs3; 
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -22,36 +22,13 @@ pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
 
-
-use prometheus::{Counter, Gauge, TextEncoder, Encoder};
-
-lazy_static! {
-    static ref TOTAL_SPACE: Gauge = register_gauge!(opts!(
-        "total_space",
-        "available space in bytes in the filesystem containing the data_path",
-        labels! {"disk" => "true",}
-    )).unwrap();
-    static ref FREE_SPACE: Gauge = register_gauge!(opts!(
-        "free_space",
-        "free space in bytes in the filesystem containing the data_path",
-        labels! {"disk" => "true",}
-    )).unwrap();
-    static ref AVAILABLE_SPACE: Gauge = register_gauge!(opts!(
-        "available_space",
-        "available space to non-privileged users in bytes in the filesystem containing the data_path",
-        labels! {"disk" => "true",}
-    )).unwrap();
-    static ref TOTAL_MANIFEST_REQUESTS: Counter  = register_counter!(opts!(
-        "total_manifest_requests",
-        "total manifest requests made to trow",
-        labels! {"manifest" => "true",}
-    )).unwrap();
-}
-
-
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
 
+
+use prometheus::{TextEncoder, Encoder};
+
+use crate::statics::{FREE_SPACE, AVAILABLE_SPACE, TOTAL_SPACE, TOTAL_MANIFEST_REQUESTS, TOTAL_BLOBS_REQUESTS};
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -234,12 +211,12 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
 // Query disk metrics
 fn query_disk_metrics(path: &PathBuf){
     let data_path = path.parent().unwrap();
-    let available_space =  fs2::available_space(data_path).unwrap_or(0);
-    AVAILABLE_SPACE.set(available_space as f64);
-    let free_space  =  fs2::free_space(data_path).unwrap_or(0);
-    FREE_SPACE.set(free_space as f64);
-    let total_space =  fs2::total_space(data_path).unwrap_or(0);
-    TOTAL_SPACE.set(total_space as f64);
+    let available_space =  fs3::available_space(data_path).unwrap_or(0);
+    AVAILABLE_SPACE.set(available_space as i64);
+    let free_space  =  fs3::free_space(data_path).unwrap_or(0);
+    FREE_SPACE.set(free_space as i64);
+    let total_space =  fs3::total_space(data_path).unwrap_or(0);
+    TOTAL_SPACE.set(total_space as i64);
 }
 
 impl TrowServer {
@@ -526,6 +503,7 @@ impl Registry for TrowServer {
         &self,
         req: Request<BlobRef>,
     ) -> Result<Response<BlobReadLocation>, Status> {
+        TOTAL_BLOBS_REQUESTS.inc();
         let br = req.into_inner();
         let path = self
             .get_catalog_path_for_blob(&br.digest)
