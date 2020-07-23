@@ -24,7 +24,7 @@ lazy_static! {
         "total manifests requests made to trow",
         labels! {"type" => "manifests"}
     )).unwrap();
-    pub static ref TOTAL_BLOBS_REQUESTS: IntCounter  = register_int_counter!(opts!(
+    pub static ref TOTAL_BLOB_REQUESTS: IntCounter  = register_int_counter!(opts!(
         "total_blob_requests",
         "total blobs requests made to trow",
         labels! {"type" => "blobs"}

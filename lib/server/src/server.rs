@@ -28,7 +28,7 @@ use crate::server::trow_server::registry_server::Registry;
 
 use prometheus::{TextEncoder, Encoder};
 
-use crate::statics::{FREE_SPACE, AVAILABLE_SPACE, TOTAL_SPACE, TOTAL_MANIFEST_REQUESTS, TOTAL_BLOBS_REQUESTS};
+use crate::statics::{FREE_SPACE, AVAILABLE_SPACE, TOTAL_SPACE, TOTAL_MANIFEST_REQUESTS, TOTAL_BLOB_REQUESTS};
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -503,7 +503,7 @@ impl Registry for TrowServer {
         &self,
         req: Request<BlobRef>,
     ) -> Result<Response<BlobReadLocation>, Status> {
-        TOTAL_BLOBS_REQUESTS.inc();
+        TOTAL_BLOB_REQUESTS.inc();
         let br = req.into_inner();
         let path = self
             .get_catalog_path_for_blob(&br.digest)
