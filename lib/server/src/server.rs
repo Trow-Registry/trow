@@ -209,7 +209,7 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
 }
 
 // Query disk metrics
-fn query_disk_metrics(path: &PathBuf){
+fn query_disk_metrics(path: &PathBuf) {
     let data_path = path.parent().unwrap();
     let available_space =  fs3::available_space(data_path).unwrap_or(0);
     AVAILABLE_SPACE.set(available_space as i64);
@@ -888,21 +888,29 @@ impl Registry for TrowServer {
         
         let encoder = TextEncoder::new();
         
-        // Gather all prometheus metrics 
+        // Gather all prometheus metrics of DEFAULT_REGISTRY 
         // * disk
-        // * manifest requests
+        // * total manifest requests
+        // * total blob requests
+
         let metric_families = prometheus::gather();
         let mut buffer = vec![];
-        encoder.encode(&metric_families, &mut buffer).unwrap();
         
-        let metrics = String::from_utf8(buffer).unwrap();
-        // Todo handle error responses
-        let reply = trow_server::MetricsResponse {
-            metrics: metrics,
-            errored: false,
-            message: String::from("")
-        };
-        
-        Ok(Response::new(reply))
+        match encoder.encode(&metric_families, &mut buffer) {
+            Ok(_) => {   
+                let metrics =  String::from_utf8(buffer).unwrap();
+
+                let reply = trow_server::MetricsResponse {                             
+                    metrics: metrics,
+                    errored: false,
+                    message: String::from("")
+                };
+                Ok(Response::new(reply))
+            },
+
+            Err(error) => {
+                return Err(Status::unavailable(error.to_string()));
+            }
+        } 
     }
 }
