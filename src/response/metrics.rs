@@ -32,3 +32,39 @@ impl<'r> Responder<'r> for MetricsResponse {
         }
     }
 }
+#[cfg(test)]
+mod test {
+    use rocket::http::Status;
+    use crate::types::{MetricsResponse};
+    use crate::response::test_helper::test_route;
+    
+    fn build_metrics_response() -> MetricsResponse {
+        MetricsResponse {
+            message: String::from(""),
+            errored: false,
+            metrics: String::from("# HELP available_space ....")
+        }
+    }
+
+    fn build_erroed_metrics_response() -> MetricsResponse  {
+        MetricsResponse {
+            message: String::from("Erroed out"),
+            errored: true,
+            metrics: String::from("")
+        }
+    }
+
+    #[test]
+    fn test_metrics_resp() {
+        let response = test_route(build_metrics_response());
+        assert_eq!(response.status(), Status::Ok);
+      
+    }
+
+    #[test]
+    fn test_errored_metrics_resp() {
+        let response = test_route(build_erroed_metrics_response());
+        assert_eq!(response.status(), Status::ServiceUnavailable);
+      
+    }
+}
