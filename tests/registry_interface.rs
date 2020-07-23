@@ -25,7 +25,7 @@ mod interface_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use trow::types::{RepoCatalog, RepoName, TagList};
+    use trow::types::{RepoCatalog, RepoName, TagList, HealthResponse, ReadinessResponse};
     use trow_server::manifest;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
@@ -360,6 +360,52 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
+    fn get_health(cl: &reqwest::Client) {
+        let mut resp = cl
+        .get(&format!("{}/healthz", TROW_ADDRESS))
+        .send()
+        .unwrap();
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let hr:HealthResponse = resp.json().unwrap();
+
+        assert_eq!(hr.is_healthy, true);
+
+    }
+
+    fn get_readiness(cl: &reqwest::Client) {
+        let mut resp = cl
+        .get(&format!("{}/readiness", TROW_ADDRESS))
+        .send()
+        .unwrap();
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let rr:ReadinessResponse = resp.json().unwrap();
+
+        assert_eq!(rr.is_ready, true);
+    }
+
+    fn get_metrics(cl: &reqwest::Client){
+        let mut resp = cl
+        .get(&format!("{}/metrics", TROW_ADDRESS))
+        .send()
+        .unwrap();
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let mut body = String::new();
+        resp.read_to_string(&mut body).unwrap();
+
+        assert!(body.contains("available_space"));
+        assert!(body.contains("free_space"));
+        assert!(body.contains("total_space"));
+        assert!(body.contains("total_manifest_requests"));
+        assert!(body.contains("total_blob_requests"));
+        assert!(!body.contains("total_trow_requests"));
+    }
+
     #[test]
     fn test_runner() {
         //Need to start with empty repo
@@ -474,6 +520,10 @@ mod interface_tests {
         tl4.insert("tag".to_string());
         tl4.insert("three".to_string());
         println!("Running check_tag_list_n_last 4");
-        check_tag_list_n_last(&client, 2, "latest", &tl4)
+        check_tag_list_n_last(&client, 2, "latest", &tl4);
+        
+        get_readiness(&client);
+        get_health(&client);
+        get_metrics(&client);
     }
 }
