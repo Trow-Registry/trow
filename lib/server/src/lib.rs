@@ -15,7 +15,7 @@ extern crate chrono;
 extern crate prometheus;
 
 use tonic::transport::Server;
-mod statics;
+mod metrics;
 mod server;
 mod validate;
 use server::trow_server::registry_server::RegistryServer;
