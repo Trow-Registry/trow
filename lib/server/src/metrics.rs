@@ -1,5 +1,10 @@
 use lazy_static::lazy_static;
-use prometheus::{IntCounter, IntGauge};
+use fs3; 
+
+use prometheus;
+use failure::Error;
+use std::path::PathBuf;
+use prometheus::{IntCounter, IntGauge, Encoder, TextEncoder};
 
 //  Metrics static values executed at runtime and registered to default
 //  prometheus registry
@@ -29,4 +34,33 @@ lazy_static! {
         "total blobs requests made to trow",
         labels! {"type" => "blobs"}
     )).unwrap();
+}
+
+// Query disk metrics
+pub fn query_disk_metrics(path: &PathBuf) {
+    let data_path = path.parent().unwrap();
+    let available_space =  fs3::available_space(data_path).unwrap_or(0);
+    AVAILABLE_SPACE.set(available_space as i64);
+    let free_space  =  fs3::free_space(data_path).unwrap_or(0);
+    FREE_SPACE.set(free_space as i64);
+    let total_space =  fs3::total_space(data_path).unwrap_or(0);
+    TOTAL_SPACE.set(total_space as i64);
+}
+
+pub fn gather_metrics(blobs_path: &PathBuf) -> Result<String, Error> {
+    query_disk_metrics(blobs_path);
+        
+    let encoder = TextEncoder::new();
+    
+    // Gather all prometheus metrics of DEFAULT_REGISTRY 
+    // * disk
+    // * total manifest requests
+    // * total blob requests
+
+    let metric_families = prometheus::gather();
+    let mut buffer = vec![];
+
+    encoder.encode(&metric_families, &mut buffer)?;
+
+    Ok(String::from_utf8(buffer).unwrap())
 }
