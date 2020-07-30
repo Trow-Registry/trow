@@ -449,35 +449,17 @@ impl ClientInterface {
     /**
      Metrics call.
 
-     Note that the server will indicate unreachable by returning an error.
+     Returns disk and total request metrics(blobs, manifests).
     */
     pub async fn get_metrics(
         &self,
-    ) -> types::MetricsResponse
-    {   
-        let mut client = match self.connect_registry().await {
-            Ok(cl) => cl,
-            Err(_) => return types::MetricsResponse {
-                metrics: "None".to_string(),
-                errored: true,
-                message: "Failed to connect to registry".to_string()
-            }
-        };
-        
+    ) -> Result<types::MetricsResponse, Error>
+    {           
         let req = Request::new(MetricsRequest{});
-        let resp = match client.get_metrics(req).await {
-            Ok(r) => r,
-            Err(e) => return types::MetricsResponse {
-                metrics: "None".to_string(),
-                message: e.to_string(),
-                errored: true
-            }
-        };
-        let response_value = resp.into_inner();
-        types::MetricsResponse {
-            metrics: response_value.metrics,
-            message: String::from(""),
-            errored: false
-        }
+        let resp = self.connect_registry().await?.get_metrics(req).await?.into_inner();
+    
+        Ok(types::MetricsResponse {
+            metrics: resp.metrics
+        })
     }
 }
