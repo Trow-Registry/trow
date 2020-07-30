@@ -13,7 +13,6 @@ use uuid::Uuid;
 use prost_types::Timestamp;
 
 use std::io;
-use fs3; 
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -25,10 +24,7 @@ pub mod trow_server {
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
 
-
-use prometheus::{TextEncoder, Encoder};
-
-use crate::statics::{FREE_SPACE, AVAILABLE_SPACE, TOTAL_SPACE, TOTAL_MANIFEST_REQUESTS, TOTAL_BLOB_REQUESTS};
+use crate::metrics;
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -208,16 +204,6 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
         .to_string())
 }
 
-// Query disk metrics
-fn query_disk_metrics(path: &PathBuf) {
-    let data_path = path.parent().unwrap();
-    let available_space =  fs3::available_space(data_path).unwrap_or(0);
-    AVAILABLE_SPACE.set(available_space as i64);
-    let free_space  =  fs3::free_space(data_path).unwrap_or(0);
-    FREE_SPACE.set(free_space as i64);
-    let total_space =  fs3::total_space(data_path).unwrap_or(0);
-    TOTAL_SPACE.set(total_space as i64);
-}
 
 impl TrowServer {
     pub fn new(
@@ -503,7 +489,7 @@ impl Registry for TrowServer {
         &self,
         req: Request<BlobRef>,
     ) -> Result<Response<BlobReadLocation>, Status> {
-        TOTAL_BLOB_REQUESTS.inc();
+        metrics::TOTAL_BLOB_REQUESTS.inc();
         let br = req.into_inner();
         let path = self
             .get_catalog_path_for_blob(&br.digest)
@@ -597,8 +583,7 @@ impl Registry for TrowServer {
         //Don't actually need to verify here; could set to false
 
         let mr = req.into_inner();
-        // Increase manifest request metrics counter
-        TOTAL_MANIFEST_REQUESTS.inc();
+        metrics::TOTAL_MANIFEST_REQUESTS.inc();
         // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
             Ok(vm) => Ok(Response::new(vm)),
@@ -884,26 +869,11 @@ impl Registry for TrowServer {
         &self,
         _request: Request<MetricsRequest>,
     ) -> Result<Response<MetricsResponse>, Status> {
-        query_disk_metrics(&mut self.blobs_path.clone());
-        
-        let encoder = TextEncoder::new();
-        
-        // Gather all prometheus metrics of DEFAULT_REGISTRY 
-        // * disk
-        // * total manifest requests
-        // * total blob requests
-
-        let metric_families = prometheus::gather();
-        let mut buffer = vec![];
-        
-        match encoder.encode(&metric_families, &mut buffer) {
-            Ok(_) => {   
-                let metrics =  String::from_utf8(buffer).unwrap();
-
+       
+        match metrics::gather_metrics(&mut self.blobs_path.clone()) {
+            Ok(metrics) => {   
                 let reply = trow_server::MetricsResponse {                             
-                    metrics: metrics,
-                    errored: false,
-                    message: String::from("")
+                    metrics: metrics
                 };
                 Ok(Response::new(reply))
             },
