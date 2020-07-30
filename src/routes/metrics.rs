@@ -1,6 +1,8 @@
 use crate::client_interface::ClientInterface;
 use crate::types::MetricsResponse;
 
+use crate::response::errors::Error;
+
 use rocket::State;
 use tokio::runtime::Runtime;
 
@@ -12,10 +14,17 @@ use tokio::runtime::Runtime;
 #[get("/metrics")]
 pub fn metrics(
     ci: State<ClientInterface>,
-) -> MetricsResponse {
+) -> Result<MetricsResponse, Error> {
     let request = ci.get_metrics();
     let mut rt = Runtime::new().unwrap();
     
-    rt.block_on(request)
+    match rt.block_on(request) {
+        Ok(metrics) => {
+            Ok(metrics)
+        }
+        Err(_) => {
+            Err(Error::InternalError)
+        }
+    }
 
 }
