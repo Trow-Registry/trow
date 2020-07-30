@@ -522,8 +522,13 @@ mod interface_tests {
         println!("Running check_tag_list_n_last 4");
         check_tag_list_n_last(&client, 2, "latest", &tl4);
         
+        println!("Running get_readiness");
         get_readiness(&client);
+
+        println!("Running get_health");
         get_health(&client);
+
+        println!("Running get_metrics");
         get_metrics(&client);
     }
 }
