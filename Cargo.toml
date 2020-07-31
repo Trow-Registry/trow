@@ -47,6 +47,8 @@ base64 = "0.10.0"
 data-encoding = "2.1.2"
 chrono = { version="^0.4", features = ["serde"] }
 rand = "^0.7.2"
+ring = "^0.13.2"
+rusqlite = "0.23.1"
 
 [build-dependencies]
 

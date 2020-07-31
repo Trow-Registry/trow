@@ -53,7 +53,7 @@ mod client_interface;
 pub mod response;
 mod routes;
 pub mod types;
-
+mod users;
 use client_interface::ClientInterface;
 
 //TODO: Make this take a cause or description
