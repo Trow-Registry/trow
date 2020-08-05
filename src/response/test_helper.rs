@@ -1,15 +1,15 @@
 #[cfg(test)]
-use rocket;
-#[cfg(test)]
-use rocket::local::Client;
-#[cfg(test)]
-use rocket::response::Responder;
-#[cfg(test)]
 use crate::GrpcConfig;
 #[cfg(test)]
 use crate::NetAddr;
 #[cfg(test)]
 use crate::TrowConfig;
+#[cfg(test)]
+use rocket;
+#[cfg(test)]
+use rocket::local::Client;
+#[cfg(test)]
+use rocket::response::Responder;
 
 #[cfg(test)]
 pub fn test_route<'r, A: Responder<'r>>(handler: A) -> rocket::Response<'r> {
@@ -21,7 +21,7 @@ pub fn test_route<'r, A: Responder<'r>>(handler: A) -> rocket::Response<'r> {
         },
         tls: None,
         grpc: GrpcConfig {
-            listen: "trow:51000".to_owned()
+            listen: "trow:51000".to_owned(),
         },
         host_names: vec![],
         allow_prefixes: vec![],

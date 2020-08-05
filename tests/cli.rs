@@ -108,5 +108,4 @@ mod cli {
             .contains("Local images with these prefixes are explicitly denied: [\"beta/\"]")
             .unwrap();
     }
-
 }

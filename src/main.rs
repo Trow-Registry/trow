@@ -2,10 +2,10 @@ extern crate clap;
 extern crate trow;
 
 use clap::{Arg, ArgMatches};
-use trow::{NetAddr, TrowBuilder};
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use std::env;
+use trow::{NetAddr, TrowBuilder};
 
 const PROGRAM_NAME: &str = "Trow";
 const PROGRAM_DESC: &str = "\nThe Cluster Registry";
@@ -158,7 +158,7 @@ Must be used with --user")
             .help("Location of file with password that can be used to access Trow (e.g. via docker login).
 Must be used with --user")
             .takes_value(true)
-        )        
+        )
         .arg(
             Arg::with_name("version")
             .long("version")
@@ -166,7 +166,7 @@ Must be used with --user")
             .value_name("version")
             .help("Get the version number of Trow")
             .takes_value(false)
-        )        
+        )
         .get_matches()
 }
 
@@ -229,22 +229,22 @@ fn main() {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
     }
     if matches.is_present("user") {
-
         let user = matches.value_of("user").expect("Failed to read user name");
 
         if matches.is_present("password") {
-
-            let pass = matches.value_of("password").expect("Failed to read user password");
+            let pass = matches
+                .value_of("password")
+                .expect("Failed to read user password");
             builder.with_user(user.to_string(), pass.to_string());
-            
         } else if matches.is_present("password-file") {
-            let file_name = matches.value_of("password-file").expect(
-                "Failed to read user password file");
-            let mut file = File::open(file_name).expect(
-                &format!("Failed to read password file {}", file_name));
+            let file_name = matches
+                .value_of("password-file")
+                .expect("Failed to read user password file");
+            let mut file = File::open(file_name)
+                .expect(&format!("Failed to read password file {}", file_name));
             let mut pass = String::new();
-            file.read_to_string(&mut pass).expect(
-                &format!("Failed to read password file {}", file_name));
+            file.read_to_string(&mut pass)
+                .expect(&format!("Failed to read password file {}", file_name));
 
             //Remove final newline if present
             if pass.ends_with('\n') {
@@ -255,7 +255,6 @@ fn main() {
             }
 
             builder.with_user(user.to_string(), pass);
-
         } else {
             eprintln!("Either --pass or --password-file must be set if --user is set");
             std::process::exit(1);
