@@ -1,24 +1,24 @@
-## Specification for container image scanning
+# Specification for container image scanning
 
-### Abstract
+## Abstract
 This document describes the introduction of container images scanning to Trow thus providing additional security to a container based infrastructures.    
 Container image scanning is currently supported by all the major container registries.  
 The implementation is not specific to any image scanner but instead it leverages existing solutions.  
 The specifications Trow follows are the same as the [Pluggable Image Vulnerability Scanning](https://github.com/goharbor/community/blob/master/proposals/pluggable-image-vulnerability-scanning_proposal.md)  
 This will allow existing plugins to work for both Harbor and Trow.
 
-### Non Goals
+## Non Goals
 The document does not cover how to implement a container image scanner.  
 It just leverages existing solutions, like Trivy or Clair.  
 
-### Table of contents
+## Table of contents
 1. Objectives
 2. Specifications  
 a. Components  
 b. Architecture  
 
 
-### 1. Objectives
+## 1. Objectives
 * [ ] Security scanners integrate via the [Pluggable Image Vulnerability Scanning](https://github.com/goharbor/community/blob/master/proposals/pluggable-image-vulnerability-scanning_proposal.md) 
 * [ ] Support scanning of OCI images and artifacts
 * [ ] Execute a scan automatically when an image is pushed to the registry
@@ -35,13 +35,13 @@ b. Architecture
 
 ---
 
-### 2. Specifications
+## 2. Specifications
 This section describes the implementation specs necessary to achieve the Objectives.  
 
-#### a. Components
+### a. Components
 This is a breakdown of all components and their descriptions.
 
-##### Trow Security Scanner registry
+#### Trow Security Scanner registry
 
 **Objectives Met**
 * Security scanners integration via the [Pluggable Image Vulnerability Scanning](https://github.com/goharbor/community/blob/master/proposals/pluggable-image-vulnerability-scanning_proposal.md)
@@ -115,7 +115,7 @@ Since we need to periodically check whether new versions of security scanners ha
 * The health check API endpoint is: `/api/v1/metadata`
 * if 2 `SecurityScannerRecord` have the same priority order them alphabetically by their name.
 
-##### Scanner Adapter API
+#### Scanner Adapter API
 
 **Objectives Met**
 * Security scanners integration via the [Pluggable Image Vulnerability Scanning](https://github.com/goharbor/community/blob/master/proposals/pluggable-image-vulnerability-scanning_proposal.md)
