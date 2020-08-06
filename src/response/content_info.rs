@@ -1,8 +1,8 @@
+use crate::response::errors::Error;
+use crate::types::ContentInfo;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::Outcome;
-use crate::response::errors::Error;
-use crate::types::ContentInfo;
 
 /**
  * ContentInfo should always be wrapped an Option in routes to avoid failure returns.
@@ -16,19 +16,13 @@ impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
                 Ok(i) => i,
                 Err(_) => {
                     warn!("Recieved request with invalid Content-Length header");
-                    return Outcome::Failure((
-                        Status::BadRequest,
-                        Error::BlobUploadInvalid,
-                    ));
+                    return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid));
                 }
             },
             None => {
                 // This probably just means we don't have ContentInfo
                 // Should be caught by an option in the RequestGuard
-                return Outcome::Failure((
-                    Status::BadRequest,
-                    Error::BlobUploadInvalid,
-                ));
+                return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid));
             }
         };
 

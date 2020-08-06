@@ -1,9 +1,9 @@
 use std::io::Cursor;
 
+use crate::types::TagList;
 use rocket::http::ContentType;
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
-use crate::types::TagList;
 
 use serde_json;
 

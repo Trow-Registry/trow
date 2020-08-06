@@ -1,3 +1,5 @@
+use crate::TrowConfig;
+use crate::UserConfig;
 use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
 use rocket::http::ContentType;
 use rocket::http::Status;
@@ -9,8 +11,6 @@ use std::io::Cursor;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
-use crate::TrowConfig;
-use crate::UserConfig;
 
 const TOKEN_DURATION: u64 = 3600;
 

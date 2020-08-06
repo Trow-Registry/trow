@@ -1,11 +1,11 @@
+extern crate base64;
 extern crate crypto;
 extern crate environment;
 extern crate hyper;
 extern crate rand;
 extern crate reqwest;
-extern crate serde_json;
-extern crate base64;
 extern crate rocket_contrib;
+extern crate serde_json;
 
 mod common;
 
@@ -15,8 +15,8 @@ mod authentication_tests {
     use crate::common;
     use environment::Environment;
 
-    use reqwest::StatusCode;
     use base64::encode;
+    use reqwest::StatusCode;
     use std::fs::{self, File};
     use std::io::Read;
     use std::process::Child;
@@ -88,27 +88,37 @@ mod authentication_tests {
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         //Test get redir header
         assert_eq!(
-            resp.headers().get(AUTHN_HEADER).unwrap(), 
+            resp.headers().get(AUTHN_HEADER).unwrap(),
             "Bearer realm=\"https://trow.test:8443/login\",service=\"trow_registry\",scope=\"push/pull\""
         );
     }
 
     fn test_login(cl: &reqwest::Client) {
         let bytes = encode(b"authtest:authpass");
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(
-            AUTHZ_HEADER, format!("Basic {}", bytes)).send().unwrap();
+        let resp = cl
+            .get(&(TROW_ADDRESS.to_owned() + "/login"))
+            .header(AUTHZ_HEADER, format!("Basic {}", bytes))
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         // Uncomment if you want to inspect the token
-        // let _token: JsonValue = resp.json().unwrap(); 
+        // let _token: JsonValue = resp.json().unwrap();
         let resp = cl
-            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, "name", "tag"))
+            .get(&format!(
+                "{}/v2/{}/manifests/{}",
+                TROW_ADDRESS, "name", "tag"
+            ))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     fn test_login_fail(cl: &reqwest::Client) {
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() +"/login")).header(AUTHZ_HEADER, "Basic thisstringwillfail").send().unwrap();
+        let resp = cl
+            .get(&(TROW_ADDRESS.to_owned() + "/login"))
+            .header(AUTHZ_HEADER, "Basic thisstringwillfail")
+            .send()
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -140,6 +150,5 @@ mod authentication_tests {
         test_login(&client);
         println!("Running test_login_fail()");
         test_login_fail(&client);
-
     }
 }

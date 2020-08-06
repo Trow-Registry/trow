@@ -1,9 +1,9 @@
 use crate::response::get_base_url;
+use crate::types::VerifiedManifest;
 use rocket::http::Header;
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-use crate::types::VerifiedManifest;
 
 impl<'r> Responder<'r> for VerifiedManifest {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
@@ -27,8 +27,8 @@ impl<'r> Responder<'r> for VerifiedManifest {
 #[cfg(test)]
 mod test {
     use crate::response::test_helper::test_route;
-    use rocket::http::Status;
     use crate::types::{create_verified_manifest, Digest, RepoName};
+    use rocket::http::Status;
 
     #[test]
     fn accepted_ok() {

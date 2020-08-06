@@ -1,11 +1,10 @@
-
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
+use libc;
 use rand::Rng;
 use reqwest::StatusCode;
-use trow_server::manifest;
 use std::process::Child;
-use libc;
+use trow_server::manifest;
 
 /* None of these are dead code, they are called from tests */
 
@@ -32,8 +31,11 @@ pub fn gen_rand_blob(size: usize) -> Vec<u8> {
 // https://stackoverflow.com/questions/49210815/how-do-i-send-a-signal-to-a-child-subprocess
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn kill_gracefully(child: &Child) { 
-  unsafe { libc::kill(child.id() as i32, libc::SIGTERM); } }
+pub fn kill_gracefully(child: &Child) {
+    unsafe {
+        libc::kill(child.id() as i32, libc::SIGTERM);
+    }
+}
 
 #[cfg(test)]
 #[allow(dead_code)]

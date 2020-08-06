@@ -10,11 +10,9 @@ use tokio::runtime::Runtime;
 */
 
 #[get("/healthz")]
-pub fn healthz(
-    ci: State<ClientInterface>,
-) -> HealthResponse {
+pub fn healthz(ci: State<ClientInterface>) -> HealthResponse {
     let request = ci.is_healthy();
     let mut rt = Runtime::new().unwrap();
-    
+
     rt.block_on(request)
 }

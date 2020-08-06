@@ -1,26 +1,26 @@
+use crate::TrowConfig;
 use hostname;
 use rocket::request::Request;
-use crate::TrowConfig;
 
 pub mod accepted_upload;
 pub mod authenticate;
-pub mod blob_reader;
 pub mod blob_deleted;
-pub mod manifest_deleted;
+pub mod blob_reader;
+pub mod content_info;
 pub mod empty;
 pub mod errors;
+pub mod health;
 pub mod html;
+pub mod manifest_deleted;
+pub mod manifest_history;
 pub mod manifest_reader;
+pub mod readiness;
 pub mod repo_catalog;
 pub mod tag_list;
-pub mod content_info;
+mod test_helper;
 pub mod trow_token;
 pub mod upload_info;
 pub mod verified_manifest;
-pub mod manifest_history;
-pub mod health;
-pub mod readiness;
-mod test_helper;
 
 /// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
 /// Falls back to hostname if it doesn't exist.
@@ -35,12 +35,10 @@ fn get_base_url(req: &Request) -> String {
 
     // Check if we have an upstream load balancer doing TLS termination
     match req.headers().get("X-Forwarded-Proto").next() {
-        None => {
-            match config.tls {
-                None => format!("http://{}", host),
-                Some(_) => format!("https://{}", host),
-            }        
-        }
+        None => match config.tls {
+            None => format!("http://{}", host),
+            Some(_) => format!("https://{}", host),
+        },
         Some(proto) => {
             if proto == "http" {
                 warn!("Security issue! Upstream proxy is using HTTP");

@@ -1,14 +1,17 @@
+use crate::response::get_base_url;
+use crate::types::AcceptedUpload;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
-use crate::response::get_base_url;
-use crate::types::AcceptedUpload;
-
 
 impl<'r> Responder<'r> for AcceptedUpload {
     fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
-
-        let location = format!("{}/v2/{}/blobs/{}", get_base_url(req), self.repo_name(), self.digest());
+        let location = format!(
+            "{}/v2/{}/blobs/{}",
+            get_base_url(req),
+            self.repo_name(),
+            self.digest()
+        );
         debug!("accepted upload response");
         let location_header = Header::new("Location", location);
         let digest_header = Header::new("Docker-Content-Digest", self.digest().0.clone());
@@ -28,11 +31,11 @@ impl<'r> Responder<'r> for AcceptedUpload {
 
 #[cfg(test)]
 mod test {
-    use crate::types::{create_accepted_upload, Digest, AcceptedUpload};
-    use rocket::http::Status;
-    use crate::types::{Uuid, RepoName};
     use crate::response::test_helper::test_route;
-    
+    use crate::types::{create_accepted_upload, AcceptedUpload, Digest};
+    use crate::types::{RepoName, Uuid};
+    use rocket::http::Status;
+
     fn build_response() -> AcceptedUpload {
         create_accepted_upload(
             Digest("123".to_string()),
