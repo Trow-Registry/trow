@@ -567,11 +567,12 @@ In order to keep things simple at this stage the payload will be the same as the
 The authentication method uses a secret key `S` which is configured for each webhook to sign the payload which is sent to the webhook client.  
 The signature is generate via HMAC(`S`, json payload).  
 The signature value is then hex encoded and send to the webhook client in an http header called: `X-Trow-Signature`  
+
 ---
 
 ### Architecture
 
-
+![Trow Container Securuty Scanning Architecture](https://github.com/ContainerSolutions/trow/blob/rfc/rfcs/trow-security-scanning.png)
 
 ---
 
