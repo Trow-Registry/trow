@@ -531,10 +531,47 @@ Example:
 ``` 
 
 #### Trow WebHook
-Once an image is found to have severe vulnerabilities we can allow pushing this information out to third party end points.  
+Once an image is found to have vulnerabilities we can allow pushing this information out to third party HTTP/s end points.  
 In this section we define the format of these events and the authentication method.  
 
-TBD
+In order to keep things simple at this stage the payload will be the same as the mime type: `application/vnd.oci.vuln.report.v1+[json|yaml]`  
+```json
+{
+  "generated_at": "2019-08-07T12:17:21.854Z",
+  "artifact": {
+    "repository": "library/mongo",
+    "digest": "sha256:917f5b7f4bef1b35ee90f03033f33a81002511c1e0767fd44276d4bd9cd2fa8e"
+  },
+  "scanner": {
+    "name": "Microscanner",
+    "vendor": "Aqua Security",
+    "version": "3.0.5"
+  },
+  "severity": "High",
+  "vulnerabilities": [
+    {
+      "id": "CVE-2017-8283",
+      "package": "dpkg",
+      "version": "1.17.27",
+      "fix_version": "1.18.0",
+      "severity": "High",
+      "description": "...",
+      "links": [
+        "https://security-tracker.debian.org/tracker/CVE-2017-8283"
+      ]
+    }
+  ]
+}
+```
+
+The authentication method uses a secret key `S` which is configured for each webhook to sign the payload which is sent to the webhook client.  
+The signature is generate via HMAC(`S`, json payload).  
+The signature value is then hex encoded and send to the webhook client in an http header called: `X-Trow-Signature`  
+---
+
+### Architecture
+
+
 
 ---
 
