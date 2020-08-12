@@ -614,6 +614,7 @@ impl Registry for TrowServer {
         match self.create_verified_manifest(&uploaded_manifest, true) {
             Ok(vm) => {
                 // copy manifest to blobs and add tag
+                let digest = vm.digest.clone();
                 let ret = self
                     .save_blob(&uploaded_manifest, &digest)
                     .and(self.save_tag(&digest, &mr.repo_name, &mr.reference))
