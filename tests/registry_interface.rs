@@ -85,7 +85,11 @@ mod interface_tests {
         assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
 
         //All v2 registries should respond with a 200 to this
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/v2/")).send().await.unwrap();
+        let resp = cl
+            .get(&(TROW_ADDRESS.to_owned() + "/v2/"))
+            .send()
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
     }
@@ -235,7 +239,12 @@ mod interface_tests {
         digest
     }
 
-    async fn push_manifest_list(cl: &reqwest::Client, digest: &str, name: &str, tag: &str) -> String {
+    async fn push_manifest_list(
+        cl: &reqwest::Client,
+        digest: &str,
+        name: &str,
+        tag: &str,
+    ) -> String {
         let manifest = format!(
             r#"{{
                 "schemaVersion": 2,
@@ -272,7 +281,11 @@ mod interface_tests {
         digest
     }
 
-    async fn push_oci_manifest_with_foreign_blob(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+    async fn push_oci_manifest_with_foreign_blob(
+        cl: &reqwest::Client,
+        name: &str,
+        tag: &str,
+    ) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();

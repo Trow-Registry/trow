@@ -12,17 +12,17 @@ extern crate hyper;
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
+extern crate argon2;
+extern crate chrono;
+extern crate data_encoding;
+extern crate derive_more;
+extern crate env_logger;
+extern crate frank_jwt;
 extern crate rand;
 extern crate serde;
 extern crate serde_json;
-extern crate uuid;
-extern crate derive_more;
 extern crate trow_server;
-extern crate argon2;
-extern crate chrono;
-extern crate env_logger;
-extern crate frank_jwt;
-extern crate data_encoding;
+extern crate uuid;
 use log::{LevelFilter, SetLoggerError};
 
 #[macro_use]
@@ -35,23 +35,23 @@ extern crate serde_derive;
 extern crate quickcheck;
 
 use failure::Error;
+use rand::rngs::OsRng;
+use rocket::fairing;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::thread;
 use uuid::Uuid;
-use rand::rngs::OsRng;
-use rocket::fairing;
 
 mod client_interface;
 pub mod response;
 mod routes;
 pub mod types;
 
+use chrono::Utc;
 use client_interface::ClientInterface;
-use chrono::{Utc};
-use std::io::Write;
 use rand::RngCore;
+use std::io::Write;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -133,9 +133,17 @@ fn init_logger() -> Result<(), SetLoggerError> {
     let mut builder = env_logger::Builder::new();
 
     if !env::var("RUST_LOG").is_ok() {
-        builder.format(|buf, record| {
-            writeln!(buf, "{} [{}] {} {}", Utc::now().format("%Y-%m-%dT%H:%M:%S"), record.target(), record.level(), record.args())
-        })
+        builder
+            .format(|buf, record| {
+                writeln!(
+                    buf,
+                    "{} [{}] {} {}",
+                    Utc::now().format("%Y-%m-%dT%H:%M:%S"),
+                    record.target(),
+                    record.level(),
+                    record.args()
+                )
+            })
             .filter(None, LevelFilter::Info);
     }
 

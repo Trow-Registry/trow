@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
+use derive_more::Display;
 use std::collections::HashSet;
 use std::io::Read;
-use derive_more::{Display};
 
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]

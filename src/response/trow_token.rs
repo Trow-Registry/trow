@@ -6,9 +6,9 @@ use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::{Responder, Response};
 use rocket::{Outcome, State};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::Cursor;
-use serde::{Serialize, Deserialize};
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -98,7 +98,6 @@ pub struct TrowToken {
 // Mirroring Docker format would allow reuse of existing token server implementations
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct TokenClaim {
-
     // (Issuer) The issuer of the token, typically the fqdn of the authorization server.
     iss: String,
 
@@ -230,12 +229,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     #[tokio::test]
-    async fn test() {
-
-    }
+    async fn test() {}
 }

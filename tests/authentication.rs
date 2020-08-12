@@ -84,7 +84,11 @@ mod authentication_tests {
     }
 
     async fn test_auth_redir(cl: &reqwest::Client) {
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/v2")).send().await.unwrap();
+        let resp = cl
+            .get(&(TROW_ADDRESS.to_owned() + "/v2"))
+            .send()
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         //Test get redir header
         assert_eq!(
