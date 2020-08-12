@@ -220,6 +220,7 @@ impl TrowBuilder {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
                 return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
             }
+            println!("{} - {}", tls.cert_file.clone(), tls.key_file.clone());
             cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
         }
         let cfg = cfg.finalize()?;

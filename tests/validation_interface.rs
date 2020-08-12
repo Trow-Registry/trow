@@ -303,7 +303,7 @@ mod validation_tests {
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _trow = start_trow();
+        let _trow = start_trow().await;
         validate_example(&client).await;
         test_image(&client, "trow.test/am/test:tag", false).await;
         //push image and test again

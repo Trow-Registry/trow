@@ -5,15 +5,13 @@ authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchi
 edition = "2018"
 
 [dependencies]
-
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
-rocket = "0.4"
+rocket = { version = "0.4", features = ["tls"] }
 rocket_contrib = "0.4"
-rustls = "0.18"
+#rustls = "0.18"
 hyper = "0.13"
-
-ring = "0.16"
+ring = "0.13"
 jwt = "0.10"
 frank_jwt = "3.1"
 rust-argon2 = "^0.4.0"
@@ -24,29 +22,19 @@ uuid = { version = "0.8", features = ["v4", "serde"] }
 log = "0.4"
 env_logger = "0.7"
 base64 = "0.12.0"
-
 failure = "0.1"
-
 trow-protobuf = { path = "./lib/protobuf" }
 trow-server = { path = "./lib/server" }
 derive_more = "0.99"
 ctrlc = { version = "3.1", features = ["termination"] }
 hostname = "0.3"
 clap = "~2.33"
-#orset = "^0.2"
-
-
-#failure_derive = "^0.1"
-
-
 tonic = "0.3"
 prost = "0.6"
 prost-types = "0.6"
 bytes = "0.4"
 chrono = { version="^0.4", features = ["serde"] }
-
 data-encoding = "2.3"
-
 
 [build-dependencies]
 
@@ -57,7 +45,7 @@ assert_cli = "^0.5"
 environment = "^0.1"
 hyper = "0.13"
 rand = "^0.7.2"
-reqwest = { version = "0.10", features = ["json"] }
+reqwest = { version = "0.10", features = ["blocking", "json", "gzip"] }
 libc = "0.2"
 rust-crypto = "^0.2"
 derive_more = "0.99"

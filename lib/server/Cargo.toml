@@ -22,7 +22,7 @@ log = "0.4"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 failure = "^0.1"
 failure_derive = "^0.1"
-ring = "0.16"
+ring = "0.13"
 serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
 

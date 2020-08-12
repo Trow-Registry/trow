@@ -45,7 +45,7 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
         .send()
         .await
-        .unwrap();
+        .expect("Error uploading layer");
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
     let uuid = resp.headers().get(UPLOAD_HEADER).unwrap().to_str().unwrap();
     let location = resp
@@ -57,7 +57,7 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
 
     //Upload file. Start uploading blob with patch then digest with put
     let blob = gen_rand_blob(100);
-    let resp = cl.patch(location).body(blob.clone()).send().await.unwrap();
+    let resp = cl.patch(location).body(blob.clone()).send().await.expect("Failed to send patch request");
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
 
     let mut hasher = Sha256::new();

@@ -19,7 +19,7 @@ mod interface_tests {
     use std::thread;
     use std::time::Duration;
 
-    const TROW_ADDRESS: &str = "http://0.0.0.0:8443";
+    const TROW_ADDRESS: &str = "https://trow.test:8443";
 
     struct TrowInstance {
         pid: Child,
@@ -32,6 +32,9 @@ mod interface_tests {
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
+            // .arg("--")
+            // .arg("--host")
+            // .arg("127.0.0.1")
             .spawn()
             .expect("failed to start");
 
@@ -46,6 +49,7 @@ mod interface_tests {
         // get a client builder
         let client = reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
@@ -200,14 +204,14 @@ mod interface_tests {
 
         upload_config(&client).await;
 
-        //Following is intentionally interleaved to add delays
+        // Following is intentionally interleaved to add delays
         let mut history_one = Vec::new();
-        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
+        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
         let mut history_two = Vec::new();
-        history_two.push(push_random_foreign_manifest(&client, "history", "two"));
-        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
-        history_two.push(push_random_foreign_manifest(&client, "history", "two"));
-        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
+        history_two.push(push_random_foreign_manifest(&client, "history", "two").await);
+        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
+        history_two.push(push_random_foreign_manifest(&client, "history", "two").await);
+        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
 
         let json = get_history(&client, "history", "one", None, None).await;
         assert_eq!(json["image"], "history:one");

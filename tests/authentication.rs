@@ -24,7 +24,7 @@ mod authentication_tests {
     use std::thread;
     use std::time::Duration;
 
-    const TROW_ADDRESS: &str = "http://0.0.0.0:8443";
+    const TROW_ADDRESS: &str = "https://trow.test:8443";
 
     const AUTHN_HEADER: &str = "www-authenticate";
     const AUTHZ_HEADER: &str = "Authorization";
@@ -89,7 +89,7 @@ mod authentication_tests {
         //Test get redir header
         assert_eq!(
             resp.headers().get(AUTHN_HEADER).unwrap(),
-            "Bearer realm=\"https://0.0.0.0:8443/login\",service=\"trow_registry\",scope=\"push/pull\""
+            "Bearer realm=\"https://trow.test:8443/login\",service=\"trow_registry\",scope=\"push/pull\""
         );
     }
 

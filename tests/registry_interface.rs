@@ -28,7 +28,7 @@ mod interface_tests {
     use trow::types::{RepoCatalog, RepoName, TagList};
     use trow_server::manifest;
 
-    const TROW_ADDRESS: &str = "http://0.0.0.0:8443";
+    const TROW_ADDRESS: &str = "https://trow.test:8443";
     const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 
     struct TrowInstance {
@@ -383,7 +383,7 @@ mod interface_tests {
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _trow = start_trow();
+        let _trow = start_trow().await;
 
         let mut buf = Vec::new();
         File::open("./certs/domain.crt")
