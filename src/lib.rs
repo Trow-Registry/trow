@@ -12,7 +12,7 @@ extern crate hyper;
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
-
+extern crate rand;
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
@@ -35,13 +35,12 @@ extern crate serde_derive;
 extern crate quickcheck;
 
 use failure::Error;
-use ring::rand::SecureRandom;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::thread;
 use uuid::Uuid;
-
+use rand::rngs::OsRng;
 use rocket::fairing;
 
 mod client_interface;
@@ -52,6 +51,7 @@ pub mod types;
 use client_interface::ClientInterface;
 use chrono::{Utc};
 use std::io::Write;
+use rand::RngCore;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -197,11 +197,9 @@ impl TrowBuilder {
     fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
         // When run in production, Rocket wants a secret key for private cookies.
         // As we don't use private cookies, we just generate it here.
-        let rng = ring::rand::SystemRandom::new();
-        //let mut rng = rand::thread_rng();
         let mut key = [0u8; 32];
-        rng.fill(&mut key[..]).expect("Error generating Rocket Secret Config");
-        let skey = base64::encode(&key);
+        OsRng.fill_bytes(&mut key);
+        let secret_key = base64::encode(&key);
 
         /*
         Keep Alive has to be turned off to mitigate issue whereby some transfers would be cut off.
@@ -213,7 +211,7 @@ impl TrowBuilder {
             .address(self.config.addr.host.clone())
             .port(self.config.addr.port)
             .keep_alive(0) // Needed to mitigate #24. See above.
-            .secret_key(skey)
+            .secret_key(secret_key)
             .workers(256);
 
         if let Some(ref tls) = self.config.tls {

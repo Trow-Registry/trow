@@ -9,7 +9,6 @@ authors = ["Adrian Mouat <adrian.mouat@container-solutions.com" ]
 futures = "0.3"
 async-stream = "0.3"
 bytes = "0.5"
-data-encoding = "2.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 prost = "0.6"
@@ -22,9 +21,12 @@ log = "0.4"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 failure = "^0.1"
 failure_derive = "^0.1"
-ring = "0.13"
 serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
+
+# crypto and crypto related crates
+sha2 = "0.9"
+hex = "0.4"
 
 [build-dependencies]
 tonic-build = "0.3"

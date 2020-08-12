@@ -12,9 +12,6 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use prost_types::Timestamp;
 use std::io;
-use data_encoding::HEXLOWER;
-use ring::digest::{Context, Digest, SHA256};
-
 
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
@@ -22,6 +19,7 @@ pub mod trow_server {
 
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
+use crate::digest::sha256_tag_digest;
 
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -91,14 +89,6 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
     Ok(dir_path)
 }
 
-fn gen_digest(bytes: &[u8]) -> String {
-    // WARNING!! It will panic here!
-    // TODO: change the function to return a Result and handle the error!
-    let digest = sha256_digest(bytes).unwrap();
-    let digest = HEXLOWER.encode(digest.as_ref());
-    format!("sha256:{}", digest)
-}
-
 fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
     digest
         == match get_digest_from_manifest_path(manifest.path()) {
@@ -154,18 +144,17 @@ impl Iterator for RepoIterator {
 fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
     let f = File::open(file)?;
     let reader = BufReader::new(f);
-    let calculated_digest = sha256_digest(reader)?;
-    let calculated_digest = HEXLOWER.encode(calculated_digest.as_ref());
 
-    let true_digest = format!("sha256:{}", calculated_digest);
-    if true_digest != digest {
+    let calculated_digest = sha256_tag_digest(reader)?;
+
+    if calculated_digest != digest {
         error!(
             "Upload did not match given digest. Was given {} but got {}",
-            digest, true_digest
+            digest, calculated_digest
         );
         return Err(failure::err_msg(format!(
             "Upload did not match given digest. Was given {} but got {}",
-            digest, true_digest
+            digest, calculated_digest
         )));
     }
 
@@ -180,21 +169,6 @@ fn is_digest(maybe_digest: &str) -> bool {
     }
 
     false
-}
-
-fn sha256_digest<R: Read>(mut reader: R) -> Result<Digest, Error> {
-    let mut context = Context::new(&SHA256);
-    let mut buffer = [0; 1024]; // TODO: figure out best number here
-
-    loop {
-        let count = reader.read(&mut buffer)?;
-        if count == 0 {
-            break;
-        }
-        context.update(&buffer[..count]);
-    }
-
-    Ok(context.finish())
 }
 
 fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
@@ -334,9 +308,13 @@ impl TrowServer {
             }
         }
 
-        //For performance, could generate only if verification is on, otherwise copy from somewhere
+        // Calculate the digest: sha256:...
+        let reader = BufReader::new(manifest_bytes.as_slice());
+        let digest = sha256_tag_digest(reader)?;
+
+        // For performance, could generate only if verification is on, otherwise copy from somewhere
         Ok(VerifiedManifest {
-            digest: gen_digest(&manifest_bytes),
+            digest,
             content_type: manifest.get_media_type().to_string(),
         })
     }
