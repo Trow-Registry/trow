@@ -68,10 +68,10 @@ mod interface_tests {
 
     /**
      * Run a simple docker push/pull against the registry.
-     * 
+     *
      * This assumes Docker is installed and has a cert for the registry.
      * For that reason, it's set to ignored by default and has to be manually enabled.
-     * 
+     *
      */
     #[test]
     #[ignore]
@@ -82,38 +82,41 @@ mod interface_tests {
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
         let _trow = start_trow();
-        
+
         let mut status = Command::new("docker")
-          .args(&["pull", "alpine:latest"])
-          .status()
-          .expect("Failed to call docker pull - prereq for smoke test");
-        
+            .args(&["pull", "alpine:latest"])
+            .status()
+            .expect("Failed to call docker pull - prereq for smoke test");
+
         assert!(status.success());
-        
+
         let image_name = format!("{}/alpine:trow", TROW_NAME);
-        status = Command::new("docker").args(&["tag", "alpine:latest", &image_name])
-          .status()
-          .expect("Failed to call docker");
-        
-        assert!(status.success());
-        
-        status = Command::new("docker").args(&["push", &image_name])
-          .status()
-          .expect("Failed to call docker");
-        
-        assert!(status.success());
-        
-        status = Command::new("docker").args(&["rmi", &image_name])
-          .status()
-          .expect("Failed to call docker");
-        
+        status = Command::new("docker")
+            .args(&["tag", "alpine:latest", &image_name])
+            .status()
+            .expect("Failed to call docker");
+
         assert!(status.success());
 
-        status = Command::new("docker").args(&["pull", &image_name])
-          .status()
-          .expect("Failed to call docker");
-        
+        status = Command::new("docker")
+            .args(&["push", &image_name])
+            .status()
+            .expect("Failed to call docker");
+
         assert!(status.success());
 
+        status = Command::new("docker")
+            .args(&["rmi", &image_name])
+            .status()
+            .expect("Failed to call docker");
+
+        assert!(status.success());
+
+        status = Command::new("docker")
+            .args(&["pull", &image_name])
+            .status()
+            .expect("Failed to call docker");
+
+        assert!(status.success());
     }
 }

@@ -7,6 +7,9 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
+    use crypto::digest::Digest;
+    use crypto::sha2::Sha256;
+    use rand::Rng;
     use reqwest;
     use reqwest::StatusCode;
     use std::fs::{self, File};
@@ -15,10 +18,7 @@ mod interface_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use crypto::sha2::Sha256;
-    use crypto::digest::Digest;
-    use rand::Rng;  
-    
+
     const TROW_ADDRESS: &str = "https://trow.test:8443";
 
     struct TrowInstance {
@@ -69,13 +69,15 @@ mod interface_tests {
     }
 
     fn upload_config(cl: &reqwest::Client) {
-
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
         let digest = format!("sha256:{}", hasher.result_str());
         let resp = cl
-            .post(&format!("{}/v2/{}/blobs/uploads/?digest={}", TROW_ADDRESS, "config", digest))
+            .post(&format!(
+                "{}/v2/{}/blobs/uploads/?digest={}",
+                TROW_ADDRESS, "config", digest
+            ))
             .body(config.clone())
             .send()
             .unwrap();
@@ -83,7 +85,7 @@ mod interface_tests {
     }
 
     fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
-        //Note config was uploaded as blob earlier 
+        //Note config was uploaded as blob earlier
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
@@ -91,14 +93,14 @@ mod interface_tests {
 
         //To ensure each manifest is different, just use foreign content with random contents
         let mut rng = rand::thread_rng();
-        let ran_size:u32 = rng.gen();
+        let ran_size: u32 = rng.gen();
         let mut digest = [0u8; 32];
         rng.fill(&mut digest[..]);
         let mut ran_digest = "".to_string();
         for b in &digest {
             ran_digest.push_str(&format!("{:x}", b).to_string());
         }
-    
+
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
                  "config": {{ "digest": "{}", 
@@ -134,8 +136,13 @@ mod interface_tests {
         digest
     }
 
-    fn get_history(cl: &reqwest::Client, repo: &str, tag: &str, limit:  Option<u32>, digest: Option<String>) -> serde_json::Value {
-
+    fn get_history(
+        cl: &reqwest::Client,
+        repo: &str,
+        tag: &str,
+        limit: Option<u32>,
+        digest: Option<String>,
+    ) -> serde_json::Value {
         let mut options = "".to_owned();
         if let Some(val) = digest {
             options = format!("?last={}", val);
@@ -148,7 +155,10 @@ mod interface_tests {
         }
 
         let mut resp = cl
-            .get(&format!("{}/{}/manifest_history/{}{}", TROW_ADDRESS, repo, tag, options))
+            .get(&format!(
+                "{}/{}/manifest_history/{}{}",
+                TROW_ADDRESS, repo, tag, options
+            ))
             .send()
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -156,14 +166,14 @@ mod interface_tests {
         // type should be decided by caller, but this is just a test
         let x: serde_json::Value = resp.json().unwrap();
 
-        return x
+        return x;
     }
 
     /**
-     * Tests of Trow's support for manifest history. 
-     * 
+     * Tests of Trow's support for manifest history.
+     *
      * Given a tag, we should be able to get the digest it currently points to and all previous digests, with dates.
-     * 
+     *
      */
     #[test]
     fn manifest_test() {
@@ -210,6 +220,5 @@ mod interface_tests {
         let start = json["history"][0]["digest"].as_str().unwrap();
         let json = get_history(&client, "history", "one", Some(20), Some(start.to_string()));
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
-        
     }
 }

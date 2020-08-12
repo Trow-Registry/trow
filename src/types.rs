@@ -1,7 +1,6 @@
+use chrono::{DateTime, Utc};
 use std::collections::HashSet;
 use std::io::Read;
-use chrono::{DateTime, Utc};
-
 
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]
@@ -43,7 +42,6 @@ impl UploadInfo {
     pub fn range(&self) -> (u32, u32) {
         self.range
     }
-
 }
 
 pub fn create_upload_info(uuid: Uuid, repo_name: RepoName, range: (u32, u32)) -> UploadInfo {
@@ -62,8 +60,18 @@ pub struct AcceptedUpload {
     range: (u32, u32),
 }
 
-pub fn create_accepted_upload(digest: Digest, repo_name: RepoName, uuid: Uuid, range: (u32, u32)) -> AcceptedUpload {
-    AcceptedUpload { digest, repo_name, uuid, range }
+pub fn create_accepted_upload(
+    digest: Digest,
+    repo_name: RepoName,
+    uuid: Uuid,
+    range: (u32, u32),
+) -> AcceptedUpload {
+    AcceptedUpload {
+        digest,
+        repo_name,
+        uuid,
+        range,
+    }
 }
 
 impl AcceptedUpload {
@@ -199,17 +207,13 @@ impl RepoCatalog {
     }
 }
 
-
 mod history_date_format {
-    use chrono::{DateTime, Utc, TimeZone};
-    use serde::{self, Deserialize, Serializer, Deserializer};
+    use chrono::{DateTime, TimeZone, Utc};
+    use serde::{self, Deserialize, Deserializer, Serializer};
 
     const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S%.f %Z";
 
-    pub fn serialize<S>(
-        date: &DateTime<Utc>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -217,22 +221,21 @@ mod history_date_format {
         serializer.serialize_str(&s)
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<DateTime<Utc>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Utc.datetime_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
+        Utc.datetime_from_str(&s, FORMAT)
+            .map_err(serde::de::Error::custom)
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct HistoryEntry {
     pub digest: String,
-    #[serde(with="history_date_format")]
-    pub date: DateTime<Utc>
+    #[serde(with = "history_date_format")]
+    pub date: DateTime<Utc>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
@@ -251,7 +254,7 @@ impl ManifestHistory {
     }
 
     pub fn insert(&mut self, digest: String, date: DateTime<Utc>) {
-        self.history.push(HistoryEntry{digest, date});
+        self.history.push(HistoryEntry { digest, date });
     }
 
     pub fn catalog(&self) -> &Vec<HistoryEntry> {
@@ -326,18 +329,16 @@ pub struct AdmissionReview {
     pub response: Option<AdmissionResponse>,
 }
 
-
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct HealthResponse {
     pub message: String,
-    pub is_healthy: bool
-
+    pub is_healthy: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize ,PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ReadinessResponse {
     pub message: String,
-    pub is_ready: bool
+    pub is_ready: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize ,PartialEq)]

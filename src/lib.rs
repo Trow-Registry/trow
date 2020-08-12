@@ -40,12 +40,12 @@ extern crate rand;
 extern crate quickcheck;
 
 use failure::Error;
+use rand::Rng;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::thread;
 use uuid::Uuid;
-use rand::Rng;
 
 use rocket::fairing;
 
@@ -200,14 +200,13 @@ impl TrowBuilder {
     }
 
     fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
-
         // When run in production, Rocket wants a secret key for private cookies.
         // As we don't use private cookies, we just generate it here.
         let mut rng = rand::thread_rng();
         let mut key = [0u8; 32];
         rng.fill(&mut key[..]);
         let skey = base64::encode(&key);
-        
+
         /*
         Keep Alive has to be turned off to mitigate issue whereby some transfers would be cut off.
         Seems to be caused by an old version of hyper in Rocket.
@@ -217,7 +216,7 @@ impl TrowBuilder {
         let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
             .address(self.config.addr.host.clone())
             .port(self.config.addr.port)
-            .keep_alive(0) // Needed to mitigate #24. See above. 
+            .keep_alive(0) // Needed to mitigate #24. See above.
             .secret_key(skey)
             .workers(256);
 
@@ -231,10 +230,9 @@ impl TrowBuilder {
         Ok(cfg)
     }
 
-
     pub fn start(&self) -> Result<(), Error> {
         init_logger()?;
-        
+
         let rocket_config = &self.build_rocket_config()?;
 
         // Start GRPC Backend thread.
@@ -242,7 +240,9 @@ impl TrowBuilder {
 
         println!(
             "Starting Trow {} on {}:{}",
-            env!("CARGO_PKG_VERSION"), self.config.addr.host, self.config.addr.port
+            env!("CARGO_PKG_VERSION"),
+            self.config.addr.host,
+            self.config.addr.port
         );
         println!("\n**Validation callback configuration\n");
 
@@ -273,7 +273,7 @@ impl TrowBuilder {
             std::process::exit(0);
         }
         let s = format!("https://{}", self.config.grpc.listen);
-        let ci:ClientInterface = build_handlers(s)?;
+        let ci: ClientInterface = build_handlers(s)?;
 
         rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
@@ -298,7 +298,7 @@ impl TrowBuilder {
             .mount("/", routes::routes())
             .register(routes::catchers())
             .launch();
-  
+
         Ok(())
     }
 }
@@ -312,7 +312,6 @@ fn attach_sigterm() -> Result<(), Error> {
 }
 
 pub fn build_handlers(listen_addr: String) -> Result<ClientInterface, Error> {
-    
     debug!("Address for backend: {}", listen_addr);
 
     //TODO this function is useless currently

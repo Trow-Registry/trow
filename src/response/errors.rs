@@ -49,25 +49,56 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::Unsupported => format_error_json(f, "UNSUPPORTED", "Unsupported", None),
-            Error::Unauthorized => format_error_json(f, "UNAUTHORIZED", "Authorization required", None),
+            Error::Unauthorized => {
+                format_error_json(f, "UNAUTHORIZED", "Authorization required", None)
+            }
             Error::BlobUnknown => format_error_json(f, "BLOB_UNKNOWN", "Blob Unknown", None),
             Error::BlobUploadUnknown => write!(f, "Blob Upload Unknown"),
-            Error::BlobUploadInvalid => format_error_json(f, "BLOB_UPLOAD_INVALID", "Invalid request to blob upload", None),
+            Error::BlobUploadInvalid => format_error_json(
+                f,
+                "BLOB_UPLOAD_INVALID",
+                "Invalid request to blob upload",
+                None,
+            ),
             //TODO: INTERNAL_ERROR code is not in the distribution spec
-            Error::InternalError => format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", None),
-            Error::DigestInvalid => format_error_json(f, "DIGEST_INVALID", "Provided digest did not match uploaded content", None),
-            Error::ManifestInvalid => format_error_json(f, "MANIFEST_INVALID", "manifest invalid", None),
-            Error::ManifestUnknown(ref tag) => format_error_json(f, "MANIFEST_UNKNOWN", "manifest unknown", Some(json!({ "Tag": tag }))),
-            Error::NameInvalid(ref name) => format_error_json(f, "NAME_INVALID","Invalid repository name", Some(json!({ "Repository": name })))
+            Error::InternalError => {
+                format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", None)
+            }
+            Error::DigestInvalid => format_error_json(
+                f,
+                "DIGEST_INVALID",
+                "Provided digest did not match uploaded content",
+                None,
+            ),
+            Error::ManifestInvalid => {
+                format_error_json(f, "MANIFEST_INVALID", "manifest invalid", None)
+            }
+            Error::ManifestUnknown(ref tag) => format_error_json(
+                f,
+                "MANIFEST_UNKNOWN",
+                "manifest unknown",
+                Some(json!({ "Tag": tag })),
+            ),
+            Error::NameInvalid(ref name) => format_error_json(
+                f,
+                "NAME_INVALID",
+                "Invalid repository name",
+                Some(json!({ "Repository": name })),
+            ),
         }
     }
 }
 
-fn format_error_json(f: &mut fmt::Formatter, code: &str, message: &str, detail: Option<Value>) -> fmt::Result {
+fn format_error_json(
+    f: &mut fmt::Formatter,
+    code: &str,
+    message: &str,
+    detail: Option<Value>,
+) -> fmt::Result {
     let emsg = ErrorMsg {
         code: code.to_string(),
         message: message.to_string(),
-        detail: detail
+        detail: detail,
     };
 
     write!(
@@ -100,14 +131,15 @@ impl<'r> Responder<'r> for Error {
         let json = format!("{}", self);
 
         let status = match self {
-            Error::Unsupported  => Status::MethodNotAllowed,
+            Error::Unsupported => Status::MethodNotAllowed,
             Error::Unauthorized => Status::Unauthorized,
-            Error::BlobUploadUnknown | Error::ManifestUnknown(_)  => Status::NotFound,
-            Error::InternalError  => Status::InternalServerError,
+            Error::BlobUploadUnknown | Error::ManifestUnknown(_) => Status::NotFound,
+            Error::InternalError => Status::InternalServerError,
             Error::BlobUploadInvalid => Status::RangeNotSatisfiable,
-            Error::DigestInvalid | Error::ManifestInvalid | Error::BlobUnknown | Error::NameInvalid(_) => {
-                Status::BadRequest
-            }
+            Error::DigestInvalid
+            | Error::ManifestInvalid
+            | Error::BlobUnknown
+            | Error::NameInvalid(_) => Status::BadRequest,
         };
         Response::build()
             .header(ContentType::JSON)
