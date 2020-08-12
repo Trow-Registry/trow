@@ -19,7 +19,7 @@ mod interface_tests {
     use std::thread;
     use std::time::Duration;
 
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    const TROW_ADDRESS: &str = "http://0.0.0.0:8443";
 
     struct TrowInstance {
         pid: Child,
@@ -27,7 +27,7 @@ mod interface_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
 
-    fn start_trow() -> TrowInstance {
+    async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
@@ -49,10 +49,10 @@ mod interface_tests {
             .build()
             .unwrap();
 
-        let mut response = client.get(TROW_ADDRESS).send();
+        let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send();
+            response = client.get(TROW_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -68,7 +68,7 @@ mod interface_tests {
         }
     }
 
-    fn upload_config(cl: &reqwest::Client) {
+    async fn upload_config(cl: &reqwest::Client) {
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
@@ -80,11 +80,12 @@ mod interface_tests {
             ))
             .body(config.clone())
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
-    fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+    async fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob earlier
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
@@ -126,6 +127,7 @@ mod interface_tests {
             .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .body(bytes)
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
@@ -136,7 +138,7 @@ mod interface_tests {
         digest
     }
 
-    fn get_history(
+    async fn get_history(
         cl: &reqwest::Client,
         repo: &str,
         tag: &str,
@@ -154,17 +156,18 @@ mod interface_tests {
             options = format!("?n={}", val);
         }
 
-        let mut resp = cl
+        let resp = cl
             .get(&format!(
                 "{}/{}/manifest_history/{}{}",
                 TROW_ADDRESS, repo, tag, options
             ))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
 
         // type should be decided by caller, but this is just a test
-        let x: serde_json::Value = resp.json().unwrap();
+        let x: serde_json::Value = resp.json().await.unwrap();
 
         return x;
     }
@@ -175,12 +178,12 @@ mod interface_tests {
      * Given a tag, we should be able to get the digest it currently points to and all previous digests, with dates.
      *
      */
-    #[test]
-    fn manifest_test() {
+    #[tokio::test]
+    async fn manifest_test() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
 
-        let _trow = start_trow();
+        let _trow = start_trow().await;
 
         let mut buf = Vec::new();
         File::open("./certs/domain.crt")
@@ -195,7 +198,7 @@ mod interface_tests {
             .build()
             .unwrap();
 
-        upload_config(&client);
+        upload_config(&client).await;
 
         //Following is intentionally interleaved to add delays
         let mut history_one = Vec::new();
@@ -206,19 +209,19 @@ mod interface_tests {
         history_two.push(push_random_foreign_manifest(&client, "history", "two"));
         history_one.push(push_random_foreign_manifest(&client, "history", "one"));
 
-        let json = get_history(&client, "history", "one", None, None);
+        let json = get_history(&client, "history", "one", None, None).await;
         assert_eq!(json["image"], "history:one");
         assert_eq!(json["history"].as_array().unwrap().len(), 3);
 
-        let json = get_history(&client, "history", "two", None, None);
+        let json = get_history(&client, "history", "two", None, None).await;
         assert_eq!(json["image"], "history:two");
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
 
-        let json = get_history(&client, "history", "one", Some(1), None);
+        let json = get_history(&client, "history", "one", Some(1), None).await;
         assert_eq!(json["history"].as_array().unwrap().len(), 1);
 
         let start = json["history"][0]["digest"].as_str().unwrap();
-        let json = get_history(&client, "history", "one", Some(20), Some(start.to_string()));
+        let json = get_history(&client, "history", "one", Some(20), Some(start.to_string())).await;
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
     }
 }

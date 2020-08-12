@@ -11,11 +11,10 @@ use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use prost_types::Timestamp;
-
 use std::io;
+use data_encoding::HEXLOWER;
+use ring::digest::{Context, Digest, SHA256};
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
@@ -93,9 +92,8 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
 }
 
 fn gen_digest(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.input(bytes);
-    format!("sha256:{}", hasher.result_str())
+    let digest = HEXLOWER.encode(bytes);
+    format!("sha256:{}", digest)
 }
 
 fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
@@ -152,16 +150,11 @@ impl Iterator for RepoIterator {
  */
 fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
     let f = File::open(file)?;
-    let mut reader = BufReader::new(f);
-    let mut hasher = Sha256::new();
-    let mut buf = [0; 256]; // TODO: figure out best number here
-    let mut bytes_read = reader.read(&mut buf[..])?;
-    while bytes_read != 0 {
-        hasher.input(&buf[..bytes_read]);
-        bytes_read = reader.read(&mut buf[..])?;
-    }
+    let reader = BufReader::new(f);
+    let calculated_digest = sha256_digest(reader)?;
+    let calculated_digest = HEXLOWER.encode(calculated_digest.as_ref());
 
-    let true_digest = format!("sha256:{}", hasher.result_str());
+    let true_digest = format!("sha256:{}", calculated_digest);
     if true_digest != digest {
         error!(
             "Upload did not match given digest. Was given {} but got {}",
@@ -184,6 +177,21 @@ fn is_digest(maybe_digest: &str) -> bool {
     }
 
     false
+}
+
+fn sha256_digest<R: Read>(mut reader: R) -> Result<Digest, Error> {
+    let mut context = Context::new(&SHA256);
+    let mut buffer = [0; 1024]; // TODO: figure out best number here
+
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        context.update(&buffer[..count]);
+    }
+
+    Ok(context.finish())
 }
 
 fn is_path_writable(path: &PathBuf) -> io::Result<bool> {

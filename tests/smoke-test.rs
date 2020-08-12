@@ -25,7 +25,8 @@ mod interface_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
 
-    fn start_trow() -> TrowInstance {
+    // #[tokio::test]
+    async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
@@ -47,10 +48,10 @@ mod interface_tests {
             .build()
             .unwrap();
 
-        let mut response = client.get(TROW_ADDRESS).send();
+        let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send();
+            response = client.get(TROW_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -73,9 +74,9 @@ mod interface_tests {
      * For that reason, it's set to ignored by default and has to be manually enabled.
      *
      */
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn smoke_test() {
+    async fn smoke_test() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
 

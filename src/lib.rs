@@ -5,42 +5,37 @@
 #[macro_use]
 extern crate failure;
 extern crate base64;
-extern crate frank_jwt;
 extern crate futures;
 extern crate hostname;
-extern crate orset;
+extern crate hyper;
 #[macro_use]
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
-extern crate rustc_serialize;
+
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
-#[macro_use]
-extern crate display_derive;
-
+extern crate derive_more;
 extern crate trow_server;
-
 extern crate argon2;
 extern crate chrono;
-extern crate crypto;
 extern crate env_logger;
+extern crate frank_jwt;
+extern crate data_encoding;
+use log::{LevelFilter, SetLoggerError};
 
-use log::{LogLevelFilter, LogRecord, SetLoggerError};
 #[macro_use]
-extern crate failure_derive;
-#[macro_use(log, warn, info, debug)]
 extern crate log;
+
 #[macro_use]
 extern crate serde_derive;
-extern crate rand;
 
 #[cfg(test)]
 extern crate quickcheck;
 
 use failure::Error;
-use rand::Rng;
+use ring::rand::SecureRandom;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -55,6 +50,8 @@ mod routes;
 pub mod types;
 
 use client_interface::ClientInterface;
+use chrono::{Utc};
+use std::io::Write;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -133,18 +130,16 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
 
 /// Build the logging agent with formatting.
 fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = env_logger::LogBuilder::new();
-    builder
-        .format(|record: &LogRecord| {
-            format!("{}[{}] {}", record.target(), record.level(), record.args(),)
-        })
-        .filter(None, LogLevelFilter::Error);
+    let mut builder = env_logger::Builder::new();
 
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
+    if !env::var("RUST_LOG").is_ok() {
+        builder.format(|buf, record| {
+            writeln!(buf, "{} [{}] {} {}", Utc::now().format("%Y-%m-%dT%H:%M:%S"), record.target(), record.level(), record.args())
+        })
+            .filter(None, LevelFilter::Info);
     }
 
-    builder.init()
+    Ok(builder.init())
 }
 
 pub struct TrowBuilder {
@@ -202,9 +197,10 @@ impl TrowBuilder {
     fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
         // When run in production, Rocket wants a secret key for private cookies.
         // As we don't use private cookies, we just generate it here.
-        let mut rng = rand::thread_rng();
+        let rng = ring::rand::SystemRandom::new();
+        //let mut rng = rand::thread_rng();
         let mut key = [0u8; 32];
-        rng.fill(&mut key[..]);
+        rng.fill(&mut key[..]).expect("Error generating Rocket Secret Config");
         let skey = base64::encode(&key);
 
         /*

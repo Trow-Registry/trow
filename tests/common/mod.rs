@@ -39,11 +39,12 @@ pub fn kill_gracefully(child: &Child) {
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
+pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
     //Should support both image/test and imagetest, only former working currently
     let resp = cl
         .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
         .send()
+        .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
     let uuid = resp.headers().get(UPLOAD_HEADER).unwrap().to_str().unwrap();
@@ -56,7 +57,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
 
     //Upload file. Start uploading blob with patch then digest with put
     let blob = gen_rand_blob(100);
-    let resp = cl.patch(location).body(blob.clone()).send().unwrap();
+    let resp = cl.patch(location).body(blob.clone()).send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
 
     let mut hasher = Sha256::new();
@@ -68,20 +69,18 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
             TROW_ADDRESS, name, uuid, digest
         ))
         .send()
+        .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
 
     //Finally get it back again
-    let mut resp = cl
+    let resp = cl
         .get(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, digest))
         .send()
+        .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-
-    let mut buf = Vec::new();
-    resp.copy_to(&mut buf).unwrap();
-
-    assert_eq!(blob, buf);
+    assert_eq!(blob, resp.bytes().await.unwrap());
 
     //Upload manifest
     //For time being use same blob for config and layer
@@ -104,7 +103,7 @@ pub fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         layers,
     };
     let manifest_addr = format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag);
-    let resp = cl.put(&manifest_addr).json(&mani).send().unwrap();
+    let resp = cl.put(&manifest_addr).json(&mani).send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();
     assert_eq!(&location, &manifest_addr);

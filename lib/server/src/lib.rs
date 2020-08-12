@@ -1,11 +1,10 @@
-#[macro_use(log, warn, debug, info, error)]
+#[macro_use(warn, debug, info, error)]
 extern crate log;
 
 #[macro_use]
 extern crate serde_derive;
-extern crate rustc_serialize;
 extern crate serde_json;
-extern crate crypto;
+extern crate ring;
 extern crate failure_derive;
 #[macro_use]
 extern crate failure;

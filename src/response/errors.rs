@@ -37,7 +37,7 @@ pub enum Error {
     DigestInvalid,
 }
 
-//Create errormsg struct that serializes to json of appropriate type
+// Create ErrorMsg struct that serializes to json of appropriate type
 #[derive(Serialize, Deserialize)]
 struct ErrorMsg {
     code: String,
@@ -60,7 +60,7 @@ impl fmt::Display for Error {
                 "Invalid request to blob upload",
                 None,
             ),
-            //TODO: INTERNAL_ERROR code is not in the distribution spec
+            // TODO: INTERNAL_ERROR code is not in the distribution spec
             Error::InternalError => {
                 format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", None)
             }
@@ -98,7 +98,7 @@ fn format_error_json(
     let emsg = ErrorMsg {
         code: code.to_string(),
         message: message.to_string(),
-        detail: detail,
+        detail,
     };
 
     write!(

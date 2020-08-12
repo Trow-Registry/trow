@@ -28,7 +28,7 @@ mod interface_tests {
     use trow::types::{RepoCatalog, RepoName, TagList};
     use trow_server::manifest;
 
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    const TROW_ADDRESS: &str = "http://0.0.0.0:8443";
     const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 
     struct TrowInstance {
@@ -37,7 +37,7 @@ mod interface_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
 
-    fn start_trow() -> TrowInstance {
+    async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
@@ -60,10 +60,10 @@ mod interface_tests {
             .build()
             .unwrap();
 
-        let mut response = client.get(TROW_ADDRESS).send();
+        let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send();
+            response = client.get(TROW_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -79,65 +79,70 @@ mod interface_tests {
         }
     }
 
-    fn get_main(cl: &reqwest::Client) {
-        let resp = cl.get(TROW_ADDRESS).send().unwrap();
+    async fn get_main(cl: &reqwest::Client) {
+        let resp = cl.get(TROW_ADDRESS).send().await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
 
         //All v2 registries should respond with a 200 to this
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/v2/")).send().unwrap();
+        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/v2/")).send().await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
     }
 
-    fn get_non_existent_blob(cl: &reqwest::Client) {
+    async fn get_non_existent_blob(cl: &reqwest::Client) {
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
-        //Might need accept headers here
-        let mut resp = cl
-            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
-            .send()
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let mani: manifest::ManifestV2 = resp.json().unwrap();
-        assert_eq!(mani.schema_version, 2);
-    }
-
-    fn get_non_existent_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
+    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
         //Might need accept headers here
         let resp = cl
             .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let mani: manifest::ManifestV2 = resp.json().await.unwrap();
+        assert_eq!(mani.schema_version, 2);
+    }
+
+    async fn get_non_existent_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
+        //Might need accept headers here
+        let resp = cl
+            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
+            .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    fn check_repo_catalog(cl: &reqwest::Client, rc: &RepoCatalog) {
-        let mut resp = cl
+    async fn check_repo_catalog(cl: &reqwest::Client, rc: &RepoCatalog) {
+        let resp = cl
             .get(&format!("{}/v2/_catalog", TROW_ADDRESS))
             .send()
+            .await
             .unwrap();
-        let rc_resp: RepoCatalog = serde_json::from_str(&resp.text().unwrap()).unwrap();
+        let rc_resp: RepoCatalog = serde_json::from_str(&resp.text().await.unwrap()).unwrap();
         assert_eq!(rc, &rc_resp);
     }
 
-    fn check_tag_list(cl: &reqwest::Client, tl: &TagList) {
-        let mut resp = cl
+    async fn check_tag_list(cl: &reqwest::Client, tl: &TagList) {
+        let resp = cl
             .get(&format!("{}/v2/{}/tags/list", TROW_ADDRESS, tl.repo_name()))
             .send()
+            .await
             .unwrap();
-        let tl_resp: TagList = serde_json::from_str(&resp.text().unwrap()).unwrap();
+        let tl_resp: TagList = serde_json::from_str(&resp.text().await.unwrap()).unwrap();
         assert_eq!(tl, &tl_resp);
     }
 
-    fn check_tag_list_n_last(cl: &reqwest::Client, n: u32, last: &str, tl: &TagList) {
-        let mut resp = cl
+    async fn check_tag_list_n_last(cl: &reqwest::Client, n: u32, last: &str, tl: &TagList) {
+        let resp = cl
             .get(&format!(
                 "{}/v2/{}/tags/list?last={}&n={}",
                 TROW_ADDRESS,
@@ -146,15 +151,17 @@ mod interface_tests {
                 n
             ))
             .send()
+            .await
             .unwrap();
-        let tl_resp: TagList = serde_json::from_str(&resp.text().unwrap()).unwrap();
+        let tl_resp: TagList = serde_json::from_str(&resp.text().await.unwrap()).unwrap();
         assert_eq!(tl, &tl_resp);
     }
 
-    fn upload_with_put(cl: &reqwest::Client, name: &str) {
+    async fn upload_with_put(cl: &reqwest::Client, name: &str) {
         let resp = cl
             .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
         let uuid = resp
@@ -174,11 +181,11 @@ mod interface_tests {
             TROW_ADDRESS, name, uuid, digest
         );
 
-        let resp = cl.put(loc).body(config.clone()).send().unwrap();
+        let resp = cl.put(loc).body(config.clone()).send().await.unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
-    fn upload_with_post(cl: &reqwest::Client, name: &str) {
+    async fn upload_with_post(cl: &reqwest::Client, name: &str) {
         let config = "{ }\n".as_bytes();
         let mut hasher = Sha256::new();
         hasher.input(&config);
@@ -190,11 +197,12 @@ mod interface_tests {
             ))
             .body(config.clone())
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
-    fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+    async fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
@@ -215,6 +223,7 @@ mod interface_tests {
             .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .body(bytes)
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
@@ -226,7 +235,7 @@ mod interface_tests {
         digest
     }
 
-    fn push_manifest_list(cl: &reqwest::Client, digest: &str, name: &str, tag: &str) -> String {
+    async fn push_manifest_list(cl: &reqwest::Client, digest: &str, name: &str, tag: &str) -> String {
         let manifest = format!(
             r#"{{
                 "schemaVersion": 2,
@@ -251,6 +260,7 @@ mod interface_tests {
             .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .body(bytes)
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
@@ -262,7 +272,7 @@ mod interface_tests {
         digest
     }
 
-    fn push_oci_manifest_with_foreign_blob(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+    async fn push_oci_manifest_with_foreign_blob(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
@@ -292,6 +302,7 @@ mod interface_tests {
             .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .body(bytes)
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
@@ -303,18 +314,19 @@ mod interface_tests {
         digest
     }
 
-    fn delete_manifest(cl: &reqwest::Client, name: &str, digest: &str) {
+    async fn delete_manifest(cl: &reqwest::Client, name: &str, digest: &str) {
         let resp = cl
             .delete(&format!(
                 "{}/v2/{}/manifests/{}",
                 TROW_ADDRESS, name, digest
             ))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    fn delete_non_existent_manifest(cl: &reqwest::Client, name: &str) {
+    async fn delete_non_existent_manifest(cl: &reqwest::Client, name: &str) {
         let resp = cl
             .delete(&format!(
                 "{}/v2/{}/manifests/{}",
@@ -323,19 +335,21 @@ mod interface_tests {
                 "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
             ))
             .send()
+            .await
             .unwrap();
         // If it doesn't exist, that's kinda the same as deleted, right?
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
-    fn attempt_delete_by_tag(cl: &reqwest::Client, name: &str, tag: &str) {
+    async fn attempt_delete_by_tag(cl: &reqwest::Client, name: &str, tag: &str) {
         let resp = cl
             .delete(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
-    fn delete_config_blob(cl: &reqwest::Client, name: &str) {
+    async fn delete_config_blob(cl: &reqwest::Client, name: &str) {
         //Deletes blob uploaded in config test
         let config = "{}\n".as_bytes();
         let mut hasher = Sha256::new();
@@ -347,21 +361,23 @@ mod interface_tests {
                 TROW_ADDRESS, name, config_digest
             ))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    fn test_5level_error(cl: &reqwest::Client) {
+    async fn test_5level_error(cl: &reqwest::Client) {
         let name = "one/two/three/four/five";
         let resp = cl
             .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
-    #[test]
-    fn test_runner() {
+    #[tokio::test]
+    async fn test_runner() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
 
@@ -383,60 +399,60 @@ mod interface_tests {
             .unwrap();
 
         println!("Running get_main()");
-        get_main(&client);
+        get_main(&client).await;
         println!("Running get_blob()");
-        get_non_existent_blob(&client);
+        get_non_existent_blob(&client).await;
 
         println!("Running upload_layer(fourth/repo/image/test:tag)");
-        common::upload_layer(&client, "fourth/repo/image/test", "tag");
+        common::upload_layer(&client, "fourth/repo/image/test", "tag").await;
         println!("Running upload_layer(repo/image/test:tag)");
-        common::upload_layer(&client, "repo/image/test", "tag");
+        common::upload_layer(&client, "repo/image/test", "tag").await;
         println!("Running upload_layer(image/test:latest)");
-        common::upload_layer(&client, "image/test", "latest");
+        common::upload_layer(&client, "image/test", "latest").await;
         println!("Running upload_layer(onename:tag)");
-        common::upload_layer(&client, "onename", "tag");
+        common::upload_layer(&client, "onename", "tag").await;
         println!("Running upload_layer(onename:latest)");
-        common::upload_layer(&client, "onename", "latest");
+        common::upload_layer(&client, "onename", "latest").await;
         println!("Running upload_with_put()");
-        upload_with_put(&client, "puttest");
+        upload_with_put(&client, "puttest").await;
         println!("Running upload_with_post");
-        upload_with_post(&client, "posttest");
+        upload_with_post(&client, "posttest").await;
 
         println!("Running test_5level_error()");
-        test_5level_error(&client);
+        test_5level_error(&client).await;
 
         println!("Running push_oci_manifest()");
-        let digest = push_oci_manifest(&client, "puttest", "puttest1");
+        let digest = push_oci_manifest(&client, "puttest", "puttest1").await;
         println!("Running push_manifest_list()");
-        let digest_list = push_manifest_list(&client, &digest, "listtest", "listtest1");
+        let digest_list = push_manifest_list(&client, &digest, "listtest", "listtest1").await;
         println!("Running get_manifest(puttest:puttest1)");
-        get_manifest(&client, "puttest", "puttest1");
+        get_manifest(&client, "puttest", "puttest1").await;
         println!("Running delete_manifest(puttest:digest)");
-        delete_manifest(&client, "puttest", &digest);
+        delete_manifest(&client, "puttest", &digest).await;
         println!("Running delete_manifest(listtest)");
-        delete_manifest(&client, "listtest", &digest_list);
+        delete_manifest(&client, "listtest", &digest_list).await;
         println!("Running delete_non_existent_manifest(onename)");
-        delete_non_existent_manifest(&client, "onename");
+        delete_non_existent_manifest(&client, "onename").await;
         println!("Running attempt_delete_by_tag(onename:tag)");
-        attempt_delete_by_tag(&client, "onename", "tag");
+        attempt_delete_by_tag(&client, "onename", "tag").await;
         println!("Running get_non_existent_manifest(puttest:puttest1)");
-        get_non_existent_manifest(&client, "puttest", "puttest1");
+        get_non_existent_manifest(&client, "puttest", "puttest1").await;
         println!("Running get_non_existent_manifest(puttest:digest)");
-        get_non_existent_manifest(&client, "puttest", &digest);
+        get_non_existent_manifest(&client, "puttest", &digest).await;
 
         println!("Running push_oci_manifest_with_foreign_blob()");
-        let digest = push_oci_manifest_with_foreign_blob(&client, "foreigntest", "blobtest1");
-        delete_manifest(&client, "foreigntest", &digest);
+        let digest = push_oci_manifest_with_foreign_blob(&client, "foreigntest", "blobtest1").await;
+        delete_manifest(&client, "foreigntest", &digest).await;
 
         println!("Running delete_config_blob");
-        delete_config_blob(&client, "puttest");
+        delete_config_blob(&client, "puttest").await;
 
         println!("Running get_manifest(onename:tag)");
-        get_manifest(&client, "onename", "tag");
+        get_manifest(&client, "onename", "tag").await;
         println!("Running get_manifest(image/test:latest)");
-        get_manifest(&client, "image/test", "latest");
+        get_manifest(&client, "image/test", "latest").await;
         println!("Running get_manifest(repo/image/test:tag)");
-        get_manifest(&client, "repo/image/test", "tag");
+        get_manifest(&client, "repo/image/test", "tag").await;
 
         let mut rc = RepoCatalog::new();
         rc.insert(RepoName("fourth/repo/image/test".to_string()));
@@ -445,15 +461,15 @@ mod interface_tests {
         rc.insert(RepoName("onename".to_string()));
 
         println!("Running check_repo_catalog");
-        check_repo_catalog(&client, &rc);
+        check_repo_catalog(&client, &rc).await;
 
         let mut tl = TagList::new(RepoName("repo/image/test".to_string()));
         tl.insert("tag".to_string());
         println!("Running check_tag_list 1");
-        check_tag_list(&client, &tl);
+        check_tag_list(&client, &tl).await;
 
-        common::upload_layer(&client, "onename", "three");
-        common::upload_layer(&client, "onename", "four");
+        common::upload_layer(&client, "onename", "three").await;
+        common::upload_layer(&client, "onename", "four").await;
 
         // list, in order should be [four, latest, tag, three]
         let mut tl2 = TagList::new(RepoName("onename".to_string()));
@@ -463,17 +479,17 @@ mod interface_tests {
         tl2.insert("three".to_string());
 
         println!("Running check_tag_list 2");
-        check_tag_list(&client, &tl2);
+        check_tag_list(&client, &tl2).await;
         let mut tl3 = TagList::new(RepoName("onename".to_string()));
         tl3.insert("four".to_string());
         tl3.insert("latest".to_string());
 
         println!("Running check_tag_list_n_last 3");
-        check_tag_list_n_last(&client, 2, "", &tl3);
+        check_tag_list_n_last(&client, 2, "", &tl3).await;
         let mut tl4 = TagList::new(RepoName("onename".to_string()));
         tl4.insert("tag".to_string());
         tl4.insert("three".to_string());
         println!("Running check_tag_list_n_last 4");
-        check_tag_list_n_last(&client, 2, "latest", &tl4)
+        check_tag_list_n_last(&client, 2, "latest", &tl4).await
     }
 }
