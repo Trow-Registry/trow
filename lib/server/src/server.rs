@@ -587,6 +587,7 @@ impl Registry for TrowServer {
     ) -> Result<Response<ManifestReadLocation>, Status> {
         //Don't actually need to verify here; could set to false
 
+
         let mr = req.into_inner();
         // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
@@ -613,11 +614,6 @@ impl Registry for TrowServer {
         match self.create_verified_manifest(&uploaded_manifest, true) {
             Ok(vm) => {
                 // copy manifest to blobs and add tag
-
-                let digest = vm.digest.clone();
-                println!("DIGEST: {:#?}", vm.digest);
-                println!("CONTENT: {:#?}", vm.content_type);
-
                 let ret = self
                     .save_blob(&uploaded_manifest, &digest)
                     .and(self.save_tag(&digest, &mr.repo_name, &mr.reference))
