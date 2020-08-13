@@ -134,7 +134,7 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
 fn init_logger() -> Result<(), SetLoggerError> {
     // If there env variable RUST_LOG is set, then take the configuration from it.
     if env::var("RUST_LOG").is_ok() {
-        env_logger::from_env(Env::default().default_filter_or("info")).init();
+        env_logger::from_env(Env::default().default_filter_or("error")).init();
         Ok(())
     } else {
         // Otherwise create a default logger
