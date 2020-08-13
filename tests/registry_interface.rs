@@ -17,13 +17,13 @@ mod interface_tests {
     use reqwest::StatusCode;
     use serde_json;
     use std::fs::{self, File};
-    use std::io::{Read, BufReader};
+    use std::io::{BufReader, Read};
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
     use trow::types::{RepoCatalog, RepoName, TagList};
-    use trow_server::{manifest, digest};
+    use trow_server::{digest, manifest};
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
     const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";

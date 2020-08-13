@@ -23,9 +23,8 @@ extern crate serde;
 extern crate serde_json;
 extern crate trow_server;
 extern crate uuid;
-use log::{LevelFilter, SetLoggerError};
 use env_logger::Env;
-
+use log::{LevelFilter, SetLoggerError};
 
 #[macro_use]
 extern crate log;

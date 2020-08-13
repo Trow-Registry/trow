@@ -7,16 +7,16 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
-    use trow_server::digest;
     use rand::Rng;
     use reqwest;
     use reqwest::StatusCode;
     use std::fs::{self, File};
-    use std::io::{Read, BufReader};
+    use std::io::{BufReader, Read};
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
+    use trow_server::digest;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
 

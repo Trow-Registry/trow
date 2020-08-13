@@ -1,10 +1,10 @@
 use libc;
 use rand::Rng;
 use reqwest::StatusCode;
-use std::process::Child;
-use trow_server::manifest;
-use trow_server::digest;
 use std::io::BufReader;
+use std::process::Child;
+use trow_server::digest;
+use trow_server::manifest;
 
 /* None of these are dead code, they are called from tests */
 
