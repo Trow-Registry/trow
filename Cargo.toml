@@ -5,56 +5,45 @@ authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchi
 edition = "2018"
 
 [dependencies]
-rust-crypto = "^0.2"
-openssl = { version = "0.10", features = ["vendored"] }
-openssl-sys = { version = "0.9", features = ["vendored"] }
-jwt = "^0.4"
-frank_jwt = "^3.1"
+futures = "0.3"
+tokio = { version = "0.2", features = ["full"] }
+rocket = { version = "0.4", features = ["tls"] }
+rocket_contrib = "0.4"
+hyper = "0.13"
+rand = "0.7"
+jwt = "0.10"
+frank_jwt = "3.1"
 rust-argon2 = "^0.4.0"
-rustc-serialize = "^0.3"
-
-rocket = { version = "=0.4.2", features = ["tls"] }
-rocket_contrib = "=0.4.2"
-
-serde = "^1.0"
-serde_json = "^1.0"
-serde_derive = "^1.0"
-uuid = { version = "^0.5", features = ["v4", "rustc-serialize"] }
-log = "^0.3"
-env_logger = "^0.4"
-ctrlc = { version = "^3.0", features = ["termination"] }
-hostname = "^0.1"
-display_derive = "^0.0"
-futures-preview = { version = "0.3.0-alpha.19" }
-
-clap = "~2.29"
-
-orset = "^0.2"
-
-failure = "^0.1"
-failure_derive = "^0.1"
-
-tokio = "0.2"
-tonic = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_derive = "1.0"
+uuid = { version = "0.8", features = ["v4", "serde"] }
+log = "0.4"
+env_logger = "0.7"
+base64 = "0.12.0"
+failure = "0.1"
+trow-protobuf = { path = "./lib/protobuf" }
+trow-server = { path = "./lib/server" }
+derive_more = "0.99"
+ctrlc = { version = "3.1", features = ["termination"] }
+hostname = "0.3"
+clap = "~2.33"
+tonic = "0.3"
 prost = "0.6"
 prost-types = "0.6"
 bytes = "0.4"
-
-trow-protobuf = { path = "./lib/protobuf" }
-trow-server = { path = "./lib/server" }
-
-base64 = "0.10.0"
-data-encoding = "2.1.2"
 chrono = { version="^0.4", features = ["serde"] }
-rand = "^0.7.2"
+data-encoding = "2.3"
 
 [build-dependencies]
 
 [dev-dependencies]
+futures = "0.3"
 quickcheck = "^0.6"
 assert_cli = "^0.5"
 environment = "^0.1"
-hyper = "^0.11"
+hyper = "0.13"
 rand = "^0.7.2"
-reqwest = "^0.9"
-libc = "^0.2"
+reqwest = { version = "0.10", features = ["blocking", "json", "gzip"] }
+libc = "0.2"
+derive_more = "0.99"

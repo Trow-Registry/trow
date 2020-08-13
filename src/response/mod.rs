@@ -50,9 +50,10 @@ fn get_base_url(req: &Request) -> String {
 
 fn get_domain_name(req: &Request) -> String {
     match req.headers().get("HOST").next() {
-        None => {
-            hostname::get_hostname().expect("Server has no name; cannot give clients my address")
-        }
-        Some(shost) => shost.to_string(),
+        None => hostname::get()
+            .expect("Server has no name; cannot give clients my address")
+            .into_string()
+            .unwrap(),
+        Some(s_host) => s_host.to_string(),
     }
 }

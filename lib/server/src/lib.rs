@@ -1,15 +1,19 @@
-#[macro_use(log, warn, debug, info, error)]
+pub mod digest;
+
+#[macro_use(warn, debug, info, error)]
 extern crate log;
 
 #[macro_use]
 extern crate serde_derive;
-extern crate rustc_serialize;
 extern crate serde_json;
-extern crate crypto;
 extern crate failure_derive;
 #[macro_use]
 extern crate failure;
 extern crate chrono;
+
+// crypto and crypto related crates
+extern crate sha2;
+extern crate hex;
 
 use tonic::transport::Server;
 mod server;

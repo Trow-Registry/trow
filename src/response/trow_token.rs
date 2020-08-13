@@ -6,6 +6,7 @@ use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::{Responder, Response};
 use rocket::{Outcome, State};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::Cursor;
 use std::ops::Add;
@@ -25,17 +26,16 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
             .guard::<rocket::State<TrowConfig>>()
             .expect("TrowConfig not present!");
 
-        let usercfg = match config.user {
-            Some(ref usercfg) => usercfg,
+        let user_cfg = match config.user {
+            Some(ref user_cfg) => user_cfg,
             None => {
                 warn!("Attempted login, but no users are configured");
                 return Outcome::Failure((Status::Unauthorized, ()));
             }
         };
 
-        //As Authorization is a standard header, we should be able to use standard code here
-        //But Rocket doesn't seem to support it, despite exporting Hyper Headers
-        let auth_val = match req.headers().get_one("Authorization") {
+        // As Authorization is a standard header
+        let auth_val = match req.headers().get_one(hyper::header::AUTHORIZATION.as_str()) {
             Some(a) => a,
             None => return Outcome::Failure((Status::Unauthorized, ())),
         };
@@ -54,10 +54,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
         }
 
         let outcome = match base64::decode(&auth_strings[1]) {
-            Ok(userpass) => {
-                if verify_user(userpass, usercfg) {
+            Ok(user_pass) => {
+                if verify_user(user_pass, user_cfg) {
                     Outcome::Success(ValidBasicToken {
-                        user: usercfg.user.clone(),
+                        user: user_cfg.user.clone(),
                     })
                 } else {
                     Outcome::Failure((Status::Unauthorized, ()))
@@ -73,12 +73,12 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
 /**
  * Sod the errors, just fail verification if there's an encoding problem.
  */
-fn verify_user(userpass: Vec<u8>, usercfg: &UserConfig) -> bool {
-    let mut userpass = userpass.split(|b| b == &b':');
-    if let Some(user) = userpass.next() {
-        if let Some(pass) = userpass.next() {
-            if usercfg.user.as_bytes() == user {
-                if let Ok(v) = argon2::verify_encoded(&usercfg.hash_encoded, pass) {
+fn verify_user(user_pass: Vec<u8>, user_cfg: &UserConfig) -> bool {
+    let mut user_pass = user_pass.split(|b| b == &b':');
+    if let Some(user) = user_pass.next() {
+        if let Some(pass) = user_pass.next() {
+            if user_cfg.user.as_bytes() == user {
+                if let Ok(v) = argon2::verify_encoded(&user_cfg.hash_encoded, pass) {
                     return v;
                 }
             }
@@ -87,24 +87,40 @@ fn verify_user(userpass: Vec<u8>, usercfg: &UserConfig) -> bool {
     return false;
 }
 
-#[derive(Debug, Serialize, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TrowToken {
     pub user: String,
     pub token: String,
 }
 
-//Just using the default token claim stuff
-//Could add scope stuff (which repos, what rights), but could also keep this in DB
-//Mirroring Docker format would allow resuse of existing token server implementations
+// Just using the default token claim stuff
+// Could add scope stuff (which repos, what rights), but could also keep this in DB
+// Mirroring Docker format would allow reuse of existing token server implementations
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct TokenClaim {
-    iss: String, // (Issuer) The issuer of the token, typically the fqdn of the authorization server.
-    sub: String, // (Subject)The subject of the token; the name or id of the client which requested it. This should be empty if the client did not authenticate.
-    aud: String, // (Audience) The intended audience of the token; the name or id of the service which will verify the token to authorize the client/subject.
-    exp: u64, // (Expiration) The token should only be considered valid up to this specified date and time.
-    nbf: u64, // (Not Before) The token should not be considered valid before this specified date and time.
-    iat: u64, // (Issued At) Specifies the date and time which the Authorization server generated this token.
-    jti: String, // (JWT ID) A unique identifier for this token. Can be used by the intended audience to prevent replays of the token.
+    // (Issuer) The issuer of the token, typically the fqdn of the authorization server.
+    iss: String,
+
+    // (Subject)The subject of the token; the name or id of the client which requested it.
+    // This should be empty if the client did not authenticate.
+    sub: String,
+
+    // (Audience) The intended audience of the token;
+    // The name or id of the service which will verify the token to authorize the client/subject.
+    aud: String,
+
+    // (Expiration) The token should only be considered valid up to this specified date and time.
+    exp: u64,
+
+    // (Not Before) The token should not be considered valid before this specified date and time.
+    nbf: u64,
+
+    // (Issued At) Specifies the date and time which the Authorization server generated this token.
+    iat: u64,
+
+    // (JWT ID) A unique identifier for this token.
+    // Can be used by the intended audience to prevent replays of the token.
+    jti: String,
 }
 /*
  * Create new jsonwebtoken.
@@ -176,7 +192,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
             None => return Outcome::Failure((Status::Unauthorized, ())),
         };
 
-        //Check header handling - isn't there a next?
+        // Check header handling - isn't there a next?
         // split the header on white space
         let auth_strings: Vec<String> = auth_val.split_whitespace().map(String::from).collect();
         if auth_strings.len() != 2 {
@@ -204,11 +220,18 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
             }
         };
 
-        let ttoken = TrowToken {
+        let trow_token = TrowToken {
             user: dec_token["sub"].to_string(),
             token: auth_strings[1].clone(),
         };
 
-        Outcome::Success(ttoken)
+        Outcome::Success(trow_token)
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[tokio::test]
+    async fn test() {}
 }
