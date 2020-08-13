@@ -24,6 +24,8 @@ extern crate serde_json;
 extern crate trow_server;
 extern crate uuid;
 use log::{LevelFilter, SetLoggerError};
+use env_logger::Env;
+
 
 #[macro_use]
 extern crate log;
@@ -130,9 +132,13 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
 
 /// Build the logging agent with formatting.
 fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = env_logger::Builder::new();
-
-    if !env::var("RUST_LOG").is_ok() {
+    // If there env variable RUST_LOG is set, then take the configuration from it.
+    if env::var("RUST_LOG").is_ok() {
+        env_logger::from_env(Env::default().default_filter_or("info")).init();
+        Ok(())
+    } else {
+        // Otherwise create a default logger
+        let mut builder = env_logger::Builder::new();
         builder
             .format(|buf, record| {
                 writeln!(
@@ -144,10 +150,9 @@ fn init_logger() -> Result<(), SetLoggerError> {
                     record.args()
                 )
             })
-            .filter(None, LevelFilter::Info);
+            .filter(None, LevelFilter::Error);
+        Ok(builder.init())
     }
-
-    Ok(builder.init())
 }
 
 pub struct TrowBuilder {
