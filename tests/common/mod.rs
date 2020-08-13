@@ -1,10 +1,10 @@
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 use libc;
 use rand::Rng;
 use reqwest::StatusCode;
 use std::process::Child;
 use trow_server::manifest;
+use trow_server::digest;
+use std::io::BufReader;
 
 /* None of these are dead code, they are called from tests */
 
@@ -65,9 +65,7 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         .expect("Failed to send patch request");
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
 
-    let mut hasher = Sha256::new();
-    hasher.input(&blob);
-    let digest = format!("sha256:{}", hasher.result_str());
+    let digest = digest::sha256_tag_digest(BufReader::new(blob.as_slice())).unwrap();
     let resp = cl
         .put(&format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",

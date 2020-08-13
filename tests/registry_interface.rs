@@ -1,4 +1,3 @@
-extern crate crypto;
 extern crate environment;
 extern crate hyper;
 extern crate rand;
@@ -14,19 +13,17 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
-    use crypto::digest::Digest;
-    use crypto::sha2::Sha256;
     use reqwest;
     use reqwest::StatusCode;
     use serde_json;
     use std::fs::{self, File};
-    use std::io::Read;
+    use std::io::{Read, BufReader};
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
     use trow::types::{RepoCatalog, RepoName, TagList};
-    use trow_server::manifest;
+    use trow_server::{manifest, digest};
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
     const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
@@ -177,9 +174,7 @@ mod interface_tests {
 
         //used by oci_manifest_test
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
         let loc = &format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
             TROW_ADDRESS, name, uuid, digest
@@ -191,9 +186,7 @@ mod interface_tests {
 
     async fn upload_with_post(cl: &reqwest::Client, name: &str) {
         let config = "{ }\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
         let resp = cl
             .post(&format!(
                 "{}/v2/{}/blobs/uploads/?digest={}",
@@ -209,9 +202,7 @@ mod interface_tests {
     async fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let config_digest = format!("sha256:{}", hasher.result_str());
+        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
@@ -232,10 +223,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        hasher.reset();
-        hasher.input(manifest.as_bytes());
-
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
         digest
     }
 
@@ -274,10 +262,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let mut hasher = Sha256::new();
-        hasher.input(manifest.as_bytes());
-
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
         digest
     }
 
@@ -288,9 +273,7 @@ mod interface_tests {
     ) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let config_digest = format!("sha256:{}", hasher.result_str());
+        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
@@ -320,10 +303,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        hasher.reset();
-        hasher.input(manifest.as_bytes());
-
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
         digest
     }
 
@@ -365,9 +345,7 @@ mod interface_tests {
     async fn delete_config_blob(cl: &reqwest::Client, name: &str) {
         //Deletes blob uploaded in config test
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let config_digest = format!("sha256:{}", hasher.result_str());
+        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
         let resp = cl
             .delete(&format!(
                 "{}/v2/{}/blobs/{}",

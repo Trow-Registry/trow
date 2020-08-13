@@ -32,4 +32,3 @@ hex = "0.4"
 tonic-build = "0.3"
 
 [dev-dependencies]
-rust-crypto = "^0.2"

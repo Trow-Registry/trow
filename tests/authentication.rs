@@ -1,5 +1,4 @@
 extern crate base64;
-extern crate crypto;
 extern crate environment;
 extern crate hyper;
 extern crate rand;
@@ -136,10 +135,7 @@ mod authentication_tests {
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        //let rt = tokio::runtime::Runtime::new().unwrap();
-        //rt.spawn(async {
         let _trow = start_trow().await;
-        //});
 
         let mut buf = Vec::new();
         File::open("./certs/domain.crt")

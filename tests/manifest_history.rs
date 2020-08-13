@@ -7,13 +7,12 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
-    use crypto::digest::Digest;
-    use crypto::sha2::Sha256;
+    use trow_server::digest;
     use rand::Rng;
     use reqwest;
     use reqwest::StatusCode;
     use std::fs::{self, File};
-    use std::io::Read;
+    use std::io::{Read, BufReader};
     use std::process::Child;
     use std::process::Command;
     use std::thread;
@@ -74,9 +73,7 @@ mod interface_tests {
 
     async fn upload_config(cl: &reqwest::Client) {
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
         let resp = cl
             .post(&format!(
                 "{}/v2/{}/blobs/uploads/?digest={}",
@@ -92,9 +89,7 @@ mod interface_tests {
     async fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob earlier
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let config_digest = format!("sha256:{}", hasher.result_str());
+        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
         let mut rng = rand::thread_rng();
@@ -135,10 +130,7 @@ mod interface_tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
-        hasher.reset();
-        hasher.input(manifest.as_bytes());
-
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
         digest
     }
 

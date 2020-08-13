@@ -46,5 +46,4 @@ hyper = "0.13"
 rand = "^0.7.2"
 reqwest = { version = "0.10", features = ["blocking", "json", "gzip"] }
 libc = "0.2"
-rust-crypto = "^0.2"
 derive_more = "0.99"

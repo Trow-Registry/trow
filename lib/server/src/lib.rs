@@ -1,4 +1,4 @@
-mod digest;
+pub mod digest;
 
 #[macro_use(warn, debug, info, error)]
 extern crate log;

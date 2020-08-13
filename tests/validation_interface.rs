@@ -1,4 +1,3 @@
-extern crate crypto;
 extern crate environment;
 extern crate hyper;
 extern crate libc;
