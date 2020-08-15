@@ -14,6 +14,12 @@ trow:
   password: password
   validation:
     enabled: false
+    allowDocker: false
+    allowKubernetes: true
+    allowPrefixes: []
+    allowImages: []
+    disallowLocalPrefixes: []
+    disallowLocalImages: []
 
 imagePullSecrets: []
 nameOverride: ""

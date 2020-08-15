@@ -32,6 +32,30 @@ spec:
           - {{ .Values.trow.user | quote }} 
           - "--password-file" 
           - "/etc/trow/pass"
+        {{- with .Values.trow.validation }}
+          {{- if .allowDocker }}
+          - "--allow-docker-official"
+          {{- end }}
+          {{- if not .allowKubernetes }}
+          - "--deny-k8s-images"
+          {{- end }}
+          {{- if .allowPrefixes }}
+          - "--allow-prefixes"
+          - {{ .allowPrefixes | join "," | quote }}
+          {{- end }}
+          {{- if .allowImages }}
+          - "--allow-images"
+          - {{ .allowImages | join "," | quote }}
+          {{- end }}
+          {{- if .disallowLocalPrefixes }}
+          - "--disallow-local-prefixes"
+          - {{ .disallowLocalPrefixes | join "," | quote }}
+          {{- end }}
+          {{- if .disallowLocalImages }}
+          - "--disallow-local-images"
+          - {{ .disallowLocalImages | join "," | quote }}
+          {{- end }}
+        {{- end }}
         ports:
         - name: http
           containerPort: 8000
