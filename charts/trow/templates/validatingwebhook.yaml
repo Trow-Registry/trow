@@ -1,6 +1,10 @@
 {{- $deprecatedOption := .Values.trow.validatingWebhooks -}}
 {{ if or .Values.trow.validation.enabled $deprecatedOption }}
+{{- if semverCompare ">=1.16-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: admissionregistration.k8s.io/v1
+{{- else -}}
+apiVersion: admissionregistration.k8s.io/v1beta1
+{{- end }}
 kind: ValidatingWebhookConfiguration
 metadata:
   name: trow-validator
