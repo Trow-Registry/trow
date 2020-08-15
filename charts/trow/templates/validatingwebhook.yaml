@@ -1,4 +1,5 @@
-{{ if .Values.trow.validatingWebhooks.enabled }}
+{{- $deprecatedOption := .Values.trow.validatingWebhooks -}}
+{{ if or .Values.trow.validation.enabled $deprecatedOption }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:

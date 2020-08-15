@@ -12,7 +12,7 @@ trow:
   domain: myregistry.mydomain.io
   user: user
   password: password
-  validatingWebhooks:
+  validation:
     enabled: false
 
 imagePullSecrets: []
