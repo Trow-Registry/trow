@@ -10,6 +10,9 @@ metadata:
   name: trow-validator
 webhooks:
   - name: {{ .Values.trow.domain }}
+    admissionReviewVersions:
+      - v1beta1
+    sideEffects: None
     rules:
       - apiGroups:
           - ""
@@ -24,4 +27,5 @@ webhooks:
       service:
         name: trow
         path: "/validate-image"
+        namespace: {{ .Release.Namespace }}
 {{ end }}
