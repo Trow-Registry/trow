@@ -177,9 +177,11 @@ impl Manifest {
 mod test {
     use super::FromJson;
     use super::Manifest;
+    use crate::digest::sha256_tag_digest;
     use crypto::digest::Digest;
     use crypto::sha2::Sha256;
     use serde_json::{self, Value};
+    use std::io::BufReader;
 
     #[test]
     fn valid_v2_2() {
@@ -319,9 +321,7 @@ mod test {
     #[test]
     fn valid_oci() {
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let config_digest = hasher.result_str();
+        let config_digest = sha256_tag_digest(BufReader::new(config)).unwrap();
         let data = format!(
             r#"{{ "config": {{ "digest": "{}", 
                              "mediaType": "application/vnd.oci.image.config.v1+json", 

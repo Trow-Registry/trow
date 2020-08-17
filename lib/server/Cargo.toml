@@ -6,10 +6,9 @@ edition = "2018"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com" ]
 
 [dependencies]
-async-stream = "0.2"
-bytes = "0.4"
-futures-core = "0.3"
-futures-util = "0.3"
+futures = "0.3"
+async-stream = "0.3"
+bytes = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 prost = "0.6"
@@ -17,21 +16,23 @@ prost-types = "0.6"
 rand = "0.7.2"
 tokio = { version = "0.2", features = ["macros", "sync", "stream", "time"] }
 chrono = "0.4"
-tonic = "0.1"
-log = "^0.3"
-uuid = { version = "^0.5", features = ["v4", "rustc-serialize"] }
+tonic = "0.3"
+log = "0.4"
+uuid = { version = "0.8", features = ["v4", "serde"] }
 failure = "^0.1"
 failure_derive = "^0.1"
-
-rust-crypto = "^0.2"
-
-rustc-serialize = "^0.3"
 serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
+rustc-serialize = "0.3"
 
 prometheus = { version = "0.9"}
 lazy_static = "1.4.0"
 fs3 = "0.5.0"
+# crypto and crypto related crates
+sha2 = "0.9"
+hex = "0.4"
 
 [build-dependencies]
-tonic-build = "0.1"
+tonic-build = "0.3"
+
+[dev-dependencies]

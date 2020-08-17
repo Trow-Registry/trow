@@ -1,4 +1,3 @@
-extern crate crypto;
 extern crate environment;
 extern crate hyper;
 extern crate libc;
@@ -30,7 +29,7 @@ mod validation_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
 
-    fn start_trow() -> TrowInstance {
+    async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
@@ -64,10 +63,10 @@ mod validation_tests {
             .build()
             .unwrap();
 
-        let mut response = client.get(LYCAON_ADDRESS).send();
+        let mut response = client.get(LYCAON_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(LYCAON_ADDRESS).send();
+            response = client.get(LYCAON_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -84,7 +83,7 @@ mod validation_tests {
     }
 
     /* Uses a copy of an actual AdmissionReview to test. */
-    fn validate_example(cl: &reqwest::Client) {
+    async fn validate_example(cl: &reqwest::Client) {
         let review = r#"{
   "kind": "AdmissionReview",
   "apiVersion": "admission.k8s.io/v1beta1",
@@ -197,22 +196,23 @@ mod validation_tests {
   }
 }"#;
 
-        let mut resp = cl
+        let resp = cl
             .post(&format!("{}/validate-image", LYCAON_ADDRESS))
             .body(review)
             .send()
+            .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
         //should deny by default
-        let txt = resp.text().unwrap();
+        let txt = resp.text().await.unwrap();
         assert!(txt.contains("\"allowed\":false"));
         assert!(txt.contains(
             "Remote image nginx disallowed as not contained in this registry and not in allow list"
         ));
     }
 
-    fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
+    async fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
         let start = r#"{
   "kind": "AdmissionReview",
   "apiVersion": "admission.k8s.io/v1beta1",
@@ -265,15 +265,16 @@ mod validation_tests {
 }"#;
         let review = format!("{}{}{}", start, image_string, end);
 
-        let mut resp = cl
+        let resp = cl
             .post(&format!("{}/validate-image", LYCAON_ADDRESS))
             .body(review)
             .send()
+            .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
         //should deny by default
-        let txt = resp.text().unwrap();
+        let txt = resp.text().await.unwrap();
         if is_allowed {
             assert!(txt.contains("\"allowed\":true"));
         } else {
@@ -281,8 +282,8 @@ mod validation_tests {
         }
     }
 
-    #[test]
-    fn test_runner() {
+    #[tokio::test]
+    async fn test_runner() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
 
@@ -301,41 +302,41 @@ mod validation_tests {
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _trow = start_trow();
-        validate_example(&client);
-        test_image(&client, "trow.test/am/test:tag", false);
+        let _trow = start_trow().await;
+        validate_example(&client).await;
+        test_image(&client, "trow.test/am/test:tag", false).await;
         //push image and test again
-        common::upload_layer(&client, "am/test", "tag");
-        test_image(&client, "trow.test/am/test:tag", true);
+        common::upload_layer(&client, "am/test", "tag").await;
+        test_image(&client, "trow.test/am/test:tag", true).await;
 
         //k8s images should be allowed by default
-        test_image(&client, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true);
+        test_image(&client, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true).await;
 
         //allow prefix example
-        test_image(&client, "docker.io/amouat/myimage:test", true);
-        test_image(&client, "amouat/myimage:test", true);
-        test_image(&client, "docker.io/someone/myimage:test", false);
+        test_image(&client, "docker.io/amouat/myimage:test", true).await;
+        test_image(&client, "amouat/myimage:test", true).await;
+        test_image(&client, "docker.io/someone/myimage:test", false).await;
 
         //allow image example
-        test_image(&client, "docker.io/debian:latest", true);
-        test_image(&client, "debian", true);
-        test_image(&client, "quay.io/coreos/etcd:3.4", true);
-        test_image(&client, "quay.io/coreos/etcd:3.4.2", false);
+        test_image(&client, "docker.io/debian:latest", true).await;
+        test_image(&client, "debian", true).await;
+        test_image(&client, "quay.io/coreos/etcd:3.4", true).await;
+        test_image(&client, "quay.io/coreos/etcd:3.4.2", false).await;
 
         //deny prefix example
-        common::upload_layer(&client, "bla/test", "tag");
-        common::upload_layer(&client, "blatest", "tag");
-        test_image(&client, "trow.test/bla/test:tag", false);
-        test_image(&client, "trow.test/blatest:tag", true);
-        common::upload_layer(&client, "testy/test", "tag");
-        common::upload_layer(&client, "testytest", "tag");
-        test_image(&client, "trow.test/testy/test:tag", false);
-        test_image(&client, "trow.test/testytest:tag", false);
+        common::upload_layer(&client, "bla/test", "tag").await;
+        common::upload_layer(&client, "blatest", "tag").await;
+        test_image(&client, "trow.test/bla/test:tag", false).await;
+        test_image(&client, "trow.test/blatest:tag", true).await;
+        common::upload_layer(&client, "testy/test", "tag").await;
+        common::upload_layer(&client, "testytest", "tag").await;
+        test_image(&client, "trow.test/testy/test:tag", false).await;
+        test_image(&client, "trow.test/testytest:tag", false).await;
 
         //deny image example
-        common::upload_layer(&client, "not", "me");
-        common::upload_layer(&client, "or/this", "one");
-        test_image(&client, "trow.test/not:me", false);
-        test_image(&client, "trow.test/or/this:one", false);
+        common::upload_layer(&client, "not", "me").await;
+        common::upload_layer(&client, "or/this", "one").await;
+        test_image(&client, "trow.test/not:me", false).await;
+        test_image(&client, "trow.test/or/this:one", false).await;
     }
 }

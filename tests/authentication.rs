@@ -1,5 +1,4 @@
 extern crate base64;
-extern crate crypto;
 extern crate environment;
 extern crate hyper;
 extern crate rand;
@@ -35,7 +34,7 @@ mod authentication_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
 
-    fn start_trow() -> TrowInstance {
+    async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
@@ -63,11 +62,11 @@ mod authentication_tests {
             .build()
             .unwrap();
 
-        let mut response = client.get(TROW_ADDRESS).send();
+        let mut response = client.get(TROW_ADDRESS).send().await;
 
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send();
+            response = client.get(TROW_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -83,8 +82,12 @@ mod authentication_tests {
         }
     }
 
-    fn test_auth_redir(cl: &reqwest::Client) {
-        let resp = cl.get(&(TROW_ADDRESS.to_owned() + "/v2")).send().unwrap();
+    async fn test_auth_redir(cl: &reqwest::Client) {
+        let resp = cl
+            .get(&(TROW_ADDRESS.to_owned() + "/v2"))
+            .send()
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         //Test get redir header
         assert_eq!(
@@ -93,12 +96,13 @@ mod authentication_tests {
         );
     }
 
-    fn test_login(cl: &reqwest::Client) {
+    async fn test_login(cl: &reqwest::Client) {
         let bytes = encode(b"authtest:authpass");
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned() + "/login"))
             .header(AUTHZ_HEADER, format!("Basic {}", bytes))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         // Uncomment if you want to inspect the token
@@ -109,27 +113,29 @@ mod authentication_tests {
                 TROW_ADDRESS, "name", "tag"
             ))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
-    fn test_login_fail(cl: &reqwest::Client) {
+    async fn test_login_fail(cl: &reqwest::Client) {
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned() + "/login"))
             .header(AUTHZ_HEADER, "Basic thisstringwillfail")
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
-    #[test]
-    fn test_runner() {
+    #[tokio::test]
+    async fn test_runner() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _trow = start_trow();
+        let _trow = start_trow().await;
 
         let mut buf = Vec::new();
         File::open("./certs/domain.crt")
@@ -145,10 +151,10 @@ mod authentication_tests {
             .unwrap();
 
         println!("Running test_auth_redir()");
-        test_auth_redir(&client);
+        test_auth_redir(&client).await;
         println!("Running test_login()");
-        test_login(&client);
+        test_login(&client).await;
         println!("Running test_login_fail()");
-        test_login_fail(&client);
+        test_login_fail(&client).await;
     }
 }
