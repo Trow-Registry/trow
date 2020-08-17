@@ -177,10 +177,8 @@ impl Manifest {
 mod test {
     use super::FromJson;
     use super::Manifest;
-    use crate::digest::sha256_tag_digest;
-    use crypto::digest::Digest;
-    use crypto::sha2::Sha256;
     use serde_json::{self, Value};
+    use crate::digest::sha256_tag_digest;
     use std::io::BufReader;
 
     #[test]
