@@ -1,10 +1,10 @@
+use fs3;
 use lazy_static::lazy_static;
-use fs3; 
 
-use prometheus;
 use failure::Error;
+use prometheus;
+use prometheus::{Encoder, IntCounter, IntGauge, TextEncoder};
 use std::path::PathBuf;
-use prometheus::{IntCounter, IntGauge, Encoder, TextEncoder};
 
 //  Metrics static values executed at runtime and registered to default
 //  prometheus registry
@@ -26,12 +26,12 @@ lazy_static! {
     )).unwrap();
     pub static ref TOTAL_MANIFEST_REQUESTS: IntCounter  = register_int_counter!(opts!(
         "total_manifest_requests",
-        "total manifests requests made to trow",
+        "total number of requests for manifests made",
         labels! {"type" => "manifests"}
     )).unwrap();
     pub static ref TOTAL_BLOB_REQUESTS: IntCounter  = register_int_counter!(opts!(
         "total_blob_requests",
-        "total blobs requests made to trow",
+        "total number of requests for blobs made",
         labels! {"type" => "blobs"}
     )).unwrap();
 }
@@ -39,28 +39,30 @@ lazy_static! {
 // Query disk metrics
 pub fn query_disk_metrics(path: &PathBuf) {
     let data_path = path.parent().unwrap();
-    let available_space =  fs3::available_space(data_path).unwrap_or(0);
+    let available_space = fs3::available_space(data_path).unwrap_or(0);
     AVAILABLE_SPACE.set(available_space as i64);
-    let free_space  =  fs3::free_space(data_path).unwrap_or(0);
+    let free_space = fs3::free_space(data_path).unwrap_or(0);
     FREE_SPACE.set(free_space as i64);
-    let total_space =  fs3::total_space(data_path).unwrap_or(0);
+    let total_space = fs3::total_space(data_path).unwrap_or(0);
     TOTAL_SPACE.set(total_space as i64);
 }
 
 pub fn gather_metrics(blobs_path: &PathBuf) -> Result<String, Error> {
     query_disk_metrics(blobs_path);
-        
+
     let encoder = TextEncoder::new();
-    
-    // Gather all prometheus metrics of DEFAULT_REGISTRY 
-    // * disk
-    // * total manifest requests
-    // * total blob requests
+
+    // Gather all prometheus metrics from the DEFAULT_REGISTRY
+    //      * disk
+    //      * total manifest requests
+    //      * total blob requests
 
     let metric_families = prometheus::gather();
     let mut buffer = vec![];
 
     encoder.encode(&metric_families, &mut buffer)?;
 
-    Ok(String::from_utf8(buffer).unwrap())
+    let metrics = String::from_utf8(buffer)?;
+
+    Ok(metrics)
 }
