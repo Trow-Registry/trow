@@ -3,10 +3,10 @@ extern crate log;
 
 #[macro_use]
 extern crate serde_derive;
-extern crate rustc_serialize;
-extern crate serde_json;
 extern crate crypto;
 extern crate failure_derive;
+extern crate rustc_serialize;
+extern crate serde_json;
 #[macro_use]
 extern crate failure;
 extern crate chrono;
@@ -18,8 +18,8 @@ use tonic::transport::Server;
 mod metrics;
 mod server;
 mod validate;
-use server::trow_server::registry_server::RegistryServer;
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
+use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
 use tokio::runtime::Runtime;
 
@@ -71,14 +71,15 @@ impl TrowServerBuilder {
     }
 
     pub fn start_trow_sync(self) -> () {
-
         let mut rt = Runtime::new().expect("Failed to start Tokio runtime");
         let ts = TrowServer::new(
             &self.data_path,
             self.allow_prefixes,
             self.allow_images,
             self.deny_prefixes,
-            self.deny_images).expect("Failure configuring Trow Server");
+            self.deny_images,
+        )
+        .expect("Failure configuring Trow Server");
 
         let server = Server::builder()
             .add_service(RegistryServer::new(ts.clone()))
@@ -87,8 +88,7 @@ impl TrowServerBuilder {
 
         debug!("Trow backend service running");
 
-        match rt.block_on(server)
-        {
+        match rt.block_on(server) {
             Ok(()) => {
                 warn!("Trow backend shutting down");
             }

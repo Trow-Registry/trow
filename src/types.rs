@@ -341,7 +341,7 @@ pub struct ReadinessResponse {
     pub is_ready: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize ,PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MetricsResponse {
-    pub metrics: String
+    pub metrics: String,
 }

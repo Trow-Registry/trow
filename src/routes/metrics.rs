@@ -12,19 +12,12 @@ use tokio::runtime::Runtime;
 */
 
 #[get("/metrics")]
-pub fn metrics(
-    ci: State<ClientInterface>,
-) -> Result<MetricsResponse, Error> {
+pub fn metrics(ci: State<ClientInterface>) -> Result<MetricsResponse, Error> {
     let request = ci.get_metrics();
     let mut rt = Runtime::new().unwrap();
-    
-    match rt.block_on(request) {
-        Ok(metrics) => {
-            Ok(metrics)
-        }
-        Err(_) => {
-            Err(Error::InternalError)
-        }
-    }
 
+    match rt.block_on(request) {
+        Ok(metrics) => Ok(metrics),
+        Err(_) => Err(Error::InternalError),
+    }
 }

@@ -16,8 +16,8 @@ use std::str;
 use tonic::Code;
 
 mod health;
-mod readiness;
 mod metrics;
+mod readiness;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local

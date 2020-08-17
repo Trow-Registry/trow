@@ -86,7 +86,8 @@ pub mod manifest_media_type {
     pub const DOCKER_V1: &'static str = "application/vnd.docker.distribution.manifest.v1+json";
     pub const DOCKER_V2: &'static str = "application/vnd.docker.distribution.manifest.v2+json";
     pub const OCI_V1: &'static str = "application/vnd.oci.image.manifest.v1+json";
-    pub const DOCKER_LIST: &'static str = "application/vnd.docker.distribution.manifest.list.v2+json";
+    pub const DOCKER_LIST: &'static str =
+        "application/vnd.docker.distribution.manifest.list.v2+json";
     pub const OCI_INDEX: &'static str = "application/vnd.oci.image.index.v1+json";
 
     // Weirdly the media type is optional in the JSON, so assume OCI_V1.
@@ -95,17 +96,20 @@ pub mod manifest_media_type {
 }
 
 fn schema_2(raw: &Value) -> Result<Manifest, Error> {
-
     // According to the spec, manifests don't have to have a mediaType (?!).
     // Assume V2 if not present.
-    let mt = raw["mediaType"].as_str().unwrap_or(manifest_media_type::DEFAULT);
+    let mt = raw["mediaType"]
+        .as_str()
+        .unwrap_or(manifest_media_type::DEFAULT);
 
     match mt {
-        manifest_media_type::DOCKER_V2 | manifest_media_type::OCI_V1 =>
-            Ok(Manifest::V2(serde_json::from_value(raw.clone())?)),
+        manifest_media_type::DOCKER_V2 | manifest_media_type::OCI_V1 => {
+            Ok(Manifest::V2(serde_json::from_value(raw.clone())?))
+        }
 
-        manifest_media_type::DOCKER_LIST | manifest_media_type::OCI_INDEX => 
-            Ok(Manifest::List(serde_json::from_value(raw.clone())?)),
+        manifest_media_type::DOCKER_LIST | manifest_media_type::OCI_INDEX => {
+            Ok(Manifest::List(serde_json::from_value(raw.clone())?))
+        }
 
         unknown => Err(InvalidManifest {
             err: format!("Media Type {} is not supported.", unknown),
@@ -159,8 +163,11 @@ impl Manifest {
     // TODO: use proper enums and return &str
     pub fn get_media_type(&self) -> String {
         match *self {
-            Manifest::V2(ref m2) => m2.media_type.as_ref().unwrap_or(
-                &manifest_media_type::DEFAULT.to_string()).to_string(),
+            Manifest::V2(ref m2) => m2
+                .media_type
+                .as_ref()
+                .unwrap_or(&manifest_media_type::DEFAULT.to_string())
+                .to_string(),
             Manifest::List(ref list) => list.media_type.clone(),
         }
     }
@@ -169,7 +176,7 @@ impl Manifest {
 #[cfg(test)]
 mod test {
     use super::FromJson;
-    use super::{Manifest};
+    use super::Manifest;
     use crypto::digest::Digest;
     use crypto::sha2::Sha256;
     use serde_json::{self, Value};
@@ -331,7 +338,6 @@ mod test {
 
     #[test]
     fn valid_manifest_list() {
-
         let data = r#"{
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",

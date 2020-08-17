@@ -1,8 +1,8 @@
 use tonic::{Request, Response, Status};
 
-use crate::server::{TrowServer, Image};
 use crate::server::trow_server::admission_controller_server::AdmissionController;
 use crate::server::trow_server::{AdmissionRequest, AdmissionResponse};
+use crate::server::{Image, TrowServer};
 
 const DOCKER_HUB_HOSTNAME: &str = "docker.io";
 
@@ -69,7 +69,6 @@ fn check_image(
     deny: &dyn Fn(&Image) -> bool,
     allow: &dyn Fn(&Image) -> bool,
 ) -> (bool, String) {
-    
     let image = parse_image(&image_raw);
     if local_hosts.contains(&image.host) {
         //local image
@@ -109,12 +108,10 @@ fn check_image(
 
 #[tonic::async_trait]
 impl AdmissionController for TrowServer {
-
     async fn validate_admission(
         &self,
-        ar: Request<AdmissionRequest>
+        ar: Request<AdmissionRequest>,
     ) -> Result<Response<AdmissionResponse>, Status> {
-
         let ar = ar.into_inner();
         let mut valid = true;
         let mut reason = "".to_string();
@@ -135,7 +132,10 @@ impl AdmissionController for TrowServer {
             }
         }
 
-        let ar = AdmissionResponse { is_allowed: valid, reason};
+        let ar = AdmissionResponse {
+            is_allowed: valid,
+            reason,
+        };
         Ok(Response::new(ar))
     }
 }
