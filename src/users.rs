@@ -3,7 +3,6 @@ use bytes::Bytes;
 use data_encoding::HEXUPPER;
 use failure;
 use rand;
-use ring::digest;
 use rusqlite::NO_PARAMS;
 use rusqlite::{params, Connection};
 use std::env;
@@ -17,7 +16,7 @@ pub struct User {
 }
 
 // Constants
-const CREDENTIAL_LEN: usize = digest::SHA512_OUTPUT_LEN;
+const CREDENTIAL_LEN: usize = 512;
 
 // Error Used for User related Functions
 // Implements the traits of Error
@@ -139,16 +138,15 @@ mod tests {
 
     use super::User;
     use super::{get_hash_from_password, get_salt, verify_password};
-    use ring::digest;
     use std::env;
 
     #[test]
     fn test_get_salt() {
         let salt = get_salt();
         assert!(
-            salt.len() == digest::SHA512_OUTPUT_LEN,
+            salt.len() == 512,
             "Expected Salt to be of length {} but got {}",
-            digest::SHA512_OUTPUT_LEN,
+            512,
             salt.len()
         )
     }
