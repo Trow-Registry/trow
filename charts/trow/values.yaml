@@ -12,8 +12,14 @@ trow:
   domain: myregistry.mydomain.io
   user: user
   password: password
-  validatingWebhooks:
+  validation:
     enabled: false
+    allowDocker: false
+    allowKubernetes: true
+    allowPrefixes: []
+    allowImages: []
+    disallowLocalPrefixes: []
+    disallowLocalImages: []
 
 imagePullSecrets: []
 nameOverride: ""
