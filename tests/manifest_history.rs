@@ -7,17 +7,16 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
-    use crypto::digest::Digest;
-    use crypto::sha2::Sha256;
     use rand::Rng;
     use reqwest;
     use reqwest::StatusCode;
     use std::fs::{self, File};
-    use std::io::Read;
+    use std::io::{BufReader, Read};
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
+    use trow_server::digest;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
 
@@ -27,11 +26,14 @@ mod interface_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
 
-    fn start_trow() -> TrowInstance {
+    async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
+            // .arg("--")
+            // .arg("--host")
+            // .arg("127.0.0.1")
             .spawn()
             .expect("failed to start");
 
@@ -46,13 +48,14 @@ mod interface_tests {
         // get a client builder
         let client = reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
-        let mut response = client.get(TROW_ADDRESS).send();
+        let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send();
+            response = client.get(TROW_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -68,11 +71,9 @@ mod interface_tests {
         }
     }
 
-    fn upload_config(cl: &reqwest::Client) {
+    async fn upload_config(cl: &reqwest::Client) {
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
         let resp = cl
             .post(&format!(
                 "{}/v2/{}/blobs/uploads/?digest={}",
@@ -80,16 +81,15 @@ mod interface_tests {
             ))
             .body(config.clone())
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
-    fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+    async fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob earlier
         let config = "{}\n".as_bytes();
-        let mut hasher = Sha256::new();
-        hasher.input(&config);
-        let config_digest = format!("sha256:{}", hasher.result_str());
+        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
         let mut rng = rand::thread_rng();
@@ -126,17 +126,15 @@ mod interface_tests {
             .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
             .body(bytes)
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
-        hasher.reset();
-        hasher.input(manifest.as_bytes());
-
-        let digest = format!("sha256:{}", hasher.result_str());
+        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
         digest
     }
 
-    fn get_history(
+    async fn get_history(
         cl: &reqwest::Client,
         repo: &str,
         tag: &str,
@@ -154,17 +152,18 @@ mod interface_tests {
             options = format!("?n={}", val);
         }
 
-        let mut resp = cl
+        let resp = cl
             .get(&format!(
                 "{}/{}/manifest_history/{}{}",
                 TROW_ADDRESS, repo, tag, options
             ))
             .send()
+            .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
 
         // type should be decided by caller, but this is just a test
-        let x: serde_json::Value = resp.json().unwrap();
+        let x: serde_json::Value = resp.json().await.unwrap();
 
         return x;
     }
@@ -175,12 +174,12 @@ mod interface_tests {
      * Given a tag, we should be able to get the digest it currently points to and all previous digests, with dates.
      *
      */
-    #[test]
-    fn manifest_test() {
+    #[tokio::test]
+    async fn manifest_test() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
 
-        let _trow = start_trow();
+        let _trow = start_trow().await;
 
         let mut buf = Vec::new();
         File::open("./certs/domain.crt")
@@ -195,30 +194,30 @@ mod interface_tests {
             .build()
             .unwrap();
 
-        upload_config(&client);
+        upload_config(&client).await;
 
-        //Following is intentionally interleaved to add delays
+        // Following is intentionally interleaved to add delays
         let mut history_one = Vec::new();
-        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
+        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
         let mut history_two = Vec::new();
-        history_two.push(push_random_foreign_manifest(&client, "history", "two"));
-        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
-        history_two.push(push_random_foreign_manifest(&client, "history", "two"));
-        history_one.push(push_random_foreign_manifest(&client, "history", "one"));
+        history_two.push(push_random_foreign_manifest(&client, "history", "two").await);
+        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
+        history_two.push(push_random_foreign_manifest(&client, "history", "two").await);
+        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
 
-        let json = get_history(&client, "history", "one", None, None);
+        let json = get_history(&client, "history", "one", None, None).await;
         assert_eq!(json["image"], "history:one");
         assert_eq!(json["history"].as_array().unwrap().len(), 3);
 
-        let json = get_history(&client, "history", "two", None, None);
+        let json = get_history(&client, "history", "two", None, None).await;
         assert_eq!(json["image"], "history:two");
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
 
-        let json = get_history(&client, "history", "one", Some(1), None);
+        let json = get_history(&client, "history", "one", Some(1), None).await;
         assert_eq!(json["history"].as_array().unwrap().len(), 1);
 
         let start = json["history"][0]["digest"].as_str().unwrap();
-        let json = get_history(&client, "history", "one", Some(20), Some(start.to_string()));
+        let json = get_history(&client, "history", "one", Some(20), Some(start.to_string())).await;
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
     }
 }

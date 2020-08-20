@@ -15,7 +15,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
             Some(l) => match l.parse::<u64>() {
                 Ok(i) => i,
                 Err(_) => {
-                    warn!("Recieved request with invalid Content-Length header");
+                    warn!("Received request with invalid Content-Length header");
                     return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid));
                 }
             },
@@ -39,7 +39,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
                 }
             }
         }
-        warn!("Recieved request with invalid Content-Range header");
+        warn!("Received request with invalid Content-Range header");
         Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid))
     }
 }

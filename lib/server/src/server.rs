@@ -11,11 +11,7 @@ use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use prost_types::Timestamp;
-
 use std::io;
-
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
@@ -23,6 +19,7 @@ pub mod trow_server {
 
 use self::trow_server::*;
 use crate::server::trow_server::registry_server::Registry;
+use crate::digest::sha256_tag_digest;
 
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
@@ -92,12 +89,6 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
     Ok(dir_path)
 }
 
-fn gen_digest(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.input(bytes);
-    format!("sha256:{}", hasher.result_str())
-}
-
 fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
     digest
         == match get_digest_from_manifest_path(manifest.path()) {
@@ -152,24 +143,18 @@ impl Iterator for RepoIterator {
  */
 fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
     let f = File::open(file)?;
-    let mut reader = BufReader::new(f);
-    let mut hasher = Sha256::new();
-    let mut buf = [0; 256]; // TODO: figure out best number here
-    let mut bytes_read = reader.read(&mut buf[..])?;
-    while bytes_read != 0 {
-        hasher.input(&buf[..bytes_read]);
-        bytes_read = reader.read(&mut buf[..])?;
-    }
+    let reader = BufReader::new(f);
 
-    let true_digest = format!("sha256:{}", hasher.result_str());
-    if true_digest != digest {
+    let calculated_digest = sha256_tag_digest(reader)?;
+
+    if calculated_digest != digest {
         error!(
             "Upload did not match given digest. Was given {} but got {}",
-            digest, true_digest
+            digest, calculated_digest
         );
         return Err(failure::err_msg(format!(
             "Upload did not match given digest. Was given {} but got {}",
-            digest, true_digest
+            digest, calculated_digest
         )));
     }
 
@@ -323,9 +308,13 @@ impl TrowServer {
             }
         }
 
-        //For performance, could generate only if verification is on, otherwise copy from somewhere
+        // Calculate the digest: sha256:...
+        let reader = BufReader::new(manifest_bytes.as_slice());
+        let digest = sha256_tag_digest(reader)?;
+
+        // For performance, could generate only if verification is on, otherwise copy from somewhere
         Ok(VerifiedManifest {
-            digest: gen_digest(&manifest_bytes),
+            digest,
             content_type: manifest.get_media_type().to_string(),
         })
     }
@@ -515,10 +504,7 @@ impl Registry for TrowServer {
             .map_err(|e| Status::invalid_argument(format!("Error parsing digest {:?}", e)))?;
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
-            Err(Status::not_found(format!(
-                "No blob found matching {:?}",
-                br
-            )))
+            Err(Status::not_found(format!("No blob found matching {:?}", br)))
         } else {
             fs::remove_file(&path)
                 .map_err(|e| {
@@ -579,6 +565,7 @@ impl Registry for TrowServer {
     ) -> Result<Response<ManifestReadLocation>, Status> {
         //Don't actually need to verify here; could set to false
 
+
         let mr = req.into_inner();
         // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
@@ -586,6 +573,46 @@ impl Registry for TrowServer {
             Err(e) => {
                 warn!("Internal error with manifest {:?}", e);
                 Err(Status::internal("Internal error finding manifest"))
+            }
+        }
+    }
+
+    /**
+     * Take uploaded manifest (which should be uuid in uploads), check it, put in catalog and
+     * by blob digest
+     */
+    async fn verify_manifest(
+        &self,
+        req: Request<VerifyManifestRequest>,
+    ) -> Result<Response<VerifiedManifest>, Status> {
+        let req = req.into_inner();
+        let mr = req.manifest.unwrap(); // Pissed off that the manifest is optional!
+        let uploaded_manifest = self.get_upload_path_for_blob(&req.uuid);
+
+        match self.create_verified_manifest(&uploaded_manifest, true) {
+            Ok(vm) => {
+                // copy manifest to blobs and add tag
+                let digest = vm.digest.clone();
+                let ret = self
+                    .save_blob(&uploaded_manifest, &digest)
+                    .and(self.save_tag(&digest, &mr.repo_name, &mr.reference))
+                    .map(|_| Response::new(vm))
+                    .map_err(|e| {
+                        error!(
+                            "Failure cataloguing manifest {}/{} {:?}",
+                            &mr.repo_name, &mr.reference, e
+                        );
+                        Status::internal("Internal error copying manifest")
+                    });
+
+                fs::remove_file(&uploaded_manifest)
+                    .unwrap_or_else(|e| error!("Failure deleting uploaded manifest {:?}", e));
+
+                ret
+            }
+            Err(e) => {
+                error!("Error verifying manifest {:?}", e);
+                Err(Status::internal("Internal error verifying manifest"))
             }
         }
     }
@@ -616,48 +643,6 @@ impl Registry for TrowServer {
             warn!("Upload {:?} not found when deleting", upload);
         }
         ret
-    }
-
-    /**
-     * Take uploaded manifest (which should be uuid in uploads), check it, put in catalog and
-     * by blob digest
-     */
-    async fn verify_manifest(
-        &self,
-        req: Request<VerifyManifestRequest>,
-    ) -> Result<Response<VerifiedManifest>, Status> {
-        let req = req.into_inner();
-        let mr = req.manifest.unwrap(); // Pissed off that the manifest is optional!
-        let uploaded_manifest = self.get_upload_path_for_blob(&req.uuid);
-
-        match self.create_verified_manifest(&uploaded_manifest, true) {
-            Ok(vm) => {
-                // copy manifest to blobs and add tag
-
-                let digest = vm.digest.clone();
-
-                let ret = self
-                    .save_blob(&uploaded_manifest, &digest)
-                    .and(self.save_tag(&digest, &mr.repo_name, &mr.reference))
-                    .map(|_| Response::new(vm))
-                    .map_err(|e| {
-                        error!(
-                            "Failure cataloguing manifest {}/{} {:?}",
-                            &mr.repo_name, &mr.reference, e
-                        );
-                        Status::internal("Internal error copying manifest")
-                    });
-
-                fs::remove_file(&uploaded_manifest)
-                    .unwrap_or_else(|e| error!("Failure deleting uploaded manifest {:?}", e));
-
-                ret
-            }
-            Err(e) => {
-                error!("Error verifying manifest {:?}", e);
-                Err(Status::internal("Internal error verifying manifest"))
-            }
-        }
     }
 
     type GetCatalogStream = mpsc::Receiver<Result<CatalogEntry, Status>>;
@@ -761,8 +746,16 @@ impl Registry for TrowServer {
             return Err(Status::invalid_argument("Require valid tag (not digest) to search for history"));
         }
 
-        let file = File::open(self.manifests_path.join(&mr.repo_name).join(&mr.tag))?;
-        let reader = BufReader::new(file);
+        let manifest_path = self.manifests_path.join(&mr.repo_name).join(&mr.tag);
+
+        let file = File::open(&manifest_path);
+
+        if file.is_err() {
+            return Err(Status::not_found(format!("Could not find the requested manifest at: {}", &manifest_path.to_str().unwrap())));
+        }
+
+        // It's safe to unwrap here
+        let reader = BufReader::new(file.unwrap());
 
         let (mut tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
@@ -821,42 +814,42 @@ impl Registry for TrowServer {
         Ok(Response::new(rx))
     }
 
-     // Readiness check
-     async fn is_ready(
-        &self,
-        _request: Request<ReadinessRequest>,
-    ) -> Result<Response<ReadyStatus>, Status> {
-
-        for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
-            
-            match is_path_writable(path) {
-                Ok(true) => {},
-                Ok(false) => {
-                    return Err(Status::unavailable(format!("{} is not writable", path.to_string_lossy())));
-                    },
-                Err(error) => {
-                    return Err(Status::unavailable(error.to_string()));
-                }
-            }
-        }
-
-        //All paths writable
-        let reply = trow_server::ReadyStatus {
-            message: String::from("Ready"),
-        };
-
-        return Ok(Response::new(reply));
-            
-    }
-
     async fn is_healthy(
         &self,
         _request: Request<HealthRequest>,
     ) -> Result<Response<HealthStatus>, Status> {
-        
+
         let reply = trow_server::HealthStatus {
             message: String::from("Healthy")
         };
         Ok(Response::new(reply))
     }
+
+    // Readiness check
+    async fn is_ready(
+       &self,
+       _request: Request<ReadinessRequest>,
+   ) -> Result<Response<ReadyStatus>, Status> {
+
+       for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
+
+           match is_path_writable(path) {
+               Ok(true) => {},
+               Ok(false) => {
+                   return Err(Status::unavailable(format!("{} is not writable", path.to_string_lossy())));
+                   },
+               Err(error) => {
+                   return Err(Status::unavailable(error.to_string()));
+               }
+           }
+       }
+
+       //All paths writable
+       let reply = trow_server::ReadyStatus {
+           message: String::from("Ready"),
+       };
+
+       return Ok(Response::new(reply));
+
+   }
 }

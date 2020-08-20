@@ -24,8 +24,7 @@ mod interface_tests {
     }
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
-
-    fn start_trow() -> TrowInstance {
+    async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
@@ -33,7 +32,7 @@ mod interface_tests {
             .spawn()
             .expect("failed to start");
 
-        let mut timeout = 20;
+        let mut timeout = 50;
 
         let mut buf = Vec::new();
         File::open("./certs/domain.crt")
@@ -44,13 +43,14 @@ mod interface_tests {
         // get a client builder
         let client = reqwest::Client::builder()
             .add_root_certificate(cert)
+            .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
-        let mut response = client.get(TROW_ADDRESS).send();
+        let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send();
+            response = client.get(TROW_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -73,15 +73,15 @@ mod interface_tests {
      * For that reason, it's set to ignored by default and has to be manually enabled.
      *
      */
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn smoke_test() {
+    async fn smoke_test() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _trow = start_trow();
+        let _trow = start_trow().await;
 
         let mut status = Command::new("docker")
             .args(&["pull", "alpine:latest"])
