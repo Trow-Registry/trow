@@ -4,6 +4,9 @@ version = "0.3.0"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
 edition = "2018"
 
+[features]
+sqlite = []
+
 [dependencies]
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
