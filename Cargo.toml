@@ -4,6 +4,9 @@ version = "0.3.0"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
 edition = "2018"
 
+[features]
+sqlite = []
+
 [dependencies]
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
@@ -33,6 +36,7 @@ prost = "0.6"
 prost-types = "0.6"
 bytes = "0.4"
 chrono = { version="^0.4", features = ["serde"] }
+rusqlite = "0.23.1"
 data-encoding = "2.3"
 
 [build-dependencies]
