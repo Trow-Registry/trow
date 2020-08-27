@@ -35,6 +35,11 @@ bytes = "0.4"
 chrono = { version="^0.4", features = ["serde"] }
 data-encoding = "2.3"
 
+tracing = {version = "^0.1", features = ["log"]}
+tracing-subscriber = "^0.2"
+tracing-futures = "^0.2"
+tracing-error = "0.1.2"
+
 [build-dependencies]
 
 [dev-dependencies]
