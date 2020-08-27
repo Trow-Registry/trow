@@ -1,7 +1,9 @@
 pub mod digest;
 
-#[macro_use(warn, debug, info, error)]
-extern crate log;
+// #[macro_use(warn, debug, info, error)]
+// extern crate log;
+#[macro_use]
+extern crate tracing;
 
 #[macro_use]
 extern crate serde_derive;
@@ -22,8 +24,9 @@ use server::trow_server::registry_server::RegistryServer;
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::TrowServer;
 use tokio::runtime::Runtime;
-
+use tracing::{Level};
 pub mod manifest;
+
 
 pub struct TrowServerBuilder {
     data_path: String,
@@ -71,6 +74,10 @@ impl TrowServerBuilder {
     }
 
     pub fn start_trow_sync(self) -> () {
+    
+        tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .finish();
 
         let mut rt = Runtime::new().expect("Failed to start Tokio runtime");
         let ts = TrowServer::new(

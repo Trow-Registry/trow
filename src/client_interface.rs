@@ -13,14 +13,17 @@ use tonic::Request;
 
 use crate::chrono::TimeZone;
 use crate::types::{self, *};
+use crate::trow_request;
 use failure::Error;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use tracing::{Level, event, instrument};
 
+#[derive(Debug)]
 pub struct ClientInterface {
-    server: String,
+    server: String
 }
 
 /**
@@ -158,10 +161,19 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
+        trow_request: &trow_request::TrowRequest,
+
     ) -> Result<(impl Write, String), Error> {
+        let tr = trow_proto::TrowRequest{
+            request_id: trow_request.request_id.clone(),
+            trow_instance: Some( trow_proto::TrowInstance {
+                id: trow_request.trow_instance.id.clone()
+            })
+        };
         let mr = ManifestRef {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone(),
+            trow_request: Some(tr)
         };
 
         let resp = self
@@ -179,16 +191,25 @@ impl ClientInterface {
             .open(resp.path)?;
         Ok((file, resp.uuid))
     }
-
+    #[instrument]
     pub async fn get_reader_for_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
+        trow_request: &trow_request::TrowRequest,
     ) -> Result<ManifestReader, Error> {
+        let tr = trow_proto::TrowRequest{
+            request_id: trow_request.request_id.clone(),
+            trow_instance: Some( trow_proto::TrowInstance {
+                id: trow_request.trow_instance.id.clone()
+            })
+        };
         let mr = ManifestRef {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone(),
+            trow_request: Some(tr)
         };
+        event!(Level::INFO,"Client Interface: {}", "reader for manifest");
         let resp = self
             .connect_registry()
             .await?
@@ -286,11 +307,19 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
         uuid: &str,
+        trow_request: &trow_request::TrowRequest,
     ) -> Result<types::VerifiedManifest, Error> {
+        let tr = trow_proto::TrowRequest{
+            request_id: trow_request.request_id.clone(),
+            trow_instance: Some( trow_proto::TrowInstance {
+                id: trow_request.trow_instance.id.clone()
+            })
+        };
         let vmr = VerifyManifestRequest {
             manifest: Some(ManifestRef {
                 reference: reference.to_owned(),
                 repo_name: repo_name.0.clone(),
+                trow_request: Some(tr)
             }),
             uuid: uuid.to_string(),
         };
@@ -315,10 +344,18 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         digest: &Digest,
+        trow_request: &trow_request::TrowRequest
     ) -> Result<ManifestDeleted, Error> {
+        let tr = trow_proto::TrowRequest{
+            request_id: trow_request.request_id.clone(),
+            trow_instance: Some( trow_proto::TrowInstance {
+                id: trow_request.trow_instance.id.clone()
+            })
+        };
         let mr = ManifestRef {
             reference: digest.0.clone(),
             repo_name: repo_name.0.clone(),
+            trow_request: Some(tr),
         };
 
         self.connect_registry()

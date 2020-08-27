@@ -26,8 +26,10 @@ extern crate uuid;
 use env_logger::Env;
 use log::{LevelFilter, SetLoggerError};
 
+// #[macro_use]
+// extern crate log;
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 #[macro_use]
 extern crate serde_derive;
@@ -43,16 +45,26 @@ use std::fs;
 use std::path::Path;
 use std::thread;
 use uuid::Uuid;
+use tracing::{Level};
 
 mod client_interface;
 pub mod response;
 mod routes;
 pub mod types;
+pub mod trow_request;
 
 use chrono::Utc;
 use client_interface::ClientInterface;
 use rand::RngCore;
 use std::io::Write;
+use trow_request::TrowInstance;
+
+
+use tracing_subscriber::prelude::*;
+
+fn init_tracer() -> Result<(), Error> {
+    Ok(())
+}
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -101,6 +113,7 @@ struct UserConfig {
     user: String,
     hash_encoded: String, //Surprised not bytes
 }
+
 
 fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, Error> {
     debug!("Starting Trow server");
@@ -237,7 +250,12 @@ impl TrowBuilder {
     }
 
     pub fn start(&self) -> Result<(), Error> {
-        init_logger()?;
+        // init_logger()?;
+
+        tracing_subscriber::fmt()
+        .with_max_level(Level::INFO)
+        .init();
+
 
         let rocket_config = &self.build_rocket_config()?;
 
@@ -280,9 +298,11 @@ impl TrowBuilder {
         }
         let s = format!("https://{}", self.config.grpc.listen);
         let ci: ClientInterface = build_handlers(s)?;
+        let instance_id: TrowInstance =  TrowInstance::new().unwrap();
 
         rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
+            .manage(instance_id)
             .manage(ci)
             .attach(fairing::AdHoc::on_attach(
                 "SIGTERM handler",

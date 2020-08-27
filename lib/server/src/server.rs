@@ -12,7 +12,7 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use prost_types::Timestamp;
 use std::io;
-
+use tracing::{Level, event, instrument};
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
@@ -37,7 +37,7 @@ static UPLOADS_DIR: &'static str = "scratch";
  * Each "route" gets a clone of this struct.
  * The Arc makes sure they all point to the same data.
  */
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TrowServer {
     active_uploads: Arc<RwLock<HashSet<Upload>>>,
     manifests_path: PathBuf,
@@ -268,6 +268,7 @@ impl TrowServer {
         Ok(())
     }
 
+    #[instrument]
     fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
         let digest = if is_digest(reference) {
             if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
@@ -286,6 +287,7 @@ impl TrowServer {
         return self.get_catalog_path_for_blob(&digest);
     }
 
+    #[instrument]
     fn create_verified_manifest(
         &self,
         manifest_path: &PathBuf,
@@ -319,6 +321,7 @@ impl TrowServer {
         })
     }
 
+    #[instrument]
     fn create_manifest_read_location(
         &self,
         repo_name: String,
@@ -558,14 +561,15 @@ impl Registry for TrowServer {
             uuid,
         }))
     }
-
+    
+    #[instrument]
     async fn get_read_location_for_manifest(
         &self,
         req: Request<ManifestRef>,
     ) -> Result<Response<ManifestReadLocation>, Status> {
         //Don't actually need to verify here; could set to false
 
-
+        event!(Level::INFO, "read loc manifest!");
         let mr = req.into_inner();
         // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {

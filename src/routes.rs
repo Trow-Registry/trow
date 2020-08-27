@@ -7,6 +7,7 @@ use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
+use crate::trow_request;
 use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
@@ -14,9 +15,11 @@ use rocket_contrib::json::{Json, JsonValue};
 use std::io::Seek;
 use std::str;
 use tonic::Code;
+use tracing::{Level, event, instrument};
 
 mod health;
 mod readiness;
+
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
@@ -150,30 +153,35 @@ Accept: manifest-version
 200 - return the manifest
 404 - manifest not known to the registry
  */
+#[instrument]
 #[get("/v2/<onename>/manifests/<reference>")]
 fn get_manifest(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     onename: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
     let rn = RepoName(onename);
-    let f = ci.get_reader_for_manifest(&rn, &reference);
+    event!(Level::INFO, "get manifest! {}", tr.request_id);
+    let f = ci.get_reader_for_manifest(&rn, &reference, tr);
     let mut rt = Runtime::new().unwrap();
     rt.block_on(f)
         .map_err(|_| Error::ManifestUnknown(reference))
 }
 
+#[instrument]
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_2level(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     user: String,
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
     let rn = RepoName(format!("{}/{}", user, repo));
-    let r = ci.get_reader_for_manifest(&rn, &reference);
+    let r = ci.get_reader_for_manifest(&rn, &reference, tr);
     let mut rt = Runtime::new().unwrap();
     rt.block_on(r).ok()
 }
@@ -181,27 +189,32 @@ fn get_manifest_2level(
 /*
  * Process 3 level manifest path
  */
+#[instrument]
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     org: String,
     user: String,
     repo: String,
     reference: String,
 ) -> Option<ManifestReader> {
     let rn = RepoName(format!("{}/{}/{}", org, user, repo));
-    let r = ci.get_reader_for_manifest(&rn, &reference);
+    let r = ci.get_reader_for_manifest(&rn, &reference, tr);
     Runtime::new().unwrap().block_on(r).ok()
 }
 
 /*
  * Process 4 level manifest path
  */
+
+#[instrument]
 #[get("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_4level(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     fourth: String,
     org: String,
     user: String,
@@ -209,7 +222,7 @@ fn get_manifest_4level(
     reference: String,
 ) -> Option<ManifestReader> {
     let rn = RepoName(format!("{}/{}/{}/{}", fourth, org, user, repo));
-    let r = ci.get_reader_for_manifest(&rn, &reference);
+    let r = ci.get_reader_for_manifest(&rn, &reference, tr);
     Runtime::new().unwrap().block_on(r).ok()
 }
 
@@ -751,20 +764,21 @@ Content-Type: <manifest media type>
 fn put_image_manifest(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     repo_name: String,
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
     let repo = RepoName(repo_name);
 
-    let write_deets = ci.get_write_sink_for_manifest(&repo, &reference);
+    let write_deets = ci.get_write_sink_for_manifest(&repo, &reference, &tr);
     let mut rt = Runtime::new().unwrap();
     let (mut sink_loc, uuid) = rt.block_on(write_deets).map_err(|_| Error::InternalError)?;
 
     match chunk.stream_to(&mut sink_loc) {
         Ok(_) => {
             //This can probably be moved to responder
-            let ver = ci.verify_manifest(&repo, &reference, &uuid);
+            let ver = ci.verify_manifest(&repo, &reference, &uuid, &tr);
             match rt.block_on(ver) {
                 Ok(vm) => Ok(vm),
                 Err(_) => Err(Error::ManifestInvalid),
@@ -781,6 +795,7 @@ fn put_image_manifest(
 fn put_image_manifest_2level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     user: String,
     repo: String,
     reference: String,
@@ -789,6 +804,7 @@ fn put_image_manifest_2level(
     put_image_manifest(
         auth_user,
         ci,
+        &tr,
         format!("{}/{}", user, repo),
         reference,
         chunk,
@@ -802,6 +818,7 @@ fn put_image_manifest_2level(
 fn put_image_manifest_3level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     org: String,
     user: String,
     repo: String,
@@ -811,6 +828,7 @@ fn put_image_manifest_3level(
     put_image_manifest(
         auth_user,
         ci,
+        tr,
         format!("{}/{}/{}", org, user, repo),
         reference,
         chunk,
@@ -827,6 +845,7 @@ fn put_image_manifest_3level(
 fn put_image_manifest_4level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     fourth: String,
     org: String,
     user: String,
@@ -837,6 +856,7 @@ fn put_image_manifest_4level(
     put_image_manifest(
         auth_user,
         ci,
+        tr,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
         chunk,
@@ -853,13 +873,14 @@ DELETE /v2/<name>/manifests/<reference>
 fn delete_image_manifest(
     _auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
     let repo_str = repo.clone();
     let repo = RepoName(repo);
     let digest = Digest(digest);
-    let r = ci.delete_manifest(&repo, &digest);
+    let r = ci.delete_manifest(&repo, &digest,&tr);
     Runtime::new().unwrap().block_on(r).map_err(|e| {
         let e = e.downcast::<tonic::Status>();
         if let Ok(ts) = e {
@@ -878,29 +899,32 @@ fn delete_image_manifest(
 fn delete_image_manifest_2level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     user: String,
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, ci, format!("{}/{}", user, repo), digest)
+    delete_image_manifest(auth_user, ci, &tr, format!("{}/{}", user, repo), digest, )
 }
 
 #[delete("/v2/<org>/<user>/<repo>/manifests/<digest>")]
 fn delete_image_manifest_3level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     org: String,
     user: String,
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
+    delete_image_manifest(auth_user, ci, &tr, format!("{}/{}/{}", org, user, repo), digest,)
 }
 
 #[delete("/v2/<fourth>/<org>/<user>/<repo>/manifests/<digest>")]
 fn delete_image_manifest_4level(
     auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
+    tr: &trow_request::TrowRequest,
     fourth: String,
     org: String,
     user: String,
@@ -910,6 +934,7 @@ fn delete_image_manifest_4level(
     delete_image_manifest(
         auth_user,
         ci,
+        tr,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         digest,
     )
