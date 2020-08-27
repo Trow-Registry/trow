@@ -9,6 +9,15 @@ message UploadRequest {
   //Expect some auth stuff as well later
 }
 
+message TrowInstance {
+  string id =1;
+}
+
+message TrowRequest {
+  string request_id = 1;
+  TrowInstance trow_instance = 2;
+}
+
 message UploadDetails {
   string uuid = 1;
 }
@@ -54,6 +63,7 @@ message ManifestRef {
   string repo_name = 1;
   //Can be digest or tag
   string reference = 2;
+  TrowRequest trow_request = 3;
 }
 
 message VerifyManifestRequest {
@@ -127,6 +137,7 @@ message ReadinessRequest {}
 message ReadyStatus {
   string message = 1;
 }
+
 
 //TODO: can we type digests and references so that we can control if it's a digest or tag?
 
