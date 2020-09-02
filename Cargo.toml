@@ -38,6 +38,7 @@ bytes = "0.4"
 chrono = { version="^0.4", features = ["serde"] }
 rusqlite = "0.23.1"
 data-encoding = "2.3"
+openssl = { version = "0.10", features = ["vendored"] }
 
 [build-dependencies]
 
