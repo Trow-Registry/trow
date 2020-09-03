@@ -15,7 +15,7 @@ use rocket_contrib::json::{Json, JsonValue};
 use std::io::Seek;
 use std::str;
 use tonic::Code;
-use tracing::{Level, event, instrument};
+use tracing::instrument;
 
 mod health;
 mod readiness;
@@ -163,7 +163,7 @@ fn get_manifest(
     reference: String,
 ) -> Result<ManifestReader, Error> {
     let rn = RepoName(onename);
-    event!(Level::INFO, "get manifest! {}", tr.request_id);
+    info!("get manifest! {}", tr.request_id);
     let f = ci.get_reader_for_manifest(&rn, &reference, tr);
     let mut rt = Runtime::new().unwrap();
     rt.block_on(f)
