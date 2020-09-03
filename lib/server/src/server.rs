@@ -12,7 +12,7 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use prost_types::Timestamp;
 use std::io;
-use tracing::{Level, event, instrument};
+use tracing::instrument;
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
@@ -302,6 +302,7 @@ impl TrowServer {
                 let path = self.get_catalog_path_for_blob(digest)?;
 
                 if !path.exists() {
+                    error!("Failed to find artifact with digest {}",digest);
                     return Err(format_err!(
                         "Failed to find artifact with digest {}",
                         digest
@@ -562,14 +563,14 @@ impl Registry for TrowServer {
         }))
     }
     
-    #[instrument]
+    #[instrument(skip(self))]
     async fn get_read_location_for_manifest(
         &self,
         req: Request<ManifestRef>,
     ) -> Result<Response<ManifestReadLocation>, Status> {
         //Don't actually need to verify here; could set to false
 
-        event!(Level::INFO, "read loc manifest!");
+        info!("read loc manifest!");
         let mr = req.into_inner();
         // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
