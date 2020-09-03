@@ -47,11 +47,9 @@ This screencast shows how quick it is to get started:
 
 [![asciicast](https://asciinema.org/a/48HK88yR4rJw0QuHt2VdkuVZn.svg)](https://asciinema.org/a/48HK88yR4rJw0QuHt2VdkuVZn)
 
-Normal installations and all production installations should follow the [standard installation
-instructions](install/INSTALL.md). The standard install requires a sub-domain that can pointed at
-the registry. The install is based on [Kustomize](https://kustomize.io), making it simple to install
-and maintain, and ideal for clusters following the
-[GitOps](https://www.weave.works/technologies/gitops/) model.
+Normal installations and all production installations should follow the
+[Kustomize](install/INSTALL.md) or [Helm](docs/HELM_INSTALL.md) installation instructions. Note that
+this requires a sub-domain that can pointed at the registry.
 
 Note that Trow is currently alpha and you can expect to find rough edges.
 

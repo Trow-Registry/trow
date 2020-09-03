@@ -9,12 +9,14 @@ obtained automatically via [cert-manager](https://github.com/jetstack/cert-manag
 [ManagedCertificate](https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs) if
 running on GKE), but does require a (sub)domain whose DNS can be pointed at the cluster.
 
-The standard install instructions are based on Kustomize (see [Scott Lowe's
+The following install instructions are based on Kustomize (see [Scott Lowe's
 blog](https://blog.scottlowe.org/2019/09/13/an-introduction-to-kustomize/) for a good introduction).
-You will need to create a new overlay for your cluster, containing your domain name and any special
-configuration (e.g. ingress). The overlay will refer to other configuration files. By keeping all
-changes to your own directory, any updates to Trow base configuration can be easily merged by just
-pulling the new commits. 
+If you'd rather try the new Helm install, please see [this guide](../docs/HELM_INSTALL.md).
+
+To use the Kustomize install you will need to create a new overlay for your cluster, containing your
+domain name and any special configuration (e.g. ingress). The overlay will refer to other
+configuration files. By keeping all changes to your own directory, any updates to Trow base
+configuration can be easily merged by just pulling the new commits. 
 
 There is a complete example in the `overlays/example-overlay` directory, which can be used as a basis
 for getting your cluster running. 
