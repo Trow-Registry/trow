@@ -410,9 +410,7 @@ mod interface_tests {
         assert!(body.contains("free_space"));
         assert!(body.contains("total_space"));
 
-        assert!(!body.contains("total_manifest_requests{type=\"manifests\"} 0"));
         assert!(body.contains("total_manifest_requests{type=\"manifests\"} 6"));
-        assert!(!body.contains("total_blob_requests{type=\"blobs\"} 0"));
         assert!(body.contains("total_blob_requests{type=\"blobs\"} 8"));
 
         get_manifest(&cl, "onename", "tag").await;
@@ -425,7 +423,6 @@ mod interface_tests {
         let manifest_body = manifest_response.text().await.unwrap();
 
         assert!(manifest_body.contains("total_manifest_requests{type=\"manifests\"} 7"));
-        assert!(!manifest_body.contains("total_manifest_requests{type=\"manifests\"} 8"));
 
         get_non_existent_blob(&cl).await;
         let blob_response = cl
@@ -439,7 +436,6 @@ mod interface_tests {
         let blob_body = blob_response.text().await.unwrap();
 
         assert!(blob_body.contains("total_blob_requests{type=\"blobs\"} 9"));
-        assert!(!blob_body.contains("total_blob_requests{type=\"blobs\"} 10"));
     }
 
     #[tokio::test]
