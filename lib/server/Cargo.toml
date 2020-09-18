@@ -23,7 +23,11 @@ failure = "^0.1"
 failure_derive = "^0.1"
 serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
+rustc-serialize = "0.3"
 
+prometheus = { version = "0.9"}
+lazy_static = "1.4.0"
+fs3 = "0.5.0"
 # crypto and crypto related crates
 sha2 = "0.9"
 hex = "0.4"

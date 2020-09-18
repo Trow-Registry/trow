@@ -5,8 +5,8 @@ pub mod trow_proto {
 use trow_proto::{
     admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
     BlobRef, CatalogRequest, CompleteRequest, HealthRequest, ListTagsRequest,
-    ManifestHistoryRequest, ManifestRef, ReadinessRequest, UploadRef, UploadRequest,
-    VerifyManifestRequest,
+    ManifestHistoryRequest, ManifestRef, MetricsRequest, ReadinessRequest, UploadRef,
+    UploadRequest, VerifyManifestRequest,
 };
 
 use tonic::Request;
@@ -489,5 +489,24 @@ impl ClientInterface {
             is_ready: true,
             message: response_value.message,
         }
+    }
+
+    /**
+     Metrics call.
+
+     Returns disk and total request metrics(blobs, manifests).
+    */
+    pub async fn get_metrics(&self) -> Result<types::MetricsResponse, Error> {
+        let req = Request::new(MetricsRequest {});
+        let resp = self
+            .connect_registry()
+            .await?
+            .get_metrics(req)
+            .await?
+            .into_inner();
+
+        Ok(types::MetricsResponse {
+            metrics: resp.metrics,
+        })
     }
 }

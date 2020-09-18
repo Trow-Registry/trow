@@ -22,7 +22,7 @@ mod interface_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use trow::types::{RepoCatalog, RepoName, TagList};
+    use trow::types::{HealthResponse, ReadinessResponse, RepoCatalog, RepoName, TagList};
     use trow_server::{digest, manifest};
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
@@ -367,6 +367,77 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
+    async fn get_health(cl: &reqwest::Client) {
+        let resp = cl
+            .get(&format!("{}/healthz", TROW_ADDRESS))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let hr: HealthResponse = resp.json().await.unwrap();
+
+        assert_eq!(hr.is_healthy, true);
+    }
+
+    async fn get_readiness(cl: &reqwest::Client) {
+        let resp = cl
+            .get(&format!("{}/readiness", TROW_ADDRESS))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let rr: ReadinessResponse = resp.json().await.unwrap();
+
+        assert_eq!(rr.is_ready, true);
+    }
+
+    async fn get_metrics(cl: &reqwest::Client) {
+        let resp = cl
+            .get(&format!("{}/metrics", TROW_ADDRESS))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = resp.text().await.unwrap();
+
+        assert!(body.contains("available_space"));
+        assert!(body.contains("free_space"));
+        assert!(body.contains("total_space"));
+
+        assert!(body.contains("total_manifest_requests{type=\"manifests\"} 6"));
+        assert!(body.contains("total_blob_requests{type=\"blobs\"} 8"));
+
+        get_manifest(&cl, "onename", "tag").await;
+        let manifest_response = cl
+            .get(&format!("{}/metrics", TROW_ADDRESS))
+            .send()
+            .await
+            .unwrap();
+
+        let manifest_body = manifest_response.text().await.unwrap();
+
+        assert!(manifest_body.contains("total_manifest_requests{type=\"manifests\"} 7"));
+
+        get_non_existent_blob(&cl).await;
+        let blob_response = cl
+            .get(&format!("{}/metrics", TROW_ADDRESS))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(blob_response.status(), StatusCode::OK);
+
+        let blob_body = blob_response.text().await.unwrap();
+
+        assert!(blob_body.contains("total_blob_requests{type=\"blobs\"} 9"));
+    }
+
     #[tokio::test]
     async fn test_runner() {
         //Need to start with empty repo
@@ -481,6 +552,16 @@ mod interface_tests {
         tl4.insert("tag".to_string());
         tl4.insert("three".to_string());
         println!("Running check_tag_list_n_last 4");
-        check_tag_list_n_last(&client, 2, "latest", &tl4).await
+        check_tag_list_n_last(&client, 2, "latest", &tl4).await;
+
+        println!("Running get_readiness");
+        get_readiness(&client).await;
+
+        println!("Running get_health");
+        get_health(&client).await;
+
+        println!("Running get_metrics");
+        get_metrics(&client).await;
+        check_tag_list_n_last(&client, 2, "latest", &tl4).await;
     }
 }

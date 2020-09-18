@@ -1,26 +1,27 @@
 use crate::manifest::{FromJson, Manifest};
 use chrono::prelude::*;
 use failure::{self, Error};
+use prost_types::Timestamp;
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
+use std::io;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
-use prost_types::Timestamp;
-use std::io;
 
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
 
 use self::trow_server::*;
-use crate::server::trow_server::registry_server::Registry;
 use crate::digest::sha256_tag_digest;
+use crate::server::trow_server::registry_server::Registry;
 
+use crate::metrics;
 
 static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -476,6 +477,7 @@ impl Registry for TrowServer {
         &self,
         req: Request<BlobRef>,
     ) -> Result<Response<BlobReadLocation>, Status> {
+        metrics::TOTAL_BLOB_REQUESTS.inc();
         let br = req.into_inner();
         let path = self
             .get_catalog_path_for_blob(&br.digest)
@@ -504,7 +506,10 @@ impl Registry for TrowServer {
             .map_err(|e| Status::invalid_argument(format!("Error parsing digest {:?}", e)))?;
         if !path.exists() {
             warn!("Request for unknown blob: {:?}", path);
-            Err(Status::not_found(format!("No blob found matching {:?}", br)))
+            Err(Status::not_found(format!(
+                "No blob found matching {:?}",
+                br
+            )))
         } else {
             fs::remove_file(&path)
                 .map_err(|e| {
@@ -565,8 +570,8 @@ impl Registry for TrowServer {
     ) -> Result<Response<ManifestReadLocation>, Status> {
         //Don't actually need to verify here; could set to false
 
-
         let mr = req.into_inner();
+        metrics::TOTAL_MANIFEST_REQUESTS.inc();
         // TODO refactor to return directly
         match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
             Ok(vm) => Ok(Response::new(vm)),
@@ -683,6 +688,7 @@ impl Registry for TrowServer {
         tokio::spawn(async move {
             for repo_name in partial_catalog {
                 let ce = CatalogEntry { repo_name };
+
                 tx.send(Ok(ce)).await.expect("Error streaming catalog");
             }
         });
@@ -740,10 +746,11 @@ impl Registry for TrowServer {
         &self,
         request: Request<ManifestHistoryRequest>,
     ) -> Result<Response<Self::GetManifestHistoryStream>, Status> {
-
         let mr = request.into_inner();
         if is_digest(&mr.tag) {
-            return Err(Status::invalid_argument("Require valid tag (not digest) to search for history"));
+            return Err(Status::invalid_argument(
+                "Require valid tag (not digest) to search for history",
+            ));
         }
 
         let manifest_path = self.manifests_path.join(&mr.repo_name).join(&mr.tag);
@@ -751,7 +758,10 @@ impl Registry for TrowServer {
         let file = File::open(&manifest_path);
 
         if file.is_err() {
-            return Err(Status::not_found(format!("Could not find the requested manifest at: {}", &manifest_path.to_str().unwrap())));
+            return Err(Status::not_found(format!(
+                "Could not find the requested manifest at: {}",
+                &manifest_path.to_str().unwrap()
+            )));
         }
 
         // It's safe to unwrap here
@@ -759,16 +769,13 @@ impl Registry for TrowServer {
 
         let (mut tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
-
             let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
 
             let mut sent = 0;
             for line in reader.lines() {
                 if line.is_ok() {
-
                     let line = line.unwrap();
                     let (digest, date) = match line.find(' ') {
-
                         Some(ind) => {
                             let (digest_str, date_str) = line.split_at(ind);
 
@@ -783,13 +790,16 @@ impl Registry for TrowServer {
                             let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
 
                             let ts = if let Ok(dt) = dt_r {
-                                Some(Timestamp { seconds: dt.timestamp(), nanos: dt.timestamp_subsec_nanos() as i32})
+                                Some(Timestamp {
+                                    seconds: dt.timestamp(),
+                                    nanos: dt.timestamp_subsec_nanos() as i32,
+                                })
                             } else {
                                 warn!("Failed to parse timestamp {}", date_str);
                                 None
                             };
                             (digest_str, ts)
-                        },
+                        }
                         None => {
                             warn!("No timestamp found in manifest");
                             (line.as_ref(), None)
@@ -798,11 +808,11 @@ impl Registry for TrowServer {
 
                     let entry = ManifestHistoryEntry {
                         digest: digest.to_string(),
-                        date
+                        date,
                     };
                     tx.send(Ok(entry))
                         .await
-                       .expect("Error streaming manifest history");
+                        .expect("Error streaming manifest history");
 
                     sent = sent + 1;
                     if sent >= mr.limit {
@@ -814,42 +824,57 @@ impl Registry for TrowServer {
         Ok(Response::new(rx))
     }
 
+    // Readiness check
+    async fn is_ready(
+        &self,
+        _request: Request<ReadinessRequest>,
+    ) -> Result<Response<ReadyStatus>, Status> {
+        for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
+            match is_path_writable(path) {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(Status::unavailable(format!(
+                        "{} is not writable",
+                        path.to_string_lossy()
+                    )));
+                }
+                Err(error) => {
+                    return Err(Status::unavailable(error.to_string()));
+                }
+            }
+        }
+
+        //All paths writable
+        let reply = trow_server::ReadyStatus {
+            message: String::from("Ready"),
+        };
+
+        return Ok(Response::new(reply));
+    }
+
     async fn is_healthy(
         &self,
         _request: Request<HealthRequest>,
     ) -> Result<Response<HealthStatus>, Status> {
-
         let reply = trow_server::HealthStatus {
-            message: String::from("Healthy")
+            message: String::from("Healthy"),
         };
         Ok(Response::new(reply))
     }
 
-    // Readiness check
-    async fn is_ready(
-       &self,
-       _request: Request<ReadinessRequest>,
-   ) -> Result<Response<ReadyStatus>, Status> {
+    async fn get_metrics(
+        &self,
+        _request: Request<MetricsRequest>,
+    ) -> Result<Response<MetricsResponse>, Status> {
+        match metrics::gather_metrics(&mut self.blobs_path.clone()) {
+            Ok(metrics) => {
+                let reply = trow_server::MetricsResponse { metrics: metrics };
+                Ok(Response::new(reply))
+            }
 
-       for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
-
-           match is_path_writable(path) {
-               Ok(true) => {},
-               Ok(false) => {
-                   return Err(Status::unavailable(format!("{} is not writable", path.to_string_lossy())));
-                   },
-               Err(error) => {
-                   return Err(Status::unavailable(error.to_string()));
-               }
-           }
-       }
-
-       //All paths writable
-       let reply = trow_server::ReadyStatus {
-           message: String::from("Ready"),
-       };
-
-       return Ok(Response::new(reply));
-
-   }
+            Err(error) => {
+                return Err(Status::unavailable(error.to_string()));
+            }
+        }
+    }
 }

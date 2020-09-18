@@ -16,6 +16,7 @@ use std::str;
 use tonic::Code;
 
 mod health;
+mod metrics;
 mod readiness;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
@@ -29,6 +30,7 @@ pub fn routes() -> Vec<rocket::Route> {
         get_homepage,
         health::healthz,
         readiness::readiness,
+        metrics::metrics,
         login,
         get_manifest,
         get_manifest_2level,
