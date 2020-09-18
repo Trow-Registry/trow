@@ -1,5 +1,8 @@
 # Helm Install Trow
 
+Use the following instructions to install Trow via [Helm](https://helm.sh). You may also find the
+information in the [standard install instructions](../install/INSTALL.md) useful.
+
 ## Add the Trow Helm Repo
 
 ```bash
@@ -12,7 +15,13 @@ helm repo add trow https://trow.io
 helm install trow trow/trow
 ```
 ## Notes on installation
-Trow needs to be served Via `TLS`, by default the ingress is disabled, so you would need to expose the trow pod (the prefered method is via ingress) and add TLS to this, the default way using:
+
+The Docker client expects to use TLS to push and pull images from registries. 
+This is normally accomplished by exposing Trow via a Kubernetes ingress endpoint with TLS
+configured. How to do this is dependent on the Kubernetes cluster configuration, but the following
+gives examples for GKE managed certificates and cert-manager. Note that you will need a (sub)domain
+name for Trow.
+
 ### Google Managed Certificates on GKE
 create a managed certificate as follows:
 ```yaml
@@ -43,7 +52,8 @@ helm install \
 ```
 
 ### Cert-Manager
-if you have `cert manager` installed you can use the following values:
+
+If you have `cert manager` installed you can use the following values:
 ```yaml
 # values.yaml
 ingress:

@@ -42,7 +42,7 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
  - If you are using a Mac, restart Docker once the install script has completed.
 
 If you'd rather have more control over the process, follow the [manual
-steps](./docs/MANUAL_INSTALL.md).
+steps](./quick-install/MANUAL_INSTALL.md).
 
 ### Test it out
 

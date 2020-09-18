@@ -49,6 +49,9 @@ pub mod response;
 mod routes;
 pub mod types;
 
+#[cfg(feature = "sqlite")]
+mod users;
+
 use chrono::Utc;
 use client_interface::ClientInterface;
 use rand::RngCore;
