@@ -1,15 +1,15 @@
 with import <nixpkgs> {};
 let
   pkgs = import <nixpkgs> {};
-  date = "2018-02-25";
+  date = "2020-09-28";
   mozilla-overlay = fetchFromGitHub {
     owner = "mozilla";
     repo = "nixpkgs-mozilla";
-    rev = "661f3f4d8183f493252faaa4e7bf192abcf5d927";
-    sha256 = "0g1ig96a5qzppbf75qwll8jvc7af596ribhymzs4pbws5zh7mp6p";
+    rev = "9f3df31ebb32ac97e385e07edd954fbf027ca242";
+    sha256 = "1swds7y664m04m1grjhypvslxzzwhiby4xqlc0aml62gbyi88jya";
   };
   mozilla = (import mozilla-overlay) pkgs pkgs;
-  rust-nightly = mozilla.rustChannelOf { date = date; channel = "nightly"; };
+  rust-nightly = mozilla.rustChannelOf { inherit date; channel = "nightly"; };
 in
 # rustPlatform.buildRustPackage rec {
 stdenv.mkDerivation rec {
@@ -43,5 +43,6 @@ stdenv.mkDerivation rec {
 
   shellHook = ''
     >&2 echo Rust Nightly: ${date}
+    export PROTOC="${protobuf}/bin/protoc"
   '';
 }
