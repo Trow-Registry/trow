@@ -171,7 +171,27 @@ The push refers to repository [trow.kube-public:31000/nginx]
 Get https://trow.kube-public:31000/v2/: dial tcp: lookup trow.kube-public: No address associated with hostname
 ```
 
-This indicates it can't resolve the host name. Running `install/configure-host.sh` should add an entry to `/etc/hosts` that will fix the issue.
+This indicates it can't resolve the host name. Running `install/configure-host.sh` should add an
+entry to `/etc/hosts` that will fix the issue.
+
+If it seems like you can connect to Trow successfully but then uploads fail with `manifest invalid`
+or `Internal Server Error`, Trow may be having trouble saving to the filesystem. First check
+the logs (see "Where are the logs?" above). If this is the case, check there is free space on the
+volume and the Trow user has the correct privileges to write to the volume. In particular, verify
+that the settings for the volume match the UID of the Trow user (333333 by default):
+
+```
+...
+    spec:
+      containers:
+      - name: trow-pod
+        image: containersol/trow:0.3
+	...
+      securityContext:             
+        runAsUser: 333333
+        runAsGroup: 333333
+        fsGroup: 333333
+```
 
 ### My pod can't pull images from Trow
 
