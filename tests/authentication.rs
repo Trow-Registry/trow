@@ -47,7 +47,7 @@ mod authentication_tests {
             .spawn()
             .expect("failed to start");
 
-        let mut timeout = 50;
+        let mut timeout = 100;
 
         let mut buf = Vec::new();
         File::open("./certs/domain.crt")
