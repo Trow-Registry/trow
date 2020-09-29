@@ -1,0 +1,49 @@
+name: Helm Chart
+
+on:
+  push:
+    branches:
+    - "*"
+
+jobs:
+  helm_chart_validation:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: engineerd/setup-kind@v0.4.0
+      with:
+          version: "v0.9.0"
+          config: ci-config/kind.yaml
+          name: trow-test
+    - name: Install Ingress
+      run: |
+          ./ci-config/install-kind-ingress.sh
+    - name: Generate Certs
+      run: |
+        openssl req -new -config ci-config/cert.config -keyout trow.test.key -x509 -days 1 -out trow.test.crt
+    - name: Create TLS Secret
+      run: |
+        kubectl create secret tls trow-test --key trow.test.key --cert trow.test.crt
+    - name: Helm Install Trow
+      run: |
+        helm install trow-test -f ci-config/values.yaml charts/trow/
+    - name: Set Routing
+      run: |
+        echo "127.0.0.1 trow.test" | sudo tee -a /etc/hosts
+    - name: Setup Docker To Validate Certs
+      run: |
+        sudo mkdir -p /etc/docker/certs.d/trow.test/
+        sudo cp trow.test.crt /etc/docker/certs.d/trow.test/ca.crt
+    - name: Pull and Tag Docker Image
+      run: |
+        docker pull nginx:alpine
+        docker tag nginx:alpine trow.test/test/nginx:alpine
+    - name: Push to Trow
+      run: |
+        docker push  trow.test/test/nginx:alpine
+    - name: Clean Up Cluster
+      run: |
+        kind delete cluster --name trow-test
+        
+    
