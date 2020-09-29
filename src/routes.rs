@@ -769,7 +769,17 @@ fn put_image_manifest(
             let ver = ci.verify_manifest(&repo, &reference, &uuid);
             match rt.block_on(ver) {
                 Ok(vm) => Ok(vm),
-                Err(_) => Err(Error::ManifestInvalid),
+                Err(e) => {
+                    let e = e.downcast::<tonic::Status>();
+                    if let Ok(ts) = e {
+                        match ts.code() {
+                            Code::InvalidArgument => Err(Error::ManifestInvalid),
+                            _ => Err(Error::InternalError)
+                        }
+                    } else {
+                        Err(Error::InternalError)
+                    }
+                }
             }
         }
         Err(_) => Err(Error::InternalError),

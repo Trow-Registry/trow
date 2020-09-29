@@ -71,12 +71,12 @@ impl fmt::Display for Error {
                 None,
             ),
             Error::ManifestInvalid => {
-                format_error_json(f, "MANIFEST_INVALID", "manifest invalid", None)
+                format_error_json(f, "MANIFEST_INVALID", "Manifest invalid", None)
             }
             Error::ManifestUnknown(ref tag) => format_error_json(
                 f,
                 "MANIFEST_UNKNOWN",
-                "manifest unknown",
+                "Manifest unknown",
                 Some(json!({ "Tag": tag })),
             ),
             Error::NameInvalid(ref name) => format_error_json(

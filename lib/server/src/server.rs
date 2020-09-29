@@ -617,7 +617,7 @@ impl Registry for TrowServer {
             }
             Err(e) => {
                 error!("Error verifying manifest {:?}", e);
-                Err(Status::internal("Internal error verifying manifest"))
+                Err(Status::invalid_argument("Failed to verify manifest"))
             }
         }
     }
