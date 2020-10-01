@@ -28,10 +28,12 @@ spec:
           - "--no-tls" 
           - "-n" 
           - {{ .Values.trow.domain | quote }}
+          {{- if and (.Values.trow.user) (.Values.trow.password) }}
           - "-u" 
           - {{ .Values.trow.user | quote }} 
           - "--password-file" 
           - "/etc/trow/pass"
+          {{- end }}
         {{- with .Values.trow.validation }}
           {{- if .allowDocker }}
           - "--allow-docker-official"
@@ -62,9 +64,12 @@ spec:
         volumeMounts:
         - name: data-vol
           mountPath: /data
+    {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
           mountPath: /etc/trow
           readOnly: true
+    {{- end}}
+    {{- if and (.Values.trow.user) (.Values.trow.password) }}
       volumes:
         - name: trow-pass
           secret:
@@ -72,6 +77,7 @@ spec:
             items:
               - key: pass
                 path: pass
+    {{- end}}
       securityContext:
         runAsUser: 333333
         runAsGroup: 333333
