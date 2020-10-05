@@ -6,6 +6,7 @@ use rand;
 use rusqlite::NO_PARAMS;
 use rusqlite::{params, Connection};
 use std::env;
+extern crate serde_yaml;
 
 // User Struct
 pub struct User {
@@ -13,6 +14,17 @@ pub struct User {
     pub salt: String,
     pub hash: String,
     pub active: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileUser {
+    name: String,
+    password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileUsers {
+    users: Vec<FileUser>,
 }
 
 // Constants
@@ -131,14 +143,29 @@ impl User {
         // unset current user
         Ok(())
     }
+
+    fn load_users_from_file() -> Result<(), failure::Error> {
+        let users_file = env::var("USER_CONFIG").unwrap_or("users.yaml".to_string());
+        let f = std::fs::read_to_string(users_file)?;
+        let file_contents = serde_yaml::from_str::<FileUsers>(&f)?;
+        for user in file_contents.users {
+            match User::new(user.name, user.password) {
+                Ok(_) => {}
+                Err(e) => return Err(format_err!("Failed Loading All users {}", e)),
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::User;
-    use super::{get_hash_from_password, get_salt, verify_password};
+    use super::{get_hash_from_password, get_salt, verify_password, FileUser, FileUsers};
     use std::env;
+    use std::fs::File;
+    use std::io::Write;
 
     #[test]
     fn test_get_salt() {
@@ -230,6 +257,45 @@ mod tests {
         assert!(
             !User::authorize("user_delete".to_string(), "Password1".to_string()).is_ok(),
             "User was not deleted"
+        );
+    }
+
+    #[test]
+    fn test_load_users_from_yaml() {
+        // Setup
+        env::set_var("DB_FILE", "test.db");
+        env::set_var("USER_CONFIG", "test_users.yaml");
+        // Create the yaml File
+        let file_user = FileUser {
+            name: "file_user".to_string(),
+            password: "123456789".to_string(),
+        };
+        let mut file_users = Vec::new();
+        file_users.push(file_user);
+        let file = FileUsers { users: file_users };
+        let yaml_string = serde_yaml::to_string(&file).expect("Failed Creating Yaml String");
+        match File::create("test_users.yaml") {
+            Ok(mut file) => file
+                .write_all(yaml_string.as_bytes())
+                .expect("Unable to write data"),
+            Err(_) => assert!(false, "Failed Creating file"),
+        }
+        // Test Loading the yaml file into db
+        assert!(
+            User::load_users_from_file().is_ok(),
+            "Failed loading users from file"
+        );
+        // clean up yaml file when no longer needed
+        std::fs::remove_file("test_users.yaml").expect("Failed Cleaning Up File");
+        // Authorize the user that was loaded
+        assert!(
+            User::authorize("file_user".to_string(), "123456789".to_string()).is_ok(),
+            "Failed authenticating Loaded User"
+        );
+        // Clean Up the user from the DB
+        assert!(
+            User::delete("filter_user".to_string()).is_ok(),
+            "Failed Cleaning Up User"
         );
     }
 }

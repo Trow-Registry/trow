@@ -19,6 +19,7 @@ frank_jwt = "3.1"
 rust-argon2 = "^0.4.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_yaml = "0.8.7"
 serde_derive = "1.0"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 log = "0.4"
