@@ -1,0 +1,16 @@
+apiVersion: config.k8s.io/v1alpha1
+kind: Krmfile
+openAPI:
+  definitions:
+    io.k8s.cli.setters.fqdn:
+      description: full qualified domain name
+      x-k8s-cli:
+        setter:
+          name: fqdn
+          value: "myregistry.mydomain.io"
+    io.k8s.cli.setters.username:
+      description: registry user name
+      x-k8s-cli:
+        setter:
+          name: username
+          value: "myuser"

@@ -4,4 +4,4 @@ metadata:
   name: trow-certificate
 spec:
   domains:
-    - myregistry.mydomain.com
+    - myregistry.mydomain.com # {"$openapi":"fqdn"}

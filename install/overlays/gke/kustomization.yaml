@@ -14,16 +14,3 @@ resources:
     - cert.yaml # Needs to be updated with your domain name, see patches below.
     - ingress.yaml
 
-# The following patch updates the certificate domain name without editing the yaml. 
-# Modify it to your needs:
-
-#patchesJson6902:
-#    - patch: |-
-#        - op: replace
-#          path: /spec/domains/0
-#          value: newregistry.mydomain.com
-#      target:
-#        kind: ManagedCertificate
-#        name: trow-certificate
-#        group: networking.gke.io
-#        version: v1beta1

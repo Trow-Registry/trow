@@ -23,29 +23,3 @@ images:
 - name: containersol/trow
   newTag: "0.3"
 
-# The following patches update the domain name in the trow argument and validator without editing
-# the YAML directly.  
-# Create your own version of the patch file with your domain name and reference in your
-# overlay as below:
-
-
-patchesJson6902:
-#    - patch: |-
-#        - op: replace
-#          path: /spec/template/spec/containers/0/args/2
-#          value: newregistry.mydomain.com
-#      target:
-#        kind: StatefulSet
-#        name: trow-set
-#        group: apps
-#        version: v1
-#
-#    - patch: |-
-#        - op: replace
-#          path: /webhooks/0/name
-#          value: newregistry.mydomain.com
-#      target:
-#        kind: ValidatingWebhookConfiguration
-#        name: trow-validator
-#        group: admissionregistration.k8s.io
-#        version: v1

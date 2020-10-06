@@ -10,7 +10,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
 spec:
   rules:
-    - host: myregistry.mydomain.io
+    - host: myregistry.mydomain.io # {"$openapi":"fqdn"}
       http:
         paths:
           - path: /
@@ -19,5 +19,5 @@ spec:
               servicePort: 8000
   tls: 
     - hosts:
-        - myregistry.mydomain.io
+        - myregistry.mydomain.io # {"$openapi":"fqdn"}
       secretName: trow-registry-tls
