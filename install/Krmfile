@@ -14,3 +14,19 @@ openAPI:
         setter:
           name: username
           value: "myuser"
+    io.k8s.cli.substitutions.fqdn-secret:
+      x-k8s-cli:
+        substitution:
+          name: fqdn-secret
+          pattern: docker-server=${fqdn}
+          values:
+          - marker: ${fqdn}
+            ref: '#/definitions/io.k8s.cli.setters.fqdn'
+    io.k8s.cli.substitutions.username-secret:
+      x-k8s-cli:
+        substitution:
+          name: username-secret
+          pattern: docker-username=${username}
+          values:
+          - marker: ${username}
+            ref: '#/definitions/io.k8s.cli.setters.username'

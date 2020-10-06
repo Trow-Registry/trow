@@ -16,7 +16,7 @@ secretGenerator:
   - name: trow-cred
     type: docker-registry
     literals:
-    - docker-server=example.registry.com # {"$openapi":"fqdn"}
-    - docker-username=example
+    - docker-server=example.registry.com # {"$openapi":"fqdn-secret"}
+    - docker-username=example # {"$openapi":"username-secret"}
     - docker-password=s3cr3tp@55
 
