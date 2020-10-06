@@ -1,3 +1,0 @@
-- op: replace
-  path: /webhooks/0/name
-  value: newregistry.mydomain.com

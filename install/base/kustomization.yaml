@@ -30,14 +30,20 @@ images:
 
 
 patchesJson6902:
-#    - path: patch-trow-arg.yaml
+#    - patch: |-
+#        - op: replace
+#          path: /spec/template/spec/containers/0/args/2
+#          value: newregistry.mydomain.com
 #      target:
 #        kind: StatefulSet
 #        name: trow-set
 #        group: apps
 #        version: v1
 #
-#    - path: patch-validator-domain.yaml
+#    - patch: |-
+#        - op: replace
+#          path: /webhooks/0/name
+#          value: newregistry.mydomain.com
 #      target:
 #        kind: ValidatingWebhookConfiguration
 #        name: trow-validator

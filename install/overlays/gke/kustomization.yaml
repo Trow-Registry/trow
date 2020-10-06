@@ -15,11 +15,13 @@ resources:
     - ingress.yaml
 
 # The following patch updates the certificate domain name without editing the yaml. 
-# Create your own version of the patch file with your domain name and reference in your overlay as
-# below:
+# Modify it to your needs:
 
 #patchesJson6902:
-#    - path: patch-cert-domain.yaml
+#    - patch: |-
+#        - op: replace
+#          path: /spec/domains/0
+#          value: newregistry.mydomain.com
 #      target:
 #        kind: ManagedCertificate
 #        name: trow-certificate

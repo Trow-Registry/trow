@@ -1,3 +1,0 @@
-- op: replace
-  path: /spec/domains/0
-  value: newregistry.mydomain.com

@@ -12,10 +12,15 @@ resources:
 
 
 # The following patches update the domain name in the ingress without editing the yaml. 
-# Create your own version of the patch file with your domain name and reference in your overlay as
-# below:
+# Modify it to your needs:
 #patchesJson6902:
-#    - path: patch-ingress-host.yaml
+#    - patch: |-
+#        - op: replace
+#          path: /spec/rules/0/host
+#          value: newregistry.mydomain.com
+#        - op: replace
+#          path: /spec/tls/0/hosts/0
+#          value: newregistry.mydomain.com
 #      target:
 #          kind: Ingress
 #          name: trow-ingress
