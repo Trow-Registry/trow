@@ -41,3 +41,18 @@ You should be now be able to run `cargo test` to run the test suite.
 
 Personally, I (Adrian Mouat) use [Visual Studio Code](https://code.visualstudio.com/) with Rust
 extensions when developing, but other contributors have sucessfully used Vim and other tools.
+
+## Developing with Nix
+
+Trow can also be developed with [Nix](https://nixos.org/guides/install-nix.html). Nix will create
+and manage a development environment that includes the correct Rust Nightly version and all other
+tools used in development. This environment can be entered manually by running `nix-shell` within
+the root of the Trow project or automatically with [direnv](https://direnv.net/).
+
+### Editor integration with Nix
+
+Any editor with `direnv` integration will have access to the Nix development environment.
+
+Users of Visual Studio Code should set the Rust extension option
+`rust-client.disableRustup` to `true` within this workspace to ensure that vscode uses the Rust
+tools provided by Nix.

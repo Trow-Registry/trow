@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eo pipefail
 unset CDPATH
 IFS=$'\n\t'
@@ -22,7 +22,7 @@ This installer will perform the following steps:
 If you're running on GKE, you may first need to give your user cluster-admin
 rights:
 
-  $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=$(gcloud config get-value core/account)
+  $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=\$(gcloud config get-value core/account)
 
 Also make sure port 31000 is open on the firewall so clients can connect.
 If you're running on the Google cloud, the following should work:

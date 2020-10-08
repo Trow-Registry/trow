@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script will build and run the Trow registry, then build and run
 # the OCI conformance tests against it. 
