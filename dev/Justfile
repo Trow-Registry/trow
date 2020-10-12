@@ -1,6 +1,7 @@
 clusterName := "trow-dev"
 localIngressPort := "8080"
 spireNamespace := "spire"
+spiffeHelperImage := "containersol/spiffe-helper:0.5"
 
 _spireBin := "/opt/spire/bin/spire-server"
 _spiffe := "$(tput setaf 9)SPIFFE$(tput sgr 0)$(tput bold)"
@@ -8,11 +9,13 @@ _spiffe := "$(tput setaf 9)SPIFFE$(tput sgr 0)$(tput bold)"
 # spin up the dev environment
 quick-install:
 	just create-cluster
+	just build-and-load-spiffe-helper
 	just deploy-spire
 	# waiting at most 480 seconds (8 min)
 	kubectl wait --timeout=480s --for=condition=Available -n {{spireNamespace}} deployment.apps/spire-server
 	just create-spire-entry
 	just deploy-trow
+	k9s
 
 # tear down the dev environment
 tear-down:
@@ -41,6 +44,11 @@ deploy-spire:
 # deploy trow into the cluster
 deploy-trow:
 	kustomize build ./trow | kubectl apply -f -
+
+# build the spiffe-helper image
+build-and-load-spiffe-helper:
+	docker build -t {{spiffeHelperImage}} ./spire/images/spiffe-helper
+	k3d image import {{spiffeHelperImage}} -c {{clusterName}}
 
 # deploy trow's validation webhook
 # deploy-validation-webhok:

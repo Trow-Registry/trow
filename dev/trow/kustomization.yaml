@@ -21,21 +21,46 @@ secretGenerator:
 
 patchesJson6902:
 - patch: |-
+    - op: add
+      path: /spec/template/spec/containers/-
+      value:
+        name: spiffe-helper
+        image: containersol/spiffe-helper:0.5
+        imagePullPolicy: Never # we custom pre-load it for dev purpose
+        volumeMounts:
+        - name: spire-agent-socket
+          mountPath: /run/spire/sockets/agent.sock
+          readOnly: true
+        - name: trow-internal-tls
+          mountPath: /tls
     - op: replace
       path: /spec/template/spec/containers/0/args
       value:
        - "-n"
        - "trow-svc:31000 trow-svc.trow-dev:31000 trow-svc.trow-dev.svc.cluster.local:31000" # NAMESPACE
+       - "-c"
+       - "/tls/svid.pem"
+       - "-k"
+       - "/tls/svid_key.pem"
     - op: replace
       path: /spec/template/spec/containers/0/volumeMounts
       value:
         - mountPath: /data
           name: data-vol
+        - mountPath: /tls
+          name: trow-internal-tls
+          readOnly: true
     - op: replace
       path: /spec/template/spec/volumes
       value:
         - name: data-vol
           emptyDir: {}
+        - name: trow-internal-tls
+          emptyDir: {}
+        - name: spire-agent-socket
+          hostPath:
+            type: Socket
+            path: /run/spire/sockets/agent.sock
     # TODO: It is cleaner to start with a deployment as base
     # since, it might also be desired to have a stateless trow
     # as production deployment variant.
