@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spire-agent
+  namespace: spire
+  labels:
+    app: spire-agent
+spec:
+  selector:
+    matchLabels:
+      app: spire-agent
+  template:
+    metadata:
+      namespace: spire
+      labels:
+        app: spire-agent
+    spec:
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: spire-agent
+      hostNetwork: true
+      hostPID: true
+      initContainers:
+      - name: init
+        # This is a small image with wait-for-it, choose whatever image
+        # you prefer that waits for a service to be up. This image is built
+        # from https://github.com/lqhl/wait-for-it
+        image: gcr.io/spiffe-io/wait-for-it
+        args: ["-t", "30", "spire-server:8081"]
+      containers:
+      - name: spire-agent
+        image: gcr.io/spiffe-io/spire-agent:0.11.0
+        args: ["-config", "/run/spire/config/agent.conf"]
+        volumeMounts:
+        - name: spire-config
+          readOnly: true
+          mountPath: /run/spire/config
+        - name: spire-agent-socket
+          readOnly: false
+          mountPath: /run/spire/sockets
+        - name: spire-token
+          mountPath: /var/run/secrets/tokens
+        livenessProbe:
+          exec:
+            command: ["/opt/spire/bin/spire-agent", "healthcheck", "-socketPath",
+              "/run/spire/sockets/agent.sock"]
+          failureThreshold: 2
+          initialDelaySeconds: 15
+          periodSeconds: 60
+          timeoutSeconds: 3
+        readinessProbe:
+          exec:
+            command: ["/opt/spire/bin/spire-agent", "healthcheck", "-socketPath",
+              "/run/spire/sockets/agent.sock", "--shallow"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: spire-config
+        configMap:
+          name: spire-agent
+      - name: spire-agent-socket
+        hostPath:
+          type: DirectoryOrCreate
+          path: /run/spire/sockets
+      - name: spire-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: spire-server
+              expirationSeconds: 7200
+              path: spire-agent

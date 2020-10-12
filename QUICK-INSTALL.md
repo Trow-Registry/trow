@@ -1,52 +1,60 @@
 Quick Install for Dev/Test Instructions
 =======================================
 
-## Install with TLS
+We use `nix` to make your live easier. `nix` is a package management ecosystem for reproducible
+builds. We use it for reproducible dev environments that come bundled with all required tools.
 
-These instructions are intended for installing Trow on short-lived clusters, typically when
-developing or testing with Kubernetes. For longer-lived clusters, please see the [standard
-installation instructions](install/INSTALL.md). 
+_For anything different than short-lived dev or testing clusters, please see the [standard
+installation instructions](install/INSTALL.md)._
 
-The install script will configure the Trow registry on an existing Kubernetes
-cluster, with a certificate signed by the Kubernetes CA. It will copy the certificate to the nodes
-in the Kubernetes cluster as well the client machine. The address "trow.kube-public" is configured
-to point to the registry by adding an entry to `/etc/hosts`.
+## Prerequisistes
 
-The script has been primarily tested with GKE and minikube on MacOS and Linux. It isn't currently
-compatible with containerd based distributions such as microk8s (see #14).
+- *nix machine &mdash; windows is currenlty only supported partially
+- `nix` package manager installed
+- this repository cloned
 
-***These instructions modify nodes in your cluster. Only run on test or dev clusters.***
+To install `nix`:
 
-### Pre-requisites
-
- - `kubectl` is installed and configured to point at the cluster you wish to install Trow on
- - You've cloned or downloaded this repo
- - Port 31000 can be reached on the worker nodes. You may need to edit the network policy or firewall settings if running in the cloud. For example, run the following if using GKE:
-```
-$ gcloud compute firewall-rules create trow \
-    --allow tcp:31000 \ 
-    --description "Allow inbound Trow registry traffic" \ 
-    --project <project name>
-```
- - If you're running on GKE or have RBAC configured you may need to expand your
-   rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
-```
-$ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
-clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
+```console
+curl -L https://nixos.org/nix/install | sh
 ```
 
-### Automatic installation
+## Enter dev environment
 
- - Just run `./install.sh` from the `quick-install` directory and follow the prompts. 
- - You can also specify installation namespace by running `./install.sh <namespace>`
- - If you are using a Mac, restart Docker once the install script has completed.
+To enter the dev entironment, at the root of this repo, run:
 
-If you'd rather have more control over the process, follow the [manual
-steps](./quick-install/MANUAL_INSTALL.md).
+```console
+nix-shell
+```
+_First time, this takes a while and uses aproximately 500Mb of disk space. The tradeoff at cost
+of your disk space and at the benefit of your convenience is deliberate. We hope you agree._
 
-### Test it out
 
-Trow has configured the domain `trow.kube-public` to point to your kubernetes cluster. Try pushing an image:
+Exit normally, as you would from any shell, with `CTRL+D`.
+
+
+## Dev `menu` & `just-menu`
+
+Within the dev environment, first enter de `./dev` folder, then run and review the output of
+the following commands to understand the current state of convenience repo tooling:
+
+- `menu`
+- `just-menu` (this is the conctext sensitive one to invoking from within `./dev` folder)
+
+
+## Quick-Install
+
+Within the dev environment, from within the `./dev` folder:
+
+1. just run:  `just quick-install`.
+2. activate local static dns with `dns-activate`.
+3. install local root CA with `ca-install`.
+
+
+## Test it out
+
+Trow has configured the domain `registry.local` to point to your trow instance within the
+kubernetes cluster. Try pushing an image:
 
 ```
 $ docker pull nginx:alpine
@@ -159,29 +167,20 @@ $ docker pull ...
 
 Trow also accepts a pointer to a file containing the password via the `--password-file` argument instead of `-p`. This allows the password to be stored in a Kubernetes secret that can be mounted into a volume inside the container.
 
-### Uninstall
+## Uninstall
 
-To uninstall the Trow Kubernetes components run the following from the `quick-install` directory:
+To tear down the dev evironment (including the dev cluster), just run:
 
-```
-sed "s/{{namespace}}/kube-public/" trow.yaml | kubectl delete -f -
-```
-
-This assumes you installed Trow to the default namespace of `kube-public`. If you installed Trow to
-a different namespace than `kube-public`, replace as appropriate.
-
-If you enabled validation, remove the webhook with:
-
-```
-kubectl delete -f validate.yaml
+```console
+just tear-down
 ```
 
-This will not remove the Trow certificates or revert the changes to `/etc/hosts` on the nodes or
-client. Leaving these changes shouldn't cause any problems. If you would like to remove them, the
-lines in `/etc/hosts` are clearly marked, and the certs should be found under `/etc/docker/certs.d/`
-on both the the nodes and client.
+To uninstall local CA and disable local static dns run:
 
-### Troubleshooting
+1. `ca-uninstall`
+2. `dns-disable`
+
+## Troubleshooting
 
 See the [User Guide](docs/USER_GUIDE.md#Troubleshooting)
 

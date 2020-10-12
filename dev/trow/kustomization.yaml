@@ -1,0 +1,69 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trow-dev
+
+resources:
+- ./namespace.yaml
+- ./../../install/base
+- ./ingress.yaml
+
+images:
+- name: containersol/trow
+  newTag: "default"
+
+secretGenerator:
+- name: trow-registry-tls # external tls certs
+  files:
+    - tls.crt=tls/registry.local.pem
+    - tls.key=tls/registry.local-key.pem
+  type: "kubernetes.io/tls"
+
+patchesJson6902:
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/args
+      value:
+       - "-n"
+       - "trow-svc:31000 trow-svc.trow-dev:31000 trow-svc.trow-dev.svc.cluster.local:31000" # NAMESPACE
+    - op: replace
+      path: /spec/template/spec/containers/0/volumeMounts
+      value:
+        - mountPath: /data
+          name: data-vol
+    - op: replace
+      path: /spec/template/spec/volumes
+      value:
+        - name: data-vol
+          emptyDir: {}
+    # TODO: It is cleaner to start with a deployment as base
+    # since, it might also be desired to have a stateless trow
+    # as production deployment variant.
+    - op: replace
+      path: /metadata/name
+      value: trow-deploy
+    - op: replace
+      path: /kind
+      value: Deployment
+    # TODO: see above: by design remove operations are especially brittle
+    - op: remove
+      path: /spec/serviceName
+    - op: remove
+      path: /spec/volumeClaimTemplates
+  target:
+    kind: StatefulSet
+    group: apps
+    version: v1
+    name: trow-set
+
+- patch: |-
+    - op: replace
+      path: /spec/ports/0/port
+      value: 433
+    - op: add
+      path: /spec/ports/0/targetPort
+      value: 31000
+  target:
+    kind: Service
+    version: v1
+    name: trow-svc

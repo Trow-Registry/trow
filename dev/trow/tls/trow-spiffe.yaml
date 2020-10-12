@@ -1,0 +1,25 @@
+entries:
+# Node alias
+- spiffe_id: spiffe://trow-dev-trust-domain/agents # alias for all spire agents in this cluster
+  parent_id: spiffe://trow-dev-trust-domain/spire/server
+  selectors:
+  - type: k8s_psat
+    value: cluster:trow-dev-cluster
+  - type: k8s_psat
+    value: agent_ns:spire
+  - type: k8s_psat
+    value: agent_sa:spire-agent
+# Trow Identity
+- spiffe_id: spiffe://trow-dev-trust-domain/trow-registry
+  parent_id: spiffe://trow-dev-trust-domain/agents
+  dns_names:
+  - trow-svc
+  - trow-svc.trow-dev # NAMESPACE
+  - trow-svc.trow-dev.svc # NAMESPACE
+  - trow-svc.trow-dev.svc.cluster.local # NAMESPACE
+  selectors:
+  - type: k8s
+    value: ns:trow-dev # NAMESPACE
+  - type: k8s
+    value: pod-label:app:trow
+

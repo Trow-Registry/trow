@@ -1,0 +1,96 @@
+namespace: "spire" # {"$openapi":"namespace"}
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ./namespace.yaml
+- ../upstream/server
+- ../upstream/agent
+- ./server-rbac.yaml # for k8s_psat NodeAttestor plugin
+- ./ingress.yaml # exposing spire server gRPC endpoint
+
+configMapGenerator:
+- name: spire-server
+  namespace: spire
+  behavior: replace # we don't use the fixed upstream bootstrap certs
+  files: [server.conf]
+- name: spire-agent
+  namespace: spire
+  behavior: replace # we don't use the fixed upstream bootstrap certs
+  files: [agent.conf]
+
+
+images:
+- name: spire-agent
+  newTag: 0.11.0 # {"$openapi":"newImageTag"}
+- name: spire-server
+  newTag: 0.11.0 # {"$openapi":"newImageTag"}
+
+patchesJson6902:
+# We reutilize the kubernetes' own boostrapped signing keys on
+# the k8s master, so make sure spire servers only run on k8s
+# master (after all they are part of the tls control plane)
+- patch: |-
+    - op: add
+      path: /spec/template/spec/containers/0/volumeMounts/-
+      value:
+        name: spire-root-ca
+        readOnly: true
+        mountPath: /tls/root-ca.pem
+    # Those paths depend on the k8s distribution. Here: k3s.
+    - op: add
+      path: /spec/template/spec/volumes/-
+      value:
+        name: spire-root-ca
+        hostPath:
+          type: File
+          path: /var/lib/rancher/k3s/agent/server-ca.crt # DISTRIBUTION
+  target:
+    kind: DaemonSet
+    group: apps
+    namespace: spire
+    version: v1
+    name: spire-agent
+
+- patch: |-
+    - op: add
+      path: /spec/template/spec/nodeSelector
+      value:
+        # This label might be distribution specific
+        # X-check with your current master nodes labels
+        node-role.kubernetes.io/master: "true"
+    - op: add
+      path: /spec/template/spec/containers/0/volumeMounts/-
+      value:
+        name: spire-signing-key
+        readOnly: true
+        mountPath: /tls/signing-key.pem
+    - op: add
+      path: /spec/template/spec/containers/0/volumeMounts/-
+      value:
+        name: spire-root-ca
+        readOnly: true
+        mountPath: /tls/root-ca.pem
+    # Those paths depend on the k8s distribution. Here: k3s.
+    - op: add
+      path: /spec/template/spec/volumes/-
+      value:
+        name: spire-signing-key
+        hostPath:
+          type: File
+          path: /var/lib/rancher/k3s/server/tls/server-ca.key # DISTRIBUTION
+    - op: add
+      path: /spec/template/spec/volumes/-
+      value:
+        name: spire-root-ca
+        hostPath:
+          type: File
+          path: /var/lib/rancher/k3s/agent/server-ca.crt # DISTRIBUTION
+  target:
+    kind: Deployment
+    group: apps
+    namespace: spire
+    version: v1
+    name: spire-server
+
+
+

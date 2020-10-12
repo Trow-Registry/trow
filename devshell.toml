@@ -42,22 +42,46 @@ interactive = """
 """
 
 # Declare commands that are available in the environment.
-# [[commands]]
-# help = "prints hello"
-# name = "hello"
-# command = "echo hello"
+[[commands]]
+help = "a slick task runner"
+name = "just"
+category =  "utilities"
+package = "just"
 
-# [[commands]]
-# help = "used to format Nix code"
-# name = "nixpkgs-fmt"
-# package = "nixpkgs-fmt"
-# category = "formatters"
+[[commands]]
+help = "official kubernetes cli"
+name = "kubectl"
+category =  "utilities"
+package = "kubectl"
 
-# [[commands]]
-# help = "github utility"
-# name = "hub"
-# package = "gitAndTools.hub"
-# category = "utilites"
+[[commands]]
+help = "official kubernetes config management tool"
+name = "kustomize"
+category =  "utilities"
+package = "kustomize"
+
+[[commands]]
+help = "deep cluster insights"
+name = "k9s"
+category =  "utilities"
+package = "k9s"
+
+[[commands]]
+help = "manage local dev cluster"
+name = "k3d"
+category =  "utilities"
+package = "kube3d"
+
+[[commands]]
+help = "jq-ish for yaml files"
+name = "yq"
+category =  "utilities"
+package = "yq-go"
+
+[[commands]]
+help = "see the task runner's recipes"
+name = "just-menu"
+command = "just --list"
 
 [extensions]
 

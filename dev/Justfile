@@ -1,0 +1,83 @@
+clusterName := "trow-dev"
+localIngressPort := "8080"
+spireNamespace := "spire"
+
+_spireBin := "/opt/spire/bin/spire-server"
+_spiffe := "$(tput setaf 9)SPIFFE$(tput sgr 0)$(tput bold)"
+
+# spin up the dev environment
+quick-install:
+	just create-cluster
+	just deploy-spire
+	# waiting at most 480 seconds (8 min)
+	kubectl wait --timeout=480s --for=condition=Available -n {{spireNamespace}} deployment.apps/spire-server
+	just create-spire-entry
+	just deploy-trow
+
+# tear down the dev environment
+tear-down:
+	k3d cluster delete {{clusterName}}
+
+# create a local k3d dev cluster
+create-cluster additionalArgs="":
+	#!/usr/bin/env bash
+	# Further info on server flags:
+	# https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/
+	# https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/
+	# https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
+	# review k3s defaults in addition here: https://github.com/rancher/k3s/blob/master/pkg/daemons/control/server.go
+	k3d cluster create {{clusterName}} \
+	--update-default-kubeconfig \
+	-p {{localIngressPort}}:80@loadbalancer --agents 2 \
+	-v $(pwd)/registries.yaml:/etc/rancher/k3s/registries.yaml:ro \
+	--k3s-server-arg '--kube-apiserver-arg=feature-gates=EphemeralContainers=true' \
+	--k3s-server-arg '--kube-apiserver-arg=api-audiences=api,spire-server' \
+	{{additionalArgs}}
+
+# deploy spire into the cluster
+deploy-spire:
+	kustomize build ./spire/trow-dev | kubectl apply -f -
+
+# deploy trow into the cluster
+deploy-trow:
+	kustomize build ./trow | kubectl apply -f -
+
+# deploy trow's validation webhook
+# deploy-validation-webhok:
+# 	kustomize build ./dev/trow | kubectl apply -f -
+
+# create spire entry from file
+create-spire-entry yaml="./trow/tls/trow-spiffe.yaml":
+	#! /usr/bin/env bash
+	spirePod=$(kubectl -n {{spireNamespace}} get pods --selector=app=spire-server -o=name)
+	spirePod=${spirePod#pod/}
+	spireCmd="kubectl -n {{spireNamespace}} exec -t ${spirePod} -- {{_spireBin}}"
+	entries=$(mktemp)
+	yq r -j {{yaml}} > $entries
+	echo $(tput bold)---- {{_spiffe}} ----------------------------------$(tput sgr 0)
+	kubectl -n {{spireNamespace}} cp "$entries" ${spirePod}:/tmp/$(basename $entries)
+	$spireCmd entry create -data "/tmp/$(basename $entries)"
+	echo $(tput bold)----------------------------------------------$(tput sgr 0)
+	rm $entries
+
+# update spire entry from file
+update-spire-entry yaml="./trow/tls/trow-spiffe.yaml":
+	#! /usr/bin/env bash
+	spirePod=$(kubectl -n {{spireNamespace}} get pods --selector=app=spire-server -o=name)
+	spirePod=${spirePod#pod/}
+	spireCmd="kubectl -n {{spireNamespace}} exec -t ${spirePod} -- {{_spireBin}}"
+	entries=$(mktemp)
+	entriesJson=$(mktemp)
+	yq r {{yaml}} > $entries
+	for spiffeID in $(yq r {{yaml}} 'entries.*.spiffe_id'); do
+	  entryID=$($spireCmd entry show -spiffeID "$spiffeID" | rg -o '\w{8}-\w{4}-\w{4}-\w{4}-\w{12}')
+	  yq w -i $entries "entries.(spiffe_id==$spiffeID).entry_id" "$entryID"
+	done
+	yq r -j $entries > $entriesJson
+	rm $entries
+	echo $(tput bold)---- {{_spiffe}} ----------------------------------$(tput sgr 0)
+	kubectl -n {{spireNamespace}} cp "$entriesJson" ${spirePod}:/tmp/$(basename $entriesJson)
+	$spireCmd entry update -data "/tmp/$(basename $entriesJson)"
+	echo $(tput bold)----------------------------------------------$(tput sgr 0)
+	rm $entriesJson
+                           

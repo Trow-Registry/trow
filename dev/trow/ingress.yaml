@@ -1,0 +1,20 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: trow-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/redirect-entry-point: https
+spec:
+  rules:
+    - host: registry.local
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: trow-svc
+              servicePort: 8000
+  tls: 
+    - hosts:
+        - registry.local
+      secretName: trow-registry-tls

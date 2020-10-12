@@ -1,0 +1,12 @@
+mirrors:
+  # local static domain of the registry for testing purposes
+  registry.local:
+    # within the cluster mapped to the trow service in the
+    # trow-dev namespace
+    endpoint:
+      - "trow-svc.trow-dev.svc:443" # NAMESPACE
+configs:
+  "trow-svc.trow-dev.svc:443": # NAMESPACE
+    tls:
+      cert_file: /var/lib/rancher/k3s/agent/server-ca.crt # DISTRIBUTION
+
