@@ -258,7 +258,7 @@ impl TrowBuilder {
         println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
 
         println!(
-            "  These host names will considered local (refer to this registry): {:?}",
+            "  These host names will be considered local (refer to this registry): {:?}",
             self.config.host_names
         );
         println!(
