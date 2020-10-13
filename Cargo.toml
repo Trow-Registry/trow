@@ -10,8 +10,8 @@ sqlite = []
 [dependencies]
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
-rocket = { version = "0.4", features = ["tls"] }
-rocket_contrib = "0.4"
+rocket = { version = "^0.4", features = ["tls"] }
+rocket_contrib = "^0.4"
 hyper = "0.13"
 rand = "0.7"
 jwt = "0.10"
