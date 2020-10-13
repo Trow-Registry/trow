@@ -63,10 +63,10 @@ Digest: sha256:e0292d158b6b353fde34909243a4886977cb9d1abb8a8a5fef9e0ff7138dd3e2
 Status: Image is up to date for nginx:alpine
 ```
 ```
-$ docker tag nginx:alpine trow.kube-public:31000/test/nginx:alpine
+$ docker tag nginx:alpine registry.local/test/nginx:alpine
 ```
 ```
-$ docker push trow.kube-public:31000/test/nginx:alpine
+$ docker push registry.local/test/nginx:alpine
 The push refers to repository [trow.kube-public:31000/test/nginx]
 979531bcfa2b: Pushed 
 8d36c62f099e: Pushed 
@@ -75,18 +75,11 @@ The push refers to repository [trow.kube-public:31000/test/nginx]
 alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c3752d11a55 size: 11903
 ```
 
-If the push seems to hang, check if port 31000 is blocked (common with cloud provider default network rules).
-
-If you're using Google cloud, you can open port 31000 as follows:
-
-```
-$ gcloud compute firewall-rules create trow-rule --allow=tcp:31000
-```
-
-The Kubernetes cluster should now be able to pull and run the image:
+Since the dev cluster is started up with a registry mirror preconfigured (see `./dev/registries.yaml`), 
+it pulls the image from within the cluster directly from the `trow-svc` service and runs the image:
 
 ```
-$ kubectl create deploy trow-test --image=trow.kube-public:31000/test/nginx:alpine
+$ kubectl create deploy trow-test --image=registry.local/test/nginx:alpine
 deployment.apps "trow-test" created
 ```
 ```
@@ -95,7 +88,7 @@ NAME        DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 trow-test   1         1         1            1           8s
 ```
 
-If you have enabled validation of images, try running a Docker Hub image, which should be denied:
+If you have enabled validation of images, try running a Docker Hub image, which will be denied:
 
 ```
 $ kubectl create deploy proxy --image=docker.io/nginx
@@ -114,16 +107,16 @@ $ kubectl describe rs proxy
 
 If you want to allow images from the Docker Hub, take a look at the `--allow-docker-official` and `--allow-prefixes` arguments. This can be passed to Trow via the `trow.yaml` file.
 
-The following example allows official images from Docker Hub and images with the prefix "registry.container-solutions.com/" to run in the cluster:
+The following example in `./dev/kustomization.yaml` allows official images from Docker Hub and images with the prefix "registry.container-solutions.com/" to run in the cluster:
 ```
 containers:
 - name: trow-pod
   image: containersol/trow:default
-  args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt","--allow-docker-official","--allow-prefixes","registry.container-solutions.com/"]
+  args: ["-n", "trow-svc:443 trow-svc.trow-dev:443", "-c", "/certs/domain.crt","--allow-docker-official","--allow-prefixes","registry.container-solutions.com/"]
 ```
 To apply the changes and restart Trow, run the following:
 ```
-$ kubectl apply -f install/trow.yaml 
+$ just deploy-trow 
 
 serviceaccount/trow unchanged
 role.rbac.authorization.k8s.io/trow unchanged
@@ -144,7 +137,7 @@ At this time the only authentication available is a simple username & password c
      containers:                                                               
       - name: trow-pod                                                          
         image: containersol/trow:default                                        
-        args: ["-u", "myuser", "-p", "mypass", "-n", "trow:31000 trow.kube-public:31000"]                       
+        args: ["-u", "myuser", "-p", "mypass", "-n", "trow-svc:443 trow-svc.trow-dev:443"]
         imagePullPolicy: Always
      ...   
 
@@ -153,12 +146,12 @@ At this time the only authentication available is a simple username & password c
 After this you will need to run `docker login` to push and pull images:
 
 ```
-$ docker pull trow.test:8443/myimage
+$ docker pull registry.local/myimage
 Using default tag: latest
-Error response from daemon: Get https://trow.test:8443/v2/myimage/manifests/latest: unauthorized: authentication required
+Error response from daemon: Get https://registry.local/v2/myimage/manifests/latest: unauthorized: authentication required
 ```
 ```
-$ docker login trow.test:8443
+$ docker login registry.local
 Username: myuser
 Password: 
 Login Succeeded
