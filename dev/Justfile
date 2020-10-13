@@ -52,6 +52,11 @@ deploy-trow:
 
 # build the spiffe-helper image
 build-and-load-spiffe-helper:
+	../docker/build.sh
+	k3d image import {{trowImage}} -c {{clusterName}}
+
+# build and load patched trow image
+build-and-load-trow-image:
 	docker build -t {{spiffeHelperImage}} ./spire/images/spiffe-helper
 	k3d image import {{spiffeHelperImage}} -c {{clusterName}}
 
