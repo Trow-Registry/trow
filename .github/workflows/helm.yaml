@@ -41,7 +41,7 @@ jobs:
         docker tag nginx:alpine trow.test/test/nginx:alpine
     - name: Push to Trow
       run: |
-        sleep 5
+        kubectl wait statefulset/trow --for condition=ready
         docker push  trow.test/test/nginx:alpine
     - name: Clean Up Cluster
       run: |
