@@ -40,6 +40,11 @@ rusqlite = "0.23.1"
 data-encoding = "2.3"
 openssl = { version = "0.10", features = ["vendored"] }
 
+[patch.crates-io]
+rustls = { git = 'https://github.com/blaggacao/rustls', branch = "v/0.14.1" }
+hyper-sync-rustls = { git = 'https://github.com/blaggacao/hyper-rustls', branch = "da-patch-ecdsa" }
+# rocket = { git = 'https://github.com/blaggacao/rocket', branch = "v0.4" }
+
 [build-dependencies]
 
 [dev-dependencies]

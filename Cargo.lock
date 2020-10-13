@@ -1200,8 +1200,7 @@ dependencies = [
 [[package]]
 name = "hyper-sync-rustls"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d1a443a90413a118ac6739e024f6a5180aa3b3f43f7de65f9d388a961cff19b"
+source = "git+https://github.com/blaggacao/hyper-rustls?branch=da-patch-ecdsa#6ac88d2370f97e23965ffca22c4e8734d0be390e"
 dependencies = [
  "hyper 0.10.16",
  "rustls",
@@ -2309,9 +2308,8 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b7891791343c75b73ed9a18cadcafd8c8563d11a88ebe2d87f5b8a3182654d9"
+version = "0.14.1"
+source = "git+https://github.com/blaggacao/rustls?branch=v/0.14.1#7064df57fbe7ab7f4df57117a9c12aa01bf6342f"
 dependencies = [
  "base64 0.9.3",
  "log 0.4.11",
@@ -3493,3 +3491,8 @@ name = "zeroize"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f33972566adbd2d3588b0491eb94b98b43695c4ef897903470ede4f3f5a28a"
+
+[[patch.unused]]
+name = "rustls"
+version = "0.14.1"
+source = "git+https://github.com/blaggacao/rustls?branch=v/0.14.1#7064df57fbe7ab7f4df57117a9c12aa01bf6342f"
