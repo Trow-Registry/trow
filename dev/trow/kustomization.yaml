@@ -33,6 +33,11 @@ patchesJson6902:
           readOnly: true
         - name: trow-internal-tls
           mountPath: /tls
+    - op: add
+      path: /spec/template/spec/containers/0/env
+      value:
+        - name: RUST_LOG
+          value: "debug,rustls::session=debug"
     # Use local patched version loaded into the cluster
     - op: replace
       path: /spec/template/spec/containers/0/imagePullPolicy
