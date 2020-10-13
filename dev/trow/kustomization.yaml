@@ -33,6 +33,10 @@ patchesJson6902:
           readOnly: true
         - name: trow-internal-tls
           mountPath: /tls
+    # Use local patched version loaded into the cluster
+    - op: replace
+      path: /spec/template/spec/containers/0/imagePullPolicy
+      value: Never
     - op: replace
       path: /spec/template/spec/containers/0/args
       value:
