@@ -1,6 +1,0 @@
-- op: replace #domain name
-  path: /spec/template/spec/containers/0/args/2
-  value: example.registry.com
-- op: replace #user name
-  path: /spec/template/spec/containers/0/args/4
-  value: example
