@@ -13,7 +13,7 @@ spec:
           - path: /
             backend:
               serviceName: trow-svc
-              servicePort: 8000
+              servicePort: https
   tls: 
     - hosts:
         - registry.local

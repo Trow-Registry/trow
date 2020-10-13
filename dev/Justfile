@@ -1,5 +1,6 @@
 clusterName := "trow-dev"
-localIngressPort := "8080"
+localIngressHttpPort := "80"
+localIngressHttpsPort := "443"
 spireNamespace := "spire"
 spiffeHelperImage := "containersol/spiffe-helper:0.5"
 trowImage := "containersol/trow:default"
@@ -33,7 +34,9 @@ create-cluster additionalArgs="":
 	# review k3s defaults in addition here: https://github.com/rancher/k3s/blob/master/pkg/daemons/control/server.go
 	k3d cluster create {{clusterName}} \
 	--update-default-kubeconfig \
-	-p {{localIngressPort}}:80@loadbalancer --agents 2 \
+	-p {{localIngressHttpPort}}:80@loadbalancer \
+	-p {{localIngressHttpsPort}}:443@loadbalancer \
+	--agents 2 \
 	-v $(pwd)/registries.yaml:/etc/rancher/k3s/registries.yaml:ro \
 	--k3s-server-arg '--kube-apiserver-arg=feature-gates=EphemeralContainers=true' \
 	--k3s-server-arg '--kube-apiserver-arg=api-audiences=api,spire-server' \

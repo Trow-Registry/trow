@@ -41,11 +41,25 @@ patchesJson6902:
       path: /spec/template/spec/containers/0/args
       value:
        - "-n"
-       - "trow-svc:31000 trow-svc.trow-dev:31000 trow-svc.trow-dev.svc.cluster.local:31000" # NAMESPACE
+       - "trow-svc:433 trow-svc.trow-dev:433 trow-svc.trow-dev.svc.cluster.local:433" # NAMESPACE
        - "-c"
        - "/tls/svid.pem"
        - "-k"
        - "/tls/svid_key.pem"
+    - op: replace
+      path: /spec/template/spec/containers/0/livenessProbe
+      value:
+        httpGet:
+          path: /healthz
+          port: trow-https-port
+          scheme: HTTPS
+    - op: replace
+      path: /spec/template/spec/containers/0/readinessProbe
+      value:
+        httpGet:
+          path: /readiness
+          port: trow-https-port
+          scheme: HTTPS
     - op: replace
       path: /spec/template/spec/containers/0/volumeMounts
       value:
@@ -85,14 +99,3 @@ patchesJson6902:
     version: v1
     name: trow-set
 
-- patch: |-
-    - op: replace
-      path: /spec/ports/0/port
-      value: 433
-    - op: add
-      path: /spec/ports/0/targetPort
-      value: 31000
-  target:
-    kind: Service
-    version: v1
-    name: trow-svc

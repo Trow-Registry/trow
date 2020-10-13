@@ -5,9 +5,13 @@ metadata:
 spec:
   selector:
     app: trow
-  type: NodePort
   ports:
-  - protocol: TCP
-    port: 8000
-    targetPort: 8000
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: trow-http-port
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: trow-https-port
 
