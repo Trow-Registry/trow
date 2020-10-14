@@ -20,7 +20,7 @@ binary will be written to `/target/debug/trow`.
 To execute the binary, you can run `cargo run`, which will first recompile Trow if anything has
 changed.
 
-### Running the Test Suite
+### Configuring TLS and Routing (required to run test suite on host)
 
 Running the tests is a little more complicated as you need to set the domain `trow.test` to point to
 your local machine and set-up TLS certificates. Instead of doing this you might find it easier to
@@ -28,12 +28,14 @@ use the slower Docker mehod instead, by simply running the `docker/test.sh` scri
 
 If you still want to run the tests locally, you will first need to configure routing. On my Linux
 laptop I do this by adding the line `127.0.0.1 trow.test` to `/etc/hosts`. I believe this will also
-work on MacOS and there is a similar solution for Windows (which uses a different directory). 
+work on MacOS and there is a similar solution for Windows (which uses a different directory). Rather
+than do this manually you may want to try the [hostctl tool](https://github.com/guumaster/hostctl).
 
 After this, we need to create a TLS certificate for testing. The easiest way to generate this is to
 use the `quick-install/self-cert/make-certs.sh` script (change to the `self-cert` directory before
 executing the script). This will create `domain.key` and `domain.crt`. Create a `certs` folder in
-the project top level and copy both files there. 
+the project top level and copy both files there. You can also accomplish something similar using the
+[mkcert tool](https://github.com/FiloSottile/mkcert).
 
 You should be now be able to run `cargo test` to run the test suite.
 
