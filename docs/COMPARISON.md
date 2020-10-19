@@ -6,7 +6,7 @@ Most registries can be categorised into one or more of the following buckets:
  - Cloud Provider registries such as GCR, ECR, ACR etc. 
  - Self-hosted registries such as Docker Distribution and Harbor.
 
-Trow is very much in the self-hosted registry bucket, but has a different focus to the other
+Trow is very much in the self-hosted registry bucket but has a different focus to the other
 solutions. Notably, it is expected that Trow would be used alongside one or more of the other
 solutions - from any of the buckets. In this set-up, Trow would provide fast distribution of images
 inside clusters, with the other registry providing long-term storage and potentially acting as the
@@ -24,11 +24,11 @@ It also integrates with the cluster itself, for example by controlling which ima
 cluster through a validating webhook - this allows you to say things like "only allow images from
 this registry to run or official images from the Docker Hub". A core aim for Trow is to develop
 advanced distribution mechanisms, possibly using P2P or similar techniques to transfer images to
-nodes as quickly as possibly (meaning containers start up faster).
+nodes as quickly as possible (meaning containers startup faster).
 
 As mentioned before, we hope and expect to see Trow working alongside other registries, including
 Harbor. In this case, the other registry (Harbor/GCR etc) would be a central store of all images and
-would keep a full history the images. Trow would run inside each of the clusters in the organisation
+would keep a full history of the images. Trow would run inside each of the clusters in the organisation
 and would distribute the working set of images to nodes. Trow would automatically pull images
 through from Harbor for use in the cluster. There a lot of potential benefits from this approach:
 
