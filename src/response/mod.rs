@@ -1,5 +1,4 @@
 use crate::TrowConfig;
-use hostname;
 use rocket::request::Request;
 
 pub mod accepted_upload;
