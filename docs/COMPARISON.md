@@ -15,7 +15,7 @@ source of images for Trow.
 Harbor is one of the most common options at the minute, so it's worth doing a direct comparison.
 Harbor builds on-top of Docker Distribution, addresses a very wide range of use cases and supports a
 bunch of different storage options. It is made up of a [large set of
-services](https://goharbor.io/docs/1.10/install-config/) which provide a lot of functionality. Each
+services](https://goharbor.io/docs/1.10/install-config/) that provide a lot of functionality. Each
 organisation typically installs a single Harbor instance in a central location that is used by
 multiple teams and clusters.
 
@@ -24,7 +24,7 @@ It also integrates with the cluster itself, for example by controlling which ima
 cluster through a validating webhook - this allows you to say things like "only allow images from
 this registry to run or official images from the Docker Hub". A core aim for Trow is to develop
 advanced distribution mechanisms, possibly using P2P or similar techniques to transfer images to
-nodes as quickly as possibly (meaning containers start up faster).
+nodes as quickly as possible (meaning containers start up faster).
 
 As mentioned before, we hope and expect to see Trow working alongside other registries, including
 Harbor. In this case, the other registry (Harbor/GCR etc) would be a central store of all images and
@@ -36,7 +36,7 @@ through from Harbor for use in the cluster. There a lot of potential benefits fr
    shorter network trip - they effectively act as a local cache for the central registry.  
  - Less stress on the central registries, which now only needs to serve the Trow registries,
    rather than every node in the cluster. 
- - Individual clusters can have differently configured registries which meet their distinct needs.
+ - Individual clusters can have differently configured registries that meet their distinct needs.
    For example, a development cluster may have looser restrictions on where images can come from or
    how to handle vulnerability scans than a production cluster.
 
