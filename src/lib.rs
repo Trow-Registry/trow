@@ -155,7 +155,7 @@ fn init_logger() -> Result<(), SetLoggerError> {
             })
             .filter(None, LevelFilter::Error);
         builder.init();
-Ok(())
+        Ok(())
     }
 }
 

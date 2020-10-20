@@ -215,11 +215,7 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let mr = create_manifest_reader(
-            Box::new(file),
-            resp.content_type,
-            Digest(resp.digest),
-        );
+        let mr = create_manifest_reader(Box::new(file), resp.content_type, Digest(resp.digest));
         Ok(mr)
     }
 

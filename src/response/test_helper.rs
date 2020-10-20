@@ -5,7 +5,6 @@ use crate::NetAddr;
 #[cfg(test)]
 use crate::TrowConfig;
 #[cfg(test)]
-
 #[cfg(test)]
 use rocket::local::Client;
 #[cfg(test)]
