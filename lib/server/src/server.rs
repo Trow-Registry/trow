@@ -23,10 +23,10 @@ use crate::server::trow_server::registry_server::Registry;
 
 use crate::metrics;
 
-static SUPPORTED_DIGESTS: [&'static str; 1] = ["sha256"];
-static MANIFESTS_DIR: &'static str = "manifests";
-static BLOBS_DIR: &'static str = "blobs";
-static UPLOADS_DIR: &'static str = "scratch";
+static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
+static MANIFESTS_DIR: &str = "manifests";
+static BLOBS_DIR: &str = "blobs";
+static UPLOADS_DIR: &str = "scratch";
 
 /* Struct implementing callbacks for the Frontend
  *
@@ -219,14 +219,14 @@ impl TrowServer {
 
     fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf, Error> {
         let mut iter = digest.split(':');
-        let alg = iter.next().ok_or(format_err!(
+        let alg = iter.next().ok_or_else(|| format_err!(
             "Digest {} did not contain alg component",
             digest
         ))?;
         if !SUPPORTED_DIGESTS.contains(&alg) {
             return Err(format_err!("Hash algorithm {} not supported", alg));
         }
-        let val = iter.next().ok_or(format_err!(
+        let val = iter.next().ok_or_else(|| format_err!(
             "Digest {} did not contain value component",
             digest
         ))?;
@@ -284,7 +284,7 @@ impl TrowServer {
             self.get_digest_from_manifest(repo_name, reference)?
         };
 
-        return self.get_catalog_path_for_blob(&digest);
+        self.get_catalog_path_for_blob(&digest)
     }
 
     fn create_verified_manifest(
@@ -316,7 +316,7 @@ impl TrowServer {
         // For performance, could generate only if verification is on, otherwise copy from somewhere
         Ok(VerifiedManifest {
             digest,
-            content_type: manifest.get_media_type().to_string(),
+            content_type: manifest.get_media_type(),
         })
     }
 
@@ -331,7 +331,7 @@ impl TrowServer {
         let vm = self.create_verified_manifest(&path, do_verification)?;
         Ok(ManifestReadLocation {
             content_type: vm.content_type.to_owned(),
-            digest: vm.digest.to_owned(),
+            digest: vm.digest,
             path: path.to_string_lossy().to_string(),
         })
     }
@@ -434,7 +434,7 @@ impl Registry for TrowServer {
         let uuid = Uuid::new_v4().to_string();
         let reply = UploadDetails { uuid: uuid.clone() };
         let upload = Upload {
-            repo_name: request.into_inner().repo_name.to_owned(),
+            repo_name: request.into_inner().repo_name,
             uuid,
         };
         {
@@ -640,7 +640,7 @@ impl Registry for TrowServer {
         //delete uuid from uploads tracking
         let upload = Upload {
             repo_name: cr.repo_name.clone(),
-            uuid: cr.uuid.clone(),
+            uuid: cr.uuid,
         };
 
         let mut set = self.active_uploads.write().unwrap();
@@ -773,8 +773,7 @@ impl Registry for TrowServer {
 
             let mut sent = 0;
             for line in reader.lines() {
-                if line.is_ok() {
-                    let line = line.unwrap();
+                if let Ok(line) = line {
                     let (digest, date) = match line.find(' ') {
                         Some(ind) => {
                             let (digest_str, date_str) = line.split_at(ind);
@@ -814,7 +813,7 @@ impl Registry for TrowServer {
                         .await
                         .expect("Error streaming manifest history");
 
-                    sent = sent + 1;
+                    sent += 1;
                     if sent >= mr.limit {
                         break;
                     }
@@ -849,7 +848,7 @@ impl Registry for TrowServer {
             message: String::from("Ready"),
         };
 
-        return Ok(Response::new(reply));
+        Ok(Response::new(reply))
     }
 
     async fn is_healthy(
@@ -866,14 +865,14 @@ impl Registry for TrowServer {
         &self,
         _request: Request<MetricsRequest>,
     ) -> Result<Response<MetricsResponse>, Status> {
-        match metrics::gather_metrics(&mut self.blobs_path.clone()) {
+        match metrics::gather_metrics(&self.blobs_path) {
             Ok(metrics) => {
-                let reply = trow_server::MetricsResponse { metrics: metrics };
+                let reply = trow_server::MetricsResponse { metrics };
                 Ok(Response::new(reply))
             }
 
             Err(error) => {
-                return Err(Status::unavailable(error.to_string()));
+                Err(Status::unavailable(error.to_string()))
             }
         }
     }

@@ -9,7 +9,7 @@ use crate::types::HealthResponse;
 
 impl<'r> Responder<'r> for HealthResponse {
     fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
-        let json = serde_json::to_string(&self).unwrap_or("{}".to_string());
+        let json = serde_json::to_string(&self).unwrap_or_else(|_| "{}".to_string());
 
         match self.is_healthy {
             true => Response::build()

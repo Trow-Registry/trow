@@ -180,7 +180,7 @@ fn main() {
     let matches = parse_args();
 
     if matches.is_present("version") {
-        let vcs_ref = env::var("VCS_REF").unwrap_or("".to_string());
+        let vcs_ref = env::var("VCS_REF").unwrap_or_default();
         println!("Trow version {} {}", env!("CARGO_PKG_VERSION"), vcs_ref);
         std::process::exit(0);
     }

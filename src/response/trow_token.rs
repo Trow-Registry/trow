@@ -54,7 +54,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
             return Outcome::Failure((Status::Unauthorized, ()));
         }
 
-        let outcome = match base64::decode(&auth_strings[1]) {
+        match base64::decode(&auth_strings[1]) {
             Ok(user_pass) => {
                 if verify_user(user_pass, user_cfg) {
                     Outcome::Success(ValidBasicToken {
@@ -65,9 +65,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
                 }
             }
             Err(_) => Outcome::Failure((Status::Unauthorized, ())),
-        };
-
-        outcome
+        }
     }
 }
 
