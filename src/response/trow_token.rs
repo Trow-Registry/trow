@@ -14,6 +14,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 const TOKEN_DURATION: u64 = 3600;
+const AUTHORIZATION: &str = "authorization";
 
 pub struct ValidBasicToken {
     user: String,
@@ -35,7 +36,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
         };
 
         // As Authorization is a standard header
-        let auth_val = match req.headers().get_one(hyper::header::AUTHORIZATION.as_str()) {
+        let auth_val = match req.headers().get_one(AUTHORIZATION) {
             Some(a) => a,
             None => return Outcome::Failure((Status::Unauthorized, ())),
         };
@@ -84,7 +85,7 @@ fn verify_user(user_pass: Vec<u8>, user_cfg: &UserConfig) -> bool {
             }
         }
     }
-    return false;
+    false
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -150,7 +151,7 @@ pub fn new(vbt: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, fra
 
     Ok(TrowToken {
         user: vbt.user,
-        token: token.to_string(),
+        token,
     })
 }
 /*
@@ -178,7 +179,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
             .guard::<rocket::State<TrowConfig>>()
             .expect("TrowConfig not present!");
 
-        if let None = config.user {
+        if config.user.is_none() {
             //Authentication is not configured
             //TODO: Figure out how to create this only once
             let no_auth_token = TrowToken {

@@ -241,10 +241,10 @@ fn main() {
                 .value_of("password-file")
                 .expect("Failed to read user password file");
             let mut file = File::open(file_name)
-                .expect(&format!("Failed to read password file {}", file_name));
+                .unwrap_or_else(|_| panic!("Failed to read password file {}", file_name));
             let mut pass = String::new();
             file.read_to_string(&mut pass)
-                .expect(&format!("Failed to read password file {}", file_name));
+                .unwrap_or_else(|_| panic!("Failed to read password file {}", file_name));
 
             //Remove final newline if present
             if pass.ends_with('\n') {

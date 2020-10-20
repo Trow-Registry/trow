@@ -632,7 +632,7 @@ fn post_blob_upload(
                             let r = ci.complete_upload(&repo_name, &up_info.uuid(), &digest, len);
                             rt.block_on(r)
                                 .map_err(|_| Error::InternalError)
-                                .map(|au| Upload::Accepted(au))
+                                .map(Upload::Accepted)
                         }
                         Err(_) => Err(Error::InternalError),
                     }
@@ -999,7 +999,7 @@ fn get_catalog(
     last: Option<String>,
 ) -> Result<RepoCatalog, Error> {
     let limit = n.unwrap_or(std::u32::MAX);
-    let last_repo = last.unwrap_or(String::new());
+    let last_repo = last.unwrap_or_default();
     let cat = ci.get_catalog(limit, &last_repo);
     match Runtime::new().unwrap().block_on(cat) {
         Ok(c) => Ok(c),
@@ -1017,7 +1017,7 @@ fn list_tags(
 ) -> Result<TagList, Error> {
     let rn = RepoName(repo_name);
     let limit = n.unwrap_or(std::u32::MAX);
-    let last_tag = last.unwrap_or(String::new());
+    let last_tag = last.unwrap_or_default();
 
     let tags = ci.list_tags(&rn, limit, &last_tag);
     match Runtime::new().unwrap().block_on(tags) {
@@ -1082,7 +1082,7 @@ fn get_manifest_history(
     n: Option<u32>,
 ) -> Result<ManifestHistory, Error> {
     let limit = n.unwrap_or(std::u32::MAX);
-    let last_digest = last.unwrap_or(String::new());
+    let last_digest = last.unwrap_or_default();
 
     let rn = RepoName(onename);
     let f = ci.get_manifest_history(&rn, &reference, limit, &last_digest);
@@ -1186,7 +1186,7 @@ fn validate_image(
                         allowed: false,
                         status: Some(Status {
                             status: "Failure".to_owned(),
-                            message: Some(format!("Internal Error {:?}", e).to_owned()),
+                            message: Some(format!("Internal Error {:?}", e)),
                             code: None,
                         }),
                     });

@@ -1,4 +1,4 @@
-use libc;
+
 use rand::Rng;
 use reqwest::StatusCode;
 use std::io::BufReader;

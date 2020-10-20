@@ -97,7 +97,7 @@ impl ClientInterface {
             .into_inner();
 
         Ok(create_upload_info(
-            types::Uuid(response.uuid.to_owned()),
+            types::Uuid(response.uuid),
             repo_name.clone(),
             (0, 0),
         ))
@@ -127,7 +127,7 @@ impl ClientInterface {
             .into_inner();
 
         Ok(create_accepted_upload(
-            Digest(resp.digest.to_owned()),
+            Digest(resp.digest),
             repo_name.clone(),
             uuid.clone(),
             (0, (len as u32)),
@@ -218,7 +218,7 @@ impl ClientInterface {
         let mr = create_manifest_reader(
             Box::new(file),
             resp.content_type,
-            Digest(resp.digest.to_owned()),
+            Digest(resp.digest),
         );
         Ok(mr)
     }
@@ -333,7 +333,7 @@ impl ClientInterface {
             repo_name.clone(),
             Digest(resp.digest.to_owned()),
             reference.to_string(),
-            resp.content_type.to_owned(),
+            resp.content_type,
         );
         Ok(vm)
     }
