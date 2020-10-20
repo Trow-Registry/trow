@@ -774,7 +774,7 @@ fn put_image_manifest(
                     if let Ok(ts) = e {
                         match ts.code() {
                             Code::InvalidArgument => Err(Error::ManifestInvalid),
-                            _ => Err(Error::InternalError)
+                            _ => Err(Error::InternalError),
                         }
                     } else {
                         Err(Error::InternalError)

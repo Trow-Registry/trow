@@ -84,7 +84,6 @@ impl ClientInterface {
      **/
 
     pub async fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
-
         info!("Request Upload called for {}", repo_name);
         let req = UploadRequest {
             repo_name: repo_name.0.clone(),
@@ -111,8 +110,10 @@ impl ClientInterface {
         digest: &Digest,
         len: u64,
     ) -> Result<AcceptedUpload, Error> {
-
-        info!("Complete Upload called for repository {} with upload id {} digest {} and length {}", repo_name, uuid, digest, len);
+        info!(
+            "Complete Upload called for repository {} with upload id {} digest {} and length {}",
+            repo_name, uuid, digest, len
+        );
         let req = CompleteRequest {
             repo_name: repo_name.0.clone(),
             uuid: uuid.0.clone(),
@@ -138,8 +139,10 @@ impl ClientInterface {
         repo_name: &RepoName,
         uuid: &Uuid,
     ) -> Result<impl Write + Seek, Error> {
-
-        info!("Getting write location for blob in repo {} with upload id {}", repo_name, uuid);
+        info!(
+            "Getting write location for blob in repo {} with upload id {}",
+            repo_name, uuid
+        );
         let br = UploadRef {
             uuid: uuid.0.clone(),
             repo_name: repo_name.0.clone(),
@@ -165,9 +168,10 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<(impl Write, String), Error> {
-
-
-        info!("Getting write location for manifest in repo {} with ref {}", repo_name, reference);
+        info!(
+            "Getting write location for manifest in repo {} with ref {}",
+            repo_name, reference
+        );
         let mr = ManifestRef {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone(),
@@ -194,8 +198,10 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<ManifestReader, Error> {
-
-        info!("Getting read location for {} with ref {}", repo_name, reference);
+        info!(
+            "Getting read location for {} with ref {}",
+            repo_name, reference
+        );
         let mr = ManifestRef {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone(),
@@ -224,8 +230,10 @@ impl ClientInterface {
         limit: u32,
         last_digest: &str,
     ) -> Result<ManifestHistory, Error> {
-
-        info!("Getting manifest history for repo {} ref {} limit {} last_digest {}", repo_name, reference, limit, last_digest);
+        info!(
+            "Getting manifest history for repo {} ref {} limit {} last_digest {}",
+            repo_name, reference, limit, last_digest
+        );
         let mr = ManifestHistoryRequest {
             tag: reference.to_owned(),
             repo_name: repo_name.0.clone(),
@@ -258,7 +266,6 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobReader, Error> {
-
         info!("Getting read location for blob {} in {}", digest, repo_name);
         let br = BlobRef {
             digest: digest.0.clone(),
@@ -283,7 +290,6 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobDeleted, Error> {
-
         info!("Attempting to delete blob {} in {}", digest, repo_name);
         let br = BlobRef {
             digest: digest.0.clone(),
@@ -304,8 +310,10 @@ impl ClientInterface {
         reference: &str,
         uuid: &str,
     ) -> Result<types::VerifiedManifest, Error> {
-
-        info!("Verifying manifest {} in {} uuid {}", reference, repo_name, uuid);
+        info!(
+            "Verifying manifest {} in {} uuid {}",
+            reference, repo_name, uuid
+        );
         let vmr = VerifyManifestRequest {
             manifest: Some(ManifestRef {
                 reference: reference.to_owned(),
@@ -335,7 +343,6 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<ManifestDeleted, Error> {
-
         info!("Attempting to delete manifest {} in {}", digest, repo_name);
         let mr = ManifestRef {
             reference: digest.0.clone(),
@@ -351,8 +358,10 @@ impl ClientInterface {
     }
 
     pub async fn get_catalog(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog, Error> {
-
-        info!("Getting image catalog limit {} last_repo {}", limit, last_repo);
+        info!(
+            "Getting image catalog limit {} last_repo {}",
+            limit, last_repo
+        );
         let cr = CatalogRequest {
             limit,
             last_repo: last_repo.to_string(),
@@ -378,8 +387,10 @@ impl ClientInterface {
         limit: u32,
         last_tag: &str,
     ) -> Result<TagList, Error> {
-
-        info!("Getting tag list for {} limit {} last_tag {}", repo_name, limit, last_tag);
+        info!(
+            "Getting tag list for {} limit {} last_tag {}",
+            repo_name, limit, last_tag
+        );
         let ltr = ListTagsRequest {
             repo_name: repo_name.0.clone(),
             limit,
@@ -409,8 +420,10 @@ impl ClientInterface {
         req: &types::AdmissionRequest,
         host_names: &[String],
     ) -> Result<types::AdmissionResponse, Error> {
-
-        info!("Validating admission request {} host_names {:?}", req.uid, host_names);
+        info!(
+            "Validating admission request {} host_names {:?}",
+            req.uid, host_names
+        );
         //TODO: write something to convert automatically (into()) between AdmissionRequest types
         // TODO: we should really be sending the full object to the backend.
         let mut images = Vec::new();
@@ -457,7 +470,6 @@ impl ClientInterface {
     Note that the server will indicate unhealthy by returning an error.
     */
     pub async fn is_healthy(&self) -> types::HealthResponse {
-
         debug!("Calling health check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
@@ -493,7 +505,6 @@ impl ClientInterface {
      Note that the server will indicate not ready by returning an error.
     */
     pub async fn is_ready(&self) -> types::ReadinessResponse {
-
         debug!("Calling readiness check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
@@ -528,7 +539,6 @@ impl ClientInterface {
      Returns disk and total request metrics(blobs, manifests).
     */
     pub async fn get_metrics(&self) -> Result<types::MetricsResponse, Error> {
-
         debug!("Getting metrics");
         let req = Request::new(MetricsRequest {});
         let resp = self
