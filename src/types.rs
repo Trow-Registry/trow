@@ -212,7 +212,7 @@ mod history_date_format {
     use chrono::{DateTime, TimeZone, Utc};
     use serde::{self, Deserialize, Deserializer, Serializer};
 
-    const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S%.f %Z";
+    const FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f %Z";
 
     pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
     where

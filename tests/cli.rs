@@ -2,7 +2,6 @@ extern crate assert_cli;
 
 #[cfg(test)]
 mod cli {
-    use assert_cli;
 
     #[test]
     fn invalid_argument() {

@@ -1,8 +1,6 @@
-use fs3;
 use lazy_static::lazy_static;
 
 use failure::Error;
-use prometheus;
 use prometheus::{Encoder, IntCounter, IntGauge, TextEncoder};
 use std::path::PathBuf;
 

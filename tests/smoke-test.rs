@@ -7,7 +7,7 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
-    use reqwest;
+
     use reqwest::StatusCode;
     use std::fs::{self, File};
     use std::io::Read;

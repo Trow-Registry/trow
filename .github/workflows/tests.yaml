@@ -43,6 +43,8 @@ jobs:
       with:
         command: test
         args: --verbose --manifest-path=lib/server/Cargo.toml
+    - name: Check formatting
+      run:  cargo fmt -- --check
     - name: Run Trow test suite
       uses: actions-rs/cargo@v1
       with:

@@ -46,6 +46,7 @@ use uuid::Uuid;
 
 mod client_interface;
 pub mod response;
+#[allow(clippy::too_many_arguments)]
 mod routes;
 pub mod types;
 
@@ -153,7 +154,8 @@ fn init_logger() -> Result<(), SetLoggerError> {
                 )
             })
             .filter(None, LevelFilter::Error);
-        Ok(builder.init())
+        builder.init();
+        Ok(())
     }
 }
 
@@ -162,6 +164,7 @@ pub struct TrowBuilder {
 }
 
 impl TrowBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         data_dir: String,
         addr: NetAddr,

@@ -1,6 +1,5 @@
 use failure::Error;
 use serde_json::{self, Value};
-use std;
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self, Error>
@@ -83,16 +82,16 @@ pub struct InvalidManifest {
 
 // TODO: Consider changing this to enum with as_str() impl?
 pub mod manifest_media_type {
-    pub const DOCKER_V1: &'static str = "application/vnd.docker.distribution.manifest.v1+json";
-    pub const DOCKER_V2: &'static str = "application/vnd.docker.distribution.manifest.v2+json";
-    pub const OCI_V1: &'static str = "application/vnd.oci.image.manifest.v1+json";
-    pub const DOCKER_LIST: &'static str =
+    pub const DOCKER_V1: &str = "application/vnd.docker.distribution.manifest.v1+json";
+    pub const DOCKER_V2: &str = "application/vnd.docker.distribution.manifest.v2+json";
+    pub const OCI_V1: &str = "application/vnd.oci.image.manifest.v1+json";
+    pub const DOCKER_LIST: &str =
         "application/vnd.docker.distribution.manifest.list.v2+json";
-    pub const OCI_INDEX: &'static str = "application/vnd.oci.image.index.v1+json";
+    pub const OCI_INDEX: &str = "application/vnd.oci.image.index.v1+json";
 
     // Weirdly the media type is optional in the JSON, so assume OCI_V1.
     // TODO: Check if we should be falling back to mime type
-    pub const DEFAULT: &'static str = OCI_V1;
+    pub const DEFAULT: &str = OCI_V1;
 }
 
 fn schema_2(raw: &Value) -> Result<Manifest, Error> {
@@ -113,7 +112,7 @@ fn schema_2(raw: &Value) -> Result<Manifest, Error> {
 
         unknown => Err(InvalidManifest {
             err: format!("Media Type {} is not supported.", unknown),
-        })?,
+        }.into()),
     }
 }
 
@@ -125,11 +124,11 @@ impl FromJson for Manifest {
         match schema_version {
             1 => Err(InvalidManifest {
                 err: "Manifest Schema version 1 is not supported. Please update.".to_owned(),
-            })?,
+            }.into()),
             2 => schema_2(raw),
             n => Err(InvalidManifest {
-                err: format!("Unsupported version: {}", n).to_owned(),
-            })?,
+                err: format!("Unsupported version: {}", n),
+            }.into()),
         }
     }
 }
