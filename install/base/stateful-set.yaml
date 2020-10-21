@@ -25,7 +25,8 @@ spec:
           - "/etc/trow/pass"
         imagePullPolicy: Always
         ports:
-        - containerPort: 8000
+        - name: trow-http-port
+          containerPort: 8000
         volumeMounts:
         - name: data-vol
           mountPath: /data

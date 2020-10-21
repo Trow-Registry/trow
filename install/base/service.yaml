@@ -7,7 +7,8 @@ spec:
     app: trow
   type: NodePort
   ports:
-  - protocol: TCP
+  - name: http-tcp
+    protocol: TCP
     port: 8000
-    targetPort: 8000
+    targetPort: trow-http-port
 
