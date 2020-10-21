@@ -1,41 +1,39 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: trow
+resources:
+    ./deployment-variant
 
-# This will start Trow in a StatefulSet along with a persistent volume for data and a service that
-# routes to it. 
+# The following patches update the Deployment and transform it into a StatefulSet where
+# images are persisted into a peristent volume claim.
 #
-# A working install will require an ingress forwarding a (sub)domain you control to this service.
-# This install assumes the ingress terminates TLS; internally Trow is running over http only.
-#
-# The overlay directories include examples of how to provision ingress on various types of
-# Kubernetes cluster.
-
-
-resources: 
-- stateful-set.yaml 
-- service.yaml 
-
-#- validate.yaml # Enable for validation webhook
-  
-images:
-- name: containersol/trow
-  newTag: "0.3"
-
-# The following patches update the domain name in the trow argument and validator without editing
-# the YAML directly.  
-# Create your own version of the patch file with your domain name and reference in your
-# overlay as below:
-
-
+# overlays use this StatefulSet variant as their base.
 patchesJson6902:
-#    - patch: |-
-#        - op: replace
-#          path: /spec/template/spec/containers/0/args/2
-#          value: newregistry.mydomain.com
-#      target:
-#        kind: StatefulSet
-#        name: trow-set
-#        group: apps
-#        version: v1
+- patch: |-
+    - op: replace
+      path: /metadata/name
+      value: trow-set
+    - op: replace
+      path: /kind
+      value: StatefulSet
+    - op: add
+      path: /spec/serviceName
+      value: trow-svc
+    - op: add
+      path: /spec/volumeClaimTemplates
+      value:
+        - metadata:
+            name: data-vol
+          spec:
+            accessModes: [ "ReadWriteOnce" ]
+            resources:
+              requests:
+                storage: 20Gi
+    - op: remove
+      path: /spec/template/spec/volumes/1 # data-vol: emptyDir
+  target:
+    kind: Deployment
+    name: trow-deploy
+    group: apps
+    version: v1
+
