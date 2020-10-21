@@ -27,6 +27,8 @@ spec:
         ports:
         - name: trow-http-port
           containerPort: 8000
+        - name: trow-https-port
+          containerPort: 8443
         volumeMounts:
         - name: data-vol
           mountPath: /data
