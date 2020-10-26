@@ -45,12 +45,3 @@ patchesJson6902:
       name: trow-set
       group: apps
       version: v1
-#    - patch: |-
-#        - op: replace
-#          path: /webhooks/0/name
-#          value: example.registry.com
-#      target:
-#        kind: ValidatingWebhookConfiguration
-#        name: trow-validator
-#        group: admissionregistration.k8s.io
-#        version: v1
