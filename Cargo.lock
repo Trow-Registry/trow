@@ -3112,6 +3112,7 @@ dependencies = [
  "prost",
  "prost-types",
  "rand 0.7.3",
+ "reqwest",
  "rustc-serialize",
  "serde",
  "serde_derive",

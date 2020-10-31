@@ -24,6 +24,7 @@ failure_derive = "^0.1"
 serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
 rustc-serialize = "0.3"
+reqwest = { version = "0.10" }
 
 prometheus = { version = "0.9"}
 lazy_static = "1.4.0"

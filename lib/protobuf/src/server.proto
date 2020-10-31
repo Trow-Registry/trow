@@ -179,7 +179,6 @@ service Registry {
   rpc GetManifestHistory(ManifestHistoryRequest) returns (stream ManifestHistoryEntry) {}
 
   // Health and Readiness Checks
-  // These should be part of the core service, not a separate service
   rpc IsHealthy(HealthRequest) returns (HealthStatus) {}
 
   rpc IsReady (ReadinessRequest) returns (ReadyStatus) {}

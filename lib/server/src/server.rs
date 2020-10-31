@@ -1,4 +1,4 @@
-use crate::manifest::{FromJson, Manifest};
+use crate::manifest::{self, FromJson, Manifest};
 use chrono::prelude::*;
 use failure::{self, Error};
 use prost_types::Timestamp;
@@ -12,6 +12,7 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+use reqwest;
 
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
@@ -61,6 +62,13 @@ pub struct Image {
     pub host: String, //Including port, docker.io by default
     pub repo: String, //Between host and : including any /s
     pub tag: String,  //Bit after the :, latest by default
+}
+
+impl Image {
+
+    fn get_manifest_url(&self) -> String {
+        format!("{}/{}/manifests/{}", self.host, self.repo, self.tag)
+    }
 }
 
 impl fmt::Display for Image {
@@ -320,12 +328,80 @@ impl TrowServer {
         })
     }
 
-    fn create_manifest_read_location(
+    fn get_manifest_proxy_address(&self, repo_name: &str, reference: &str) -> Option<Image> {
+
+        if repo_name.starts_with("docker/") {
+
+            Some(Image {
+                host: "https://docker.io".to_string(),
+                repo: repo_name.get(7..).unwrap().to_string(),
+                tag: reference.to_string()
+            })
+        } else {
+            None
+        }
+    }
+
+    async fn download_manifest_and_layers(&self, cl: &reqwest::Client, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
+
+        let resp = cl.get(&remote_image.get_manifest_url()).send().await?;
+        if !resp.status().is_success() {
+            return failure::Error();
+        }
+        let mani: Manifest = resp.json().await?;
+
+        for digest in mani.get_local_asset_digests() {
+
+            let addr = format!("{}/{}/blobs/{}", remote_image.host, remote_image.repo, digest);
+            let resp = cl.get(&addr).send().await?;
+            resp.copy_to(file_buf);
+            //copy over to blob dir, probably a method for this
+
+        }
+
+        //Save out manifest
+
+        Ok()
+
+    }
+
+
+    async fn create_manifest_read_location(
         &self,
         repo_name: String,
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
+
+
+        if let Some(proxy_image) = self.get_manifest_proxy_address(&repo_name, &reference) {
+
+            //TODO: MUST CONSIDER WHAT HAPPENS IF THIS IS CALLED MULTIPLE TIMES SIMULTANEOUSLY
+            //Probably need arc of downloads :(
+            
+            info!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
+
+            let cl = reqwest::Client::new();
+            let mut have_manifest = false;
+            let resp = cl.head(&proxy_image.get_manifest_url()).send().await.unwrap(); //REMOVE UNWRAP
+            if resp.status().is_success() {
+                if let Some(digest) = resp.headers().get("Docker-Content-Digest") {
+                    let digest=format!("{:?}", digest);
+                    if self.get_catalog_path_for_blob(&digest).is_ok() {
+                        have_manifest = true;
+                    }
+                }
+            }
+
+            if !have_manifest {
+                self.download_manifest_and_layers(&cl, &proxy_image, &repo_name).await?;
+            }
+
+
+            //do head request, parse digest from header, check if we have it
+            //else download manifest and layers
+        }
+
         //TODO: This isn't optimal
         let path = self.get_path_for_manifest(&repo_name, &reference)?;
         let vm = self.create_verified_manifest(&path, do_verification)?;
