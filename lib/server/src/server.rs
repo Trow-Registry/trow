@@ -345,8 +345,6 @@ impl TrowServer {
 
     async fn download_manifest_and_layers<T: Display>(&self, cl: &reqwest::Client, token: T, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
 
-        info!("Downloading proxy image from {}", remote_image.get_manifest_url());
-        println!("Downloading proxy image from {}", remote_image.get_manifest_url());
         let resp = cl.get(&remote_image.get_manifest_url()).bearer_auth(&token).header(reqwest::header::ACCEPT, "application/vnd.docker.distribution.manifest.v2+json").send().await?;
         if !resp.status().is_success() {
             return Err(failure::err_msg(format!("GET {} returned unexpected {}", &remote_image.get_manifest_url(), resp.status())));
@@ -420,8 +418,9 @@ impl TrowServer {
 
         if let Some(proxy_image) = self.get_manifest_proxy_address(&repo_name, &reference) {
 
-            //TODO: MUST CONSIDER WHAT HAPPENS IF THIS IS CALLED MULTIPLE TIMES SIMULTANEOUSLY
-            //Probably need arc of downloads :(
+            //TODO: May want to consider download tracking in case of simultaneous requests
+            //In short term this isn't a big problem as should just copy over itself in worst case
+
             println!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
             info!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
 
@@ -572,7 +571,7 @@ impl Registry for TrowServer {
         };
         {
             self.active_uploads.write().unwrap().insert(upload);
-            debug!("Hash Table: {:?}", self.active_uploads);
+            debug!("Upload Table: {:?}", self.active_uploads);
         }
 
         Ok(Response::new(reply))

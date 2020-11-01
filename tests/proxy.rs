@@ -15,18 +15,15 @@ mod interface_tests {
     use crate::common;
     use reqwest;
     use reqwest::StatusCode;
-    use serde_json;
     use std::fs::{self, File};
-    use std::io::{BufReader, Read};
+    use std::io::Read;
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use trow::types::{HealthResponse, ReadinessResponse, RepoCatalog, RepoName, TagList};
-    use trow_server::{digest, manifest};
+    use trow_server::manifest;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
-    const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 
     struct TrowInstance {
         pid: Child,
