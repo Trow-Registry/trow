@@ -12,6 +12,7 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+use core::fmt::Display;
 use reqwest;
 
 pub mod trow_server {
@@ -333,7 +334,7 @@ impl TrowServer {
         if repo_name.starts_with("docker/") {
 
             Some(Image {
-                host: "https://docker.io".to_string(),
+                host: "https://registry-1.docker.io/v2".to_string(),
                 repo: repo_name.get(7..).unwrap().to_string(),
                 tag: reference.to_string()
             })
@@ -342,12 +343,15 @@ impl TrowServer {
         }
     }
 
-    async fn download_manifest_and_layers(&self, cl: &reqwest::Client, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
+    async fn download_manifest_and_layers<T: Display>(&self, cl: &reqwest::Client, token: T, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
 
-        let resp = cl.get(&remote_image.get_manifest_url()).send().await?;
+        info!("Downloading proxy image from {}", remote_image.get_manifest_url());
+        println!("Downloading proxy image from {}", remote_image.get_manifest_url());
+        let resp = cl.get(&remote_image.get_manifest_url()).bearer_auth(&token).header(reqwest::header::ACCEPT, "application/vnd.docker.distribution.manifest.v2+json").send().await?;
         if !resp.status().is_success() {
             return Err(failure::err_msg(format!("GET {} returned unexpected {}", &remote_image.get_manifest_url(), resp.status())));
         }
+
         //First save as bytes
         let mani_id = Uuid::new_v4().to_string();
         let temp_mani_path = self.scratch_path.join(mani_id);
@@ -360,8 +364,19 @@ impl TrowServer {
         let mut paths = vec![];
         for digest in mani.get_local_asset_digests() {
 
+            //break if have digest
+            if self.get_catalog_path_for_blob(digest)?.exists() {
+                info!("Already have blob {}", digest);    
+                break;
+            }
+
+
             let addr = format!("{}/{}/blobs/{}", remote_image.host, remote_image.repo, digest);
-            let resp = cl.get(&addr).send().await?;
+            info!("Downloading blob {}", addr);
+            println!("Downloading blob {}", addr);
+
+
+            let resp = cl.get(&addr).bearer_auth(&token).send().await?;
             let path = self.scratch_path.join(digest);
             
             let mut buf = File::create(&path)?;
@@ -407,23 +422,40 @@ impl TrowServer {
 
             //TODO: MUST CONSIDER WHAT HAPPENS IF THIS IS CALLED MULTIPLE TIMES SIMULTANEOUSLY
             //Probably need arc of downloads :(
-            
+            println!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
             info!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
 
             let cl = reqwest::Client::new();
             let mut have_manifest = false;
-            let resp = cl.head(&proxy_image.get_manifest_url()).send().await.unwrap(); //REMOVE UNWRAP
+            //Get auth token
+            let auth_req =format!("https://auth.docker.io/token?service={}&scope=repository:{}:pull", "registry.docker.io", proxy_image.repo);
+            let auth = cl.get(&auth_req).send().await.unwrap();
+            let auth = auth.json::<serde_json::Value>().await?;
+            let auth = auth["token"].as_str().unwrap();
+
+            let resp = cl.head(&proxy_image.get_manifest_url()).bearer_auth(&auth).header(reqwest::header::ACCEPT, "application/vnd.docker.distribution.manifest.v2+json").send().await.unwrap(); //REMOVE UNWRAP
             if resp.status().is_success() {
+                
                 if let Some(digest) = resp.headers().get("Docker-Content-Digest") {
-                    let digest=format!("{:?}", digest);
-                    if self.get_catalog_path_for_blob(&digest).is_ok() {
+                    let mut digest=format!("{:?}", digest);
+                    digest = digest.trim_matches('"').to_string();
+                
+                    if self.get_catalog_path_for_blob(&digest)?.exists() {
+                        info!("Have up to date manifest for {} digest {}", repo_name, digest);
                         have_manifest = true;
                     }
                 }
+            } else {
+                error!("Failed HEAD request for proxied image {} returned {}", proxy_image.get_manifest_url(), resp.status());
             }
 
             if !have_manifest {
-                self.download_manifest_and_layers(&cl, &proxy_image, &repo_name).await?;
+                let res = self.download_manifest_and_layers(&cl, &auth, &proxy_image, &repo_name).await;
+
+                if res.is_err() {
+                    println!("Got err {:?}", &res.unwrap_err());
+                    //BAD CONSUMED ERR
+                }
             }
         }
 
