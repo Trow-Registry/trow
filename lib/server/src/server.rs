@@ -1,4 +1,4 @@
-use crate::manifest::{self, FromJson, Manifest};
+use crate::manifest::{FromJson, Manifest};
 use chrono::prelude::*;
 use failure::{self, Error};
 use prost_types::Timestamp;
@@ -346,22 +346,51 @@ impl TrowServer {
 
         let resp = cl.get(&remote_image.get_manifest_url()).send().await?;
         if !resp.status().is_success() {
-            return failure::Error();
+            return Err(failure::err_msg(format!("GET {} returned unexpected {}", &remote_image.get_manifest_url(), resp.status())));
         }
-        let mani: Manifest = resp.json().await?;
+        //First save as bytes
+        let mani_id = Uuid::new_v4().to_string();
+        let temp_mani_path = self.scratch_path.join(mani_id);
+        let mut buf = File::create(&temp_mani_path)?;
+        let bytes = resp.bytes().await?;
+        buf.write_all(&bytes)?;
 
+        let mani: Manifest = serde_json::from_slice(&bytes)?;
+
+        let mut paths = vec![];
         for digest in mani.get_local_asset_digests() {
 
             let addr = format!("{}/{}/blobs/{}", remote_image.host, remote_image.repo, digest);
             let resp = cl.get(&addr).send().await?;
-            resp.copy_to(file_buf);
-            //copy over to blob dir, probably a method for this
-
+            let path = self.scratch_path.join(digest);
+            
+            let mut buf = File::create(&path)?;
+            buf.write_all(&resp.bytes().await?)?; //Is this going to be buffered?
+            paths.push((path, digest));
+            
         }
 
+        for (path, digest) in &paths {
+            self.save_blob(&path, digest)?;
+        }
+        
         //Save out manifest
+        let f = File::open(&temp_mani_path)?;
+        let reader = BufReader::new(f);
+        let calculated_digest = sha256_tag_digest(reader)?;
 
-        Ok()
+        self.save_blob(&temp_mani_path, &calculated_digest)?;
+        self.save_tag(&calculated_digest, local_repo_name, &remote_image.tag)?;
+
+        //Delete all the temp stuff
+        fs::remove_file(&temp_mani_path)
+                    .unwrap_or_else(|e| error!("Failure deleting downloaded manifest {:?}", e));
+
+        for (path, _digest) in paths {
+            fs::remove_file(path).unwrap_or_else(|e| error!("Failure deleting downloaded blob {:?}", e));
+        }
+
+        Ok(())
 
     }
 
@@ -396,10 +425,6 @@ impl TrowServer {
             if !have_manifest {
                 self.download_manifest_and_layers(&cl, &proxy_image, &repo_name).await?;
             }
-
-
-            //do head request, parse digest from header, check if we have it
-            //else download manifest and layers
         }
 
         //TODO: This isn't optimal
@@ -649,7 +674,7 @@ impl Registry for TrowServer {
         let mr = req.into_inner();
         metrics::TOTAL_MANIFEST_REQUESTS.inc();
         // TODO refactor to return directly
-        match self.create_manifest_read_location(mr.repo_name, mr.reference, true) {
+        match self.create_manifest_read_location(mr.repo_name, mr.reference, true).await {
             Ok(vm) => Ok(Response::new(vm)),
             Err(e) => {
                 warn!("Internal error with manifest {:?}", e);
