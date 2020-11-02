@@ -58,6 +58,7 @@ fn parse_image(image_str: &str) -> Image {
         host: host.to_string(),
         repo: repo.to_string(),
         tag: tag.to_string(),
+        auth: None
     }
 }
 
@@ -155,6 +156,7 @@ mod test {
                 host: "docker.io".to_string(),
                 repo: "debian".to_string(),
                 tag: "latest".to_string(),
+                auth: None
             }
         );
         ret = parse_image("amouat/network-utils");
@@ -164,6 +166,7 @@ mod test {
                 host: "docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
                 tag: "latest".to_string(),
+                auth: None
             }
         );
         ret = parse_image("amouat/network-utils:beta");
@@ -173,6 +176,7 @@ mod test {
                 host: "docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
                 tag: "beta".to_string(),
+                auth: None
             }
         );
 
@@ -183,6 +187,7 @@ mod test {
                 host: "localhost:8080".to_string(),
                 repo: "myimage".to_string(),
                 tag: "test".to_string(),
+                auth: None
             }
         );
         ret = parse_image("localhost:8080/mydir/myimage:test");
@@ -192,6 +197,7 @@ mod test {
                 host: "localhost:8080".to_string(),
                 repo: "mydir/myimage".to_string(),
                 tag: "test".to_string(),
+                auth: None
             }
         );
 
@@ -202,6 +208,7 @@ mod test {
                 host: "quay.io".to_string(),
                 repo: "mydir/another/myimage".to_string(),
                 tag: "test".to_string(),
+                auth: None
             }
         );
     }

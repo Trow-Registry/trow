@@ -85,6 +85,39 @@ mod interface_tests {
         assert_eq!(mani.schema_version, 2);
     }
 
+    async fn upload_to_nonwritable_repo(cl: &reqwest::Client, name: &str) {
+        let resp = cl
+            .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
+            .send()
+            .await
+            .expect("Error uploading layer");
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+        //Try manifest
+        let config = manifest::Object {
+            media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
+            digest: "fake".to_string(),
+            size: None
+        };
+        let layer = manifest::Object {
+            media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_owned(),
+            size: None,
+            digest: "fake".to_string(),
+        };
+
+        let mut layers = Vec::new();
+        layers.push(layer);
+        let mani = manifest::ManifestV2 {
+            schema_version: 2,
+            media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
+            config,
+            layers,
+        };
+        let manifest_addr = format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, "tag");
+        let resp = cl.put(&manifest_addr).json(&mani).send().await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
     #[tokio::test]
     async fn test_runner() {
         //Need to start with empty repo
@@ -108,11 +141,15 @@ mod interface_tests {
             .unwrap();
 
         //Using docker proxy should be able to download image even though it's not in registry
-        get_manifest(&client, "docker/amouat/trow", "latest").await;
-        get_manifest(&client, "docker/amouat/trow", "latest").await;
+        //These tests are repeated to exercise caching logic
+        get_manifest(&client, "f_/docker/amouat/trow", "latest").await;
+        get_manifest(&client, "f_/docker/amouat/trow", "latest").await;
 
-        get_manifest(&client, "docker/library/alpine", "latest").await;
-        get_manifest(&client, "docker/library/alpine", "latest").await;
+        get_manifest(&client, "f_/docker/library/alpine", "latest").await;
+        get_manifest(&client, "f_/docker/library/alpine", "latest").await;
+
+        //test writing manifest to proxy dir isn't allowed
+        upload_to_nonwritable_repo(&client, "f_/failthis").await;
 
     }
 }

@@ -1,4 +1,4 @@
-use crate::manifest::{FromJson, Manifest};
+use crate::manifest::{FromJson, Manifest, manifest_media_type};
 use chrono::prelude::*;
 use failure::{self, Error};
 use prost_types::Timestamp;
@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use core::fmt::Display;
-use reqwest;
+use reqwest::{self, header::{HeaderMap, HeaderValue}};
 
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
@@ -29,6 +29,12 @@ static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 static MANIFESTS_DIR: &str = "manifests";
 static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
+
+static PROXY_DIR: &str = "f_/"; //Repositories starting with this are considered proxies
+static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
+static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
+static HUB_AUTH_ADDRESS: &str = "https://auth.docker.io/token?service=registry.docker.io";
+static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
  *
@@ -63,6 +69,7 @@ pub struct Image {
     pub host: String, //Including port, docker.io by default
     pub repo: String, //Between host and : including any /s
     pub tag: String,  //Bit after the :, latest by default
+    pub auth: Option<String>
 }
 
 impl Image {
@@ -76,6 +83,13 @@ impl fmt::Display for Image {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}/{}:{}", self.host, self.repo, self.tag)
     }
+}
+
+fn create_accept_header() -> HeaderMap {
+
+    let mut headers = HeaderMap::new();
+    headers.insert(reqwest::header::ACCEPT, HeaderValue::from_str(&format!("{}, {}", manifest_media_type::OCI_V1, manifest_media_type::DOCKER_V2)).unwrap());
+    headers
 }
 
 fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
@@ -329,23 +343,42 @@ impl TrowServer {
         })
     }
 
+    /**
+    If repo is proxied to another registry, this will return the details of the remote image.
+    If the repo isn't proxied None is returned
+    **/
     fn get_manifest_proxy_address(&self, repo_name: &str, reference: &str) -> Option<Image> {
 
-        if repo_name.starts_with("docker/") {
+        //All proxies are under "f_"
+        if repo_name.starts_with(PROXY_DIR) {
 
-            Some(Image {
-                host: "https://registry-1.docker.io/v2".to_string(),
-                repo: repo_name.get(7..).unwrap().to_string(),
-                tag: reference.to_string()
-            })
-        } else {
-            None
+            let proxy_name = repo_name.strip_prefix(PROXY_DIR).unwrap();
+
+            if proxy_name.starts_with(HUB_PROXY_DIR) {
+
+                let repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
+                let auth = Some(format!("{}&scope=repository:{}:pull", HUB_AUTH_ADDRESS, &repo).to_string());
+
+                return Some(Image {
+                    host: HUB_ADDRESS.to_string(),
+                    repo,
+                    tag: reference.to_string(),
+                    auth,
+                })
+            } 
         }
+
+        None
     }
 
-    async fn download_manifest_and_layers<T: Display>(&self, cl: &reqwest::Client, token: T, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
+    async fn download_manifest_and_layers<T: Display>(&self, cl: &reqwest::Client, token: &Option<T>, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
 
-        let resp = cl.get(&remote_image.get_manifest_url()).bearer_auth(&token).header(reqwest::header::ACCEPT, "application/vnd.docker.distribution.manifest.v2+json").send().await?;
+        let resp = if let Some(auth) = token {
+            cl.get(&remote_image.get_manifest_url()).bearer_auth(auth).headers(create_accept_header()).send().await?
+        } else {
+            cl.get(&remote_image.get_manifest_url()).headers(create_accept_header()).send().await?
+        };
+
         if !resp.status().is_success() {
             return Err(failure::err_msg(format!("GET {} returned unexpected {}", &remote_image.get_manifest_url(), resp.status())));
         }
@@ -374,7 +407,11 @@ impl TrowServer {
             println!("Downloading blob {}", addr);
 
 
-            let resp = cl.get(&addr).bearer_auth(&token).send().await?;
+            let resp = if let Some(auth) = token {
+                cl.get(&addr).bearer_auth(auth).send().await?
+            } else {
+                cl.get(&addr).send().await?
+            };
             let path = self.scratch_path.join(digest);
             
             let mut buf = File::create(&path)?;
@@ -415,27 +452,30 @@ impl TrowServer {
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
 
-
         if let Some(proxy_image) = self.get_manifest_proxy_address(&repo_name, &reference) {
 
             //TODO: May want to consider download tracking in case of simultaneous requests
             //In short term this isn't a big problem as should just copy over itself in worst case
-
-            println!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
             info!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
 
             let cl = reqwest::Client::new();
             let mut have_manifest = false;
+            let mut auth = None;
             //Get auth token
-            let auth_req =format!("https://auth.docker.io/token?service={}&scope=repository:{}:pull", "registry.docker.io", proxy_image.repo);
-            let auth = cl.get(&auth_req).send().await.unwrap();
-            let auth = auth.json::<serde_json::Value>().await?;
-            let auth = auth["token"].as_str().unwrap();
-
-            let resp = cl.head(&proxy_image.get_manifest_url()).bearer_auth(&auth).header(reqwest::header::ACCEPT, "application/vnd.docker.distribution.manifest.v2+json").send().await.unwrap(); //REMOVE UNWRAP
+            let resp = if let Some(auth_url) = &proxy_image.auth {
+                let auth_rs = cl.get(auth_url).send().await.unwrap();
+                let auth_v = auth_rs.json::<serde_json::Value>().await?;
+                let auth_str = auth_v["token"].as_str().unwrap().to_string();
+                auth = Some(auth_str.clone());    
+                cl.head(&proxy_image.get_manifest_url()).bearer_auth(&auth_str).headers(create_accept_header()).send().await.unwrap()
+            } else {
+                cl.head(&proxy_image.get_manifest_url())
+                    .headers(create_accept_header()).send().await.unwrap()  
+            };
+            
             if resp.status().is_success() {
                 
-                if let Some(digest) = resp.headers().get("Docker-Content-Digest") {
+                if let Some(digest) = resp.headers().get(DIGEST_HEADER) {
                     let mut digest=format!("{:?}", digest);
                     digest = digest.trim_matches('"').to_string();
                 
@@ -555,6 +595,15 @@ impl TrowServer {
 
         false
     }
+
+    fn is_writable_repo(&self, repo_name: &str) -> bool {
+
+        if repo_name.starts_with(PROXY_DIR) {
+            return false;
+        }
+
+        true
+    }
 }
 
 #[tonic::async_trait]
@@ -563,18 +612,27 @@ impl Registry for TrowServer {
         &self,
         request: Request<UploadRequest>,
     ) -> Result<Response<UploadDetails>, Status> {
-        let uuid = Uuid::new_v4().to_string();
-        let reply = UploadDetails { uuid: uuid.clone() };
-        let upload = Upload {
-            repo_name: request.into_inner().repo_name,
-            uuid,
-        };
-        {
-            self.active_uploads.write().unwrap().insert(upload);
-            debug!("Upload Table: {:?}", self.active_uploads);
+
+        let repo_name = request.into_inner().repo_name;
+        if self.is_writable_repo(&repo_name) {
+
+            let uuid = Uuid::new_v4().to_string();
+            let reply = UploadDetails { uuid: uuid.clone() };
+            let upload = Upload {
+                repo_name,
+                uuid,
+            };
+            {
+                self.active_uploads.write().unwrap().insert(upload);
+                debug!("Upload Table: {:?}", self.active_uploads);
+            }
+            Ok(Response::new(reply))
+        } else {
+
+            Err(Status::invalid_argument(format!("Repository {} is not writable", repo_name)))
         }
 
-        Ok(Response::new(reply))
+        
     }
 
     async fn get_write_location_for_blob(
@@ -684,16 +742,23 @@ impl Registry for TrowServer {
 
     async fn get_write_details_for_manifest(
         &self,
-        _req: Request<ManifestRef>, // Expect to be used later in checks e.g. immutable tags
+        req: Request<ManifestRef>, 
     ) -> Result<Response<ManifestWriteDetails>, Status> {
-        //Give the manifest a UUID and save it to the uploads dir
-        let uuid = Uuid::new_v4().to_string();
+        
+        let repo_name = req.into_inner().repo_name;
+        if self.is_writable_repo(&repo_name) {
 
-        let manifest_path = self.get_upload_path_for_blob(&uuid);
-        Ok(Response::new(ManifestWriteDetails {
-            path: manifest_path.to_string_lossy().to_string(),
-            uuid,
-        }))
+            //Give the manifest a UUID and save it to the uploads dir
+            let uuid = Uuid::new_v4().to_string();
+
+            let manifest_path = self.get_upload_path_for_blob(&uuid);
+            Ok(Response::new(ManifestWriteDetails {
+                path: manifest_path.to_string_lossy().to_string(),
+                uuid,
+            }))
+        } else {
+            Err(Status::invalid_argument(format!("Repository {} is not writable", repo_name)))
+        }
     }
 
     async fn get_read_location_for_manifest(
