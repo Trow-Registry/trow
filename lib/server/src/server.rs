@@ -1,6 +1,6 @@
 use crate::manifest::{FromJson, Manifest, manifest_media_type};
 use chrono::prelude::*;
-use failure::{self, Error};
+use failure::{self, Error, Fail};
 use prost_types::Timestamp;
 use std::collections::HashSet;
 use std::fmt;
@@ -52,6 +52,7 @@ pub struct TrowServer {
     manifests_path: PathBuf,
     blobs_path: PathBuf,
     scratch_path: PathBuf,
+    proxy_hub: bool,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_local_prefixes: Vec<String>,
@@ -62,6 +63,13 @@ pub struct TrowServer {
 struct Upload {
     repo_name: String,
     uuid: String,
+}
+
+
+#[derive(Fail, Debug)]
+#[fail(display = "Error getting proxied repo {}", msg)]
+pub struct ProxyError {
+    msg: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -215,6 +223,7 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
 impl TrowServer {
     pub fn new(
         data_path: &str,
+        proxy_hub: bool,
         allow_prefixes: Vec<String>,
         allow_images: Vec<String>,
         deny_local_prefixes: Vec<String>,
@@ -228,6 +237,7 @@ impl TrowServer {
             manifests_path,
             blobs_path,
             scratch_path,
+            proxy_hub,
             allow_prefixes,
             allow_images,
             deny_local_prefixes,
@@ -354,7 +364,7 @@ impl TrowServer {
 
             let proxy_name = repo_name.strip_prefix(PROXY_DIR).unwrap();
 
-            if proxy_name.starts_with(HUB_PROXY_DIR) {
+            if self.proxy_hub && proxy_name.starts_with(HUB_PROXY_DIR) {
 
                 let repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
                 let auth = Some(format!("{}&scope=repository:{}:pull", HUB_AUTH_ADDRESS, &repo).to_string());
@@ -373,11 +383,12 @@ impl TrowServer {
 
     async fn download_manifest_and_layers<T: Display>(&self, cl: &reqwest::Client, token: &Option<T>, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
 
-        let resp = if let Some(auth) = token {
-            cl.get(&remote_image.get_manifest_url()).bearer_auth(auth).headers(create_accept_header()).send().await?
-        } else {
-            cl.get(&remote_image.get_manifest_url()).headers(create_accept_header()).send().await?
-        };
+        let mut resp = cl.get(&remote_image.get_manifest_url());
+        if let Some(auth) = token {
+            resp = resp.bearer_auth(auth);
+        }
+
+        let resp = resp.headers(create_accept_header()).send().await?;
 
         if !resp.status().is_success() {
             return Err(failure::err_msg(format!("GET {} returned unexpected {}", &remote_image.get_manifest_url(), resp.status())));
@@ -400,12 +411,8 @@ impl TrowServer {
                 info!("Already have blob {}", digest);    
                 break;
             }
-
-
             let addr = format!("{}/{}/blobs/{}", remote_image.host, remote_image.repo, digest);
             info!("Downloading blob {}", addr);
-            println!("Downloading blob {}", addr);
-
 
             let resp = if let Some(auth) = token {
                 cl.get(&addr).bearer_auth(auth).send().await?
@@ -441,9 +448,7 @@ impl TrowServer {
         }
 
         Ok(())
-
     }
-
 
     async fn create_manifest_read_location(
         &self,
@@ -463,38 +468,45 @@ impl TrowServer {
             let mut auth = None;
             //Get auth token
             let resp = if let Some(auth_url) = &proxy_image.auth {
-                let auth_rs = cl.get(auth_url).send().await.unwrap();
-                let auth_v = auth_rs.json::<serde_json::Value>().await?;
-                let auth_str = auth_v["token"].as_str().unwrap().to_string();
+                let auth_rs = cl.get(auth_url).send().await
+                    .map_err(|e| ProxyError{msg: format!("Failed to retrieve auth token {}", e)})?;
+                let auth_v = auth_rs.json::<serde_json::Value>().await
+                    .map_err(|e| ProxyError{msg: format!("Failed to decode auth token {}", e)})?;
+                let auth_str = auth_v["token"].as_str()
+                    .ok_or_else(|| ProxyError{msg: "Failed to find auth token".to_string()})?.to_string();
                 auth = Some(auth_str.clone());    
-                cl.head(&proxy_image.get_manifest_url()).bearer_auth(&auth_str).headers(create_accept_header()).send().await.unwrap()
+                cl.head(&proxy_image.get_manifest_url()).bearer_auth(&auth_str).headers(create_accept_header())
             } else {
                 cl.head(&proxy_image.get_manifest_url())
-                    .headers(create_accept_header()).send().await.unwrap()  
+                    .headers(create_accept_header())
             };
+            let resp = resp.send().await;
             
-            if resp.status().is_success() {
+            if resp.is_ok() {
+                let resp = resp.unwrap();
+                if resp.status().is_success() {
                 
-                if let Some(digest) = resp.headers().get(DIGEST_HEADER) {
-                    let mut digest=format!("{:?}", digest);
-                    digest = digest.trim_matches('"').to_string();
+                    if let Some(digest) = resp.headers().get(DIGEST_HEADER) {
+                        let mut digest=format!("{:?}", digest);
+                        digest = digest.trim_matches('"').to_string();
                 
-                    if self.get_catalog_path_for_blob(&digest)?.exists() {
-                        info!("Have up to date manifest for {} digest {}", repo_name, digest);
-                        have_manifest = true;
+                        if self.get_catalog_path_for_blob(&digest)?.exists() {
+                            info!("Have up to date manifest for {} digest {}", repo_name, digest);
+                            have_manifest = true;
+                        }
                     }
+                } else {
+                    //Don't return; possibly registry doesn't like HEAD requests
+                    error!("Failed HEAD request for proxied image {} returned {}", proxy_image.get_manifest_url(), resp.status());
                 }
             } else {
-                error!("Failed HEAD request for proxied image {} returned {}", proxy_image.get_manifest_url(), resp.status());
+                //Don't return; possibly registry doesn't like HEAD requests
+                error!("Failed HEAD request for proxied image {} got error {:?}", proxy_image.get_manifest_url(), resp.err());
             }
 
             if !have_manifest {
-                let res = self.download_manifest_and_layers(&cl, &auth, &proxy_image, &repo_name).await;
-
-                if res.is_err() {
-                    println!("Got err {:?}", &res.unwrap_err());
-                    //BAD CONSUMED ERR
-                }
+                self.download_manifest_and_layers(&cl, &auth, &proxy_image, &repo_name).await
+                    .map_err(|e| ProxyError{msg: format!("Failed to download proxied image {}", e)})?;
             }
         }
 

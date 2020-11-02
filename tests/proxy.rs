@@ -36,6 +36,8 @@ mod interface_tests {
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
+            .arg("--")
+            .arg("--proxy-docker-hub")
             .spawn()
             .expect("failed to start");
 

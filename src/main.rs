@@ -167,6 +167,13 @@ Must be used with --user")
             .help("Get the version number of Trow")
             .takes_value(false)
         )
+        .arg(
+            Arg::with_name("proxy-docker-hub")
+            .long("proxy-docker-hub")
+            .value_name("proxy-docker-hub")
+            .help("Proxies repos at _f/docker/<repo_name> to docker.io/<repo_name>. Downloaded images will be cached.")
+            .takes_value(false)
+        )
         .get_matches()
 }
 
@@ -197,6 +204,7 @@ fn main() {
     let host_names_str = matches.value_of("names").unwrap_or(host);
     let host_names = parse_list(&host_names_str);
     let dry_run = matches.is_present("dry-run");
+    let proxy_hub = matches.is_present("proxy-docker-hub");
 
     let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
     if matches.is_present("allow-docker-official") {
@@ -219,6 +227,7 @@ fn main() {
         addr,
         "127.0.0.1:51000".to_string(),
         host_names,
+        proxy_hub,
         allow_prefixes,
         allow_images,
         deny_prefixes,
