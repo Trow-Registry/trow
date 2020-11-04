@@ -23,6 +23,8 @@ pub fn test_route<'r, A: Responder<'r>>(handler: A) -> rocket::Response<'r> {
             listen: "trow:51000".to_owned(),
         },
         proxy_hub: true,
+        hub_user: None,
+        hub_pass: None,
         host_names: vec![],
         allow_prefixes: vec![],
         allow_images: vec![],

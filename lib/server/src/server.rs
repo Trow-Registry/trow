@@ -33,7 +33,8 @@ static UPLOADS_DIR: &str = "scratch";
 static PROXY_DIR: &str = "f_/"; //Repositories starting with this are considered proxies
 static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
 static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
-static HUB_AUTH_ADDRESS: &str = "https://auth.docker.io/token?service=registry.docker.io";
+static HUB_AUTH_ENDPOINT: &str = "https://auth.docker.io/token";
+static HUB_RESOURCE: &str = "registry.docker.io";
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
@@ -53,6 +54,8 @@ pub struct TrowServer {
     blobs_path: PathBuf,
     scratch_path: PathBuf,
     proxy_hub: bool,
+    hub_user: Option<String>,
+    hub_pass: Option<String>,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_local_prefixes: Vec<String>,
@@ -77,7 +80,12 @@ pub struct Image {
     pub host: String, //Including port, docker.io by default
     pub repo: String, //Between host and : including any /s
     pub tag: String,  //Bit after the :, latest by default
-    pub auth: Option<String>
+}
+
+impl fmt::Display for Image {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}:{}", self.host, self.repo, self.tag)
+    }
 }
 
 impl Image {
@@ -87,10 +95,12 @@ impl Image {
     }
 }
 
-impl fmt::Display for Image {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}/{}:{}", self.host, self.repo, self.tag)
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub struct Auth {
+    pub endpoint: String,
+    pub resource: String,
+    pub user: Option<String>, //DockerHub has anon auth
+    pub pass: Option<String>,
 }
 
 fn create_accept_header() -> HeaderMap {
@@ -224,6 +234,8 @@ impl TrowServer {
     pub fn new(
         data_path: &str,
         proxy_hub: bool,
+        hub_user: Option<String>,
+        hub_pass: Option<String>,
         allow_prefixes: Vec<String>,
         allow_images: Vec<String>,
         deny_local_prefixes: Vec<String>,
@@ -238,6 +250,8 @@ impl TrowServer {
             blobs_path,
             scratch_path,
             proxy_hub,
+            hub_user,
+            hub_pass,
             allow_prefixes,
             allow_images,
             deny_local_prefixes,
@@ -357,7 +371,7 @@ impl TrowServer {
     If repo is proxied to another registry, this will return the details of the remote image.
     If the repo isn't proxied None is returned
     **/
-    fn get_manifest_proxy_address(&self, repo_name: &str, reference: &str) -> Option<Image> {
+    fn get_proxy_address_and_auth(&self, repo_name: &str, reference: &str) -> Option<(Image, Option<Auth>)> {
 
         //All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
@@ -367,14 +381,15 @@ impl TrowServer {
             if self.proxy_hub && proxy_name.starts_with(HUB_PROXY_DIR) {
 
                 let repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
-                let auth = Some(format!("{}&scope=repository:{}:pull", HUB_AUTH_ADDRESS, &repo).to_string());
 
-                return Some(Image {
-                    host: HUB_ADDRESS.to_string(),
-                    repo,
-                    tag: reference.to_string(),
-                    auth,
-                })
+                return Some((
+                    Image{host: HUB_ADDRESS.to_string(), repo, tag: reference.to_string()},
+                    Some(Auth{
+                        endpoint: HUB_AUTH_ENDPOINT.to_string(), 
+                        resource: HUB_RESOURCE.to_string(), 
+                        user: self.hub_user.clone(), 
+                        pass: self.hub_pass.clone(),
+                    })))
             } 
         }
 
@@ -404,6 +419,7 @@ impl TrowServer {
         let mani: Manifest = serde_json::from_slice(&bytes)?;
 
         let mut paths = vec![];
+        //TODO: change to perform dloads async
         for digest in mani.get_local_asset_digests() {
 
             //break if have digest
@@ -450,6 +466,39 @@ impl TrowServer {
         Ok(())
     }
 
+    async fn get_auth_token(&self, cl: &reqwest::Client, image: &Image, auth: &Auth) -> Result<String, Error> {
+
+        //Fucking annoyingly, anonymous requests have to use GET whilst user based is POST
+
+        let resp = if !&auth.pass.is_some() {
+            info!("Making anonymous auth request to Docker Hub");
+            let req = format!("{}?service={}&scope=repository:{}:pull", &auth.endpoint, auth.resource, image.repo).to_string();
+
+            cl.get(&req).send().await?
+        } else {            
+            let mut auth_req = format!("&grant_type=password&client_id=trow_proxy&service={}&scope=repository:{}:pull", auth.resource, image.repo);
+
+            if let Some(user) = &auth.user {
+                info!("Making request to Docker Hub as {}", &user);
+                auth_req = format!("{}&username={}", auth_req, user);
+            }
+            if let Some(pass) = &auth.pass {
+                auth_req = format!("{}&password={}", auth_req, pass);
+            }
+
+            cl.post(&auth.endpoint)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .body(auth_req).send().await?
+        };
+
+        if !resp.status().is_success() {
+            Err(ProxyError{msg: format!("Failed to authenticate to {}", auth.endpoint)})?;
+        }
+        let auth = resp.json::<serde_json::Value>().await?;
+
+        Ok(auth["access_token"].as_str().ok_or_else(|| ProxyError{msg: "Failed to find auth token".to_string()})?.to_string())
+    }
+
     async fn create_manifest_read_location(
         &self,
         repo_name: String,
@@ -457,24 +506,20 @@ impl TrowServer {
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
 
-        if let Some(proxy_image) = self.get_manifest_proxy_address(&repo_name, &reference) {
+        if let Some((proxy_image, proxy_auth)) = self.get_proxy_address_and_auth(&repo_name, &reference) {
 
             //TODO: May want to consider download tracking in case of simultaneous requests
             //In short term this isn't a big problem as should just copy over itself in worst case
             info!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
 
             let cl = reqwest::Client::new();
+           
             let mut have_manifest = false;
-            let mut auth = None;
+            let mut auth_token = None;
             //Get auth token
-            let resp = if let Some(auth_url) = &proxy_image.auth {
-                let auth_rs = cl.get(auth_url).send().await
-                    .map_err(|e| ProxyError{msg: format!("Failed to retrieve auth token {}", e)})?;
-                let auth_v = auth_rs.json::<serde_json::Value>().await
-                    .map_err(|e| ProxyError{msg: format!("Failed to decode auth token {}", e)})?;
-                let auth_str = auth_v["token"].as_str()
-                    .ok_or_else(|| ProxyError{msg: "Failed to find auth token".to_string()})?.to_string();
-                auth = Some(auth_str.clone());    
+            let resp = if let Some(auth) = &proxy_auth {
+                let auth_str = self.get_auth_token(&cl, &proxy_image, &auth).await?;  
+                auth_token = Some(auth_str.clone());
                 cl.head(&proxy_image.get_manifest_url()).bearer_auth(&auth_str).headers(create_accept_header())
             } else {
                 cl.head(&proxy_image.get_manifest_url())
@@ -505,7 +550,7 @@ impl TrowServer {
             }
 
             if !have_manifest {
-                self.download_manifest_and_layers(&cl, &auth, &proxy_image, &repo_name).await
+                self.download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name).await
                     .map_err(|e| ProxyError{msg: format!("Failed to download proxied image {}", e)})?;
             }
         }
