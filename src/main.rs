@@ -292,7 +292,9 @@ fn main() {
         }
     }
     if matches.is_present("proxy-docker-hub") && matches.is_present("hub-user") {
-        let hub_user = matches.value_of("hub-user").expect("Failed to read Docker Hub user name");
+        let hub_user = matches
+            .value_of("hub-user")
+            .expect("Failed to read Docker Hub user name");
 
         if matches.is_present("hub-token") {
             let hub_token = matches

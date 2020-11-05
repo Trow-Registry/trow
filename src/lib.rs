@@ -223,7 +223,6 @@ impl TrowBuilder {
     }
 
     pub fn with_hub_auth(&mut self, hub_user: String, token: String) -> &mut TrowBuilder {
-
         self.config.hub_pass = Some(token);
         self.config.hub_user = Some(hub_user);
         self

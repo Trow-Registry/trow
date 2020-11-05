@@ -380,7 +380,12 @@ impl TrowServer {
 
             if self.proxy_hub && proxy_name.starts_with(HUB_PROXY_DIR) {
 
-                let repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
+                let mut repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
+
+                //Official images have to use the library/ repository
+                if !repo.contains('/') {
+                    repo = format!("library/{}", repo).to_string();
+                }
 
                 return Some((
                     Image{host: HUB_ADDRESS.to_string(), repo, tag: reference.to_string()},
@@ -468,7 +473,7 @@ impl TrowServer {
 
     async fn get_auth_token(&self, cl: &reqwest::Client, image: &Image, auth: &Auth) -> Result<String, Error> {
 
-        //Fucking annoyingly, anonymous requests have to use GET whilst user based is POST
+        //Fucking annoyingly, anonymous requests have to use GET whilst user based requests have to be POST
 
         let resp = if !&auth.pass.is_some() {
             info!("Making anonymous auth request to Docker Hub");
@@ -492,7 +497,7 @@ impl TrowServer {
         };
 
         if !resp.status().is_success() {
-            Err(ProxyError{msg: format!("Failed to authenticate to {}", auth.endpoint)})?;
+            return Err(ProxyError{msg: format!("Failed to authenticate to {}", auth.endpoint)}.into());
         }
         let auth = resp.json::<serde_json::Value>().await?;
 
@@ -538,6 +543,19 @@ impl TrowServer {
                         if self.get_catalog_path_for_blob(&digest)?.exists() {
                             info!("Have up to date manifest for {} digest {}", repo_name, digest);
                             have_manifest = true;
+
+                            //Make sure our tag exists and is up-to-date
+                            if !is_digest(&reference) {
+                                let our_digest = self.get_digest_from_manifest(&repo_name, &reference);
+                                if our_digest.is_err() || (our_digest.unwrap() != digest) {
+                                    let res = self.save_tag(&digest, &repo_name, &reference);
+                                    if res.is_err() {
+                                        error!("Internal error updating tag for proxied image {:?}", res.unwrap());
+                                    }
+                                }
+                                
+                            }
+                             
                         }
                     }
                 } else {
@@ -552,6 +570,8 @@ impl TrowServer {
             if !have_manifest {
                 self.download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name).await
                     .map_err(|e| ProxyError{msg: format!("Failed to download proxied image {}", e)})?;
+
+                //TODO in error case check for cached copy
             }
         }
 

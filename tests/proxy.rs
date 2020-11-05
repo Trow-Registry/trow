@@ -99,7 +99,7 @@ mod interface_tests {
         let config = manifest::Object {
             media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
             digest: "fake".to_string(),
-            size: None
+            size: None,
         };
         let layer = manifest::Object {
             media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_owned(),
@@ -150,8 +150,10 @@ mod interface_tests {
         get_manifest(&client, "f_/docker/library/alpine", "latest").await;
         get_manifest(&client, "f_/docker/library/alpine", "latest").await;
 
+        //Need to special case single name repos
+        get_manifest(&client, "f_/docker/alpine", "latest").await;
+
         //test writing manifest to proxy dir isn't allowed
         upload_to_nonwritable_repo(&client, "f_/failthis").await;
-
     }
 }

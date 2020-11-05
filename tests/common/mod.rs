@@ -39,7 +39,6 @@ pub fn kill_gracefully(child: &Child) {
 #[cfg(test)]
 #[allow(dead_code)]
 pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
-    
     let resp = cl
         .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
         .send()
