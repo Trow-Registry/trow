@@ -167,6 +167,35 @@ Must be used with --user")
             .help("Get the version number of Trow")
             .takes_value(false)
         )
+        .arg(
+            Arg::with_name("proxy-docker-hub")
+            .long("proxy-docker-hub")
+            .value_name("proxy-docker-hub")
+            .help("Proxies repos at f/docker/<repo_name> to docker.io/<repo_name>. Downloaded images will be cached.")
+            .takes_value(false)
+        )
+        .arg(
+            Arg::with_name("hub-user")
+            .long("hub-user")
+            .value_name("hub-user")
+            .help("Set the username for accessing the Docker Hub, used when proxying Docker Hub images.
+Must be used with --hub-token or --hub-token-file")
+            .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("hub-token")
+            .long("hub-token")
+            .value_name("hub-token")
+            .help("Set the token for accessing the Docker Hub, used when proxying Docker Hub images")
+            .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("hub-token-file")
+            .long("hub-token-file")
+            .value_name("hub-token-file")
+            .help("Location of file with token that can be used for accessing the Docker Hub, used when proxying Docker Hub images")
+            .takes_value(true)
+        )
         .get_matches()
 }
 
@@ -197,6 +226,7 @@ fn main() {
     let host_names_str = matches.value_of("names").unwrap_or(host);
     let host_names = parse_list(&host_names_str);
     let dry_run = matches.is_present("dry-run");
+    let proxy_hub = matches.is_present("proxy-docker-hub");
 
     let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
     if matches.is_present("allow-docker-official") {
@@ -219,6 +249,7 @@ fn main() {
         addr,
         "127.0.0.1:51000".to_string(),
         host_names,
+        proxy_hub,
         allow_prefixes,
         allow_images,
         deny_prefixes,
@@ -255,6 +286,40 @@ fn main() {
             }
 
             builder.with_user(user.to_string(), pass);
+        } else {
+            eprintln!("Either --pass or --password-file must be set if --user is set");
+            std::process::exit(1);
+        }
+    }
+    if matches.is_present("proxy-docker-hub") && matches.is_present("hub-user") {
+        let hub_user = matches
+            .value_of("hub-user")
+            .expect("Failed to read Docker Hub user name");
+
+        if matches.is_present("hub-token") {
+            let hub_token = matches
+                .value_of("hub-token")
+                .expect("Failed to read Docker Hub token");
+            builder.with_hub_auth(hub_user.to_string(), hub_token.to_string());
+        } else if matches.is_present("hub-token-file") {
+            let file_name = matches
+                .value_of("hub-token-file")
+                .expect("Failed to read Docker Hub token file");
+            let mut file = File::open(file_name)
+                .unwrap_or_else(|_| panic!("Failed to read Docker Hub token file {}", file_name));
+            let mut token = String::new();
+            file.read_to_string(&mut token)
+                .unwrap_or_else(|_| panic!("Failed to read Docker Hub token file {}", file_name));
+
+            //Remove final newline if present
+            if token.ends_with('\n') {
+                token.pop();
+                if token.ends_with('\r') {
+                    token.pop();
+                }
+            }
+
+            builder.with_hub_auth(hub_user.to_string(), token);
         } else {
             eprintln!("Either --pass or --password-file must be set if --user is set");
             std::process::exit(1);

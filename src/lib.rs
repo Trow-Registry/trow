@@ -80,6 +80,9 @@ pub struct TrowConfig {
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
     host_names: Vec<String>,
+    proxy_hub: bool,
+    hub_user: Option<String>,
+    hub_pass: Option<String>,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -116,6 +119,9 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
     let ts = trow_server::build_server(
         &config.data_dir,
         config.grpc.listen.parse::<std::net::SocketAddr>()?,
+        config.proxy_hub,
+        config.hub_user,
+        config.hub_pass,
         config.allow_prefixes,
         config.allow_images,
         config.deny_prefixes,
@@ -170,6 +176,7 @@ impl TrowBuilder {
         addr: NetAddr,
         listen: String,
         host_names: Vec<String>,
+        proxy_hub: bool,
         allow_prefixes: Vec<String>,
         allow_images: Vec<String>,
         deny_prefixes: Vec<String>,
@@ -182,6 +189,9 @@ impl TrowBuilder {
             tls: None,
             grpc: GrpcConfig { listen },
             host_names,
+            proxy_hub,
+            hub_user: None,
+            hub_pass: None,
             allow_prefixes,
             allow_images,
             deny_prefixes,
@@ -209,6 +219,12 @@ impl TrowBuilder {
                 .expect("Error hashing password");
         let usercfg = UserConfig { user, hash_encoded };
         self.config.user = Some(usercfg);
+        self
+    }
+
+    pub fn with_hub_auth(&mut self, hub_user: String, token: String) -> &mut TrowBuilder {
+        self.config.hub_pass = Some(token);
+        self.config.hub_user = Some(hub_user);
         self
     }
 
@@ -280,6 +296,10 @@ impl TrowBuilder {
             "  Local images with these names are explicitly denied: {:?}\n",
             self.config.deny_images
         );
+
+        if self.config.proxy_hub {
+            println!("Docker Hub repostories are being proxy-cached under f/docker/\n");
+        }
         if self.config.dry_run {
             println!("Dry run, exiting.");
             std::process::exit(0);

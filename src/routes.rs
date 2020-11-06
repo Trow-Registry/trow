@@ -607,6 +607,7 @@ fn post_blob_upload(
     optimisation, but is arguably less flexible.
     */
 
+    let rn = repo_name.clone();
     let repo_name = RepoName(repo_name);
     let mut rt = Runtime::new().unwrap();
 
@@ -614,7 +615,15 @@ fn post_blob_upload(
 
     let up_info = rt.block_on(req).map_err(|e| {
         warn!("Error getting ref from backend: {}", e);
-        Error::InternalError
+        let e = e.downcast::<tonic::Status>();
+        if let Ok(ts) = e {
+            match ts.code() {
+                Code::InvalidArgument => Error::NameInvalid(rn),
+                _ => Error::InternalError,
+            }
+        } else {
+            Error::InternalError
+        }
     })?;
 
     if let Some(digest) = uri.query() {
@@ -757,11 +766,23 @@ fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
+    let rn = repo_name.clone();
     let repo = RepoName(repo_name);
 
     let write_deets = ci.get_write_sink_for_manifest(&repo, &reference);
     let mut rt = Runtime::new().unwrap();
-    let (mut sink_loc, uuid) = rt.block_on(write_deets).map_err(|_| Error::InternalError)?;
+    let (mut sink_loc, uuid) = rt.block_on(write_deets).map_err(|e| {
+        warn!("Error getting write details for manifest: {}", e);
+        let e = e.downcast::<tonic::Status>();
+        if let Ok(ts) = e {
+            match ts.code() {
+                Code::InvalidArgument => Error::NameInvalid(rn),
+                _ => Error::InternalError,
+            }
+        } else {
+            Error::InternalError
+        }
+    })?;
 
     match chunk.stream_to(&mut sink_loc) {
         Ok(_) => {

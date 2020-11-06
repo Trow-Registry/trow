@@ -29,6 +29,94 @@ cases you may need to perform an explicit `chown` or `chmod` using the UID of th
 
 Backing up the Trow registry can be done by copying the data directory (`/data` by default). 
 
+## Proxying the Docker Hub
+
+Trow can be configured as a proxy cache for Docker Hub images by passing the argument
+`--proxy-docker-hub` on start-up. Any repositories under `f/docker/` will automatically be pulled
+from the Docker Hub. For example, if we start Trow with:
+
+```
+$ trow --proxy-docker-hub 
+Starting Trow 0.3.0 on 0.0.0.0:8443
+
+**Validation callback configuration
+
+  By default all remote images are denied, and all local images present in the repository are allowed
+
+  These host names will be considered local (refer to this registry): ["0.0.0.0"]
+  Images with these prefixes are explicitly allowed: ["k8s.gcr.io/", "docker.io/containersol/trow"]
+  Images with these names are explicitly allowed: []
+  Local images with these prefixes are explicitly denied: []
+  Local images with these names are explicitly denied: []
+
+Docker Hub repostories are being proxy-cached under f/docker/
+```
+
+And then make the following request to the empty registry:
+
+```
+$ docker pull localhost:8443/f/docker/nginx:latest
+latest: Pulling from f/docker/nginx
+bb79b6b2107f: Already exists 
+5a9f1c0027a7: Pull complete 
+b5c20b2b484f: Pull complete 
+166a2418f7e8: Pull complete 
+1966ea362d23: Pull complete 
+Digest: sha256:34f3f875e745861ff8a37552ed7eb4b673544d2c56c7cc58f9a9bec5b4b3530e
+Status: Downloaded newer image for localhost:8443/f/docker/nginx:latest
+localhost:8443/f/docker/nginx:latest
+```
+
+Trow will keep a cached copy and check for new versions on each pull. The check is done via a HEAD
+request which does not count towards the Docker rate limits. If the image cannot be pulled a cached
+version will be returned, if available. This can be used to effectively mitigate issues with the
+Docker Hub.
+
+An account can configured to use with Trow, which will ensure it has it's own rate limit quota. To
+use this, you will need to obtain a token from the Docker Hub (see
+https://docs.docker.com/docker-hub/access-tokens/). The user and token can then be specified on
+start-up e.g:
+
+```
+$ trow --proxy-docker-hub --hub-user amouat --hub-token ffffffff-ffff-ffff-ffff-ffffffffffff
+Starting Trow 0.3.0 on 0.0.0.0:8443
+
+**Validation callback configuration
+
+  By default all remote images are denied, and all local images present in the repository are allowed
+
+  These host names will be considered local (refer to this registry): ["0.0.0.0"]
+  Images with these prefixes are explicitly allowed: ["k8s.gcr.io/", "docker.io/containersol/trow"]
+  Images with these names are explicitly allowed: []
+  Local images with these prefixes are explicitly denied: []
+  Local images with these names are explicitly denied: []
+
+Docker Hub repostories are being proxy-cached under f/docker/
+
+Trow is up and running!
+```
+
+As with passwords, the token can (and should) be loaded from a file:
+
+```
+$ trow --proxy-docker-hub --hub-user amouat --hub-token-file ./.hub_token
+Starting Trow 0.3.0 on 0.0.0.0:8443
+
+**Validation callback configuration
+
+  By default all remote images are denied, and all local images present in the repository are allowed
+
+  These host names will be considered local (refer to this registry): ["0.0.0.0"]
+  Images with these prefixes are explicitly allowed: ["k8s.gcr.io/", "docker.io/containersol/trow"]
+  Images with these names are explicitly allowed: []
+  Local images with these prefixes are explicitly denied: []
+  Local images with these names are explicitly denied: []
+
+Docker Hub repostories are being proxy-cached under f/docker/
+
+Trow is up and running!
+```
+
 ## Listing Repositories and Tags
 
 Trow implements the [OCI Distribution
