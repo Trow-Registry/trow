@@ -319,7 +319,7 @@ fn main() {
                 }
             }
 
-            builder.with_user(hub_user.to_string(), token);
+            builder.with_hub_auth(hub_user.to_string(), token);
         } else {
             eprintln!("Either --pass or --password-file must be set if --user is set");
             std::process::exit(1);
