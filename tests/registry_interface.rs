@@ -108,7 +108,10 @@ mod interface_tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
+        //Just check header exists for minute
+        resp.headers().get("Docker-Content-Digest").unwrap().to_str().unwrap();
         let mani: manifest::ManifestV2 = resp.json().await.unwrap();
+
         assert_eq!(mani.schema_version, 2);
     }
 
