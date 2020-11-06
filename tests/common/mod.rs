@@ -81,6 +81,13 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+    let digest_header = resp
+        .headers()
+        .get("Docker-Content-Digest")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert_eq!(digest, digest_header);
     assert_eq!(blob, resp.bytes().await.unwrap());
 
     //Upload manifest
