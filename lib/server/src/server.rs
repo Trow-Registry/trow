@@ -508,6 +508,7 @@ impl TrowServer {
             error!("Failed to authenticate to {}", auth.endpoint);
             return None
         }
+        
         let auth = match resp.json::<serde_json::Value>().await {
             Ok(auth) => auth,
             Err(e) => { 
