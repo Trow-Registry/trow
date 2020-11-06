@@ -30,7 +30,7 @@ static MANIFESTS_DIR: &str = "manifests";
 static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
 
-static PROXY_DIR: &str = "f_/"; //Repositories starting with this are considered proxies
+static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
 static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
 static HUB_AUTH_ENDPOINT: &str = "https://auth.docker.io/token";
@@ -471,7 +471,7 @@ impl TrowServer {
         Ok(())
     }
 
-    async fn get_auth_token(&self, cl: &reqwest::Client, image: &Image, auth: &Auth) -> Result<String, Error> {
+    async fn get_auth_token(&self, cl: &reqwest::Client, image: &Image, auth: &Auth) -> Option<String> {
 
         //Fucking annoyingly, anonymous requests have to use GET whilst user based requests have to be POST
 
@@ -479,7 +479,7 @@ impl TrowServer {
             info!("Making anonymous auth request to Docker Hub");
             let req = format!("{}?service={}&scope=repository:{}:pull", &auth.endpoint, auth.resource, image.repo).to_string();
 
-            cl.get(&req).send().await?
+            cl.get(&req).send().await
         } else {            
             let mut auth_req = format!("&grant_type=password&client_id=trow_proxy&service={}&scope=repository:{}:pull", auth.resource, image.repo);
 
@@ -493,15 +493,62 @@ impl TrowServer {
 
             cl.post(&auth.endpoint)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .body(auth_req).send().await?
+                .body(auth_req).send().await
+        };
+
+        let resp = match resp {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Remote registry didn't repsond to auth request: {}", e);
+                return None
+            }
         };
 
         if !resp.status().is_success() {
-            return Err(ProxyError{msg: format!("Failed to authenticate to {}", auth.endpoint)}.into());
+            error!("Failed to authenticate to {}", auth.endpoint);
+            return None
         }
-        let auth = resp.json::<serde_json::Value>().await?;
+        let auth = match resp.json::<serde_json::Value>().await {
+            Ok(auth) => auth,
+            Err(e) => { 
+                error!("Failed to deserialize auth response {}", e); 
+                return None;
+            }
+        };
 
-        Ok(auth["access_token"].as_str().ok_or_else(|| ProxyError{msg: "Failed to find auth token".to_string()})?.to_string())
+        match auth["access_token"].as_str() {
+            Some(t) => Some(t.to_string()),
+            None => {
+                error!("Failed to find auth token in auth repsonse"); 
+                None
+            }
+        }
+    }
+
+    async fn get_digest_from_header(&self, cl: &reqwest::Client, image: &Image, auth_token: &Option<String>) -> Option<String> {
+
+        let resp = if let Some(auth) = auth_token {
+            cl.head(&image.get_manifest_url()).bearer_auth(&auth).headers(create_accept_header()).send().await
+        } else {
+            cl.head(&image.get_manifest_url())
+                .headers(create_accept_header()).send().await
+        };
+
+        let resp = match resp {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Remote registry didn't respond to HEAD request {}", e);
+                return None
+            }
+        };
+
+        if let Some(digest) = resp.headers().get(DIGEST_HEADER) {
+            let digest=format!("{:?}", digest);
+            Some(digest.trim_matches('"').to_string())
+        } else {
+            None
+        }
+
     }
 
     async fn create_manifest_read_location(
@@ -520,58 +567,38 @@ impl TrowServer {
             let cl = reqwest::Client::new();
            
             let mut have_manifest = false;
-            let mut auth_token = None;
             //Get auth token
-            let resp = if let Some(auth) = &proxy_auth {
-                let auth_str = self.get_auth_token(&cl, &proxy_image, &auth).await?;  
-                auth_token = Some(auth_str.clone());
-                cl.head(&proxy_image.get_manifest_url()).bearer_auth(&auth_str).headers(create_accept_header())
-            } else {
-                cl.head(&proxy_image.get_manifest_url())
-                    .headers(create_accept_header())
-            };
-            let resp = resp.send().await;
-            
-            if resp.is_ok() {
-                let resp = resp.unwrap();
-                if resp.status().is_success() {
-                
-                    if let Some(digest) = resp.headers().get(DIGEST_HEADER) {
-                        let mut digest=format!("{:?}", digest);
-                        digest = digest.trim_matches('"').to_string();
-                
-                        if self.get_catalog_path_for_blob(&digest)?.exists() {
-                            info!("Have up to date manifest for {} digest {}", repo_name, digest);
-                            have_manifest = true;
 
-                            //Make sure our tag exists and is up-to-date
-                            if !is_digest(&reference) {
-                                let our_digest = self.get_digest_from_manifest(&repo_name, &reference);
-                                if our_digest.is_err() || (our_digest.unwrap() != digest) {
-                                    let res = self.save_tag(&digest, &repo_name, &reference);
-                                    if res.is_err() {
-                                        error!("Internal error updating tag for proxied image {:?}", res.unwrap());
-                                    }
-                                }
-                                
-                            }
-                             
-                        }
-                    }
-                } else {
-                    //Don't return; possibly registry doesn't like HEAD requests
-                    error!("Failed HEAD request for proxied image {} returned {}", proxy_image.get_manifest_url(), resp.status());
-                }
+            let auth_token = if let Some(auth) = &proxy_auth {
+                self.get_auth_token(&cl, &proxy_image, &auth).await
             } else {
-                //Don't return; possibly registry doesn't like HEAD requests
-                error!("Failed HEAD request for proxied image {} got error {:?}", proxy_image.get_manifest_url(), resp.err());
+                None
+            };
+            let digest = self.get_digest_from_header(&cl, &proxy_image, &auth_token).await;
+
+            if let Some(digest) = digest {
+                if self.get_catalog_path_for_blob(&digest)?.exists() {
+                    info!("Have up to date manifest for {} digest {}", repo_name, digest);
+                    have_manifest = true;
+
+                    //Make sure our tag exists and is up-to-date
+                    if !is_digest(&reference) {
+                        let our_digest = self.get_digest_from_manifest(&repo_name, &reference);
+                        if our_digest.is_err() || (our_digest.unwrap() != digest) {
+                           let res = self.save_tag(&digest, &repo_name, &reference);
+                            if res.is_err() {
+                                error!("Internal error updating tag for proxied image {:?}", res.unwrap());
+                            }
+                        }            
+                    }                 
+                }
             }
 
             if !have_manifest {
-                self.download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name).await
-                    .map_err(|e| ProxyError{msg: format!("Failed to download proxied image {}", e)})?;
-
-                //TODO in error case check for cached copy
+                if let Err(e) = self.download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name).await{ 
+                    //Note that we may still have an out-of-date version that will be returned
+                    error!("Failed to download proxied image {}", e);
+                }   
             }
         }
 

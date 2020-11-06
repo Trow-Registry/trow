@@ -144,16 +144,16 @@ mod interface_tests {
 
         //Using docker proxy should be able to download image even though it's not in registry
         //These tests are repeated to exercise caching logic
-        get_manifest(&client, "f_/docker/amouat/trow", "latest").await;
-        get_manifest(&client, "f_/docker/amouat/trow", "latest").await;
+        get_manifest(&client, "f/docker/amouat/trow", "latest").await;
+        get_manifest(&client, "f/docker/amouat/trow", "latest").await;
 
-        get_manifest(&client, "f_/docker/library/alpine", "latest").await;
-        get_manifest(&client, "f_/docker/library/alpine", "latest").await;
+        get_manifest(&client, "f/docker/library/alpine", "latest").await;
+        get_manifest(&client, "f/docker/library/alpine", "latest").await;
 
         //Need to special case single name repos
-        get_manifest(&client, "f_/docker/alpine", "latest").await;
+        get_manifest(&client, "f/docker/alpine", "latest").await;
 
         //test writing manifest to proxy dir isn't allowed
-        upload_to_nonwritable_repo(&client, "f_/failthis").await;
+        upload_to_nonwritable_repo(&client, "f/failthis").await;
     }
 }
