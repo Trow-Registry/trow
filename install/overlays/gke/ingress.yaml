@@ -8,4 +8,4 @@ metadata:
 spec:
   backend:
     serviceName: trow-svc
-    servicePort: 8000
+    servicePort: http-tcp
