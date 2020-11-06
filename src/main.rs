@@ -171,7 +171,7 @@ Must be used with --user")
             Arg::with_name("proxy-docker-hub")
             .long("proxy-docker-hub")
             .value_name("proxy-docker-hub")
-            .help("Proxies repos at _f/docker/<repo_name> to docker.io/<repo_name>. Downloaded images will be cached.")
+            .help("Proxies repos at f/docker/<repo_name> to docker.io/<repo_name>. Downloaded images will be cached.")
             .takes_value(false)
         )
         .arg(

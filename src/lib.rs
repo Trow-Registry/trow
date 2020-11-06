@@ -298,7 +298,7 @@ impl TrowBuilder {
         );
 
         if self.config.proxy_hub {
-            println!("Docker Hub repostories are being proxy-cached under _f/docker/\n");
+            println!("Docker Hub repostories are being proxy-cached under f/docker/\n");
         }
         if self.config.dry_run {
             println!("Dry run, exiting.");
