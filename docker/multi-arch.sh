@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 #change to directory with script so we know where project root is
 #https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
@@ -16,8 +17,7 @@ then
 fi
 docker buildx use trow-multi
 
-# Github Package Repository doesn't support multi-arch images currently, so on hold
-GH_REPO=${DOCKER_REPO:-"docker.pkg.github.com/containersolutions/trow/trow"}
+GH_REPO=${DOCKER_REPO:-"ghcr.io/containersolutions/trow/trow"}
 REPO=${DOCKER_REPO:-"containersol/trow"}
 
 # If we're in a github action, set the image name differently

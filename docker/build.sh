@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 #change to directory with script so we know where project root is
 #https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
@@ -46,7 +47,7 @@ then
     docker tag $IMAGE $GH_REPO:default 
     docker push $GH_REPO:default 
     docker tag $IMAGE $GH_REPO:latest 
-    docker push $IMAGE $GH_REPO:latest 
+    docker push $GH_REPO:latest 
 
     # Add new image name to manifest template
     sed -i "s|{{TROW_AMD64_IMAGE}}|${IMAGE}|" ./manifest.tmpl
