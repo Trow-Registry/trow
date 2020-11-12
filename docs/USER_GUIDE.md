@@ -37,7 +37,7 @@ from the Docker Hub. For example, if we start Trow with:
 
 ```
 $ trow --proxy-docker-hub 
-Starting Trow 0.3.0 on 0.0.0.0:8443
+Starting Trow 0.3.1-PROXY on 0.0.0.0:8443
 
 **Validation callback configuration
 
@@ -79,7 +79,7 @@ start-up e.g:
 
 ```
 $ trow --proxy-docker-hub --hub-user amouat --hub-token ffffffff-ffff-ffff-ffff-ffffffffffff
-Starting Trow 0.3.0 on 0.0.0.0:8443
+Starting Trow 0.3.1-PROXY on 0.0.0.0:8443
 
 **Validation callback configuration
 
@@ -100,7 +100,7 @@ As with passwords, the token can (and should) be loaded from a file:
 
 ```
 $ trow --proxy-docker-hub --hub-user amouat --hub-token-file ./.hub_token
-Starting Trow 0.3.0 on 0.0.0.0:8443
+Starting Trow 0.3.1-PROXY on 0.0.0.0:8443
 
 **Validation callback configuration
 

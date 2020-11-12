@@ -3056,7 +3056,7 @@ checksum = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
 
 [[package]]
 name = "trow"
-version = "0.3.1"
+version = "0.3.1-PROXY"
 dependencies = [
  "assert_cli",
  "base64 0.12.3",
@@ -3098,7 +3098,7 @@ dependencies = [
 
 [[package]]
 name = "trow-protobuf"
-version = "0.3.1"
+version = "0.3.1-PROXY"
 dependencies = [
  "async-stream 0.3.0",
  "bytes 0.5.6",
@@ -3115,7 +3115,7 @@ dependencies = [
 
 [[package]]
 name = "trow-server"
-version = "0.3.1"
+version = "0.3.1-PROXY"
 dependencies = [
  "async-stream 0.3.0",
  "bytes 0.5.6",
