@@ -42,6 +42,7 @@ jobs:
           ./docker/build.sh
     - name: Push multi-arch image
       run: |
+         cat ./docker/manifest.tmpl
          ./manifest-tool push from-spec ./docker/manifest.tmpl
   conformance_tests:
     services:
