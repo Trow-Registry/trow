@@ -6,7 +6,7 @@ MINOR_VERSION="3"
 PATCH_VERSION="1"
 # Only use this for "special" release and prefix with "-" 
 # e.g. -SCANNING for scanning preview feature release
-NAME="" 
+NAME="-PROXY" 
 
 VERSION="$MAJOR_VERSION.$MINOR_VERSION.$PATCH_VERSION$NAME"
 
@@ -58,7 +58,7 @@ docker push containersol/trow:$VERSION-armv7
 docker push containersol/trow:$VERSION-arm64
 
 # Tag and push to GHCR
-for v in ["amd64", "armv7", "arm64"]
+for v in amd64 armv7 arm64
 do
     docker tag containersol/trow:$VERSION-$v ghcr.io/containersolutions/trow/trow:$VERSION-$v
     docker push ghcr.io/containersolutions/trow/trow:$VERSION-$v
@@ -68,9 +68,9 @@ cp release-manifest.tmpl release-manifest.yaml
 sed -i "s|{{FULL_VERSION}}|$VERSION|" ./release-manifest.yaml
 sed -i "s|{{MAJOR_VERSION}}|$MAJOR_VERSION$NAME|" ./release-manifest.yaml
 sed -i "s|{{MINOR_VERSION}}|$MAJOR_VERSION.$MINOR_VERSION$NAME|" ./release-manifest.yaml
-sed -i "s|{{TROW_AMD64_IMAGE}}|containersol/trow:$VERSION$NAME-amd64|" ./release-manifest.yaml
-sed -i "s|{{TROW_ARMV7_IMAGE}}|containersol/trow:$VERSION$NAME-armv7|" ./release-manifest.yaml
-sed -i "s|{{TROW_ARM64_IMAGE}}|containersol/trow:$VERSION$NAME-arm64|" ./release-manifest.yaml
+sed -i "s|{{TROW_AMD64_IMAGE}}|containersol/trow:$VERSION-amd64|" ./release-manifest.yaml
+sed -i "s|{{TROW_ARMV7_IMAGE}}|containersol/trow:$VERSION-armv7|" ./release-manifest.yaml
+sed -i "s|{{TROW_ARM64_IMAGE}}|containersol/trow:$VERSION-arm64|" ./release-manifest.yaml
 manifest-tool push from-spec ./release-manifest.yaml
 
 if [[ $(git rev-parse --abbrev-ref HEAD) != "master" ]]

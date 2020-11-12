@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 #change to directory with script so we know where project root is
 #https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
@@ -8,13 +8,16 @@ cd "$src_dir"
 
 # Use trow-multi builder if it exists, otherwise create it
 
-if [[ $(docker buildx ls | grep -s trow-multi) != 0 ]]
+set +e
+docker buildx ls | grep -s trow-multi
+if [[ $? != 0 ]]
 then
     # Register binfmt handlers
     docker run --rm --privileged aptman/qus -s -- -p arm aarch64
     # Create new build instance
     docker buildx create --name trow-multi
 fi
+set -e
 docker buildx use trow-multi
 
 GH_REPO=${DOCKER_REPO:-"ghcr.io/containersolutions/trow/trow"}
