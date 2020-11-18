@@ -1,6 +1,7 @@
 # Trow User Guide
 
  * [Persisting Data/Images](#persisting-dataimages)
+ * [Proxying the Docker Hub](#proxying-the-docker-hub)
  * [Listing Repositories and Tags](#listing-repositories-and-tags)
  * [Using Curl Securely](#using-curl-securely)
  * [Multiplatform Builds](#multiplatform)
