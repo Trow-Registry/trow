@@ -9,7 +9,7 @@ use trow_proto::{
     UploadRequest, VerifyManifestRequest,
 };
 
-use tonic::Request;
+use tonic::{Request, Code};
 
 use crate::chrono::TimeZone;
 use crate::types::{self, *};
@@ -18,6 +18,7 @@ use serde_json::Value;
 use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::io;
 
 pub struct ClientInterface {
     server: String,
@@ -49,6 +50,16 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
         _ => (),
     }
     images
+}
+
+#[derive(Debug, Fail)]
+pub enum RegistryError {
+    #[fail(display = "Invalid repository or tag")]
+    InvalidName,
+    #[fail(display = "Invalid manifest")]
+    InvalidManifest,
+    #[fail(display = "Internal Error")]
+    Internal
 }
 
 impl ClientInterface {
@@ -161,6 +172,43 @@ impl ClientInterface {
             .append(true)
             .open(resp.path)?;
         Ok(file)
+    }
+
+    pub async fn upload_manifest<'a>(
+        &self,
+        repo_name: &RepoName,
+        reference: &str,
+        manifest: &mut Box<dyn Read + 'a>
+    ) -> Result<types::VerifiedManifest, RegistryError> {
+
+        let (mut sink_loc, uuid) = self.get_write_sink_for_manifest(repo_name, reference).await.map_err(|e| {
+            let e = e.downcast::<tonic::Status>();
+            if let Ok(ts) = e {
+                match ts.code() {
+                    Code::InvalidArgument => RegistryError::InvalidName,
+                    _ => RegistryError::Internal,
+                }
+            } else {
+                RegistryError::Internal
+            }
+        })?;
+
+        io::copy(manifest, &mut sink_loc).map_err(|e| {
+            warn!("Error wirting out manifest {:?}", e);
+            RegistryError::Internal
+        })?;
+
+        self.verify_manifest(repo_name, reference, &uuid).await.map_err(|e| {
+            let e = e.downcast::<tonic::Status>();
+            if let Ok(ts) = e {
+                match ts.code() {
+                    Code::InvalidArgument => RegistryError::InvalidManifest,
+                    _ => RegistryError::Internal,
+                }
+            } else {
+                RegistryError::Internal
+            }
+        })
     }
 
     pub async fn get_write_sink_for_manifest(

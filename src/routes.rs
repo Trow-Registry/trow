@@ -1,4 +1,4 @@
-use crate::client_interface::ClientInterface;
+use crate::client_interface::{ClientInterface, RegistryError};
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
 use crate::response::html::HTML;
@@ -11,7 +11,7 @@ use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
-use std::io::Seek;
+use std::io::{Read, Seek};
 use std::str;
 use tonic::Code;
 
@@ -766,44 +766,17 @@ fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
+
     let rn = repo_name.clone();
     let repo = RepoName(repo_name);
 
-    let write_deets = ci.get_write_sink_for_manifest(&repo, &reference);
     let mut rt = Runtime::new().unwrap();
-    let (mut sink_loc, uuid) = rt.block_on(write_deets).map_err(|e| {
-        warn!("Error getting write details for manifest: {}", e);
-        let e = e.downcast::<tonic::Status>();
-        if let Ok(ts) = e {
-            match ts.code() {
-                Code::InvalidArgument => Error::NameInvalid(rn),
-                _ => Error::InternalError,
-            }
-        } else {
-            Error::InternalError
-        }
-    })?;
-
-    match chunk.stream_to(&mut sink_loc) {
-        Ok(_) => {
-            //This can probably be moved to responder
-            let ver = ci.verify_manifest(&repo, &reference, &uuid);
-            match rt.block_on(ver) {
-                Ok(vm) => Ok(vm),
-                Err(e) => {
-                    let e = e.downcast::<tonic::Status>();
-                    if let Ok(ts) = e {
-                        match ts.code() {
-                            Code::InvalidArgument => Err(Error::ManifestInvalid),
-                            _ => Err(Error::InternalError),
-                        }
-                    } else {
-                        Err(Error::InternalError)
-                    }
-                }
-            }
-        }
-        Err(_) => Err(Error::InternalError),
+    let mut a: Box<dyn Read> = Box::new(chunk.open());
+    match rt.block_on(ci.upload_manifest(&repo, &reference, &mut a)) {
+        Ok(vm) => Ok(vm),
+        Err(RegistryError::InvalidName) =>  Err(Error::NameInvalid(rn)),
+        Err(RegistryError::InvalidManifest) => Err(Error::ManifestInvalid),
+        Err(_) => Err(Error::InternalError)
     }
 }
 
