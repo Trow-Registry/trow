@@ -316,34 +316,18 @@ fn put_blob(
     digest: String,
     chunk: rocket::data::Data,
 ) -> Result<AcceptedUpload, Error> {
-    let repo = RepoName(repo_name);
+    let repo = RepoName(repo_name.clone());
     let uuid = Uuid(uuid);
 
-    let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
-
     let mut rt = Runtime::new().unwrap();
-    let sink = rt.block_on(sink_f);
+    let mut data: Box<dyn Read> = Box::new(chunk.open());
 
-    match sink {
-        Ok(mut sink) => {
-            // Puts should be monolithic uploads (all in go I belive)
-            let len = chunk.stream_to(&mut sink);
-            match len {
-                //TODO: For chunked upload this should be start pos to end pos
-                Ok(len) => {
-                    let digest = Digest(digest);
-                    let r = ci.complete_upload(&repo, &uuid, &digest, len);
-                    rt.block_on(r).map_err(|_| Error::InternalError)
-                }
-                Err(_) => Err(Error::InternalError),
-            }
-        }
-        Err(_) => {
-            // TODO: this conflates rpc errors with uuid not existing
-            warn!("Uuid {} does not exist, dropping connection", uuid);
-            Err(Error::BlobUnknown)
-        }
+    match rt.block_on(ci.upload_blob(&repo, &uuid, &digest, &mut data)) {
+        Ok(au) => Ok(au),
+        Err(RegistryError::InvalidNameOrUUID) =>  Err(Error::NameInvalid(repo_name)),
+        Err(_) => Err(Error::InternalError)
     }
+    
 }
 
 /*
@@ -586,7 +570,8 @@ fn patch_blob_4level(
 
  We respond with details of location and UUID to upload to with patch/put.
 
- No data is being transferred yet.
+ No data is being transferred _unless_ the request ends with "?digest".
+ In this case the whole blob is attached.
 */
 #[post("/v2/<repo_name>/blobs/uploads", data = "<data>")]
 fn post_blob_upload(
@@ -628,32 +613,15 @@ fn post_blob_upload(
 
     if let Some(digest) = uri.query() {
         if digest.starts_with("digest=") {
+            //Have a monolithic upload
+
+            let mut data: Box<dyn Read> = Box::new(data.open());
             let digest = &Uri::percent_decode_lossy(&digest["digest=".len()..].as_bytes());
-            let sink_f = ci.get_write_sink_for_upload(&repo_name, &up_info.uuid());
-            let sink = rt.block_on(sink_f);
-            return match sink {
-                Ok(mut sink) => {
-                    // We have a monolithic upload
-                    let len = data.stream_to(&mut sink);
-                    match len {
-                        Ok(len) => {
-                            let digest = Digest(digest.to_string());
-                            let r = ci.complete_upload(&repo_name, &up_info.uuid(), &digest, len);
-                            rt.block_on(r)
-                                .map_err(|_| Error::InternalError)
-                                .map(Upload::Accepted)
-                        }
-                        Err(_) => Err(Error::InternalError),
-                    }
-                }
-                Err(_) => {
-                    // TODO: this conflates rpc errors with uuid not existing
-                    warn!(
-                        "Uuid {} does not exist, dropping connection",
-                        &up_info.uuid()
-                    );
-                    Err(Error::BlobUnknown)
-                }
+
+            return match rt.block_on(ci.upload_blob(&repo_name, &up_info.uuid(), &digest, &mut data)) {
+                Ok(au) => Ok(Upload::Accepted(au)),
+                Err(RegistryError::InvalidNameOrUUID) =>  Err(Error::BlobUnknown),
+                Err(_) => Err(Error::InternalError)
             };
         }
     }

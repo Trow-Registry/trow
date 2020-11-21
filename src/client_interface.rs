@@ -56,6 +56,8 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
 pub enum RegistryError {
     #[fail(display = "Invalid repository or tag")]
     InvalidName,
+    #[fail(display = "Invalid name or UUID")]
+    InvalidNameOrUUID,
     #[fail(display = "Invalid manifest")]
     InvalidManifest,
     #[fail(display = "Internal Error")]
@@ -112,6 +114,29 @@ impl ClientInterface {
             repo_name.clone(),
             (0, 0),
         ))
+    }
+
+    pub async fn upload_blob<'a>(
+        &self,
+        repo_name: &RepoName,
+        uuid: &Uuid,
+        digest: &str,
+        blob: &mut Box<dyn Read + 'a>
+    ) -> Result<AcceptedUpload, RegistryError> {
+
+        let mut sink = self.get_write_sink_for_upload(repo_name, &uuid).await.map_err(|e| {
+            warn!("Error finding write sink for blob {:?}", e);
+            RegistryError::InvalidNameOrUUID
+        })?;
+        let len = io::copy(blob, &mut sink).map_err(|e| {
+            warn!("Error writing blob {:?}", e);
+            RegistryError::Internal
+        })?;
+        let digest = Digest(digest.to_string());
+        self.complete_upload(repo_name, uuid, &digest, len).await.map_err(|e| {
+            warn!("Error finalising upload {:?}", e);
+            RegistryError::Internal
+        })
     }
 
     pub async fn complete_upload(
@@ -211,7 +236,7 @@ impl ClientInterface {
         })
     }
 
-    pub async fn get_write_sink_for_manifest(
+    async fn get_write_sink_for_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
