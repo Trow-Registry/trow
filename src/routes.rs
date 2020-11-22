@@ -739,8 +739,8 @@ fn put_image_manifest(
     let repo = RepoName(repo_name);
 
     let mut rt = Runtime::new().unwrap();
-    let mut a: Box<dyn Read> = Box::new(chunk.open());
-    match rt.block_on(ci.upload_manifest(&repo, &reference, &mut a)) {
+    let mut data: Box<dyn Read> = Box::new(chunk.open());
+    match rt.block_on(ci.upload_manifest(&repo, &reference, &mut data)) {
         Ok(vm) => Ok(vm),
         Err(RegistryError::InvalidName) =>  Err(Error::NameInvalid(rn)),
         Err(RegistryError::InvalidManifest) => Err(Error::ManifestInvalid),
