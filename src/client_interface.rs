@@ -52,6 +52,8 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
     images
 }
 
+// TODO: Each function should have it's own enum of the errors it can return
+// There must be a standard pattern for this somewhere...
 #[derive(Debug, Fail)]
 pub enum RegistryError {
     #[fail(display = "Invalid repository or tag")]
