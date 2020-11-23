@@ -11,7 +11,7 @@ use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
-use std::io::{Read, Seek};
+use std::io::Read;
 use std::str;
 use tonic::Code;
 
@@ -412,8 +412,8 @@ fn put_blob_4level(
 /*
 
 ---
-Chunked Upload (Don't implement until Monolithic works)
-Must be implemented as docker only supports this
+Chunked Upload
+
 PATCH /v2/<name>/blobs/uploads/<uuid>
 Content-Length: <size of chunk>
 Content-Range: <start of range>-<end of range>
@@ -436,57 +436,17 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    let repo = RepoName(repo_name);
+    let repo = RepoName(repo_name.clone());
     let uuid = Uuid(uuid);
 
-    let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
-    let sink = Runtime::new().unwrap().block_on(sink_f);
+    let mut rt = Runtime::new().unwrap();
+    let mut data: Box<dyn Read> = Box::new(chunk.open());
 
-    let have_chunked_upload = info.is_some();
-    let info = info.unwrap_or(ContentInfo {
-        length: 0,
-        range: (0, 0),
-    });
-
-    match sink {
-        Ok(mut sink) => {
-            // Uploads must be in order, so length should match start
-            // Note chunked uploads must be in order according to spec.
-            let start_index = sink.stream_len().unwrap_or(0);
-            if start_index != info.range.0 {
-                warn!("start_len {} l {}", start_index, info.range.0);
-                return Err(Error::BlobUploadInvalid);
-            }
-
-            let len = chunk.stream_to(&mut sink);
-            //Check len matches how much we were told
-            match len {
-                Ok(len) => {
-                    // Get total bytes written so far, including any previous chunks
-                    let total = sink.stream_len().unwrap_or(len);
-
-                    // Right of range should equal total if doing a chunked upload
-                    if have_chunked_upload {
-                        if (info.range.1 + 1) != total {
-                            warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
-                            return Err(Error::BlobUploadInvalid);
-                        }
-                        //Check length if chunked upload
-                        if info.length != len {
-                            warn!("info.length {} len {}", info.length, len);
-                            return Err(Error::BlobUploadInvalid);
-                        }
-                    }
-                    Ok(create_upload_info(uuid, repo, (0, total as u32)))
-                }
-                Err(_) => Err(Error::InternalError),
-            }
-        }
-        Err(_) => {
-            // TODO: this conflates rpc errors with uuid not existing
-            warn!("Uuid {} does not exist, dropping connection", uuid);
-            Err(Error::BlobUnknown)
-        }
+    match rt.block_on(ci.upload_blob_chunk(&repo, &uuid, info, &mut data)) {
+        Ok(au) => Ok(au),
+        Err(RegistryError::InvalidNameOrUUID) =>  Err(Error::NameInvalid(repo_name)),
+        Err(RegistryError::InvalidContentRange) => Err(Error::BlobUploadInvalid),
+        Err(_) => Err(Error::InternalError)
     }
 }
 

@@ -61,6 +61,8 @@ pub enum RegistryError {
     #[fail(display = "Invalid manifest")]
     InvalidManifest,
     #[fail(display = "Internal Error")]
+    InvalidContentRange,
+    #[fail(display = "Internal Error")]
     Internal
 }
 
@@ -139,7 +141,51 @@ impl ClientInterface {
         })
     }
 
-    pub async fn complete_upload(
+    pub async fn upload_blob_chunk<'a>(
+        &self,
+        repo_name: &RepoName,
+        uuid: &Uuid,
+        info: Option<ContentInfo>,
+        chunk: &mut Box<dyn Read + 'a>
+    ) -> Result<UploadInfo, RegistryError> {
+
+        let mut sink = self.get_write_sink_for_upload(repo_name, &uuid).await.map_err(|e| {
+            warn!("Error finding write sink for blob {:?}", e);
+            RegistryError::InvalidNameOrUUID
+        })?;
+
+        let have_chunked_upload = info.is_some();
+        let info = info.unwrap_or(ContentInfo {
+            length: 0,
+            range: (0, 0),
+        });
+
+        let start_index = sink.stream_len().unwrap_or(0);
+        if start_index != info.range.0 {
+            warn!("Asked for blob upload with invalid start index. Expected {} got {}", start_index, info.range.0);
+            return Err(RegistryError::InvalidContentRange);
+        }
+
+        let len = io::copy(chunk, &mut sink).map_err(|e| {
+            warn!("Error writing blob {:?}", e);
+            RegistryError::Internal
+        })?;
+        let total = sink.stream_len().unwrap_or(len);
+        if have_chunked_upload {
+            if (info.range.1 + 1) != total {
+                warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
+                return Err(RegistryError::InvalidContentRange);
+            }
+            //Check length if chunked upload
+            if info.length != len {
+                warn!("info.length {} len {}", info.length, len);
+                return Err(RegistryError::InvalidContentRange);
+            }
+        }
+        Ok(create_upload_info(uuid.clone(), repo_name.clone(), (0, total as u32)))
+    }
+
+    async fn complete_upload(
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
@@ -170,7 +216,7 @@ impl ClientInterface {
         ))
     }
 
-    pub async fn get_write_sink_for_upload(
+    async fn get_write_sink_for_upload(
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
