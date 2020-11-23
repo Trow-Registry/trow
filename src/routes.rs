@@ -1,4 +1,4 @@
-use crate::client_interface::ClientInterface;
+use crate::client_interface::{ClientInterface, RegistryError};
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
 use crate::response::html::HTML;
@@ -11,7 +11,7 @@ use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
-use std::io::Seek;
+use std::io::Read;
 use std::str;
 use tonic::Code;
 
@@ -316,33 +316,16 @@ fn put_blob(
     digest: String,
     chunk: rocket::data::Data,
 ) -> Result<AcceptedUpload, Error> {
-    let repo = RepoName(repo_name);
+    let repo = RepoName(repo_name.clone());
     let uuid = Uuid(uuid);
 
-    let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
-
     let mut rt = Runtime::new().unwrap();
-    let sink = rt.block_on(sink_f);
+    let mut data: Box<dyn Read> = Box::new(chunk.open());
 
-    match sink {
-        Ok(mut sink) => {
-            // Puts should be monolithic uploads (all in go I belive)
-            let len = chunk.stream_to(&mut sink);
-            match len {
-                //TODO: For chunked upload this should be start pos to end pos
-                Ok(len) => {
-                    let digest = Digest(digest);
-                    let r = ci.complete_upload(&repo, &uuid, &digest, len);
-                    rt.block_on(r).map_err(|_| Error::InternalError)
-                }
-                Err(_) => Err(Error::InternalError),
-            }
-        }
-        Err(_) => {
-            // TODO: this conflates rpc errors with uuid not existing
-            warn!("Uuid {} does not exist, dropping connection", uuid);
-            Err(Error::BlobUnknown)
-        }
+    match rt.block_on(ci.upload_blob(&repo, &uuid, &digest, &mut data)) {
+        Ok(au) => Ok(au),
+        Err(RegistryError::InvalidNameOrUUID) => Err(Error::NameInvalid(repo_name)),
+        Err(_) => Err(Error::InternalError),
     }
 }
 
@@ -428,8 +411,8 @@ fn put_blob_4level(
 /*
 
 ---
-Chunked Upload (Don't implement until Monolithic works)
-Must be implemented as docker only supports this
+Chunked Upload
+
 PATCH /v2/<name>/blobs/uploads/<uuid>
 Content-Length: <size of chunk>
 Content-Range: <start of range>-<end of range>
@@ -452,57 +435,17 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    let repo = RepoName(repo_name);
+    let repo = RepoName(repo_name.clone());
     let uuid = Uuid(uuid);
 
-    let sink_f = ci.get_write_sink_for_upload(&repo, &uuid);
-    let sink = Runtime::new().unwrap().block_on(sink_f);
+    let mut rt = Runtime::new().unwrap();
+    let mut data: Box<dyn Read> = Box::new(chunk.open());
 
-    let have_chunked_upload = info.is_some();
-    let info = info.unwrap_or(ContentInfo {
-        length: 0,
-        range: (0, 0),
-    });
-
-    match sink {
-        Ok(mut sink) => {
-            // Uploads must be in order, so length should match start
-            // Note chunked uploads must be in order according to spec.
-            let start_index = sink.stream_len().unwrap_or(0);
-            if start_index != info.range.0 {
-                warn!("start_len {} l {}", start_index, info.range.0);
-                return Err(Error::BlobUploadInvalid);
-            }
-
-            let len = chunk.stream_to(&mut sink);
-            //Check len matches how much we were told
-            match len {
-                Ok(len) => {
-                    // Get total bytes written so far, including any previous chunks
-                    let total = sink.stream_len().unwrap_or(len);
-
-                    // Right of range should equal total if doing a chunked upload
-                    if have_chunked_upload {
-                        if (info.range.1 + 1) != total {
-                            warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
-                            return Err(Error::BlobUploadInvalid);
-                        }
-                        //Check length if chunked upload
-                        if info.length != len {
-                            warn!("info.length {} len {}", info.length, len);
-                            return Err(Error::BlobUploadInvalid);
-                        }
-                    }
-                    Ok(create_upload_info(uuid, repo, (0, total as u32)))
-                }
-                Err(_) => Err(Error::InternalError),
-            }
-        }
-        Err(_) => {
-            // TODO: this conflates rpc errors with uuid not existing
-            warn!("Uuid {} does not exist, dropping connection", uuid);
-            Err(Error::BlobUnknown)
-        }
+    match rt.block_on(ci.upload_blob_chunk(&repo, &uuid, info, &mut data)) {
+        Ok(au) => Ok(au),
+        Err(RegistryError::InvalidNameOrUUID) => Err(Error::NameInvalid(repo_name)),
+        Err(RegistryError::InvalidContentRange) => Err(Error::BlobUploadInvalid),
+        Err(_) => Err(Error::InternalError),
     }
 }
 
@@ -586,7 +529,8 @@ fn patch_blob_4level(
 
  We respond with details of location and UUID to upload to with patch/put.
 
- No data is being transferred yet.
+ No data is being transferred _unless_ the request ends with "?digest".
+ In this case the whole blob is attached.
 */
 #[post("/v2/<repo_name>/blobs/uploads", data = "<data>")]
 fn post_blob_upload(
@@ -628,32 +572,20 @@ fn post_blob_upload(
 
     if let Some(digest) = uri.query() {
         if digest.starts_with("digest=") {
+            //Have a monolithic upload
+
+            let mut data: Box<dyn Read> = Box::new(data.open());
             let digest = &Uri::percent_decode_lossy(&digest["digest=".len()..].as_bytes());
-            let sink_f = ci.get_write_sink_for_upload(&repo_name, &up_info.uuid());
-            let sink = rt.block_on(sink_f);
-            return match sink {
-                Ok(mut sink) => {
-                    // We have a monolithic upload
-                    let len = data.stream_to(&mut sink);
-                    match len {
-                        Ok(len) => {
-                            let digest = Digest(digest.to_string());
-                            let r = ci.complete_upload(&repo_name, &up_info.uuid(), &digest, len);
-                            rt.block_on(r)
-                                .map_err(|_| Error::InternalError)
-                                .map(Upload::Accepted)
-                        }
-                        Err(_) => Err(Error::InternalError),
-                    }
-                }
-                Err(_) => {
-                    // TODO: this conflates rpc errors with uuid not existing
-                    warn!(
-                        "Uuid {} does not exist, dropping connection",
-                        &up_info.uuid()
-                    );
-                    Err(Error::BlobUnknown)
-                }
+
+            return match rt.block_on(ci.upload_blob(
+                &repo_name,
+                &up_info.uuid(),
+                &digest,
+                &mut data,
+            )) {
+                Ok(au) => Ok(Upload::Accepted(au)),
+                Err(RegistryError::InvalidNameOrUUID) => Err(Error::BlobUnknown),
+                Err(_) => Err(Error::InternalError),
             };
         }
     }
@@ -769,40 +701,12 @@ fn put_image_manifest(
     let rn = repo_name.clone();
     let repo = RepoName(repo_name);
 
-    let write_deets = ci.get_write_sink_for_manifest(&repo, &reference);
     let mut rt = Runtime::new().unwrap();
-    let (mut sink_loc, uuid) = rt.block_on(write_deets).map_err(|e| {
-        warn!("Error getting write details for manifest: {}", e);
-        let e = e.downcast::<tonic::Status>();
-        if let Ok(ts) = e {
-            match ts.code() {
-                Code::InvalidArgument => Error::NameInvalid(rn),
-                _ => Error::InternalError,
-            }
-        } else {
-            Error::InternalError
-        }
-    })?;
-
-    match chunk.stream_to(&mut sink_loc) {
-        Ok(_) => {
-            //This can probably be moved to responder
-            let ver = ci.verify_manifest(&repo, &reference, &uuid);
-            match rt.block_on(ver) {
-                Ok(vm) => Ok(vm),
-                Err(e) => {
-                    let e = e.downcast::<tonic::Status>();
-                    if let Ok(ts) = e {
-                        match ts.code() {
-                            Code::InvalidArgument => Err(Error::ManifestInvalid),
-                            _ => Err(Error::InternalError),
-                        }
-                    } else {
-                        Err(Error::InternalError)
-                    }
-                }
-            }
-        }
+    let mut data: Box<dyn Read> = Box::new(chunk.open());
+    match rt.block_on(ci.upload_manifest(&repo, &reference, &mut data)) {
+        Ok(vm) => Ok(vm),
+        Err(RegistryError::InvalidName) => Err(Error::NameInvalid(rn)),
+        Err(RegistryError::InvalidManifest) => Err(Error::ManifestInvalid),
         Err(_) => Err(Error::InternalError),
     }
 }
