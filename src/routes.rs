@@ -324,10 +324,9 @@ fn put_blob(
 
     match rt.block_on(ci.upload_blob(&repo, &uuid, &digest, &mut data)) {
         Ok(au) => Ok(au),
-        Err(RegistryError::InvalidNameOrUUID) =>  Err(Error::NameInvalid(repo_name)),
-        Err(_) => Err(Error::InternalError)
+        Err(RegistryError::InvalidNameOrUUID) => Err(Error::NameInvalid(repo_name)),
+        Err(_) => Err(Error::InternalError),
     }
-    
 }
 
 /*
@@ -444,9 +443,9 @@ fn patch_blob(
 
     match rt.block_on(ci.upload_blob_chunk(&repo, &uuid, info, &mut data)) {
         Ok(au) => Ok(au),
-        Err(RegistryError::InvalidNameOrUUID) =>  Err(Error::NameInvalid(repo_name)),
+        Err(RegistryError::InvalidNameOrUUID) => Err(Error::NameInvalid(repo_name)),
         Err(RegistryError::InvalidContentRange) => Err(Error::BlobUploadInvalid),
-        Err(_) => Err(Error::InternalError)
+        Err(_) => Err(Error::InternalError),
     }
 }
 
@@ -578,10 +577,15 @@ fn post_blob_upload(
             let mut data: Box<dyn Read> = Box::new(data.open());
             let digest = &Uri::percent_decode_lossy(&digest["digest=".len()..].as_bytes());
 
-            return match rt.block_on(ci.upload_blob(&repo_name, &up_info.uuid(), &digest, &mut data)) {
+            return match rt.block_on(ci.upload_blob(
+                &repo_name,
+                &up_info.uuid(),
+                &digest,
+                &mut data,
+            )) {
                 Ok(au) => Ok(Upload::Accepted(au)),
-                Err(RegistryError::InvalidNameOrUUID) =>  Err(Error::BlobUnknown),
-                Err(_) => Err(Error::InternalError)
+                Err(RegistryError::InvalidNameOrUUID) => Err(Error::BlobUnknown),
+                Err(_) => Err(Error::InternalError),
             };
         }
     }
@@ -694,7 +698,6 @@ fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
-
     let rn = repo_name.clone();
     let repo = RepoName(repo_name);
 
@@ -702,9 +705,9 @@ fn put_image_manifest(
     let mut data: Box<dyn Read> = Box::new(chunk.open());
     match rt.block_on(ci.upload_manifest(&repo, &reference, &mut data)) {
         Ok(vm) => Ok(vm),
-        Err(RegistryError::InvalidName) =>  Err(Error::NameInvalid(rn)),
+        Err(RegistryError::InvalidName) => Err(Error::NameInvalid(rn)),
         Err(RegistryError::InvalidManifest) => Err(Error::ManifestInvalid),
-        Err(_) => Err(Error::InternalError)
+        Err(_) => Err(Error::InternalError),
     }
 }
 
