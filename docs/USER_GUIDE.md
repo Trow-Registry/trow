@@ -73,7 +73,7 @@ request which does not count towards the Docker rate limits. If the image cannot
 version will be returned, if available. This can be used to effectively mitigate issues with the
 Docker Hub.
 
-An account can configured to use with Trow, which will ensure it has it's own rate limit quota. To
+An account can be configured to use with Trow, which will ensure it has it's own rate limit quota. To
 use this, you will need to obtain a token from the Docker Hub (see
 https://docs.docker.com/docker-hub/access-tokens/). The user and token can then be specified on
 start-up e.g:
