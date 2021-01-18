@@ -2,6 +2,8 @@ import React, { useRef, useEffect } from "react";
 import { Grid, Segment, Header, Input, Container } from "semantic-ui-react";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 
+import config from "../../../config";
+
 import { currentBlobQuery, currentManifestQuery } from "../../state/selectors";
 import {
     currentTagState,
@@ -65,7 +67,7 @@ export default function Details() {
                                     icon: "copy",
                                     onClick: copyText,
                                 }}
-                                value={`docker pull ${repo}:${tag}`}
+                                value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
                                 ref={copyRef}
                             />
                         </Container>

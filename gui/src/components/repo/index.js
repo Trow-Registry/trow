@@ -8,6 +8,8 @@ import {
     Header,
 } from "semantic-ui-react";
 
+import config from "../../../config";
+
 import Details from "../details";
 import Tags from "../tags";
 
@@ -40,7 +42,7 @@ export default function Repo({ repo }) {
                                     icon: "copy",
                                     onClick: copyText,
                                 }}
-                                value={`docker pull ${repo}`}
+                                value={`docker pull ${config.trow_registry_url}/${repo}`}
                                 ref={copyRef}
                             />
                         </Container>

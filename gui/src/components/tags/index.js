@@ -4,6 +4,8 @@ import { Link, useRouteMatch } from "react-router-dom";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import queryString from "query-string";
 
+import config from "../../../config";
+
 import { currentTagState } from "../../state/atoms";
 import { currentRepoTagsQuery } from "../../state/selectors";
 
@@ -58,7 +60,7 @@ export default function Tags({ repo }) {
                                     icon: "copy",
                                     onClick: () => copyText(index),
                                 }}
-                                value={`docker pull ${repo}:${tag}`}
+                                value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
                                 ref={(el) => (copyRefs.current[index] = el)}
                             />
                         </List.Content>
