@@ -1,2 +1,29 @@
 h4 {
 }
+
+#homeGrid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: rgba(220, 220, 220, 0.657);
+}
+
+#catalogGrid {
+    // background-color: lightgrey;
+    background-color: rgba(220, 220, 220, 0.657);
+
+    display: flex;
+    height: 100vh;
+}
+
+#loaderSegment {
+    background-color: rgba(220, 220, 220, 0.657);
+    display: flex;
+    height: 100vh;
+}
+
+#mainHeader {
+    background-color: rgba(220, 220, 220, 0.657);
+
+}
