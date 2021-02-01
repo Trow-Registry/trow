@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect } from "react";
+import React, { useEffect, memo, Suspense } from "react";
 import { List, Grid, Segment } from "semantic-ui-react";
 import { Link, useRouteMatch } from "react-router-dom";
 import queryString from "query-string";
@@ -6,14 +6,14 @@ import { useRecoilValue, useSetRecoilState } from "recoil";
 
 import { catalogState, currentRepositoryState } from "../../state/atoms";
 
-import Repo from "../repo";
-import MainHeader from "../header";
+import { MemoisedRepo } from "../repo";
+import { MemoisedMainHeader } from "../header";
+import SuspenseLoader from "../loader";
+
 import NavVertical from "../nav";
 
-const defaultCatalogSchema = [];
-
 export default function Catalog() {
-    const catalogList = useRecoilValue(catalogState) || defaultCatalogSchema;
+    const catalogList = useRecoilValue(catalogState);
     const { url } = useRouteMatch();
 
     const setCurrentRepository = useSetRecoilState(currentRepositoryState);
@@ -26,22 +26,32 @@ export default function Catalog() {
     }, [repo]);
 
     return (
-        <>
-            <MainHeader />
-            <Grid stackable columns={4}>
+        <Suspense fallback={<SuspenseLoader />}>
+            <MemoisedMainHeader />
+            <Grid
+                stackable
+                columns={4}
+                id="catalogGrid"
+                padded="vertically"
+                divided
+            >
                 <Grid.Column width={1}>
                     <NavVertical />
                 </Grid.Column>
                 <Grid.Column width={2}>
                     <Segment basic>
                         <List selection verticalAlign="middle" divided animated>
-                            {catalogList.map((catalogItem) => (
-                                <List.Item key={catalogItem}>
-                                    <List.Content
-                                        as={Link}
-                                        repo={catalogItem}
-                                        to={`${url}?repo=${catalogItem}`}
-                                    >
+                            {catalogList.map((catalogItem, index) => (
+                                <List.Item
+                                    key={index}
+                                    as={Link}
+                                    repo={catalogItem}
+                                    to={{
+                                        pathname: url,
+                                        search: `?repo=${catalogItem}`,
+                                    }}
+                                >
+                                    <List.Content>
                                         <List.Header>{catalogItem}</List.Header>
                                     </List.Content>
                                 </List.Item>
@@ -49,8 +59,10 @@ export default function Catalog() {
                         </List>
                     </Segment>
                 </Grid.Column>
-                <Repo repo={repo} />
+                <MemoisedRepo repo={repo} />
             </Grid>
-        </>
+        </Suspense>
     );
 }
+
+export const MemoisedCatalog = memo(Catalog);

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { Grid, Segment, Header, Input, Container } from "semantic-ui-react";
+import { Grid, Segment, Input, Card } from "semantic-ui-react";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 
 import config from "../../../config";
@@ -48,30 +48,37 @@ export default function Details() {
         <Grid.Column width={5}>
             <Segment basic>
                 {tag ? (
-                    <div>
-                        <Container>
-                            <Header as="h4" content={`${repo}:${tag}`} />
-                        </Container>
-                        <Container>
-                            <strong>digest:</strong>{" "}
-                            {manifestResponse.config.digest}
-                        </Container>
-                        <Container>
-                            <strong>os/architecture:</strong> {blobResponse.os}/
-                            {blobResponse.architecture}
-                        </Container>
-                        <Container>
-                            <Input
-                                action={{
-                                    color: "teal",
-                                    icon: "copy",
-                                    onClick: copyText,
-                                }}
-                                value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
-                                ref={copyRef}
-                            />
-                        </Container>
-                    </div>
+                    <>
+                        <Card fluid>
+                            <Card.Content>
+                                <Card.Header
+                                    as="h4"
+                                    content={`${repo}:${tag}`}
+                                />
+                                <Card.Meta>
+                                    <strong>digest:</strong>{" "}
+                                    {manifestResponse.config.digest}
+                                </Card.Meta>
+                                <Card.Meta>
+                                    <strong>os/architecture:</strong>{" "}
+                                    {blobResponse.os}/
+                                    {blobResponse.architecture}
+                                </Card.Meta>
+                            </Card.Content>
+                            <Card.Content extra>
+                                <Input
+                                    fluid
+                                    action={{
+                                        color: "teal",
+                                        icon: "copy",
+                                        onClick: copyText,
+                                    }}
+                                    value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
+                                    ref={copyRef}
+                                />
+                            </Card.Content>
+                        </Card>
+                    </>
                 ) : (
                     <div />
                 )}

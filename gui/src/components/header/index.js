@@ -1,31 +1,17 @@
-import React from "react";
-import { Menu, Icon, Header } from "semantic-ui-react";
+import React, { memo } from "react";
+import { Menu, Header } from "semantic-ui-react";
 import { Link } from "react-router-dom";
 
-export default function MainHeader() {
+export function MainHeader() {
     return (
-        // <Segment basic clearing>
-
-        <Menu borderless size="mini">
+        <Menu borderless secondary id="mainHeader">
             <Menu.Item>
                 <Header floated="left" as={Link} to="/">
                     Trow
                 </Header>
             </Menu.Item>
-
-            <Menu.Menu position="right">
-                {/* <Menu.Item>
-                        <Input
-                            action={{ type: 'submit', content: 'Search images' }}
-                            placeholder='Search images...'
-                        />
-                    </Menu.Item> */}
-                <Menu.Item>
-                    <Icon name="user outline"></Icon>
-                </Menu.Item>
-            </Menu.Menu>
         </Menu>
-
-        // </Segment>
     );
 }
+
+export const MemoisedMainHeader = memo(MainHeader);

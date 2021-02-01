@@ -10,7 +10,7 @@ export default function NavVertical() {
     };
 
     return (
-        <Menu size="mini" icon="labeled" borderless vertical>
+        <Menu size="mini" icon="labeled" borderless secondary vertical>
             <Menu.Item
                 name="repositories"
                 active={activeItem === "repositories"}

@@ -4,6 +4,7 @@ import { Link, useRouteMatch } from "react-router-dom";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import queryString from "query-string";
 
+// import SuspenseLoader from "../loader";
 import config from "../../../config";
 
 import { currentTagState } from "../../state/atoms";
@@ -41,32 +42,35 @@ export default function Tags({ repo }) {
     }, [tag]);
 
     return (
-        <>
-            <List selection verticalAlign="middle" divided animated>
-                {tagsResponse.tags.map((tag, index) => (
-                    <List.Item key={tag}>
-                        <List.Content
-                            as={Link}
-                            to={`${url}?repo=${repo}#tag=${tag}`}
-                            key={`${tag}${index}`}
+        <List selection verticalAlign="middle" divided animated>
+            {tagsResponse.tags.map((tag, index) => (
+                <List.Item key={`${tag}${index}`}>
+                    <List.Content>
+                        <Link
+                            to={{
+                                pathname: url,
+                                search: `?repo=${repo}`,
+                                hash: `#tag=${tag}`,
+                            }}
+                            key={`${tag}/${index}`}
                         >
-                            <List.Description>{tag}</List.Description>
-                        </List.Content>
-                        <List.Content floated="right">
-                            <Input
-                                key={index}
-                                action={{
-                                    color: "teal",
-                                    icon: "copy",
-                                    onClick: () => copyText(index),
-                                }}
-                                value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
-                                ref={(el) => (copyRefs.current[index] = el)}
-                            />
-                        </List.Content>
-                    </List.Item>
-                ))}
-            </List>
-        </>
+                            {tag}
+                        </Link>
+                    </List.Content>
+                    <List.Content floated="right">
+                        <Input
+                            key={index}
+                            action={{
+                                color: "teal",
+                                icon: "copy",
+                                onClick: () => copyText(index),
+                            }}
+                            value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
+                            ref={(el) => (copyRefs.current[index] = el)}
+                        />
+                    </List.Content>
+                </List.Item>
+            ))}
+        </List>
     );
 }

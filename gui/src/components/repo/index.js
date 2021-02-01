@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, memo, useCallback, Suspense } from "react";
 import {
     Grid,
     Segment,
@@ -8,26 +8,31 @@ import {
     Header,
 } from "semantic-ui-react";
 
+import SuspenseLoader from "../loader";
+
 import config from "../../../config";
 
 import Details from "../details";
 import Tags from "../tags";
 
-export default function Repo({ repo }) {
+export function Repo({ repo }) {
     const [activeItem, setActiveItem] = useState("tags");
     const copyRef = useRef(null);
 
-    const handleItemClick = (e, { name }) => {
-        setActiveItem(name);
-    };
+    const handleItemClick = useCallback(
+        (e, { name }) => {
+            setActiveItem(name);
+        },
+        [activeItem]
+    );
 
-    const copyText = () => {
+    const copyText = useCallback(() => {
         copyRef.current.select();
         document.execCommand("copy");
-    };
+    }, []);
 
     return (
-        <>
+        <Suspense fallback={<SuspenseLoader />}>
             {repo ? (
                 <Grid.Column width={8}>
                     <Segment basic>
@@ -61,22 +66,28 @@ export default function Repo({ repo }) {
                         </Menu>
                     </Segment>
 
-                    <Segment basic>
-                        {activeItem == "tags" ? (
-                            <Tags repo={repo} />
-                        ) : (
-                            <>
-                                <Container fluid>
-                                    <strong>Name:</strong> {repo}
-                                </Container>
-                            </>
-                        )}
-                    </Segment>
+                    <Suspense fallback={<SuspenseLoader />}>
+                        <Segment basic>
+                            {activeItem == "tags" ? (
+                                <Tags repo={repo} />
+                            ) : (
+                                <>
+                                    <Container fluid>
+                                        <strong>Name:</strong> {repo}
+                                    </Container>
+                                </>
+                            )}
+                        </Segment>
+                    </Suspense>
                 </Grid.Column>
             ) : (
                 <div />
             )}
-            <Details />
-        </>
+            <Suspense fallback={<SuspenseLoader />}>
+                <Details />
+            </Suspense>
+        </Suspense>
     );
 }
+
+export const MemoisedRepo = memo(Repo);
