@@ -9,7 +9,7 @@ cd "$src_dir"
 GH_REPO=${DOCKER_REPO:-"ghcr.io/containersolutions/trow/trow"}
 REPO=${DOCKER_REPO:-"containersol/trow"}
 
-if [[ -z ${CI+x} ]] && [[ "$CI" = true ]]
+if [[ "$CI" = true ]]
 then
     VERSION=$(date +"%Y-%m-%d")-$GITHUB_RUN_NUMBER
 else
@@ -31,7 +31,7 @@ docker build \
 
 docker tag $IMAGE $REPO:default
 
-if [[ -z ${CI+x} ]] && [[ "$CI" = true ]]
+if [[ "$CI" = true ]]
 then
 
     docker push $IMAGE

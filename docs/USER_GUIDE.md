@@ -1,6 +1,7 @@
 # Trow User Guide
 
  * [Persisting Data/Images](#persisting-dataimages)
+ * [Proxying the Docker Hub](#proxying-the-docker-hub)
  * [Listing Repositories and Tags](#listing-repositories-and-tags)
  * [Using Curl Securely](#using-curl-securely)
  * [Multiplatform Builds](#multiplatform)
@@ -37,7 +38,7 @@ from the Docker Hub. For example, if we start Trow with:
 
 ```
 $ trow --proxy-docker-hub 
-Starting Trow 0.3.0 on 0.0.0.0:8443
+Starting Trow 0.3.1-PROXY on 0.0.0.0:8443
 
 **Validation callback configuration
 
@@ -72,14 +73,14 @@ request which does not count towards the Docker rate limits. If the image cannot
 version will be returned, if available. This can be used to effectively mitigate issues with the
 Docker Hub.
 
-An account can configured to use with Trow, which will ensure it has it's own rate limit quota. To
+An account can be configured to use Trow, which will ensure it has it's own rate limit quota. To
 use this, you will need to obtain a token from the Docker Hub (see
 https://docs.docker.com/docker-hub/access-tokens/). The user and token can then be specified on
 start-up e.g:
 
 ```
 $ trow --proxy-docker-hub --hub-user amouat --hub-token ffffffff-ffff-ffff-ffff-ffffffffffff
-Starting Trow 0.3.0 on 0.0.0.0:8443
+Starting Trow 0.3.1-PROXY on 0.0.0.0:8443
 
 **Validation callback configuration
 
@@ -100,7 +101,7 @@ As with passwords, the token can (and should) be loaded from a file:
 
 ```
 $ trow --proxy-docker-hub --hub-user amouat --hub-token-file ./.hub_token
-Starting Trow 0.3.0 on 0.0.0.0:8443
+Starting Trow 0.3.1-PROXY on 0.0.0.0:8443
 
 **Validation callback configuration
 

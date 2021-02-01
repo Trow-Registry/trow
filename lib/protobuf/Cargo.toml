@@ -1,6 +1,6 @@
 [package]
 name = "trow-protobuf"
-version = "0.3.1-PROXY"
+version = "0.3.2"
 edition = "2018"
 
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]

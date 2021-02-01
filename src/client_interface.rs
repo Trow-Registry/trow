@@ -9,7 +9,7 @@ use trow_proto::{
     UploadRequest, VerifyManifestRequest,
 };
 
-use tonic::Request;
+use tonic::{Code, Request};
 
 use crate::chrono::TimeZone;
 use crate::types::{self, *};
@@ -17,6 +17,7 @@ use failure::Error;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fs::OpenOptions;
+use std::io;
 use std::io::prelude::*;
 
 pub struct ClientInterface {
@@ -49,6 +50,22 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
         _ => (),
     }
     images
+}
+
+// TODO: Each function should have it's own enum of the errors it can return
+// There must be a standard pattern for this somewhere...
+#[derive(Debug, Fail)]
+pub enum RegistryError {
+    #[fail(display = "Invalid repository or tag")]
+    InvalidName,
+    #[fail(display = "Invalid name or UUID")]
+    InvalidNameOrUUID,
+    #[fail(display = "Invalid manifest")]
+    InvalidManifest,
+    #[fail(display = "Internal Error")]
+    InvalidContentRange,
+    #[fail(display = "Internal Error")]
+    Internal,
 }
 
 impl ClientInterface {
@@ -103,7 +120,87 @@ impl ClientInterface {
         ))
     }
 
-    pub async fn complete_upload(
+    pub async fn upload_blob<'a>(
+        &self,
+        repo_name: &RepoName,
+        uuid: &Uuid,
+        digest: &str,
+        blob: &mut Box<dyn Read + 'a>,
+    ) -> Result<AcceptedUpload, RegistryError> {
+        let mut sink = self
+            .get_write_sink_for_upload(repo_name, &uuid)
+            .await
+            .map_err(|e| {
+                warn!("Error finding write sink for blob {:?}", e);
+                RegistryError::InvalidNameOrUUID
+            })?;
+        let len = io::copy(blob, &mut sink).map_err(|e| {
+            warn!("Error writing blob {:?}", e);
+            RegistryError::Internal
+        })?;
+        let digest = Digest(digest.to_string());
+        self.complete_upload(repo_name, uuid, &digest, len)
+            .await
+            .map_err(|e| {
+                warn!("Error finalising upload {:?}", e);
+                RegistryError::Internal
+            })
+    }
+
+    pub async fn upload_blob_chunk<'a>(
+        &self,
+        repo_name: &RepoName,
+        uuid: &Uuid,
+        info: Option<ContentInfo>,
+        chunk: &mut Box<dyn Read + 'a>,
+    ) -> Result<UploadInfo, RegistryError> {
+        let mut sink = self
+            .get_write_sink_for_upload(repo_name, &uuid)
+            .await
+            .map_err(|e| {
+                warn!("Error finding write sink for blob {:?}", e);
+                RegistryError::InvalidNameOrUUID
+            })?;
+
+        let have_chunked_upload = info.is_some();
+        let info = info.unwrap_or(ContentInfo {
+            length: 0,
+            range: (0, 0),
+        });
+
+        let start_index = sink.stream_len().unwrap_or(0);
+        if start_index != info.range.0 {
+            warn!(
+                "Asked for blob upload with invalid start index. Expected {} got {}",
+                start_index, info.range.0
+            );
+            return Err(RegistryError::InvalidContentRange);
+        }
+
+        let len = io::copy(chunk, &mut sink).map_err(|e| {
+            warn!("Error writing blob {:?}", e);
+            RegistryError::Internal
+        })?;
+        let total = sink.stream_len().unwrap_or(len);
+        if have_chunked_upload {
+            if (info.range.1 + 1) != total {
+                warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
+                return Err(RegistryError::InvalidContentRange);
+            }
+            //Check length if chunked upload
+            if info.length != len {
+                warn!("info.length {} len {}", info.length, len);
+                return Err(RegistryError::InvalidContentRange);
+            }
+        }
+        Ok(create_upload_info(
+            uuid.clone(),
+            repo_name.clone(),
+            (0, total as u32),
+        ))
+    }
+
+    async fn complete_upload(
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
@@ -134,7 +231,7 @@ impl ClientInterface {
         ))
     }
 
-    pub async fn get_write_sink_for_upload(
+    async fn get_write_sink_for_upload(
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
@@ -163,7 +260,48 @@ impl ClientInterface {
         Ok(file)
     }
 
-    pub async fn get_write_sink_for_manifest(
+    pub async fn upload_manifest<'a>(
+        &self,
+        repo_name: &RepoName,
+        reference: &str,
+        manifest: &mut Box<dyn Read + 'a>,
+    ) -> Result<types::VerifiedManifest, RegistryError> {
+        let (mut sink_loc, uuid) = self
+            .get_write_sink_for_manifest(repo_name, reference)
+            .await
+            .map_err(|e| {
+                let e = e.downcast::<tonic::Status>();
+                if let Ok(ts) = e {
+                    match ts.code() {
+                        Code::InvalidArgument => RegistryError::InvalidName,
+                        _ => RegistryError::Internal,
+                    }
+                } else {
+                    RegistryError::Internal
+                }
+            })?;
+
+        io::copy(manifest, &mut sink_loc).map_err(|e| {
+            warn!("Error wirting out manifest {:?}", e);
+            RegistryError::Internal
+        })?;
+
+        self.verify_manifest(repo_name, reference, &uuid)
+            .await
+            .map_err(|e| {
+                let e = e.downcast::<tonic::Status>();
+                if let Ok(ts) = e {
+                    match ts.code() {
+                        Code::InvalidArgument => RegistryError::InvalidManifest,
+                        _ => RegistryError::Internal,
+                    }
+                } else {
+                    RegistryError::Internal
+                }
+            })
+    }
+
+    async fn get_write_sink_for_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
