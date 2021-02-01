@@ -36,7 +36,6 @@ export const manifestQuery = selectorFamily({
     key: "manifestQuery",
     get: ({ repoName, reference }) => async () => {
         const response = await getManifest({ repoName, reference });
-        console.log(response);
         return response;
     },
 });
@@ -57,7 +56,6 @@ export const blobQuery = selectorFamily({
     key: "blobQuery",
     get: ({ repoName, digest }) => async () => {
         const response = await getBlob({ repoName, digest });
-        console.log(response);
         return response;
     },
 });
@@ -69,7 +67,6 @@ export const currentBlobQuery = selector({
             blobQuery({
                 repoName: get(currentRepositoryState),
                 digest: get(currentBlobDigestState),
-                // digest: "sha256:a4b51fc0e8756bd76674bffdd32e5a7b0c8d027ec8787984c5bf86f4b9014fb9"
             })
         ),
 });
