@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import Login from "../login";
 
-export default function Home() {
+const Home = () => {
     return (
         <Segment basic>
             <Grid stackable columns={2} doubling divided id="homeGrid">
@@ -29,6 +29,6 @@ export default function Home() {
             </Grid>
         </Segment>
     );
-}
+};
 
 export const MemoisedHome = memo(Home);

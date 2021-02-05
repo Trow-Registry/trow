@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Header, Form, Button, Segment } from "semantic-ui-react";
 
-export default function Login() {
+const Login = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
 
@@ -38,4 +38,6 @@ export default function Login() {
             </Form>
         </Segment>
     );
-}
+};
+
+export default Login;

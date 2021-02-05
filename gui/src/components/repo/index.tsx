@@ -15,7 +15,7 @@ import config from "../../../config";
 import Details from "../details";
 import Tags from "../tags";
 
-export function Repo({ repo }) {
+const Repo = ({ repo }) => {
     const [activeItem, setActiveItem] = useState("tags");
     const copyRef = useRef(null);
 
@@ -88,6 +88,6 @@ export function Repo({ repo }) {
             </Suspense>
         </Suspense>
     );
-}
+};
 
 export const MemoisedRepo = memo(Repo);

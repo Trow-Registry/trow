@@ -1,15 +1,15 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, memo } from "react";
 import { Grid, Segment, Input, Card } from "semantic-ui-react";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 
 import config from "../../../config";
 
-import { currentBlobQuery, currentManifestQuery } from "../../state/selectors";
+import { currentBlobQuery, currentManifestQuery } from "../../store/selectors";
 import {
     currentTagState,
     currentRepositoryState,
     currentBlobDigestState,
-} from "../../state/atoms";
+} from "../../store/atoms";
 
 const defaultManifestSchema = {
     schemaVersion: "",
@@ -19,7 +19,7 @@ const defaultManifestSchema = {
     annotations: {},
 };
 
-export default function Details() {
+const Details = () => {
     const manifestResponse =
         useRecoilValue(currentManifestQuery) || defaultManifestSchema;
 
@@ -85,4 +85,7 @@ export default function Details() {
             </Segment>
         </Grid.Column>
     );
-}
+};
+
+export const MemoisedDetails = memo(Details);
+export default Details;

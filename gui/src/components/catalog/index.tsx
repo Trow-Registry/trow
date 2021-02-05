@@ -4,7 +4,7 @@ import { Link, useRouteMatch } from "react-router-dom";
 import queryString from "query-string";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 
-import { catalogState, currentRepositoryState } from "../../state/atoms";
+import { catalogState, currentRepositoryState } from "../../store/atoms";
 
 import { MemoisedRepo } from "../repo";
 import { MemoisedMainHeader } from "../header";
@@ -12,14 +12,14 @@ import SuspenseLoader from "../loader";
 
 import NavVertical from "../nav";
 
-export default function Catalog() {
+const Catalog = () => {
     const catalogList = useRecoilValue(catalogState);
     const { url } = useRouteMatch();
 
     const setCurrentRepository = useSetRecoilState(currentRepositoryState);
 
-    const parsed = queryString.parse(location.search);
-    const repo = parsed.repo;
+    const parsed: any = queryString.parse(location.search);
+    const repo: string = parsed.repo;
 
     useEffect(() => {
         setCurrentRepository(repo);
@@ -41,21 +41,25 @@ export default function Catalog() {
                 <Grid.Column width={2}>
                     <Segment basic>
                         <List selection verticalAlign="middle" divided animated>
-                            {catalogList.map((catalogItem, index) => (
-                                <List.Item
-                                    key={index}
-                                    as={Link}
-                                    repo={catalogItem}
-                                    to={{
-                                        pathname: url,
-                                        search: `?repo=${catalogItem}`,
-                                    }}
-                                >
-                                    <List.Content>
-                                        <List.Header>{catalogItem}</List.Header>
-                                    </List.Content>
-                                </List.Item>
-                            ))}
+                            {catalogList.map(
+                                (catalogItem: string, index: number) => (
+                                    <List.Item
+                                        key={index}
+                                        as={Link}
+                                        repo={catalogItem}
+                                        to={{
+                                            pathname: url,
+                                            search: `?repo=${catalogItem}`,
+                                        }}
+                                    >
+                                        <List.Content>
+                                            <List.Header>
+                                                {catalogItem}
+                                            </List.Header>
+                                        </List.Content>
+                                    </List.Item>
+                                )
+                            )}
                         </List>
                     </Segment>
                 </Grid.Column>
@@ -63,6 +67,6 @@ export default function Catalog() {
             </Grid>
         </Suspense>
     );
-}
+};
 
 export const MemoisedCatalog = memo(Catalog);

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Menu, Icon } from "semantic-ui-react";
 import { Link } from "react-router-dom";
 
-export default function NavVertical() {
+const NavVertical = () => {
     const [activeItem, setActiveItem] = useState("repositories");
 
     const handleItemClick = (e, { name }) => {
@@ -33,4 +33,6 @@ export default function NavVertical() {
             </Menu.Item>
         </Menu>
     );
-}
+};
+
+export default NavVertical;

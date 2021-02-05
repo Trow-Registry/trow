@@ -7,25 +7,25 @@ import queryString from "query-string";
 // import SuspenseLoader from "../loader";
 import config from "../../../config";
 
-import { currentTagState } from "../../state/atoms";
-import { currentRepoTagsQuery } from "../../state/selectors";
+import { currentTagState } from "../../store/atoms";
+import { currentRepoTagsQuery } from "../../store/selectors";
 
 const defaultRepoTagsSchema = {
     tags: [],
     name: "",
 };
 
-export default function Tags({ repo }) {
+const Tags = ({ repo }) => {
     const copyRefs = useRef([]);
     const { url } = useRouteMatch();
     const tagsResponse =
         useRecoilValue(currentRepoTagsQuery) || defaultRepoTagsSchema;
 
     const setCurrentTag = useSetRecoilState(currentTagState);
-    const parsedHash = queryString.parse(location.hash);
-    const tag = parsedHash.tag;
+    const parsedHash: any = queryString.parse(location.hash);
+    const tag: string = parsedHash.tag;
 
-    const copyText = (index) => {
+    const copyText = (index: number) => {
         copyRefs.current[index].select();
         document.execCommand("copy");
     };
@@ -73,4 +73,6 @@ export default function Tags({ repo }) {
             ))}
         </List>
     );
-}
+};
+
+export default Tags;

@@ -1,11 +1,11 @@
 import React from "react";
-import { Segment } from "semantic-ui-react";
+import { Segment, Dimmer, Loader } from "semantic-ui-react";
 
 const SuspenseLoader = () => (
-    <Segment loading basic id="loaderSegment">
-        {/* <Dimmer inverted active>
+    <Segment basic id="loaderSegment">
+        <Dimmer inverted active>
             <Loader content="Loading.." />
-        </Dimmer> */}
+        </Dimmer>
     </Segment>
 );
 

@@ -2,7 +2,7 @@ import React, { memo } from "react";
 import { Menu, Header } from "semantic-ui-react";
 import { Link } from "react-router-dom";
 
-export function MainHeader() {
+const MainHeader = () => {
     return (
         <Menu borderless secondary id="mainHeader">
             <Menu.Item>
@@ -12,6 +12,6 @@ export function MainHeader() {
             </Menu.Item>
         </Menu>
     );
-}
+};
 
 export const MemoisedMainHeader = memo(MainHeader);
