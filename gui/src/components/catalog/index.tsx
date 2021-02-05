@@ -13,7 +13,8 @@ import SuspenseLoader from "../loader";
 import NavVertical from "../nav";
 
 const Catalog = () => {
-    const catalogList = useRecoilValue(catalogState);
+    const defaultCatalog: string[]  = []
+    const catalogList = useRecoilValue(catalogState) || defaultCatalog;
     const { url } = useRouteMatch();
 
     const setCurrentRepository = useSetRecoilState(currentRepositoryState);

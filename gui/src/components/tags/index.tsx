@@ -10,10 +10,12 @@ import config from "../../../config";
 import { currentTagState } from "../../store/atoms";
 import { currentRepoTagsQuery } from "../../store/selectors";
 
-const defaultRepoTagsSchema = {
+interface RepoTagsSchema{ 
     tags: [],
-    name: "",
+    name: string
 };
+
+const defaultRepoTagsSchema: RepoTagsSchema = {tags: [], name: ""}
 
 const Tags = ({ repo }) => {
     const copyRefs = useRef([]);
