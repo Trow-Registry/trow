@@ -2,9 +2,15 @@
     "env": {
         "browser": true,
         "es2021": true,
-        "node": true
+        "node": true,
+        "jest": true
     },
-    "extends": ["eslint:recommended", "plugin:react/recommended"],
+    "extends": [
+        "eslint:recommended",
+        "plugin:react/recommended",
+        "plugin:@typescript-eslint/eslint-recommended",
+        "plugin:@typescript-eslint/recommended"
+    ],
     "parserOptions": {
         "ecmaFeatures": {
             "jsx": true
@@ -14,6 +20,20 @@
     },
     "plugins": ["react"],
     "rules": {
-        "react/prop-types": "off"
-    }
+        "react/prop-types": "off",
+        "no-console": "warn"
+    },
+
+    "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
+    },
+    "overrides": [
+        {
+            "files": ["**/*.ts", "**/*.tsx"],
+            "parser": "typescript-eslint-parser",
+            "rules": {
+                "no-undef": "off"
+            }
+        }
+    ]
 }
