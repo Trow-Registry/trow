@@ -20,7 +20,7 @@ export const repositoriesQuery = selector({
 // Tags
 export const tagsQuery = selectorFamily({
     key: "tagsQuery",
-    get: (repoName) => async () => {
+    get: (repoName: string) => async () => {
         const response = await getRepoTags({ repoName });
         return response;
     },
@@ -34,7 +34,13 @@ export const currentRepoTagsQuery = selector({
 // Manifests
 export const manifestQuery = selectorFamily({
     key: "manifestQuery",
-    get: ({ repoName, reference }) => async () => {
+    get: ({
+        repoName,
+        reference,
+    }: {
+        repoName: string;
+        reference: string;
+    }) => async () => {
         const response = await getManifest({ repoName, reference });
         return response;
     },
@@ -54,7 +60,13 @@ export const currentManifestQuery = selector({
 // Blobs
 export const blobQuery = selectorFamily({
     key: "blobQuery",
-    get: ({ repoName, digest }) => async () => {
+    get: ({
+        repoName,
+        digest,
+    }: {
+        repoName: string;
+        digest: string;
+    }) => async () => {
         const response = await getBlob({ repoName, digest });
         return response;
     },
