@@ -17,7 +17,7 @@ export async function getCatalog() {
     }
 }
 
-export async function getRepoTags({ repoName }) {
+export async function getRepoTags({ repoName }: { repoName: string }) {
     try {
         const response = await api.get(`/v2/${repoName}/tags/list`);
         return response.data;
@@ -26,7 +26,13 @@ export async function getRepoTags({ repoName }) {
     }
 }
 
-export async function getManifest({ repoName, reference }) {
+export async function getManifest({
+    repoName,
+    reference,
+}: {
+    repoName: string;
+    reference: string;
+}) {
     try {
         const response = await api.get(
             `/v2/${repoName}/manifests/${reference}`
@@ -37,7 +43,13 @@ export async function getManifest({ repoName, reference }) {
     }
 }
 
-export async function getBlob({ repoName, digest }) {
+export async function getBlob({
+    repoName,
+    digest,
+}: {
+    repoName: string;
+    digest: string;
+}) {
     try {
         const response = await api.get(`/v2/${repoName}/blobs/${digest}`);
         return response.data;
