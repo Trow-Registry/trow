@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "allowSyntheticDefaultImports": true,
+        "moduleResolution": "Node",
+        "outDir": "./dist/",
+        // "noImplicitAny": true,
+        "module": "ES6",
+        "target": "ES2015",
+        "jsx": "react",
+        "allowJs": true,
+        "lib": ["ES2020", "DOM", "ScriptHost"],
+        // "checkJs": true,
+        "strict": false
+    }
+}
