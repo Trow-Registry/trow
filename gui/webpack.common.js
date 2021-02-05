@@ -43,7 +43,7 @@ const TerserPlugin = require("terser-webpack-plugin");
 
 module.exports = {
     entry: {
-        app: "./src/App.js",
+        app: path.resolve(__dirname, "src", "index.tsx"),
     },
 
     output: {
@@ -71,16 +71,22 @@ module.exports = {
         new ESLintPlugin(),
     ],
 
+    resolve: {
+        extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
+    },
+
     module: {
         rules: [
             {
                 test: /\.(js|jsx|json)$/,
                 include: [path.resolve(__dirname, "src")],
                 loader: "babel-loader",
-                options: {
-                    presets: ["@babel/preset-env"],
-                },
-                exclude: /node_modules/,
+                exclude: path.resolve(__dirname, "/node_modules"),
+            },
+            {
+                test: /\.(ts|ts)x?$/,
+                use: "ts-loader",
+                exclude: path.resolve(__dirname, "/node_modules"),
             },
             {
                 test: /\.(sa|sc|c)ss$/,
