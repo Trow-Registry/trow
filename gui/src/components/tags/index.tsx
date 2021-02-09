@@ -10,18 +10,18 @@ import config from "../../../config";
 import { currentTagState } from "../../store/atoms";
 import { currentRepoTagsQuery } from "../../store/selectors";
 
-interface RepoTagsSchema{ 
-    tags: [],
-    name: string
-};
+interface RepoTagsSchema {
+    tags: [];
+    name: string;
+}
 
-const defaultRepoTagsSchema: RepoTagsSchema = {tags: [], name: ""}
+const defaultRepoTagsSchema: RepoTagsSchema = { tags: [], name: "" };
 
 const Tags = ({ repo }) => {
     const copyRefs = useRef([]);
     const { url } = useRouteMatch();
     const tagsResponse =
-        useRecoilValue(currentRepoTagsQuery) || defaultRepoTagsSchema;
+        useRecoilValue(currentRepoTagsQuery) ?? defaultRepoTagsSchema;
 
     const setCurrentTag = useSetRecoilState(currentTagState);
     const parsedHash: any = queryString.parse(location.hash);
