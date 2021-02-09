@@ -2,9 +2,7 @@ const defaultRegistryURL: string = "https://trow.local:8443";
 
 interface AppConfig {
     trow_registry_url: string;
-    app: {
-        [key: string]: app;
-    };
+    app: app
 }
 
 interface app {
