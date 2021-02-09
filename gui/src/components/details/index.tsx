@@ -1,40 +1,33 @@
 import React, { useRef, useEffect, memo } from "react";
 import { Grid, Segment, Input, Card } from "semantic-ui-react";
-import { useRecoilValue, useSetRecoilState } from "recoil";
+import { useRecoilValue, useSetRecoilState, useRecoilState } from "recoil";
 
 import config from "../../../config";
 
 import { currentBlobQuery, currentManifestQuery } from "../../store/selectors";
+import { defaultManifestSchema } from "../../store/schemas/manifest";
+import { defaultBlobSchema } from "../../store/schemas/blob";
+
 import {
     currentTagState,
     currentRepositoryState,
     currentBlobDigestState,
 } from "../../store/atoms";
 
-const defaultManifestSchema = {
-    schemaVersion: "",
-    config: { mediaType: "", digest: "", size: "" },
-    layers: [],
-    mediaType: "",
-    annotations: {},
-};
-
 const Details = () => {
-    const manifestResponse =
-        useRecoilValue(currentManifestQuery) || defaultManifestSchema;
-
     const copyRef = useRef(null);
-    const tag = useRecoilValue(currentTagState);
+    const currentRepository = useRecoilValue(currentRepositoryState);
+    const currentTag = useRecoilValue(currentTagState);
 
-    const repo = useRecoilValue(currentRepositoryState);
-
+    const manifestResponse = useRecoilValue(currentManifestQuery) ?? defaultManifestSchema;
+    
     const copyText = () => {
         copyRef.current.select();
         document.execCommand("copy");
     };
 
-    const blobResponse = useRecoilValue(currentBlobQuery) || {};
-
+    const blobResponse = useRecoilValue(currentBlobQuery) ?? defaultBlobSchema;
+    
     const setCurrentBlobDigest = useSetRecoilState(currentBlobDigestState);
 
     useEffect(() => {
@@ -47,13 +40,13 @@ const Details = () => {
     return (
         <Grid.Column width={5}>
             <Segment basic>
-                {tag ? (
+                {currentTag ? (
                     <>
                         <Card fluid>
                             <Card.Content>
                                 <Card.Header
                                     as="h4"
-                                    content={`${repo}:${tag}`}
+                                    content={`${currentRepository}:${currentTag}`}
                                 />
                                 <Card.Meta>
                                     <strong>digest:</strong>{" "}
@@ -73,7 +66,7 @@ const Details = () => {
                                         icon: "copy",
                                         onClick: copyText,
                                     }}
-                                    value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
+                                    value={`docker pull ${config.trow_registry_url}/${currentRepository}:${currentTag}`}
                                     ref={copyRef}
                                 />
                             </Card.Content>
