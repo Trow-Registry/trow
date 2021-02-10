@@ -34,58 +34,60 @@ const Repo = ({ repo }) => {
     return (
         <Suspense fallback={<SuspenseLoader />}>
             {repo ? (
-                <Grid.Column width={8}>
-                    <Segment basic>
-                        <Container fluid textAlign="left">
-                            <Header as="h3">{repo}</Header>
-                        </Container>
-                        <Container textAlign="center"></Container>
-                        <Container textAlign="right">
-                            <Input
-                                action={{
-                                    color: "teal",
-                                    icon: "copy",
-                                    onClick: copyText,
-                                }}
-                                value={`docker pull ${config.trow_registry_url}/${repo}`}
-                                ref={copyRef}
-                            />
-                        </Container>
-                        <Menu pointing secondary>
-                            <Menu.Item
-                                name="tags"
-                                active={activeItem === "tags"}
-                                onClick={handleItemClick}
-                            />
-
-                            <Menu.Item
-                                name="description"
-                                active={activeItem === "description"}
-                                onClick={handleItemClick}
-                            />
-                        </Menu>
-                    </Segment>
-
-                    <Suspense fallback={<SuspenseLoader />}>
+                <>
+                    <Grid.Column width={8}>
                         <Segment basic>
-                            {activeItem == "tags" ? (
-                                <Tags repo={repo} />
-                            ) : (
-                                <>
-                                    <Container fluid>
-                                        <strong>Name:</strong> {repo}
-                                    </Container>
-                                </>
-                            )}
+                            <Container fluid textAlign="left">
+                                <Header as="h3">{repo}</Header>
+                            </Container>
+                            <Container textAlign="center"></Container>
+                            <Container textAlign="right">
+                                <Input
+                                    action={{
+                                        color: "teal",
+                                        icon: "copy",
+                                        onClick: copyText,
+                                    }}
+                                    value={`docker pull ${config.trow_registry_url}/${repo}`}
+                                    ref={copyRef}
+                                />
+                            </Container>
+                            <Menu pointing secondary>
+                                <Menu.Item
+                                    name="tags"
+                                    active={activeItem === "tags"}
+                                    onClick={handleItemClick}
+                                />
+
+                                <Menu.Item
+                                    name="description"
+                                    active={activeItem === "description"}
+                                    onClick={handleItemClick}
+                                />
+                            </Menu>
                         </Segment>
+
+                        <Suspense fallback={<SuspenseLoader />}>
+                            <Segment basic>
+                                {activeItem == "tags" ? (
+                                    <Tags repo={repo} />
+                                ) : (
+                                    <>
+                                        <Container fluid>
+                                            <strong>Name:</strong> {repo}
+                                        </Container>
+                                    </>
+                                )}
+                            </Segment>
+                        </Suspense>
+                    </Grid.Column>
+                    <Suspense fallback={<SuspenseLoader />}>
+                        <Details />
                     </Suspense>
-                </Grid.Column>
+                </>
             ) : (
                 <div />
             )}
-            <Suspense fallback={<SuspenseLoader />}>
-                <Details />
-            </Suspense>
         </Suspense>
     );
 };
