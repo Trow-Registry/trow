@@ -1,11 +1,11 @@
 import axios from "axios";
-import config from "../../config";
+// import config from "../../config";
 
-const TROW_API = config.trow_registry_url;
+// const TROW_API = config.trow_registry_url;
 
 const api = axios.create({
-    baseURL: TROW_API,
-    timeout: 1000,
+    // baseURL: TROW_API,
+    timeout: 1000
 });
 
 export async function getCatalog() {
