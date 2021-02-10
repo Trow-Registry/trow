@@ -5,17 +5,9 @@ Trow. The Cloud Native Registry.
 -   requirements
 
     -   trow registry instance running
-    -   export `TROW_REGISTRY_URL` env variable, default assumed at https://trow.local:8443
-    -   add code below to `trow/src/lib.rs` below API header fairing to allow CORS
+    -   (optional) export `TROW_REGISTRY_URL` env variable, default assumed at `https://trow.local:8443`
+    -   (optional) export `PROXY_PORT` env variable to change the proxy port, default is set to `9001`
 
-    ```
-     .attach(fairing::AdHoc::on_response(
-                  "CORS dev",
-                  |_, resp| {
-                      resp.set_raw_header("Access-Control-Allow-Origin", "*");
-                  },
-              ))
-    ```
 
 -   install dependencies
 
@@ -23,14 +15,14 @@ Trow. The Cloud Native Registry.
 yarn install
 ```
 
--   start backend
+-   start gui and proxy server
 
 ```
 yarn start
 ```
 
--   available at
-
 ```
-http://localhost:9000
+http://localhost:9000 - gui
+http://localhost:9001 - proxy
+
 ```
