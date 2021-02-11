@@ -1,6 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 #![feature(plugin)]
-#![feature(seek_convenience)]
 #![feature(seek_stream_len)]
 
 #[macro_use]
