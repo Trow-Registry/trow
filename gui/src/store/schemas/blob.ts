@@ -56,13 +56,12 @@ interface blobRootFS {
     type: string;
 }
 
-
 export const defaultBlobSchema: Blob = {
     os: "",
     architecture: "",
     rootfs: {
         type: "",
-        diff_ids: []
+        diff_ids: [],
     },
-    container: ""
-}
+    container: "",
+};

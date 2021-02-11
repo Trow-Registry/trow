@@ -19,15 +19,16 @@ const Details = () => {
     const currentRepository = useRecoilValue(currentRepositoryState);
     const currentTag = useRecoilValue(currentTagState);
 
-    const manifestResponse = useRecoilValue(currentManifestQuery) ?? defaultManifestSchema;
-    
+    const manifestResponse =
+        useRecoilValue(currentManifestQuery) ?? defaultManifestSchema;
+
     const copyText = () => {
         copyRef.current.select();
         document.execCommand("copy");
     };
 
     const blobResponse = useRecoilValue(currentBlobQuery) ?? defaultBlobSchema;
-    
+
     const setCurrentBlobDigest = useSetRecoilState(currentBlobDigestState);
 
     useEffect(() => {

@@ -2,7 +2,7 @@ const { merge } = require("webpack-merge");
 const common = require("./webpack.common.js");
 const path = require("path");
 
-const PROXY_PORT = process.env.PROXY_PORT || 9001
+const PROXY_PORT = process.env.PROXY_PORT || 9001;
 
 module.exports = merge(common, {
     mode: "development",
@@ -16,9 +16,9 @@ module.exports = merge(common, {
         proxy: [
             {
                 context: ["/v2", "/login"],
-                target: `http://localhost:${PROXY_PORT}`
+                target: `http://localhost:${PROXY_PORT}`,
             },
-        ]
+        ],
     },
 
     devtool: "inline-source-map",

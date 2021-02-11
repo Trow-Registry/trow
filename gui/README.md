@@ -8,7 +8,6 @@ Trow. The Cloud Native Registry.
     -   (optional) export `TROW_REGISTRY_URL` env variable, default assumed at `https://trow.local:8443`
     -   (optional) export `PROXY_PORT` env variable to change the proxy port, default is set to `9001`
 
-
 -   install dependencies
 
 ```

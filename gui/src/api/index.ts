@@ -5,7 +5,7 @@ import axios from "axios";
 
 const api = axios.create({
     // baseURL: TROW_API,
-    timeout: 1000
+    timeout: 1000,
 });
 
 export async function getCatalog() {

@@ -1,9 +1,9 @@
 export interface Manifest {
     schemaVersion: number;
-    config: descriptor
+    config: descriptor;
     layers: descriptor[];
     mediaType: string;
-    annotations?: annotations
+    annotations?: annotations;
 }
 
 interface descriptor {
@@ -11,11 +11,11 @@ interface descriptor {
     digest: string;
     size: string;
     urls?: string[];
-    annotations?: annotations
+    annotations?: annotations;
 }
 
 interface annotations {
-    [key: string]: string
+    [key: string]: string;
 }
 
 export const defaultManifestSchema: Manifest = {

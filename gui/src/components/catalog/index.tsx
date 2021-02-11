@@ -13,7 +13,7 @@ import SuspenseLoader from "../loader";
 import NavVertical from "../nav";
 
 const Catalog = () => {
-    const defaultCatalog: string[]  = []
+    const defaultCatalog: string[] = [];
     const catalogList = useRecoilValue(catalogState) || defaultCatalog;
     const { url } = useRouteMatch();
 
