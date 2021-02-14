@@ -1,4 +1,4 @@
-import React, { useEffect, memo, Suspense } from "react";
+import React, { useEffect, useState, memo, Suspense } from "react";
 import { List, Grid, Segment } from "semantic-ui-react";
 import { Link, useRouteMatch } from "react-router-dom";
 import queryString from "query-string";
@@ -13,6 +13,8 @@ import SuspenseLoader from "../loader";
 import NavVertical from "../nav";
 
 const Catalog = () => {
+    const [activeItem, setActiveItem] = useState("");
+
     const defaultCatalog: string[] = [];
     const catalogList = useRecoilValue(catalogState) || defaultCatalog;
     const { url } = useRouteMatch();
@@ -22,13 +24,17 @@ const Catalog = () => {
     const parsed: any = queryString.parse(location.search);
     const repo: string = parsed.repo;
 
+    const handleItemClick = (e, { repo }: { repo: string }) => {
+        setActiveItem(repo);
+    };
+
     useEffect(() => {
         setCurrentRepository(repo);
     }, [repo]);
 
     return (
         <Suspense fallback={<SuspenseLoader />}>
-            <MemoisedMainHeader />
+            {/* <MemoisedMainHeader /> */}
             <Grid
                 stackable
                 columns={4}
@@ -36,7 +42,7 @@ const Catalog = () => {
                 padded="vertically"
                 divided
             >
-                <Grid.Column width={1}>
+                <Grid.Column width={1} color="teal">
                     <NavVertical />
                 </Grid.Column>
                 <Grid.Column width={2}>
@@ -45,6 +51,7 @@ const Catalog = () => {
                             {catalogList.map(
                                 (catalogItem: string, index: number) => (
                                     <List.Item
+                                        active={activeItem === catalogItem}
                                         key={index}
                                         as={Link}
                                         repo={catalogItem}
@@ -52,6 +59,7 @@ const Catalog = () => {
                                             pathname: url,
                                             search: `?repo=${catalogItem}`,
                                         }}
+                                        onClick={handleItemClick}
                                     >
                                         <List.Content>
                                             <List.Header>

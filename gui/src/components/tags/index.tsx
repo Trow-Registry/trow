@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, createRef } from "react";
+import React, { useEffect, useRef, createRef, useState } from "react";
 import { List, Input } from "semantic-ui-react";
 import { Link, useRouteMatch } from "react-router-dom";
 import { useRecoilValue, useSetRecoilState } from "recoil";
@@ -18,6 +18,8 @@ interface RepoTagsSchema {
 const defaultRepoTagsSchema: RepoTagsSchema = { tags: [], name: "" };
 
 const Tags = ({ repo }) => {
+    const [activeItem, setActiveItem] = useState("");
+
     const copyRefs = useRef([]);
     const { url } = useRouteMatch();
     const tagsResponse =
@@ -30,6 +32,10 @@ const Tags = ({ repo }) => {
     const copyText = (index: number) => {
         copyRefs.current[index].select();
         document.execCommand("copy");
+    };
+
+    const handleItemClick = (e, { tag }: { tag: string }) => {
+        setActiveItem(tag);
     };
 
     useEffect(() => {
@@ -46,7 +52,12 @@ const Tags = ({ repo }) => {
     return (
         <List selection verticalAlign="middle" divided animated>
             {tagsResponse.tags.map((tag, index) => (
-                <List.Item key={`${tag}${index}`}>
+                <List.Item
+                    key={`${tag}${index}`}
+                    tag={tag}
+                    onClick={handleItemClick}
+                    active={activeItem === tag}
+                >
                     <List.Content>
                         <Link
                             to={{
@@ -67,7 +78,7 @@ const Tags = ({ repo }) => {
                                 icon: "copy",
                                 onClick: () => copyText(index),
                             }}
-                            value={`docker pull ${config.trow_registry_url}/${repo}:${tag}`}
+                            value={`docker pull ${window.location.host}/${repo}:${tag}`}
                             ref={(el) => (copyRefs.current[index] = el)}
                         />
                     </List.Content>

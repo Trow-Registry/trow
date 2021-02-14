@@ -1,6 +1,11 @@
 import React, { memo } from "react";
 import { Button, Segment, Grid } from "semantic-ui-react";
 import { Link } from "react-router-dom";
+import styled from "styled-components";
+
+const TextSegment = styled(Segment)`
+    padding-top: 40% !important;
+`;
 
 import Login from "../login";
 
@@ -9,7 +14,7 @@ const Home = () => {
         <Segment basic>
             <Grid stackable columns={2} doubling divided id="homeGrid">
                 <Grid.Column>
-                    <Segment textAlign="center" basic>
+                    <TextSegment textAlign="center" basic>
                         <h2>Trow</h2>
                         <h4>The Cloud Native Registry</h4>
 
@@ -21,9 +26,9 @@ const Home = () => {
                         >
                             Repositories
                         </Button>
-                    </Segment>
+                    </TextSegment>
                 </Grid.Column>
-                <Grid.Column>
+                <Grid.Column color="teal">
                     <Login />
                 </Grid.Column>
             </Grid>
