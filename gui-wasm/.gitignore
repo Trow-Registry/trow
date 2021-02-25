@@ -1,5 +1,6 @@
 /target
 Cargo.lock
+yarn.lock
 dist
 pkg
 node_modules
