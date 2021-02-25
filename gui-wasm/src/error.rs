@@ -15,10 +15,7 @@ pub enum ApiError {
     #[error("Response parsing failed")]
     ResponseParsingFailed,
     #[error("invalid header (expected {expected:?}, found {found:?})")]
-    InvalidHeader {
-        expected: String,
-        found: String,
-    },
+    InvalidHeader { expected: String, found: String },
     #[error("unknown api error")]
     Unknown,
 }

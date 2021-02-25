@@ -1,14 +1,12 @@
 use crate::components::{reference_details::ReferenceDetails, repository::Repository};
 use crate::switch::{AppAnchor, AppRoute};
 
-use yew::services::fetch::{FetchTask};
+use yew::prelude::*;
+use yew::services::fetch::FetchTask;
 use yew::Properties;
-use yew::{
-    prelude::*,
-};
 
-use crate::services::repositories::{RepositoriesSvc, RepositoriesResponse};
 use crate::error::ApiError;
+use crate::services::repositories::{RepositoriesResponse, RepositoriesSvc};
 
 #[derive(Clone, Debug, PartialEq, Properties)]
 pub struct Props {
@@ -17,7 +15,6 @@ pub struct Props {
     #[prop_or(String::from(""))]
     pub repository: String,
 }
-
 
 pub struct Catalog {
     repositories_svc: RepositoriesSvc,

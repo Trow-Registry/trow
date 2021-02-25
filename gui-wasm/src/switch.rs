@@ -10,10 +10,9 @@ pub enum AppRoute {
     PageNotFound(Permissive<String>),
 }
 
-
-pub type AppRouter = Router<AppRoute>;  
+pub type AppRouter = Router<AppRoute>;
 pub type AppAnchor = RouterAnchor<AppRoute>;
 
-// Note: using repo/tag query strings with routes did not work due to 
+// Note: using repo/tag query strings with routes did not work due to
 // repos and tags having url unsafe strings such as "/", "-"
 // url encoding was an option but ended up using yew callbacks.

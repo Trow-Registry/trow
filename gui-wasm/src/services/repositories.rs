@@ -1,9 +1,9 @@
-use yew::{Callback, services::fetch::{FetchTask}};
+use yew::{services::fetch::FetchTask, Callback};
 
 use serde::{Deserialize, Serialize};
 
-use crate::services::api::Api;
 use crate::error::ApiError;
+use crate::services::api::Api;
 
 #[derive(Serialize, Default, Deserialize, Debug)]
 #[serde(default, rename_all = "camelCase")]

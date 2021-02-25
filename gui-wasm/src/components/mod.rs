@@ -1,5 +1,5 @@
 pub mod catalog;
-pub mod repository;
-pub mod login;
 pub mod home;
+pub mod login;
 pub mod reference_details;
+pub mod repository;

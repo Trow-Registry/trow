@@ -1,8 +1,8 @@
 use yew::prelude::*;
 use yew_router::{route::Route, switch::Permissive};
 
-use crate::components::{home::Home, catalog::Catalog};
-use crate::switch::{ AppRoute, AppRouter};
+use crate::components::{catalog::Catalog, home::Home};
+use crate::switch::{AppRoute, AppRouter};
 
 pub struct Model {
     // link: ComponentLink<Self>,
@@ -39,14 +39,13 @@ impl Component for Model {
     }
 }
 
-
 impl Model {
     fn switch(switch: AppRoute) -> Html {
         match switch {
             AppRoute::Repositories => {
                 html! { <Catalog  /> }
             }
-           
+
             AppRoute::Home => {
                 html! { <Home /> }
             }
@@ -56,9 +55,8 @@ impl Model {
             }
 
             AppRoute::PageNotFound(Permissive(None)) => {
-                html!{"Page not found"}
+                html! {"Page not found"}
             }
         }
-    } 
+    }
 }
-

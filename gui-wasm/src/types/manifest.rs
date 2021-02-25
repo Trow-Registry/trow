@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::default::Default;
 
-#[derive( Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Manifest {
     pub schema_version: u8,
@@ -20,7 +20,5 @@ pub struct Descriptor {
     pub digest: String,
     pub size: u32,
     pub urls: Vec<String>,
-    pub annotations: HashMap<String, String>
+    pub annotations: HashMap<String, String>,
 }
-
-
