@@ -67,7 +67,7 @@ const Details = () => {
                                         icon: "copy",
                                         onClick: copyText,
                                     }}
-                                    value={`docker pull ${config.trow_registry_url}/${currentRepository}:${currentTag}`}
+                                    value={`docker pull ${window.location.host}/${currentRepository}:${currentTag}`}
                                     ref={copyRef}
                                 />
                             </Card.Content>

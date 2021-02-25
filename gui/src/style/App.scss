@@ -1,28 +1,26 @@
-h4 {
+$default-background-color: rgba(220, 220, 220, 0.657);
+
+body {
+    min-height: 100vh;
 }
 
 #homeGrid {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background-color: rgba(220, 220, 220, 0.657);
+    min-height: 100vh;
+    background-color: $default-background-color;
 }
 
 #catalogGrid {
-    // background-color: lightgrey;
-    background-color: rgba(220, 220, 220, 0.657);
-
+    background-color: $default-background-color;
     display: flex;
     height: 100vh;
 }
 
 #loaderSegment {
-    background-color: rgba(220, 220, 220, 0.657);
+    background-color: $default-background-color;
     display: flex;
     height: 100vh;
 }
 
 #mainHeader {
-    background-color: rgba(220, 220, 220, 0.657);
+    background-color: $default-background-color;
 }

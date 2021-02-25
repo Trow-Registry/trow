@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 const MainHeader = () => {
     return (
-        <Menu borderless secondary id="mainHeader">
+        <Menu borderless secondary id="mainHeader" color="blue">
             <Menu.Item>
                 <Header floated="left" as={Link} to="/">
                     Trow

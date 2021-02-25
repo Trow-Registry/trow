@@ -48,7 +48,7 @@ const Repo = ({ repo }) => {
                                         icon: "copy",
                                         onClick: copyText,
                                     }}
-                                    value={`docker pull ${config.trow_registry_url}/${repo}`}
+                                    value={`docker pull ${window.location.host}/${repo}`}
                                     ref={copyRef}
                                 />
                             </Container>
