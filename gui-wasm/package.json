@@ -1,0 +1,23 @@
+{
+  "scripts": {
+    "build": "webpack --mode production --progress --color --config webpack.prod.js",
+    "serve": "node proxy & webpack serve --config webpack.dev.js"
+  },
+  "devDependencies": {
+    "@wasm-tool/wasm-pack-plugin": "^1.3.2",
+    "css-loader": "^5.0.2",
+    "html-webpack-plugin": "^5.1.0",
+    "sass": "^1.32.7",
+    "sass-loader": "^11.0.1",
+    "style-loader": "^2.0.0",
+    "text-encoding": "^0.7.0",
+    "webpack": "^5.6.0",
+    "webpack-cli": "^4.2.0",
+    "webpack-dev-server": "^3.11.0",
+    "webpack-merge": "^5.4.0",
+    "express": "^4.17.1",
+    "http-proxy-middleware": "^1.0.6",
+    "morgan": "^1.10.0"
+  },
+  "dependencies": {}
+}
