@@ -36,8 +36,9 @@ FROM debian:stable-slim
 
 RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
+# Note that certs are needed for proxying
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl libssl-dev \
+  && apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates\
   && apt-get clean\
   && rm -rf /var/lib/apt/lists/*
 
