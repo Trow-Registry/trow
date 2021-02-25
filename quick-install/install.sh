@@ -129,7 +129,7 @@ kubectl config view --raw --minify --flatten \
   -o jsonpath='{.clusters[].cluster.certificate-authority-data}' \
   | base64 --decode | tee -a $cert_file
 kubectl create configmap trow-ca-cert --from-file=cert=$cert_file \
-  --dry-run -o json | kubectl apply -n "$namespace" -f -
+  --dry-run=client -o json | kubectl apply -n "$namespace" -f -
 
 echo
 ./copy-certs.sh "$namespace"
