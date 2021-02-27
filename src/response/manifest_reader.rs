@@ -8,7 +8,6 @@ impl<'r> Responder<'r> for ManifestReader {
         let ct = Header::new("Content-Type", self.content_type().to_string());
         let digest = Header::new("Docker-Content-Digest", self.digest().0.clone());
 
-        
         // Important to used sized_body in order to have content length set correctly
         let mut resp = Response::build().sized_body(self.get_reader()).ok()?;
         resp.set_header(ct);

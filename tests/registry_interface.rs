@@ -116,7 +116,8 @@ mod interface_tests {
             .unwrap();
 
         if let Some(s) = size {
-            let actual_size = resp.headers()
+            let actual_size = resp
+                .headers()
                 .get("Content-Length")
                 .unwrap()
                 .to_str()
@@ -126,8 +127,6 @@ mod interface_tests {
         let mani: manifest::ManifestV2 = resp.json().await.unwrap();
 
         assert_eq!(mani.schema_version, 2);
-
-        
     }
 
     async fn get_non_existent_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
