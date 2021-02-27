@@ -353,7 +353,15 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let mr = create_manifest_reader(Box::new(file), resp.content_type, Digest(resp.digest));
+
+        let len = match file.metadata() {
+            Ok(m) => m.len(),
+            Err(e) => {
+                warn!("Failed to get length of manifest {}", e);
+                0
+            }
+        };
+        let mr = create_manifest_reader(Box::new(file), resp.content_type, len, Digest(resp.digest));
         Ok(mr)
     }
 

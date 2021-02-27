@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use derive_more::Display;
-use std::collections::HashSet;
+use std::{collections::HashSet, io::Seek};
 use std::io::Read;
 
 #[derive(Clone, Debug, Display, Serialize)]
@@ -135,14 +135,18 @@ pub fn create_verified_manifest(
     }
 }
 
+pub trait SeekRead: Read + Seek {}
+impl SeekRead for std::fs::File {}
+
 pub struct ManifestReader {
     content_type: String,
+    pub length: u64,
     digest: Digest,
-    reader: Box<dyn Read>,
+    reader: Box<dyn SeekRead>,
 }
 
 impl ManifestReader {
-    pub fn get_reader(self) -> Box<dyn Read> {
+    pub fn get_reader(self) -> Box<dyn SeekRead> {
         self.reader
     }
 
@@ -156,24 +160,26 @@ impl ManifestReader {
 }
 
 pub fn create_manifest_reader(
-    reader: Box<dyn Read>,
+    reader: Box<dyn SeekRead>,
     content_type: String,
+    length: u64,
     digest: Digest,
 ) -> ManifestReader {
     ManifestReader {
         reader,
         content_type,
+        length,
         digest,
     }
 }
 
 pub struct BlobReader {
     digest: Digest,
-    reader: Box<dyn Read>,
+    reader: Box<dyn SeekRead>,
 }
 
 impl BlobReader {
-    pub fn get_reader(self) -> Box<dyn Read> {
+    pub fn get_reader(self) -> Box<dyn SeekRead> {
         self.reader
     }
 
@@ -182,7 +188,7 @@ impl BlobReader {
     }
 }
 
-pub fn create_blob_reader(reader: Box<dyn Read>, digest: Digest) -> BlobReader {
+pub fn create_blob_reader(reader: Box<dyn SeekRead>, digest: Digest) -> BlobReader {
     BlobReader { reader, digest }
 }
 

@@ -1,12 +1,17 @@
  [ req ]
  distinguished_name     = req_distinguished_name
  prompt                 = no
+subjectAltName = alt_names
 
  [ req_distinguished_name ]
  C                      = GB
  ST                     = Trowland
  L                      = Trowie Knowe
  O                      = Trow Registry
- CN                     = trow.test
  emailAddress           = test@email.address
 
+[alt_names]
+IP.1 = 127.0.0.1
+IP.2 = 0.0.0.0
+DNS.1 = localhost
+DNS.2 = trow.test
