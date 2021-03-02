@@ -1,6 +1,7 @@
 /target
 Cargo.lock
 yarn.lock
+yarn-error.log
 dist
 pkg
 node_modules
