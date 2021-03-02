@@ -27,14 +27,12 @@ impl Component for Model {
 
     fn view(&self) -> Html {
         html! {
-            <div>
-                <AppRouter
-                    render=AppRouter::render(Self::switch)
-                    redirect=AppRouter::redirect(|route: Route| {
-                        AppRoute::PageNotFound(Permissive(Some(route.route)))
-                    })
-                />
-            </div>
+            <AppRouter
+                render=AppRouter::render(Self::switch)
+                redirect=AppRouter::redirect(|route: Route| {
+                    AppRoute::PageNotFound(Permissive(Some(route.route)))
+                })
+            />
         }
     }
 }
