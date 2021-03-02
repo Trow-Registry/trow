@@ -86,35 +86,35 @@ impl Component for Catalog {
     }
     fn view(&self) -> Html {
         html! {
-            <div class="columns">
-                <div class="column is-1">
-                    <aside class="menu">
-                        <p class="menu-label">
-                        <AppAnchor  route=AppRoute::Home>
-                            { "Trow" }
-                        </AppAnchor>
-                        </p>
+            <div class="uk-grid uk-child-width-expand uk-grid-divider uk-height-viewport">
+                <div class="uk-width-small">
+                    <ul class="uk-nav uk-nav-default">
+                        <li class="uk-nav-header">
+                            <AppAnchor  route=AppRoute::Home>
+                             { "Trow" }
+                            </AppAnchor>
+                        </li>
 
-                        <ul class="menu-list">
-                            <li><AppAnchor  route=AppRoute::Repositories>
+                        <li><a>
+                            <AppAnchor  route=AppRoute::Repositories>
                                 { "Repositories" }
                             </AppAnchor>
-                            </li>
-                        </ul>
+                            
+                        </a>
+                        </li>
 
-                    </aside>
+                    </ul>
                 </div>
 
-                <div class="column is-1">
-
-                { self.view_fetching() }
-                { self.view_repositories()}
+                <div class="uk-width-medium">
+                    { self.view_fetching() }
+                    { self.view_repositories()}
                 </div>
 
-                <div class="column">
+                <div class="">
                     {self.view_repo()}
                 </div>
-                <div class="column">
+                <div class="">
                     {self.view_reference_details()}
                 </div>
 
@@ -133,15 +133,13 @@ impl Catalog {
                     Msg::SetCurrentRepository(r.to_string())
                 });
                 html! {
-                    <li onclick=onclick >{repo.to_string()}</li>
+                    <li><a class="header" onclick=onclick >{repo.to_string()}</a></li>
                 }
             });
             html! {
-                <div class="content">
-                    <ul class="repo-list">
-                        { for repos_render}
-                    </ul>
-                </div>
+                <ul class="uk-list uk-list-collapse uk-list-divider">
+                    { for repos_render}
+                </ul>
             }
         } else {
             html! {

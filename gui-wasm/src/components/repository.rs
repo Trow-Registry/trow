@@ -84,11 +84,29 @@ impl Component for Repository {
 
     fn view(&self) -> Html {
         html! {
-            <div class="content">
-                <p>{&self.props.repository}</p>
-                <p>{&self.props.reference}</p>
-                {self.view_fetching()}
-                {self.view_tags()}
+            <div class="">
+                <div class="uk-section">
+                    <div class="uk-card uk-card-default uk-card-body">
+                        <p>{&self.props.repository}</p>
+                    </div>
+                </div>
+                
+                <div class="uk-section">
+                    <ul class="uk-subnav uk-subnav-pill" uk-switcher="">
+                        <li><a href="#">{"Tags"}</a></li>
+                        <li><a href="#">{"Info"}</a></li>
+                    </ul>
+
+                    <ul class="uk-switcher uk-margin">
+                        <li>
+                            {self.view_fetching()}
+                            {self.view_tags()}
+                        </li>
+                        <li>
+                            {"Name:"} {&self.props.repository}
+                        </li>
+                    </ul>
+                </div>
             </div>
         }
     }
@@ -104,15 +122,17 @@ impl Repository {
                     Msg::SetCurrentReference(t.to_string())
                 });
                 html! {
-                     <li onclick=onclick >{tag.to_string()}</li>
+                    <div class="item">
+                        <div class="content">
+                            <a onclick=onclick >{tag.to_string()}</a>
+                        </div>
+                    </div>
+
                 }
             });
             html! {
-                <div class="content">
-                    <ul class="item-list">
-
-                        { for tags_render }
-                    </ul>
+                <div class="ui relaxed divided list">
+                    { for tags_render }
                 </div>
             }
         } else {

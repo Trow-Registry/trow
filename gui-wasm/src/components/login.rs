@@ -30,34 +30,34 @@ impl Component for Login {
     }
     fn view(&self) -> Html {
         html! {
-            <>
-            <div class="field">
-                <p class="control has-icons-left has-icons-right">
-                <input class="input" type="username" placeholder="Username" />
-                <span class="icon is-small is-left">
-                    <i class="fas fa-user"></i>
-                </span>
-                <span class="icon is-small is-right">
-                    <i class="fas fa-check"></i>
-                </span>
-                </p>
-            </div>
-            <div class="field">
-                <p class="control has-icons-left">
-                <input class="input" type="password" placeholder="Password" />
-                <span class="icon is-small is-left">
-                    <i class="fas fa-lock"></i>
-                </span>
-                </p>
-            </div>
-            <div class="field">
-                <p class="control">
-                <button class="button is-success">
-                    {"Login"}
-                </button>
-                </p>
-            </div>
-          </>
+
+            <div class="content home-segment-login">
+
+                <form class="ui form">
+                    <div class="field">
+                    <p class="control has-icons-left has-icons-right">
+                    <input class="uk-input" type="username" placeholder="Username"/>
+                    <span class="icon is-small is-left">
+                        <i class="fas fa-user"></i>
+                    </span>
+                    </p>
+                </div>
+                <div class="field">
+                    <p class="control has-icons-left">
+                    <input class="uk-input" type="password" placeholder="Password"/>
+        
+                    </p>
+                </div>
+                <div class="field">
+                    <p class="control">
+                    <button class="uk-button uk-button-default">
+                        {"Login"}
+                    </button>
+                    </p>
+                </div>
+                </form>
+
+          </div>
         }
     }
 }

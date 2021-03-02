@@ -110,8 +110,8 @@ impl Component for ReferenceDetails {
     }
     fn view(&self) -> Html {
         html! {
-            <div class="content">
-                <p1>{&self.props.repository}</p1>
+            <div class="uk-section">
+                <p1>{&self.props.repository} {":"} {&self.props.reference}</p1>
                 { self.view_fetching_manifest()}
                 { self.view_fetching_blob()}
                 { self.view_manifest_details()}
@@ -125,7 +125,7 @@ impl ReferenceDetails {
     fn view_manifest_details(&self) -> Html {
         if let Some(manifest) = &self.manifest {
             html! {
-                <p>{&manifest.config.digest}</p>
+                <p>{"Digest:"}{&manifest.config.digest}</p>
             }
         } else {
             html! {
@@ -138,9 +138,7 @@ impl ReferenceDetails {
         if let Some(blob) = &self.blob {
             html! {
                 <>
-                    <p>{&blob.os}</p>
-                    {"/"}
-                    <p>{&blob.architecture}</p>
+                    <p>{&blob.os} {"/"} {&blob.architecture}</p>
                 </>
             }
         } else {

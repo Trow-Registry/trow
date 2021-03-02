@@ -31,20 +31,20 @@ impl Component for Home {
     }
     fn view(&self) -> Html {
         html! {
-            <div class="columns">
-                <div class="column">
-                    <div class="content is-centered">
+            <div class="uk-grid uk-child-width-expand@s uk-text-center uk-height-viewport" >
+                <div class="">
+                    <div class="content home-segment-text">
 
                         <h4>{"Trow"}</h4>
                         <h6>{"The Cloud Native Registry"}</h6>
-                        <button class="button">
+                        <button class="uk-button uk-button-default">
                             <AppAnchor  route=AppRoute::Repositories>
                                 { "Repositories" }
                             </AppAnchor>
-                            </button>
+                        </button>
                     </div>
                 </div>
-                <div class="column">
+                <div class="">
                     <Login />
                 </div>
             </div>
