@@ -21,6 +21,9 @@ opt-level = 'z'
 # link time optimization using using whole-program analysis
 lto = true
 
+# [features]
+# default = ["console_error_panic_hook", "wee_alloc"]
+
 
 [dependencies]
 yew = "0.17"
@@ -33,3 +36,5 @@ log = "0.4.6"
 wasm-logger = "0.2.0"
 anyhow = "1.0"
 thiserror = "1.0"
+cfg-if = "1.0"
+wee_alloc = "0.4.5"
