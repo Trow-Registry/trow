@@ -1,0 +1,82 @@
+name: Continuous deployment
+on:
+  push:
+    branches: ["master"]
+jobs:
+  # Compare cargo version with existing git tags and decide if a new version
+  # should be triggered.
+  verify_new_version:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: git fetch --all --tags
+    - name: Check Release Version
+      uses: thebongy/version-check@v1
+      with:
+        file: Cargo.toml
+        tagFormat: v${version}
+      id: version_check
+    - name: Write new version to txt
+      shell: bash
+      run: |
+        echo ${{steps.version_check.outputs.rawVersion}} >> new-version.txt
+    - name: Store version as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: new-version
+        path: new-version.txt
+  
+  # If a new version needs to be created, update 
+  update_helm_chart_version:
+    runs-on: ubuntu-latest
+    needs: ["verify_new_version"]
+    steps:
+      - name: Download new-version number
+        uses: actions/download-artifact@v2
+        with:
+          name: new-version
+      - run: |
+          echo "NEW_VERSION=$(cat new-version.txt)" >> $GITHUB_ENV;
+          #TODO: finish
+      
+  create_and_deploy_docker_images:
+    runs-on: ubuntu-latest
+    needs: ["verify_new_version"]
+    steps:
+      - name: Download new-version number
+        uses: actions/download-artifact@v2
+        with:
+          name: new-version
+      - run: |
+          echo "NEW_VERSION=$(cat new-version.txt)" >> $GITHUB_ENV;
+          #TODO: finish
+
+  create_git_release_tag_and_github_release_object:
+    runs-on: ubuntu-latest
+    needs: ["create_and_deploy_docker_images", "update_helm_chart_version"]
+    steps:
+      - name: Download new-version number
+        uses: actions/download-artifact@v2
+        id: version_check_staging
+        with:
+          name: new-version
+      - run: echo "NEW_VERSION=$(cat new-version.txt)" >> $GITHUB_ENV;
+      - uses: actions/checkout@v2
+      - name: Create and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v5.2
+        with:
+          default_bump: false
+          custom_tag: ${{ env.NEW_VERSION }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create a GitHub release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          release_name: Trow ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+          draft: false
+          prerelease: false
