@@ -1,2 +1,2 @@
-import("./static/app.scss");
+import("./style/app.scss");
 import("./pkg");
