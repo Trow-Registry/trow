@@ -3,10 +3,10 @@ set -euo pipefail
 
 MAJOR_VERSION="0"
 MINOR_VERSION="3"
-PATCH_VERSION="1"
+PATCH_VERSION="2"
 # Only use this for "special" release and prefix with "-" 
 # e.g. -SCANNING for scanning preview feature release
-NAME="-PROXY" 
+NAME="" 
 
 VERSION="$MAJOR_VERSION.$MINOR_VERSION.$PATCH_VERSION$NAME"
 
