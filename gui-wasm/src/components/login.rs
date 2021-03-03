@@ -23,41 +23,37 @@ impl Component for Login {
     }
 
     fn change(&mut self, _props: Self::Properties) -> ShouldRender {
-        // Should only return "true" if new properties are different to
-        // previously received properties.
-        // This component has no properties so we will always return "false".
         false
     }
     fn view(&self) -> Html {
         html! {
 
-            <div class="content home-segment-login">
+            <div class="home-segment-login">
+                <form>
+                    <div class="uk-margin">
+                        <div class="uk-inline">
+                            <span class="uk-form-icon" uk-icon="icon: user"></span>
+                            <input class="uk-input" type="username" placeholder="Username"/>
+                        </div>
+                    </div>
 
-                <form class="ui form">
+                    <div class="uk-margin">
+                        <div class="uk-inline">
+                            <span class="uk-form-icon" uk-icon="icon: lock"></span>
+                            <input class="uk-input" type="password" placeholder="Password"/>
+                        </div>
+                    </div>
+
                     <div class="field">
-                    <p class="control has-icons-left has-icons-right">
-                    <input class="uk-input" type="username" placeholder="Username"/>
-                    <span class="icon is-small is-left">
-                        <i class="fas fa-user"></i>
-                    </span>
-                    </p>
-                </div>
-                <div class="field">
-                    <p class="control has-icons-left">
-                    <input class="uk-input" type="password" placeholder="Password"/>
-        
-                    </p>
-                </div>
-                <div class="field">
-                    <p class="control">
-                    <button class="uk-button uk-button-default">
-                        {"Login"}
-                    </button>
-                    </p>
-                </div>
+                        <p class="control">
+                        <button class="uk-button uk-button-default">
+                            {"Login"}
+                        </button>
+                        </p>
+                    </div>
                 </form>
 
-          </div>
+            </div>
         }
     }
 }
