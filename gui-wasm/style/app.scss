@@ -1,0 +1,18 @@
+$default-background-color: rgba(220, 220, 220, 0.657);
+
+body {
+    min-height: 100vh;
+}
+
+.home-segment-text {
+    margin-top: 50% !important;
+    text-align: center;
+}
+
+.home-segment-login {
+    margin: 50% 20% 0 20% !important;
+}
+
+.login {
+    background-color: $default-background-color;
+}
