@@ -22,7 +22,7 @@ module.exports = {
   plugins: [
     new webpack.ProgressPlugin(),
     new HtmlWebpackPlugin({
-      template: "static/index.html",
+      template: "html/index.html",
     }),
     new CleanWebpackPlugin(),
     new MiniCssExtractPlugin({
