@@ -24,18 +24,14 @@ impl Component for Home {
     }
 
     fn change(&mut self, _props: Self::Properties) -> ShouldRender {
-        // Should only return "true" if new properties are different to
-        // previously received properties.
-        // This component has no properties so we will always return "false".
         false
     }
     fn view(&self) -> Html {
         html! {
             <div class="uk-grid uk-child-width-expand@s uk-text-center uk-height-viewport" >
                 <div class="">
-                    <div class="content home-segment-text">
-
-                        <h4>{"Trow"}</h4>
+                    <div class="home-segment-text">
+                        <h4 class="uk-heading-small">{"Trow"}</h4>
                         <h6>{"The Cloud Native Registry"}</h6>
                         <button class="uk-button uk-button-default">
                             <AppAnchor  route=AppRoute::Repositories>
@@ -44,7 +40,7 @@ impl Component for Home {
                         </button>
                     </div>
                 </div>
-                <div class="">
+                <div class="login">
                     <Login />
                 </div>
             </div>
