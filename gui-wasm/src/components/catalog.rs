@@ -86,27 +86,12 @@ impl Component for Catalog {
     }
     fn view(&self) -> Html {
         html! {
-            <div class="uk-grid uk-child-width-expand uk-grid-divider uk-height-viewport">
+            <div class="uk-grid uk-child-width-expand@s uk-grid-divider uk-height-viewport">
+
                 <div class="uk-width-small">
-                    <ul class="uk-nav uk-nav-default">
-                        <li class="uk-nav-header">
-                            <AppAnchor  route=AppRoute::Home>
-                             { "Trow" }
-                            </AppAnchor>
-                        </li>
-
-                        <li><a>
-                            <AppAnchor  route=AppRoute::Repositories>
-                                { "Repositories" }
-                            </AppAnchor>
-                            
-                        </a>
-                        </li>
-
-                    </ul>
+                    { self.view_nav() }
                 </div>
-
-                <div class="uk-width-medium">
+                <div class="uk-width-medium uk-overflow-auto">
                     { self.view_fetching() }
                     { self.view_repositories()}
                 </div>
@@ -133,11 +118,11 @@ impl Catalog {
                     Msg::SetCurrentRepository(r.to_string())
                 });
                 html! {
-                    <li><a class="header" onclick=onclick >{repo.to_string()}</a></li>
+                    <li><a class="uk-link-text" onclick=onclick >{repo.to_string()}</a></li>
                 }
             });
             html! {
-                <ul class="uk-list uk-list-collapse uk-list-divider">
+                <ul class="uk-list uk-list-divider">
                     { for repos_render}
                 </ul>
             }
@@ -150,14 +135,38 @@ impl Catalog {
 
     fn view_fetching(&self) -> Html {
         if self.fetch_catalog_task.is_some() {
-            html! { <p>{ "Fetching repositories..." }</p> }
+            html! {
+            <>
+                <div class="uk-spinner"></div>
+                <p>{ "Fetching repositories..." }</p>
+            </>
+            }
         } else {
             html! { <p></p> }
         }
     }
 
     fn view_nav(&self) -> Html {
-        unimplemented!()
+        html! {
+            <div class="uk-padding-small">
+                <ul class="uk-nav uk-nav-default uk-nav-center">
+                    <li class="uk-nav-header">
+                        <AppAnchor  route=AppRoute::Home>
+                        { "Trow" }
+                        </AppAnchor>
+                    </li>
+
+                    <li>
+                        // <div class="uk-inline">
+                            <a class="uk-link-text">
+                                <span class="uk-icon" uk-icon="icon: folder"></span>
+                                <AppAnchor  route=AppRoute::Repositories>{ "Repositories" }</AppAnchor>
+                            </a>
+                        // </div>
+                    </li>
+                </ul>
+            </div>
+        }
     }
 
     fn view_repo(&self) -> Html {
