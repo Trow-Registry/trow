@@ -64,7 +64,6 @@ impl Component for Repository {
             Msg::FetchTagsResponseReady(Err(_)) => false,
 
             Msg::SetCurrentReference(reference) => {
-                log::info!("{}", reference);
                 self.props.callback_reference.emit(reference);
                 true
             }
@@ -87,10 +86,12 @@ impl Component for Repository {
             <div class="">
                 <div class="uk-section">
                     <div class="uk-card uk-card-default uk-card-body">
-                        <p>{&self.props.repository}</p>
+                            // <span uk-icon="icon: file"></span>
+                        <h4 class="uk-card-title">{&self.props.repository}</h4>
+                        {self.view_pull_details()}
                     </div>
                 </div>
-                
+
                 <div class="uk-section">
                     <ul class="uk-subnav uk-subnav-pill" uk-switcher="">
                         <li><a href="#">{"Tags"}</a></li>
@@ -103,7 +104,7 @@ impl Component for Repository {
                             {self.view_tags()}
                         </li>
                         <li>
-                            {"Name:"} {&self.props.repository}
+                            <strong>{"Name:"}</strong> {&self.props.repository}
                         </li>
                     </ul>
                 </div>
@@ -113,6 +114,24 @@ impl Component for Repository {
 }
 
 impl Repository {
+    fn view_pull_details(&self) -> Html {
+        let wn = yew::utils::window().location().host();
+        match wn {
+            Ok(host) => {
+                let pull_command = format!("docker pull {}/{}", host, &self.props.repository);
+                html! {
+                    <code class="uk-align-right">{pull_command}</code>
+                }
+            }
+
+            _ => {
+                html! {
+                    <p></p>
+                }
+            }
+        }
+    }
+
     fn view_tags(&self) -> Html {
         if let Some(tags) = &self.tags {
             let tags_render = tags.iter().map(|tag| {
@@ -122,18 +141,14 @@ impl Repository {
                     Msg::SetCurrentReference(t.to_string())
                 });
                 html! {
-                    <div class="item">
-                        <div class="content">
-                            <a onclick=onclick >{tag.to_string()}</a>
-                        </div>
-                    </div>
+                    <li><a class="uk-link-text" onclick=onclick >{tag.to_string()}</a></li>
 
                 }
             });
             html! {
-                <div class="ui relaxed divided list">
+                <ul class="uk-list uk-list-divider">
                     { for tags_render }
-                </div>
+                </ul>
             }
         } else {
             html! {
