@@ -109,23 +109,62 @@ impl Component for ReferenceDetails {
         changed
     }
     fn view(&self) -> Html {
+        let repo_reference = format!("{}:{}", &self.props.repository, &self.props.reference);
+
         html! {
-            <div class="uk-section">
-                <p1>{&self.props.repository} {":"} {&self.props.reference}</p1>
-                { self.view_fetching_manifest()}
-                { self.view_fetching_blob()}
-                { self.view_manifest_details()}
-                { self.view_blob_details()}
-            </div>
+            <>
+                <div class="uk-section">
+                    <div class="uk-card uk-card-default uk-card-body">
+                        // <h6>{"Tag Info"}</h6>
+                        <p class="uk-card-title">{repo_reference}</p>
+                        { self.view_pull_details()}
+                        <div class="uk-section">
+                            { self.view_fetching_manifest()}
+                            { self.view_fetching_blob()}
+                            { self.view_blob_details()}
+                            { self.view_manifest_details()}
+                        </div>
+                    </div>
+                </div>
+                <div class="uk-section">
+                    <h6>{"Scans"}</h6>
+                    <p>{"No scan data available"}</p>
+                </div>
+            </>
         }
     }
 }
 
 impl ReferenceDetails {
+    fn view_pull_details(&self) -> Html {
+        let wn = yew::utils::window().location().host();
+        match wn {
+            Ok(host) => {
+                let pull_command = format!(
+                    "docker pull {}/{}:{}",
+                    host, &self.props.repository, &self.props.reference
+                );
+                html! {
+
+                    <code class="uk-align-right">{pull_command}</code>
+                }
+            }
+
+            _ => {
+                html! {
+                    <p></p>
+                }
+            }
+        }
+    }
+
     fn view_manifest_details(&self) -> Html {
         if let Some(manifest) = &self.manifest {
             html! {
-                <p>{"Digest:"}{&manifest.config.digest}</p>
+                <>
+                    <p><span class="uk-text-italic">{"digest: "}</span> {&manifest.config.digest}</p>
+                </>
+
             }
         } else {
             html! {
@@ -138,7 +177,7 @@ impl ReferenceDetails {
         if let Some(blob) = &self.blob {
             html! {
                 <>
-                    <p>{&blob.os} {"/"} {&blob.architecture}</p>
+                    <p><span class="uk-text-italic">{"os/arch: "}</span>{&blob.os} {"/"} {&blob.architecture}</p>
                 </>
             }
         } else {
