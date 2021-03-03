@@ -21,7 +21,7 @@ opt-level = 'z'
 # link time optimization using using whole-program analysis
 lto = true
 
-# [features]
+[features]
 # default = ["console_error_panic_hook", "wee_alloc"]
 default = ["console_error_panic_hook"]
 
