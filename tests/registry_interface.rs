@@ -100,7 +100,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
+    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str, size: Option<usize>) {
         //Might need accept headers here
         let resp = cl
             .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
@@ -114,6 +114,16 @@ mod interface_tests {
             .unwrap()
             .to_str()
             .unwrap();
+
+        if let Some(s) = size {
+            let actual_size = resp
+                .headers()
+                .get("Content-Length")
+                .unwrap()
+                .to_str()
+                .unwrap();
+            assert_eq!(actual_size, format!("{}", s));
+        }
         let mani: manifest::ManifestV2 = resp.json().await.unwrap();
 
         assert_eq!(mani.schema_version, 2);
@@ -420,7 +430,7 @@ mod interface_tests {
         assert!(body.contains("total_manifest_requests{type=\"manifests\"} 6"));
         assert!(body.contains("total_blob_requests{type=\"blobs\"} 8"));
 
-        get_manifest(&cl, "onename", "tag").await;
+        get_manifest(&cl, "onename", "tag", None).await;
         let manifest_response = cl
             .get(&format!("{}/metrics", TROW_ADDRESS))
             .send()
@@ -495,7 +505,7 @@ mod interface_tests {
         println!("Running push_manifest_list()");
         let digest_list = push_manifest_list(&client, &digest, "listtest", "listtest1").await;
         println!("Running get_manifest(puttest:puttest1)");
-        get_manifest(&client, "puttest", "puttest1").await;
+        get_manifest(&client, "puttest", "puttest1", Some(358)).await;
         println!("Running delete_manifest(puttest:digest)");
         delete_manifest(&client, "puttest", &digest).await;
         println!("Running delete_manifest(listtest)");
@@ -517,11 +527,11 @@ mod interface_tests {
         delete_config_blob(&client, "puttest").await;
 
         println!("Running get_manifest(onename:tag)");
-        get_manifest(&client, "onename", "tag").await;
+        get_manifest(&client, "onename", "tag", None).await;
         println!("Running get_manifest(image/test:latest)");
-        get_manifest(&client, "image/test", "latest").await;
+        get_manifest(&client, "image/test", "latest", None).await;
         println!("Running get_manifest(repo/image/test:tag)");
-        get_manifest(&client, "repo/image/test", "tag").await;
+        get_manifest(&client, "repo/image/test", "tag", None).await;
 
         let mut rc = RepoCatalog::new();
         rc.insert(RepoName("fourth/repo/image/test".to_string()));
