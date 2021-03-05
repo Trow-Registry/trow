@@ -21,7 +21,7 @@ trow:
     allowImages: []
     disallowLocalPrefixes: []
     disallowLocalImages: []
-    proxyDockerHub: true
+    proxyDockerHub: false
 
 imagePullSecrets: []
 nameOverride: ""
