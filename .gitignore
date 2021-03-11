@@ -15,6 +15,7 @@
 
 .vscode/
 data/
+data.d/
 out/
 certs/
 protoc/
