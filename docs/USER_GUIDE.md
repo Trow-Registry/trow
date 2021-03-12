@@ -4,7 +4,7 @@
  * [Proxying the Docker Hub](#proxying-the-docker-hub)
  * [Listing Repositories and Tags](#listing-repositories-and-tags)
  * [Using Curl Securely](#using-curl-securely)
- * [Multiplatform Builds](#multiplatform)
+ * [Multiplatform Builds](#multiplatform-builds)
  * [Troubleshooting](#troubleshooting)
 
 More information is available in the [README](../README.md) and [Installation
@@ -159,13 +159,9 @@ reasons and ambiguities in specification.
 
 ## Multiplatform Builds
 
-At the time of writing, Trow images on the [Docker Hub](https://hub.docker.com/r/containersol/trow/tags)
-only support the linux/amd64 platform, largely due to limitations of the Docker Hub autobuild
-system. Moving forward, we intend for release tagged images (e.g. `containersol/trow:0.2`) to support
-multiple platforms (`default` and `latest` will still be built from master).
+Trow has builds for amd64, armv7 and arm64. Images with a release version but no explicit platform e.g. `trow:0.3` or `trow:0.3.2` should be _multiplatform_ builds that will automatically pull the correct version of the image for the current platform. Images tagged `latest` or `default` are currently amd64 only. Images should be pushed to both [GHCR](https://github.com/orgs/ContainerSolutions/packages/container/package/trow%2Ftrow) and the [Docker Hub](https://hub.docker.com/r/containersol/trow).
 
-If you'd like to build your own Docker image for a given architecture, please see
-[docker/README.md](../docker/README.md) for instructions.
+If there's another build you would like to see, please get in contact.
 
 ## Troubleshooting
 
