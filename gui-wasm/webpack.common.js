@@ -22,7 +22,7 @@ module.exports = {
   plugins: [
     new webpack.ProgressPlugin(),
     new HtmlWebpackPlugin({
-      template: "html/index.html",
+      template: path.resolve(__dirname, "html", "index.html"),
     }),
     new CleanWebpackPlugin(),
     new MiniCssExtractPlugin({
@@ -30,6 +30,9 @@ module.exports = {
     }),
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, "."),
+      args: "",
+      // Default arguments are `--typescript --target browser --mode normal`.
+      extraArgs: "",
     }),
     // Have this work in Edge which doesn't ship `TextEncoder` or
     // `TextDecoder` at this time.
@@ -42,7 +45,11 @@ module.exports = {
     rules: [
       {
         test: /\.(sa|sc|c)ss$/,
-        use: ["style-loader", "css-loader", "sass-loader"],
+        use: [
+          devMode ? "style-loader" : MiniCssExtractPlugin.loader,
+          "css-loader",
+          "sass-loader",
+        ],
       },
     ],
   },
