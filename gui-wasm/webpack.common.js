@@ -10,7 +10,7 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const devMode = process.env.NODE_ENV !== "production";
 
 module.exports = {
-  entry: "./index.js",
+  entry: path.resolve(__dirname, "app.js"),
   output: {
     path: path.resolve(__dirname, "dist"),
     filename: devMode ? "[name].[fullhash].js" : "[name].[chunkhash].js",
