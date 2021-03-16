@@ -1,4 +1,5 @@
 FROM --platform=${BUILDPLATFORM:-linux/amd64} rust:1.50.0 as builder
+ENV NODE_ENV production
 RUN curl -fsSL https://deb.nodesource.com/setup_15.x | bash - && \
     apt update && \
     apt install -y nodejs && \
