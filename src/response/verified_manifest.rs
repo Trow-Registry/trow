@@ -36,7 +36,6 @@ mod test {
             RepoName("repo_name".to_string()),
             Digest("digest".to_string()),
             "ref".to_string(),
-            "can't_remember".to_string(),
         ));
         assert_eq!(response.status(), Status::Created);
     }

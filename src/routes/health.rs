@@ -1,8 +1,8 @@
 use crate::client_interface::ClientInterface;
+use crate::registry_interface::Metrics;
 use crate::types::HealthResponse;
 
 use rocket::State;
-use tokio::runtime::Runtime;
 
 /*
 * Trow health endpoint
@@ -11,8 +11,8 @@ use tokio::runtime::Runtime;
 
 #[get("/healthz")]
 pub fn healthz(ci: State<ClientInterface>) -> HealthResponse {
-    let request = ci.is_healthy();
-    let mut rt = Runtime::new().unwrap();
-
-    rt.block_on(request)
+    HealthResponse {
+        message: "".to_string(),
+        is_healthy: ci.is_healthy(),
+    }
 }
