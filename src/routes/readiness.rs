@@ -1,8 +1,8 @@
 use crate::client_interface::ClientInterface;
+use crate::registry_interface::Metrics;
 use crate::types::ReadinessResponse;
 use rocket::get;
 use rocket::State;
-use tokio::runtime::Runtime;
 
 /*
 * Trow readiness endpoint
@@ -11,7 +11,8 @@ use tokio::runtime::Runtime;
 
 #[get("/readiness")]
 pub fn readiness(ci: State<ClientInterface>) -> ReadinessResponse {
-    let request = ci.is_ready();
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on(request)
+    ReadinessResponse {
+        message: "".to_string(),
+        is_ready: ci.is_ready(),
+    }
 }

@@ -14,7 +14,6 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 use core::fmt::Display;
 use reqwest::{self, header::{HeaderMap, HeaderValue}};
-
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
@@ -73,6 +72,13 @@ struct Upload {
 #[fail(display = "Error getting proxied repo {}", msg)]
 pub struct ProxyError {
     msg: String,
+}
+
+#[derive(Fail, Debug)]
+#[fail(display = "Expected digest {} but got {}", user_digest, actual_digest)]
+pub struct DigestValidationError {
+    user_digest: String,
+    actual_digest: String
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -194,10 +200,7 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
             "Upload did not match given digest. Was given {} but got {}",
             digest, calculated_digest
         );
-        return Err(failure::err_msg(format!(
-            "Upload did not match given digest. Was given {} but got {}",
-            digest, calculated_digest
-        )));
+        Err(DigestValidationError {user_digest: digest.to_string(), actual_digest: calculated_digest})?;
     }
 
     Ok(())
@@ -934,8 +937,15 @@ impl Registry for TrowServer {
                 digest: cr.user_digest.clone(),
             })),
             Err(e) => {
-                warn!("Failure when saving layer: {:?}", e);
-                Err(Status::internal("Internal error saving layer"))
+                match e.downcast::<DigestValidationError>() {
+                    Ok(v_e)    => { 
+                        Err(Status::invalid_argument(v_e.to_string()))
+                     }
+                    Err(e)      => { 
+                        warn!("Failure when saving layer: {:?}", e);
+                        Err(Status::internal("Internal error saving layer")) 
+                    }
+                }   
             }
         };
 
