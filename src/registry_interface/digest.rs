@@ -2,10 +2,6 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::io::{Error, Read};
 
-use crate::registry_interface::repository_error;
-use crate::registry_interface::repository_error::RepositoryError;
-
-use crate::registry_interface::registry_error::APIRegistryError;
 
 // Crypto and crypto related imports
 use sha2::{Sha256, Sha512};
@@ -15,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use sha2::Digest as ShaDigest;
 use std::fmt;
 use std::str::FromStr;
+use thiserror::Error;
+
 // Buffer size for SHA2 hashing
 const BUFFER_SIZE: usize = 1024;
 
@@ -22,6 +20,12 @@ const BUFFER_SIZE: usize = 1024;
 lazy_static! {
     static ref REGEX_ALGO: Regex = Regex::new(r"^[A-Za-z0-9_+.-]+$").unwrap();
     static ref REGEX_DIGEST: Regex = Regex::new(r"^[A-Fa-f0-9]+$").unwrap();
+}
+
+#[derive(Error, Debug)]
+pub enum DigestError {
+    #[error("`{0}`")]
+    InvalidDigest(String),
 }
 
 pub const SUPPORTED_DIGEST_ALGORITHMS: [DigestAlgorithm; 2] =
@@ -117,24 +121,10 @@ fn sha512_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
 }
 
 /// Returns a hash in the form of: algo:hash
-pub fn hash_tag<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String, APIRegistryError> {
+pub fn hash_tag<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String, Error> {
     match algo {
-        DigestAlgorithm::Sha256 => sha256_tag_digest(reader).map_err(|_e| {
-            let message = format!("Failed to calculate digest");
-            log::error!("{}", message);
-            APIRegistryError::DigestInvalid {
-                message,
-                details: String::default(),
-            }
-        }),
-        DigestAlgorithm::Sha512 => sha512_tag_digest(reader).map_err(|_e| {
-            let message = format!("Failed to calculate digest");
-            log::error!("{}", message);
-            APIRegistryError::DigestInvalid {
-                message,
-                details: String::default(),
-            }
-        }),
+        DigestAlgorithm::Sha256 => sha256_tag_digest(reader),
+        DigestAlgorithm::Sha512 => sha512_tag_digest(reader)
     }
 }
 
@@ -146,7 +136,7 @@ pub fn hash_reference<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<Stri
     }
 }
 
-pub fn parse(component: &str) -> Result<Digest, RepositoryError> {
+pub fn parse(component: &str) -> Result<Digest, DigestError> {
     let algo_digest = component
         .split(":")
         .map(|token| String::from(token))
@@ -154,8 +144,8 @@ pub fn parse(component: &str) -> Result<Digest, RepositoryError> {
 
     // check that we have both parts: algo and digest
     if algo_digest.len() < 2 {
-        return Err(repository_error::from(format!(
-            "Component cannot be parsed into a digest: {}",
+        return Err(DigestError::InvalidDigest(
+            format!("Component cannot be parsed into a digest: {}",
             &component
         )));
     }
@@ -165,22 +155,22 @@ pub fn parse(component: &str) -> Result<Digest, RepositoryError> {
     let digest = String::from(&algo_digest[1]);
 
     if !REGEX_ALGO.is_match(&algo) {
-        return Err(repository_error::from(format!(
+        return Err(DigestError::InvalidDigest(format!(
             "Component cannot be parsed into a TAG wrong digest algorithm: {} - {}",
             &component, &algo
         )));
     }
 
     if !REGEX_DIGEST.is_match(&digest) {
-        return Err(repository_error::from(format!(
+        return Err(DigestError::InvalidDigest(format!(
             "Component cannot be parsed into a TAG wrong digest format: {} - {}",
             &component, &digest
         )));
     }
 
-    let algo_enum = DigestAlgorithm::from_str(algo.as_str()).map_err(|e| RepositoryError {
-        message: e.to_string(),
-    })?;
+    let algo_enum = DigestAlgorithm::from_str(algo.as_str()).map_err(|e| DigestError::InvalidDigest(
+        e.to_string()
+    ))?;
 
     Ok(Digest {
         algo: algo_enum,

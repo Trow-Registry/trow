@@ -8,10 +8,6 @@ use thiserror::Error;
 
 #[allow(dead_code)]
 pub mod digest;
-pub mod index;
-pub mod media;
-pub mod registry_error;
-pub mod repository_error;
 
 // TODO: implement the 'mount' and 'multi-arch' OCI spec
 
