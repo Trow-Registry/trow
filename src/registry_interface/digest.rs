@@ -123,7 +123,7 @@ fn sha512_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
 pub fn hash_tag<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String, Error> {
     match algo {
         DigestAlgorithm::Sha256 => sha256_tag_digest(reader),
-        DigestAlgorithm::Sha512 => sha512_tag_digest(reader),
+        DigestAlgorithm::Sha512 => sha512_tag_digest(reader)
     }
 }
 
@@ -143,8 +143,8 @@ pub fn parse(component: &str) -> Result<Digest, DigestError> {
 
     // check that we have both parts: algo and digest
     if algo_digest.len() < 2 {
-        return Err(DigestError::InvalidDigest(format!(
-            "Component cannot be parsed into a digest: {}",
+        return Err(DigestError::InvalidDigest(
+            format!("Component cannot be parsed into a digest: {}",
             &component
         )));
     }
@@ -167,8 +167,9 @@ pub fn parse(component: &str) -> Result<Digest, DigestError> {
         )));
     }
 
-    let algo_enum = DigestAlgorithm::from_str(algo.as_str())
-        .map_err(|e| DigestError::InvalidDigest(e.to_string()))?;
+    let algo_enum = DigestAlgorithm::from_str(algo.as_str()).map_err(|e| DigestError::InvalidDigest(
+        e.to_string()
+    ))?;
 
     Ok(Digest {
         algo: algo_enum,
