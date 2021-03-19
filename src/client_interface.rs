@@ -2,6 +2,11 @@ pub mod trow_proto {
     include!("../lib/protobuf/out/trow.rs");
 }
 
+use crate::registry_interface::digest::{Digest as if_digest, DigestAlgorithm};
+use crate::registry_interface::{
+    CatalogOperations, Metrics, MetricsError, Validation, ValidationError,
+};
+use tokio::runtime::Runtime;
 use trow_proto::{
     admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
     BlobRef, CatalogRequest, CompleteRequest, HealthRequest, ListTagsRequest,
@@ -11,14 +16,21 @@ use trow_proto::{
 
 use tonic::{Code, Request};
 
-use crate::chrono::TimeZone;
 use crate::types::{self, *};
+use crate::{
+    chrono::TimeZone,
+    registry_interface::{BlobStorage, ManifestStorage, StorageDriverError},
+};
 use failure::Error;
 use serde_json::Value;
-use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::prelude::*;
+use std::{convert::TryInto, str::FromStr};
+
+// BIG TODO:
+// Creating a new runtime for each request is awful.
+// Wasn't clear how to manage this in rocket, might need to pass runtime in or something.
 
 pub struct ClientInterface {
     server: String,
@@ -58,14 +70,284 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
 pub enum RegistryError {
     #[fail(display = "Invalid repository or tag")]
     InvalidName,
-    #[fail(display = "Invalid name or UUID")]
-    InvalidNameOrUUID,
     #[fail(display = "Invalid manifest")]
     InvalidManifest,
-    #[fail(display = "Internal Error")]
-    InvalidContentRange,
-    #[fail(display = "Internal Error")]
+    #[fail(display = "Invalid Range")]
     Internal,
+}
+
+impl ManifestStorage for ClientInterface {
+    fn get_manifest(&self, name: &str, tag: &str) -> Result<ManifestReader, StorageDriverError> {
+        let mut rt = Runtime::new().unwrap();
+        let rn = RepoName(name.to_string());
+        let f = self.get_reader_for_manifest(&rn, tag);
+        let mr = rt.block_on(f).map_err(|e| {
+            warn!("Error getting manifest {:?}", e);
+            StorageDriverError::Internal
+        })?;
+
+        Ok(mr)
+    }
+
+    fn store_manifest(
+        &self,
+        name: &str,
+        tag: &str,
+        data: &mut Box<dyn Read>,
+    ) -> Result<if_digest, StorageDriverError> {
+        let repo = RepoName(name.to_string());
+
+        let mut rt = Runtime::new().unwrap();
+        match rt.block_on(self.upload_manifest(&repo, &tag, data)) {
+            Ok(vm) => {
+                let mut iter = vm.digest().0.split(":");
+                let algo = DigestAlgorithm::from_str(iter.next().unwrap_or("sha256"))
+                    .unwrap_or(DigestAlgorithm::Sha256);
+                let hash = iter
+                    .next()
+                    .ok_or_else(|| {
+                        warn!("Error decoding digest: {}", vm.digest());
+                        StorageDriverError::Internal
+                    })?
+                    .to_string();
+                Ok(if_digest { algo, hash })
+            }
+            Err(RegistryError::InvalidName) => {
+                Err(StorageDriverError::InvalidName(format!("{}:{}", name, tag)))
+            }
+            Err(RegistryError::InvalidManifest) => Err(StorageDriverError::InvalidManifest),
+            Err(_) => Err(StorageDriverError::Internal),
+        }
+    }
+
+    fn delete_manifest(&self, name: &str, digest: &if_digest) -> Result<(), StorageDriverError> {
+        let repo = RepoName(name.to_string());
+        let digest = Digest(format!("{}", digest));
+        let r = self.delete_by_manifest(&repo, &digest);
+        Runtime::new().unwrap().block_on(r).map_err(|e| {
+            let e = e.downcast::<tonic::Status>();
+            if let Ok(ts) = e {
+                match ts.code() {
+                    Code::InvalidArgument => StorageDriverError::Unsupported,
+                    Code::NotFound => StorageDriverError::InvalidManifest,
+                    _ => StorageDriverError::Internal,
+                }
+            } else {
+                StorageDriverError::Internal
+            }
+        })?;
+        Ok(())
+    }
+
+    fn has_manifest(&self, _name: &str, _algo: &DigestAlgorithm, _reference: &str) -> bool {
+        todo!()
+    }
+}
+
+impl BlobStorage for ClientInterface {
+    fn get_blob(&self, name: &str, digest: &if_digest) -> Result<BlobReader, StorageDriverError> {
+        let mut rt = Runtime::new().unwrap();
+        let rn = RepoName(name.to_string());
+        let digest = Digest(format!("{}", digest).to_string());
+        let f = self.get_reader_for_blob(&rn, &digest);
+        let br = rt.block_on(f).map_err(|e| {
+            warn!("Error getting manifest {:?}", e);
+            StorageDriverError::Internal
+        })?;
+
+        Ok(br)
+    }
+
+    fn store_blob_chunk(
+        &self,
+        name: &str,
+        session_id: &str,
+        data_info: Option<ContentInfo>,
+        data: &mut Box<dyn Read>,
+    ) -> Result<u64, StorageDriverError> {
+        let mut rt = Runtime::new().unwrap();
+        let rn = RepoName(name.to_string());
+        let uuid = Uuid(session_id.to_string());
+        let f = self.get_write_sink_for_upload(&rn, &uuid);
+        let mut sink = rt.block_on(f).map_err(|e| {
+            warn!("Error finding write sink for blob {:?}", e);
+            StorageDriverError::InvalidName(format!("{} {}", name, session_id))
+        })?;
+
+        let have_range = data_info.is_some();
+        let info = data_info.unwrap_or(ContentInfo {
+            length: 0,
+            range: (0, 0),
+        });
+
+        let start_index = sink.stream_len().unwrap_or(0);
+        if have_range && (start_index != info.range.0) {
+            warn!(
+                "Asked to store blob with invalid start index. Expected {} got {}",
+                start_index, info.range.0
+            );
+            return Err(StorageDriverError::InvalidContentRange);
+        }
+
+        let len = io::copy(data, &mut sink).map_err(|e| {
+            warn!("Error writing blob {:?}", e);
+            StorageDriverError::Internal
+        })?;
+
+        let total = sink.stream_len().unwrap_or(len);
+        if have_range {
+            if (info.range.1 + 1) != total {
+                warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
+                return Err(StorageDriverError::InvalidContentRange);
+            }
+            //Check length if chunked upload
+            if info.length != len {
+                warn!("info.length {} len {}", info.length, len);
+                return Err(StorageDriverError::InvalidContentRange);
+            }
+        }
+        Ok(total)
+    }
+
+    fn complete_and_verify_blob_upload(
+        &self,
+        name: &str,
+        session_id: &str,
+        digest: &if_digest,
+    ) -> Result<(), StorageDriverError> {
+        let mut rt = Runtime::new().unwrap();
+
+        rt.block_on(self.complete_upload(name, session_id, &digest))
+            .map_err(|e| match e.downcast::<tonic::Status>() {
+                Ok(ts) => match ts.code() {
+                    Code::InvalidArgument => StorageDriverError::InvalidDigest,
+                    _ => StorageDriverError::Internal,
+                },
+                Err(e) => {
+                    warn!("Error finalising upload {:?}", e);
+                    StorageDriverError::Internal
+                }
+            })?;
+        Ok(())
+    }
+
+    fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError> {
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(self.request_upload(name)).map_err(|e| {
+            match e.downcast::<tonic::Status>().map(|s| s.code()) {
+                Ok(Code::InvalidArgument) => StorageDriverError::InvalidName(name.to_string()),
+                _ => StorageDriverError::Internal,
+            }
+        })
+    }
+
+    fn delete_blob(&self, name: &str, digest: &if_digest) -> Result<(), StorageDriverError> {
+        info!("Attempting to delete blob {} in {}", digest, name);
+        let rn = RepoName(name.to_string());
+        let dig = Digest(digest.to_string());
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(self.delete_blob_local(&rn, &dig))
+            .map_err(|_| StorageDriverError::InvalidDigest)?;
+        Ok(())
+    }
+
+    fn status_blob_upload(
+        &self,
+        _name: &str,
+        _session_id: &str,
+    ) -> crate::registry_interface::UploadInfo {
+        todo!()
+    }
+
+    fn cancel_blob_upload(&self, _name: &str, _session_id: &str) -> Result<(), StorageDriverError> {
+        todo!()
+    }
+
+    fn has_blob(&self, _name: &str, _digest: &if_digest) -> bool {
+        todo!()
+    }
+}
+
+impl CatalogOperations for ClientInterface {
+    fn get_catalog(
+        &self,
+        start_value: Option<&str>,
+        num_results: Option<u32>,
+    ) -> Result<Vec<String>, StorageDriverError> {
+        let num_results = num_results.unwrap_or(u32::MAX);
+        let start_value = start_value.unwrap_or_default();
+
+        Runtime::new()
+            .unwrap()
+            .block_on(self.get_catalog_part(num_results, start_value))
+            .map_err(|_| StorageDriverError::Internal)
+            .map(|rc| rc.raw())
+    }
+
+    fn get_tags(
+        &self,
+        repo: &str,
+        start_value: Option<&str>,
+        num_results: Option<u32>,
+    ) -> Result<Vec<String>, StorageDriverError> {
+        let num_results = num_results.unwrap_or(u32::MAX);
+        let start_value = start_value.unwrap_or_default();
+
+        Runtime::new()
+            .unwrap()
+            .block_on(self.list_tags(repo, num_results, start_value))
+            .map_err(|_| StorageDriverError::Internal)
+            .map(|rc| rc.raw())
+    }
+
+    fn get_history(
+        &self,
+        repo: &str,
+        name: &str,
+        start_value: Option<&str>,
+        num_results: Option<u32>,
+    ) -> Result<ManifestHistory, StorageDriverError> {
+        let num_results = num_results.unwrap_or(u32::MAX);
+        let start_value = start_value.unwrap_or_default();
+
+        Runtime::new()
+            .unwrap()
+            .block_on(self.get_manifest_history(repo, name, num_results, start_value))
+            .map_err(|_| StorageDriverError::Internal)
+    }
+}
+
+impl Validation for ClientInterface {
+    fn validate_admission(
+        &self,
+        admission_req: &AdmissionRequest,
+        host_names: &Vec<String>,
+    ) -> Result<AdmissionResponse, ValidationError> {
+        Runtime::new()
+            .unwrap()
+            .block_on(self.validate_admission_internal(admission_req, host_names))
+            .map_err(|_| ValidationError::Internal)
+    }
+}
+
+impl Metrics for ClientInterface {
+    fn is_healthy(&self) -> bool {
+        Runtime::new()
+            .unwrap()
+            .block_on(self.is_healthy())
+            .is_healthy
+    }
+
+    fn is_ready(&self) -> bool {
+        Runtime::new().unwrap().block_on(self.is_ready()).is_ready
+    }
+
+    fn get_metrics(&self) -> Result<MetricsResponse, crate::registry_interface::MetricsError> {
+        Runtime::new()
+            .unwrap()
+            .block_on(self.get_metrics())
+            .map_err(|_| MetricsError::Internal)
+    }
 }
 
 impl ClientInterface {
@@ -91,19 +373,10 @@ impl ClientInterface {
         x
     }
 
-    /**
-     * Ok so these functions are largely boilerplate to call the GRPC backend.
-     * But doing it here lets us change things behind the scenes much cleaner.
-     *
-     * Frontend code becomes smaller and doesn't need to know about GRPC types.
-     * In fact you could pull it out for a different implementation now by
-     * just changing this file...
-     **/
-
-    pub async fn request_upload(&self, repo_name: &RepoName) -> Result<UploadInfo, Error> {
+    async fn request_upload(&self, repo_name: &str) -> Result<String, Error> {
         info!("Request Upload called for {}", repo_name);
         let req = UploadRequest {
-            repo_name: repo_name.0.clone(),
+            repo_name: repo_name.to_string(),
         };
 
         let response = self
@@ -113,122 +386,32 @@ impl ClientInterface {
             .await?
             .into_inner();
 
-        Ok(create_upload_info(
-            types::Uuid(response.uuid),
-            repo_name.clone(),
-            (0, 0),
-        ))
-    }
-
-    pub async fn upload_blob<'a>(
-        &self,
-        repo_name: &RepoName,
-        uuid: &Uuid,
-        digest: &str,
-        blob: &mut Box<dyn Read + 'a>,
-    ) -> Result<AcceptedUpload, RegistryError> {
-        let mut sink = self
-            .get_write_sink_for_upload(repo_name, &uuid)
-            .await
-            .map_err(|e| {
-                warn!("Error finding write sink for blob {:?}", e);
-                RegistryError::InvalidNameOrUUID
-            })?;
-        let len = io::copy(blob, &mut sink).map_err(|e| {
-            warn!("Error writing blob {:?}", e);
-            RegistryError::Internal
-        })?;
-        let digest = Digest(digest.to_string());
-        self.complete_upload(repo_name, uuid, &digest, len)
-            .await
-            .map_err(|e| {
-                warn!("Error finalising upload {:?}", e);
-                RegistryError::Internal
-            })
-    }
-
-    pub async fn upload_blob_chunk<'a>(
-        &self,
-        repo_name: &RepoName,
-        uuid: &Uuid,
-        info: Option<ContentInfo>,
-        chunk: &mut Box<dyn Read + 'a>,
-    ) -> Result<UploadInfo, RegistryError> {
-        let mut sink = self
-            .get_write_sink_for_upload(repo_name, &uuid)
-            .await
-            .map_err(|e| {
-                warn!("Error finding write sink for blob {:?}", e);
-                RegistryError::InvalidNameOrUUID
-            })?;
-
-        let have_chunked_upload = info.is_some();
-        let info = info.unwrap_or(ContentInfo {
-            length: 0,
-            range: (0, 0),
-        });
-
-        let start_index = sink.stream_len().unwrap_or(0);
-        if start_index != info.range.0 {
-            warn!(
-                "Asked for blob upload with invalid start index. Expected {} got {}",
-                start_index, info.range.0
-            );
-            return Err(RegistryError::InvalidContentRange);
-        }
-
-        let len = io::copy(chunk, &mut sink).map_err(|e| {
-            warn!("Error writing blob {:?}", e);
-            RegistryError::Internal
-        })?;
-        let total = sink.stream_len().unwrap_or(len);
-        if have_chunked_upload {
-            if (info.range.1 + 1) != total {
-                warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
-                return Err(RegistryError::InvalidContentRange);
-            }
-            //Check length if chunked upload
-            if info.length != len {
-                warn!("info.length {} len {}", info.length, len);
-                return Err(RegistryError::InvalidContentRange);
-            }
-        }
-        Ok(create_upload_info(
-            uuid.clone(),
-            repo_name.clone(),
-            (0, total as u32),
-        ))
+        Ok(response.uuid)
     }
 
     async fn complete_upload(
         &self,
-        repo_name: &RepoName,
-        uuid: &Uuid,
-        digest: &Digest,
-        len: u64,
-    ) -> Result<AcceptedUpload, Error> {
+        repo_name: &str,
+        uuid: &str,
+        digest: &if_digest,
+    ) -> Result<(), Error> {
         info!(
-            "Complete Upload called for repository {} with upload id {} digest {} and length {}",
-            repo_name, uuid, digest, len
+            "Complete Upload called for repository {} with upload id {} digest {}",
+            repo_name, uuid, digest
         );
+
         let req = CompleteRequest {
-            repo_name: repo_name.0.clone(),
-            uuid: uuid.0.clone(),
-            user_digest: digest.0.clone(),
+            repo_name: repo_name.to_string(),
+            uuid: uuid.to_string(),
+            user_digest: digest.to_string(),
         };
-        let resp = self
-            .connect_registry()
+
+        self.connect_registry()
             .await?
             .complete_upload(Request::new(req))
-            .await?
-            .into_inner();
+            .await?;
 
-        Ok(create_accepted_upload(
-            Digest(resp.digest),
-            repo_name.clone(),
-            uuid.clone(),
-            (0, (len as u32)),
-        ))
+        Ok(())
     }
 
     async fn get_write_sink_for_upload(
@@ -260,7 +443,7 @@ impl ClientInterface {
         Ok(file)
     }
 
-    pub async fn upload_manifest<'a>(
+    async fn upload_manifest<'a>(
         &self,
         repo_name: &RepoName,
         reference: &str,
@@ -331,7 +514,7 @@ impl ClientInterface {
         Ok((file, resp.uuid))
     }
 
-    pub async fn get_reader_for_manifest(
+    async fn get_reader_for_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
@@ -357,9 +540,9 @@ impl ClientInterface {
         Ok(mr)
     }
 
-    pub async fn get_manifest_history(
+    async fn get_manifest_history(
         &self,
-        repo_name: &RepoName,
+        repo_name: &str,
         reference: &str,
         limit: u32,
         last_digest: &str,
@@ -370,7 +553,7 @@ impl ClientInterface {
         );
         let mr = ManifestHistoryRequest {
             tag: reference.to_owned(),
-            repo_name: repo_name.0.clone(),
+            repo_name: repo_name.to_string(),
             limit,
             last_digest: last_digest.to_owned(),
         };
@@ -395,7 +578,7 @@ impl ClientInterface {
         Ok(history)
     }
 
-    pub async fn get_reader_for_blob(
+    async fn get_reader_for_blob(
         &self,
         repo_name: &RepoName,
         digest: &Digest,
@@ -419,7 +602,7 @@ impl ClientInterface {
         Ok(reader)
     }
 
-    pub async fn delete_blob(
+    async fn delete_blob_local(
         &self,
         repo_name: &RepoName,
         digest: &Digest,
@@ -438,7 +621,7 @@ impl ClientInterface {
         Ok(BlobDeleted {})
     }
 
-    pub async fn verify_manifest(
+    async fn verify_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
@@ -467,12 +650,11 @@ impl ClientInterface {
             repo_name.clone(),
             Digest(resp.digest.to_owned()),
             reference.to_string(),
-            resp.content_type,
         );
         Ok(vm)
     }
 
-    pub async fn delete_manifest(
+    async fn delete_by_manifest(
         &self,
         repo_name: &RepoName,
         digest: &Digest,
@@ -491,11 +673,12 @@ impl ClientInterface {
         Ok(ManifestDeleted {})
     }
 
-    pub async fn get_catalog(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog, Error> {
+    async fn get_catalog_part(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog, Error> {
         info!(
             "Getting image catalog limit {} last_repo {}",
             limit, last_repo
         );
+
         let cr = CatalogRequest {
             limit,
             last_repo: last_repo.to_string(),
@@ -509,15 +692,15 @@ impl ClientInterface {
         let mut catalog = RepoCatalog::new();
 
         while let Some(ce) = stream.message().await? {
-            catalog.insert(RepoName(ce.repo_name.to_owned()));
+            catalog.insert(ce.repo_name.to_owned());
         }
 
         Ok(catalog)
     }
 
-    pub async fn list_tags(
+    async fn list_tags(
         &self,
-        repo_name: &RepoName,
+        repo_name: &str,
         limit: u32,
         last_tag: &str,
     ) -> Result<TagList, Error> {
@@ -526,7 +709,7 @@ impl ClientInterface {
             repo_name, limit, last_tag
         );
         let ltr = ListTagsRequest {
-            repo_name: repo_name.0.clone(),
+            repo_name: repo_name.to_string(),
             limit,
             last_tag: last_tag.to_string(),
         };
@@ -537,7 +720,7 @@ impl ClientInterface {
             .list_tags(Request::new(ltr))
             .await?
             .into_inner();
-        let mut list = TagList::new(repo_name.clone());
+        let mut list = TagList::new(repo_name.to_string());
 
         while let Some(tag) = stream.message().await? {
             list.insert(tag.tag.to_owned());
@@ -549,7 +732,7 @@ impl ClientInterface {
     /**
      * Returns an AdmissionReview object with the AdmissionResponse completed with details of vaildation.
      */
-    pub async fn validate_admission(
+    async fn validate_admission_internal(
         &self,
         req: &types::AdmissionRequest,
         host_names: &[String],
@@ -599,11 +782,11 @@ impl ClientInterface {
     }
 
     /**
-     Health check.
+    Health check.
 
     Note that the server will indicate unhealthy by returning an error.
     */
-    pub async fn is_healthy(&self) -> types::HealthResponse {
+    async fn is_healthy(&self) -> types::HealthResponse {
         debug!("Calling health check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
@@ -638,7 +821,7 @@ impl ClientInterface {
 
      Note that the server will indicate not ready by returning an error.
     */
-    pub async fn is_ready(&self) -> types::ReadinessResponse {
+    async fn is_ready(&self) -> types::ReadinessResponse {
         debug!("Calling readiness check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
@@ -672,7 +855,7 @@ impl ClientInterface {
 
      Returns disk and total request metrics(blobs, manifests).
     */
-    pub async fn get_metrics(&self) -> Result<types::MetricsResponse, Error> {
+    async fn get_metrics(&self) -> Result<types::MetricsResponse, Error> {
         debug!("Getting metrics");
         let req = Request::new(MetricsRequest {});
         let resp = self

@@ -1,4 +1,5 @@
-use crate::client_interface::{ClientInterface, RegistryError};
+use crate::registry_interface::digest as if_digest;
+use crate::registry_interface::Validation;
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
 use crate::response::html::HTML;
@@ -7,13 +8,17 @@ use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
+use crate::{
+    client_interface::ClientInterface,
+    registry_interface::BlobStorage,
+    registry_interface::{CatalogOperations, ManifestStorage, StorageDriverError},
+};
 use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
 use rocket_contrib::json::{Json, JsonValue};
 use std::io::Read;
 use std::str;
-use tonic::Code;
 
 mod blob;
 mod catalog;
@@ -23,11 +28,6 @@ mod manifest;
 mod metrics;
 mod readiness;
 mod tags;
-
-//ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
-//which is hugely inefficient. Need to figure out how to use thread-local
-//for each runtime or move to Warp and share the runtime.
-use tokio::runtime::Runtime;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -178,25 +178,19 @@ fn get_manifest(
     onename: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
-    let rn = RepoName(onename);
-    let f = ci.get_reader_for_manifest(&rn, &reference);
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on(f)
+    ci.get_manifest(&onename, &reference)
         .map_err(|_| Error::ManifestUnknown(reference))
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_2level(
-    _auth_user: TrowToken,
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
-) -> Option<ManifestReader> {
-    let rn = RepoName(format!("{}/{}", user, repo));
-    let r = ci.get_reader_for_manifest(&rn, &reference);
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on(r).ok()
+) -> Result<ManifestReader, Error> {
+    get_manifest(auth_user, ci, format!("{}/{}", user, repo), reference)
 }
 
 /*
@@ -204,16 +198,19 @@ fn get_manifest_2level(
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_3level(
-    _auth_user: TrowToken,
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
     reference: String,
-) -> Option<ManifestReader> {
-    let rn = RepoName(format!("{}/{}/{}", org, user, repo));
-    let r = ci.get_reader_for_manifest(&rn, &reference);
-    Runtime::new().unwrap().block_on(r).ok()
+) -> Result<ManifestReader, Error> {
+    get_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}/{}", org, user, repo),
+        reference,
+    )
 }
 
 /*
@@ -221,17 +218,20 @@ fn get_manifest_3level(
  */
 #[get("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 fn get_manifest_4level(
-    _auth_user: TrowToken,
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,
     repo: String,
     reference: String,
-) -> Option<ManifestReader> {
-    let rn = RepoName(format!("{}/{}/{}/{}", fourth, org, user, repo));
-    let r = ci.get_reader_for_manifest(&rn, &reference);
-    Runtime::new().unwrap().block_on(r).ok()
+) -> Result<ManifestReader, Error> {
+    get_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}", fourth, org, user, repo),
+        reference,
+    )
 }
 
 /*
@@ -253,10 +253,11 @@ fn get_blob(
     name_repo: String,
     digest: String,
 ) -> Option<BlobReader> {
-    let rn = RepoName(name_repo);
-    let d = Digest(digest);
-    let r = ci.get_reader_for_blob(&rn, &d);
-    Runtime::new().unwrap().block_on(r).ok()
+    let digest = if_digest::parse(&digest);
+    match digest {
+        Ok(d) => ci.get_blob(&name_repo, &d).ok(),
+        Err(_) => None,
+    }
 }
 
 /*
@@ -322,9 +323,6 @@ Content-Type: application/octet-stream
 
 /**
  * Completes the upload.
- *
- * TODO: allow uploading of final data
- * TODO: add other failure states
  */
 #[put("/v2/<repo_name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
 fn put_blob(
@@ -335,17 +333,28 @@ fn put_blob(
     digest: String,
     chunk: rocket::data::Data,
 ) -> Result<AcceptedUpload, Error> {
-    let repo = RepoName(repo_name.clone());
-    let uuid = Uuid(uuid);
-
-    let mut rt = Runtime::new().unwrap();
     let mut data: Box<dyn Read> = Box::new(chunk.open());
 
-    match rt.block_on(ci.upload_blob(&repo, &uuid, &digest, &mut data)) {
-        Ok(au) => Ok(au),
-        Err(RegistryError::InvalidNameOrUUID) => Err(Error::NameInvalid(repo_name)),
-        Err(_) => Err(Error::InternalError),
-    }
+    let size = match ci.store_blob_chunk(&repo_name, &uuid, None, &mut data) {
+        Ok(size) => size,
+        Err(StorageDriverError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
+        Err(StorageDriverError::InvalidContentRange) => return Err(Error::BlobUploadInvalid),
+        Err(_) => return Err(Error::InternalError),
+    };
+
+    let digest_obj = if_digest::parse(&digest).map_err(|_| Error::DigestInvalid)?;
+    ci.complete_and_verify_blob_upload(&repo_name, &uuid, &digest_obj)
+        .map_err(|e| match e {
+            StorageDriverError::InvalidDigest => Error::DigestInvalid,
+            _ => Error::InternalError,
+        })?;
+
+    Ok(create_accepted_upload(
+        Digest(digest),
+        RepoName(repo_name),
+        Uuid(uuid),
+        (0, (size as u32)),
+    ))
 }
 
 /*
@@ -454,16 +463,16 @@ fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    let repo = RepoName(repo_name.clone());
-    let uuid = Uuid(uuid);
-
-    let mut rt = Runtime::new().unwrap();
     let mut data: Box<dyn Read> = Box::new(chunk.open());
 
-    match rt.block_on(ci.upload_blob_chunk(&repo, &uuid, info, &mut data)) {
-        Ok(au) => Ok(au),
-        Err(RegistryError::InvalidNameOrUUID) => Err(Error::NameInvalid(repo_name)),
-        Err(RegistryError::InvalidContentRange) => Err(Error::BlobUploadInvalid),
+    match ci.store_blob_chunk(&repo_name, &uuid, info, &mut data) {
+        Ok(size) => {
+            let repo_name = RepoName(repo_name);
+            let uuid = Uuid(uuid);
+            Ok(create_upload_info(uuid, repo_name, (0, size as u32)))
+        }
+        Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
+        Err(StorageDriverError::InvalidContentRange) => Err(Error::BlobUploadInvalid),
         Err(_) => Err(Error::InternalError),
     }
 }
@@ -554,7 +563,7 @@ fn patch_blob_4level(
 #[post("/v2/<repo_name>/blobs/uploads", data = "<data>")]
 fn post_blob_upload(
     uri: &Origin, // This is a mess, but needed to check for ?digest
-    _auth_user: TrowToken,
+    auth_user: TrowToken,
     ci: rocket::State<ClientInterface>,
     repo_name: String,
     data: rocket::data::Data,
@@ -570,45 +579,33 @@ fn post_blob_upload(
     optimisation, but is arguably less flexible.
     */
 
-    let rn = repo_name.clone();
-    let repo_name = RepoName(repo_name);
-    let mut rt = Runtime::new().unwrap();
-
-    let req = ci.request_upload(&repo_name);
-
-    let up_info = rt.block_on(req).map_err(|e| {
-        warn!("Error getting ref from backend: {}", e);
-        let e = e.downcast::<tonic::Status>();
-        if let Ok(ts) = e {
-            match ts.code() {
-                Code::InvalidArgument => Error::NameInvalid(rn),
-                _ => Error::InternalError,
-            }
-        } else {
-            Error::InternalError
-        }
+    let uuid = ci.start_blob_upload(&repo_name).map_err(|e| match e {
+        StorageDriverError::InvalidName(n) => Error::NameInvalid(n),
+        _ => Error::InternalError,
     })?;
 
     if let Some(digest) = uri.query() {
         if digest.starts_with("digest=") {
-            //Have a monolithic upload
+            //Have a monolithic upload with data
 
-            let mut data: Box<dyn Read> = Box::new(data.open());
             let digest = &Uri::percent_decode_lossy(&digest["digest=".len()..].as_bytes());
-
-            return match rt.block_on(ci.upload_blob(
-                &repo_name,
-                &up_info.uuid(),
-                &digest,
-                &mut data,
-            )) {
-                Ok(au) => Ok(Upload::Accepted(au)),
-                Err(RegistryError::InvalidNameOrUUID) => Err(Error::BlobUnknown),
-                Err(_) => Err(Error::InternalError),
-            };
+            return put_blob(
+                auth_user,
+                ci,
+                repo_name.to_string(),
+                uuid,
+                digest.to_string(),
+                data,
+            )
+            .map(|r| Upload::Accepted(r));
         }
     }
-    Ok(Upload::Info(up_info))
+
+    Ok(Upload::Info(create_upload_info(
+        Uuid(uuid),
+        RepoName(repo_name.clone()),
+        (0, 0),
+    )))
 }
 
 /*
@@ -717,15 +714,16 @@ fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data,
 ) -> Result<VerifiedManifest, Error> {
-    let rn = repo_name.clone();
-    let repo = RepoName(repo_name);
-
-    let mut rt = Runtime::new().unwrap();
     let mut data: Box<dyn Read> = Box::new(chunk.open());
-    match rt.block_on(ci.upload_manifest(&repo, &reference, &mut data)) {
-        Ok(vm) => Ok(vm),
-        Err(RegistryError::InvalidName) => Err(Error::NameInvalid(rn)),
-        Err(RegistryError::InvalidManifest) => Err(Error::ManifestInvalid),
+
+    match ci.store_manifest(&repo_name, &reference, &mut data) {
+        Ok(digest) => Ok(create_verified_manifest(
+            RepoName(repo_name),
+            Digest(format!("{}", digest)),
+            reference,
+        )),
+        Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
+        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid),
         Err(_) => Err(Error::InternalError),
     }
 }
@@ -812,22 +810,13 @@ fn delete_image_manifest(
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
-    let repo_str = repo.clone();
-    let repo = RepoName(repo);
-    let digest = Digest(digest);
-    let r = ci.delete_manifest(&repo, &digest);
-    Runtime::new().unwrap().block_on(r).map_err(|e| {
-        let e = e.downcast::<tonic::Status>();
-        if let Ok(ts) = e {
-            match ts.code() {
-                Code::InvalidArgument => Error::Unsupported,
-                Code::NotFound => Error::ManifestUnknown(repo_str),
-                _ => Error::InternalError,
-            }
-        } else {
-            Error::InternalError
-        }
-    })
+    let digest = if_digest::parse(&digest).map_err(|_| Error::Unsupported)?;
+    match ci.delete_manifest(&repo, &digest) {
+        Ok(_) => Ok(ManifestDeleted {}),
+        Err(StorageDriverError::Unsupported) => Err(Error::Unsupported),
+        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestUnknown(repo)),
+        Err(_) => Err(Error::InternalError),
+    }
 }
 
 #[delete("/v2/<user>/<repo>/manifests/<digest>")]
@@ -885,13 +874,10 @@ fn delete_blob(
     repo: String,
     digest: String,
 ) -> Result<BlobDeleted, Error> {
-    let repo = RepoName(repo);
-    let digest = Digest(digest);
-    let r = ci.delete_blob(&repo, &digest);
-    Runtime::new()
-        .unwrap()
-        .block_on(r)
-        .map_err(|_| Error::BlobUnknown)
+    let digest = if_digest::parse(&digest).map_err(|_| Error::DigestInvalid)?;
+    ci.delete_blob(&repo, &digest)
+        .map_err(|_| Error::BlobUnknown)?;
+    Ok(BlobDeleted {})
 }
 
 #[delete("/v2/<user>/<repo>/blobs/<digest>")]
@@ -944,11 +930,12 @@ fn get_catalog(
 ) -> Result<RepoCatalog, Error> {
     let limit = n.unwrap_or(std::u32::MAX);
     let last_repo = last.unwrap_or_default();
-    let cat = ci.get_catalog(limit, &last_repo);
-    match Runtime::new().unwrap().block_on(cat) {
-        Ok(c) => Ok(c),
-        Err(_) => Err(Error::InternalError),
-    }
+
+    let cat = ci
+        .get_catalog(Some(&last_repo), Some(limit))
+        .map_err(|_| Error::InternalError)?;
+
+    Ok(RepoCatalog::from(cat))
 }
 
 #[get("/v2/<repo_name>/tags/list?<last>&<n>")]
@@ -959,15 +946,13 @@ fn list_tags(
     last: Option<String>,
     n: Option<u32>,
 ) -> Result<TagList, Error> {
-    let rn = RepoName(repo_name);
     let limit = n.unwrap_or(std::u32::MAX);
     let last_tag = last.unwrap_or_default();
 
-    let tags = ci.list_tags(&rn, limit, &last_tag);
-    match Runtime::new().unwrap().block_on(tags) {
-        Ok(c) => Ok(c),
-        Err(_) => Err(Error::InternalError),
-    }
+    let tags = ci
+        .get_tags(&repo_name, Some(&last_tag), Some(limit))
+        .map_err(|_| Error::InternalError)?;
+    Ok(TagList::new_filled(repo_name, tags))
 }
 
 #[get("/v2/<user>/<repo>/tags/list?<last>&<n>")]
@@ -1028,11 +1013,10 @@ fn get_manifest_history(
     let limit = n.unwrap_or(std::u32::MAX);
     let last_digest = last.unwrap_or_default();
 
-    let rn = RepoName(onename);
-    let f = ci.get_manifest_history(&rn, &reference, limit, &last_digest);
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on(f)
-        .map_err(|_| Error::ManifestUnknown(reference))
+    let mh = ci
+        .get_history(&onename, &reference, Some(&last_digest), Some(limit))
+        .map_err(|_| Error::InternalError)?;
+    Ok(mh)
 }
 
 #[get("/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
@@ -1117,27 +1101,24 @@ fn validate_image(
      */
     let mut resp_data = image_data.clone();
     match image_data.0.request {
-        Some(req) => {
-            let r = ci.validate_admission(&req, &tc.host_names);
-            match Runtime::new().unwrap().block_on(r) {
-                Ok(res) => {
-                    resp_data.response = Some(res);
-                    Json(resp_data)
-                }
-                Err(e) => {
-                    resp_data.response = Some(AdmissionResponse {
-                        uid: req.uid.clone(),
-                        allowed: false,
-                        status: Some(Status {
-                            status: "Failure".to_owned(),
-                            message: Some(format!("Internal Error {:?}", e)),
-                            code: None,
-                        }),
-                    });
-                    Json(resp_data)
-                }
+        Some(req) => match ci.validate_admission(&req, &tc.host_names) {
+            Ok(res) => {
+                resp_data.response = Some(res);
+                Json(resp_data)
             }
-        }
+            Err(e) => {
+                resp_data.response = Some(AdmissionResponse {
+                    uid: req.uid.clone(),
+                    allowed: false,
+                    status: Some(Status {
+                        status: "Failure".to_owned(),
+                        message: Some(format!("Internal Error {:?}", e)),
+                        code: None,
+                    }),
+                });
+                Json(resp_data)
+            }
+        },
 
         None => {
             resp_data.response = Some(AdmissionResponse {

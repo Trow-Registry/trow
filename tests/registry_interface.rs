@@ -22,7 +22,7 @@ mod interface_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use trow::types::{HealthResponse, ReadinessResponse, RepoCatalog, RepoName, TagList};
+    use trow::types::{HealthResponse, ReadinessResponse, RepoCatalog, TagList};
     use trow_server::{digest, manifest};
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
@@ -93,7 +93,7 @@ mod interface_tests {
 
     async fn get_non_existent_blob(cl: &reqwest::Client) {
         let resp = cl
-            .get(&(TROW_ADDRESS.to_owned() + "/v2/test/test/blobs/not-an-entry"))
+            .get(&(TROW_ADDRESS.to_owned() + "/v2/test/test/blobs/sha256:baadf00d"))
             .send()
             .await
             .unwrap();
@@ -423,6 +423,8 @@ mod interface_tests {
 
         let body = resp.text().await.unwrap();
 
+        println!("testout {}", body);
+
         assert!(body.contains("available_space"));
         assert!(body.contains("free_space"));
         assert!(body.contains("total_space"));
@@ -534,15 +536,15 @@ mod interface_tests {
         get_manifest(&client, "repo/image/test", "tag", None).await;
 
         let mut rc = RepoCatalog::new();
-        rc.insert(RepoName("fourth/repo/image/test".to_string()));
-        rc.insert(RepoName("repo/image/test".to_string()));
-        rc.insert(RepoName("image/test".to_string()));
-        rc.insert(RepoName("onename".to_string()));
+        rc.insert("fourth/repo/image/test".to_string());
+        rc.insert("repo/image/test".to_string());
+        rc.insert("image/test".to_string());
+        rc.insert("onename".to_string());
 
         println!("Running check_repo_catalog");
         check_repo_catalog(&client, &rc).await;
 
-        let mut tl = TagList::new(RepoName("repo/image/test".to_string()));
+        let mut tl = TagList::new("repo/image/test".to_string());
         tl.insert("tag".to_string());
         println!("Running check_tag_list 1");
         check_tag_list(&client, &tl).await;
@@ -551,7 +553,7 @@ mod interface_tests {
         common::upload_layer(&client, "onename", "four").await;
 
         // list, in order should be [four, latest, tag, three]
-        let mut tl2 = TagList::new(RepoName("onename".to_string()));
+        let mut tl2 = TagList::new("onename".to_string());
         tl2.insert("four".to_string());
         tl2.insert("latest".to_string());
         tl2.insert("tag".to_string());
@@ -559,13 +561,13 @@ mod interface_tests {
 
         println!("Running check_tag_list 2");
         check_tag_list(&client, &tl2).await;
-        let mut tl3 = TagList::new(RepoName("onename".to_string()));
+        let mut tl3 = TagList::new("onename".to_string());
         tl3.insert("four".to_string());
         tl3.insert("latest".to_string());
 
         println!("Running check_tag_list_n_last 3");
         check_tag_list_n_last(&client, 2, "", &tl3).await;
-        let mut tl4 = TagList::new(RepoName("onename".to_string()));
+        let mut tl4 = TagList::new("onename".to_string());
         tl4.insert("tag".to_string());
         tl4.insert("three".to_string());
         println!("Running check_tag_list_n_last 4");

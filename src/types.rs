@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use derive_more::Display;
-use std::io::Read;
-use std::{collections::HashSet, io::Seek};
+use std::io::{Read, Seek};
 
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]
@@ -100,7 +99,6 @@ pub struct VerifiedManifest {
     repo_name: RepoName,
     digest: Digest,
     tag: String,
-    content_type: String,
 }
 
 impl VerifiedManifest {
@@ -115,23 +113,17 @@ impl VerifiedManifest {
     pub fn repo_name(&self) -> &RepoName {
         &self.repo_name
     }
-
-    pub fn content_type(&self) -> &str {
-        &self.content_type
-    }
 }
 
 pub fn create_verified_manifest(
     repo_name: RepoName,
     digest: Digest,
     tag: String,
-    content_type: String,
 ) -> VerifiedManifest {
     VerifiedManifest {
         repo_name,
         digest,
         tag,
-        content_type,
     }
 }
 
@@ -193,22 +185,33 @@ pub fn create_blob_reader(reader: Box<dyn SeekRead>, digest: Digest) -> BlobRead
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RepoCatalog {
     #[serde(rename = "repositories")]
-    catalog: HashSet<RepoName>,
+    catalog: Vec<String>,
 }
 
 impl RepoCatalog {
     pub fn new() -> RepoCatalog {
         RepoCatalog {
-            catalog: HashSet::new(),
+            catalog: Vec::new(),
         }
     }
 
-    pub fn insert(&mut self, rn: RepoName) {
-        self.catalog.insert(rn);
+    pub fn insert(&mut self, rn: String) {
+        self.catalog.push(rn);
+        self.catalog.sort();
     }
 
-    pub fn catalog(&self) -> &HashSet<RepoName> {
+    pub fn catalog(&self) -> &Vec<String> {
         &self.catalog
+    }
+
+    pub fn raw(self) -> Vec<String> {
+        self.catalog
+    }
+}
+
+impl From<Vec<String>> for RepoCatalog {
+    fn from(cat: Vec<String>) -> Self {
+        RepoCatalog { catalog: cat }
     }
 }
 
@@ -270,29 +273,37 @@ impl ManifestHistory {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TagList {
     #[serde(rename = "name")]
-    repo: RepoName,
+    repo: String,
     #[serde(rename = "tags")]
     list: Vec<String>,
 }
 
 impl TagList {
-    pub fn new(repo_name: RepoName) -> TagList {
+    pub fn new(repo_name: String) -> TagList {
         TagList {
             repo: repo_name,
             list: Vec::new(),
         }
     }
 
+    pub fn new_filled(repo: String, list: Vec<String>) -> TagList {
+        TagList { repo, list }
+    }
+
     pub fn insert(&mut self, tag: String) {
         self.list.push(tag);
     }
 
-    pub fn repo_name(&self) -> &RepoName {
+    pub fn repo_name(&self) -> &str {
         &self.repo
     }
 
     pub fn list(&self) -> &Vec<String> {
         &self.list
+    }
+
+    pub fn raw(self) -> Vec<String> {
+        self.list
     }
 }
 

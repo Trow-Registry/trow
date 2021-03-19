@@ -52,6 +52,7 @@ pub mod response;
 mod routes;
 pub mod types;
 
+mod registry_interface;
 #[cfg(feature = "sqlite")]
 mod users;
 
