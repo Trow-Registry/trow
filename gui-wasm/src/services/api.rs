@@ -1,16 +1,21 @@
 use yew::services::fetch::Request;
 
 use serde::Deserialize;
-use yew::services::fetch::{FetchService, FetchTask, Response};
+use yew::services::{storage::{Area, StorageService}, fetch::{FetchService, FetchTask, Response}};
 use yew::{
-    format::{Nothing, Text},
+    format::{Nothing, Text, Json},
     Callback,
 };
 
 use crate::error::ApiError;
 
+const REGISTRY_KEY: &str = "trow.gui.registry_url";
+const DEFAULT_REGISTRY_URL: &str = "https://0.0.0.0:8443";
+
 #[derive(Default)]
-pub struct Api {}
+pub struct Api {
+    pub base_url: String
+}
 
 // refs
 // https://doc.rust-lang.org/beta/nomicon/hrtb.html
@@ -18,7 +23,14 @@ pub struct Api {}
 
 impl Api {
     pub fn new() -> Self {
-        Self {}
+        let storage = StorageService::new(Area::Local).expect("storage was disabled by the user"); 
+        let registry_url = if let Json(Ok(registry_url_value)) = storage.restore(REGISTRY_KEY)  {
+            registry_url_value
+        } else {
+            String::from(DEFAULT_REGISTRY_URL)
+        };
+        
+        Self { base_url: registry_url}
     }
 
     pub fn builder<B, T>(
