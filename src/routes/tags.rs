@@ -1,9 +1,7 @@
 use rocket_contrib::json::{Json, JsonValue};
 
 #[options("/v2/<repo_name>/tags/list")]
-pub fn options_tags(
-    repo_name: String,
-) -> Json<JsonValue> {
+pub fn options_tags(repo_name: String) -> Json<JsonValue> {
     let _ = repo_name;
     Json(json!({}))
 }

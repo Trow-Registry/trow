@@ -15,14 +15,14 @@ use std::io::Read;
 use std::str;
 use tonic::Code;
 
+mod blob;
+mod catalog;
 mod health;
+mod login;
+mod manifest;
 mod metrics;
 mod readiness;
-mod catalog;
 mod tags;
-mod manifest;
-mod blob;
-mod login;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
