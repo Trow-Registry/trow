@@ -20,7 +20,9 @@ impl BlobSvc {
         digest: String,
         callback: Callback<Result<Blob, ApiError>>,
     ) -> FetchTask {
-        self.svc
-            .get::<Blob>(format!("{}/v2/{}/blobs/{}", self.svc.base_url, repository, digest), callback)
+        self.svc.get::<Blob>(
+            format!("{}/v2/{}/blobs/{}", self.svc.base_url, repository, digest),
+            callback,
+        )
     }
 }

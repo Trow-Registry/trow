@@ -1,4 +1,4 @@
-use crate::components::{reference_details::ReferenceDetails, repository::Repository, nav::Nav};
+use crate::components::{nav::Nav, reference_details::ReferenceDetails, repository::Repository};
 
 use yew::prelude::*;
 use yew::services::fetch::FetchTask;
@@ -142,7 +142,6 @@ impl Catalog {
             html! { <p></p> }
         }
     }
-
 
     fn view_repo(&self) -> Html {
         if !self.props.repository.is_empty() {

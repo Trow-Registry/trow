@@ -1,9 +1,12 @@
 use yew::services::fetch::Request;
 
 use serde::Deserialize;
-use yew::services::{storage::{Area, StorageService}, fetch::{FetchService, FetchTask, Response}};
+use yew::services::{
+    fetch::{FetchService, FetchTask, Response},
+    storage::{Area, StorageService},
+};
 use yew::{
-    format::{Nothing, Text, Json},
+    format::{Json, Nothing, Text},
     Callback,
 };
 
@@ -14,7 +17,7 @@ const DEFAULT_REGISTRY_URL: &str = "https://0.0.0.0:8443";
 
 #[derive(Default)]
 pub struct Api {
-    pub base_url: String
+    pub base_url: String,
 }
 
 // refs
@@ -23,14 +26,16 @@ pub struct Api {
 
 impl Api {
     pub fn new() -> Self {
-        let storage = StorageService::new(Area::Local).expect("storage was disabled by the user"); 
-        let registry_url = if let Json(Ok(registry_url_value)) = storage.restore(REGISTRY_KEY)  {
+        let storage = StorageService::new(Area::Local).expect("storage was disabled by the user");
+        let registry_url = if let Json(Ok(registry_url_value)) = storage.restore(REGISTRY_KEY) {
             registry_url_value
         } else {
             String::from(DEFAULT_REGISTRY_URL)
         };
-        
-        Self { base_url: registry_url}
+
+        Self {
+            base_url: registry_url,
+        }
     }
 
     pub fn builder<B, T>(

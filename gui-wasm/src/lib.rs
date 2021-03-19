@@ -1,13 +1,11 @@
 #![recursion_limit = "1024"]
 
-
 cfg_if::cfg_if! {
     if #[cfg(feature = "wee_alloc")] {
         #[global_allocator]
         static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
     }
 }
-
 
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
