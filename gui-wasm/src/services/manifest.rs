@@ -20,7 +20,7 @@ impl ManifestSvc {
         callback: Callback<Result<Manifest, ApiError>>,
     ) -> FetchTask {
         self.svc.get::<Manifest>(
-            format!("/v2/{}/manifests/{}", repository, reference),
+            format!("{}/v2/{}/manifests/{}",self.svc.base_url, repository, reference),
             callback,
         )
     }

@@ -19,7 +19,7 @@ impl TagsSvc {
         callback: Callback<Result<TagsResponse, ApiError>>,
     ) -> FetchTask {
         self.svc
-            .get::<TagsResponse>(format!("/v2/{}/tags/list", repository), callback)
+            .get::<TagsResponse>(format!("{}/v2/{}/tags/list", self.svc.base_url, repository), callback)
     }
 
     // pub fn fetch_by_limit(

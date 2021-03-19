@@ -25,25 +25,27 @@ impl RepositoriesSvc {
         callback: Callback<Result<RepositoriesResponse, ApiError>>,
     ) -> FetchTask {
         self.svc
-            .get::<RepositoriesResponse>(String::from("/v2/_catalog"), callback)
+            .get::<RepositoriesResponse>(format!("{}/v2/_catalog", self.svc.base_url), callback)
     }
 
-    // pub fn fetch_by_limit(
-    //     &mut self,
-    //     limit: u32,
-    //     callback: Callback<Result<RepositoriesResponse, ApiError>>,
-    // ) -> FetchTask {
-    //     self.svc
-    //         .get::<RepositoriesResponse>(format!("v2/_catalog?{}", limit), callback)
-    // }
+    #[allow(dead_code)]
+    pub fn fetch_by_limit(
+        &mut self,
+        limit: u32,
+        callback: Callback<Result<RepositoriesResponse, ApiError>>,
+    ) -> FetchTask {
+        self.svc
+            .get::<RepositoriesResponse>(format!("v2/_catalog?{}", limit), callback)
+    }
 
-    // pub fn fetch_by_limit_and_last_repo(
-    //     &mut self,
-    //     limit: u32,
-    //     last_repo: String,
-    //     callback: Callback<Result<RepositoriesResponse, ApiError>>,
-    // ) -> FetchTask {
-    //     self.svc
-    //         .get::<RepositoriesResponse>(format!("v2/_catalog?{}&{}", limit, last_repo), callback)
-    // }
+    #[allow(dead_code)]
+    pub fn fetch_by_limit_and_last_repo(
+        &mut self,
+        limit: u32,
+        last_repo: String,
+        callback: Callback<Result<RepositoriesResponse, ApiError>>,
+    ) -> FetchTask {
+        self.svc
+            .get::<RepositoriesResponse>(format!("v2/_catalog?{}&{}", limit, last_repo), callback)
+    }
 }
