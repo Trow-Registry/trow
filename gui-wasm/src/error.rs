@@ -1,12 +1,14 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum ComponentError {
     #[error("unknown component error")]
     Unknown,
 }
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum ApiError {
     #[error("Request failed")]
     RequestFailed,
