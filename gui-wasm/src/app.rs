@@ -1,7 +1,7 @@
 use yew::prelude::*;
 use yew_router::{route::Route, switch::Permissive};
 
-use crate::components::{catalog::Catalog, home::Home};
+use crate::components::{catalog::Catalog, home::Home, settings::Settings};
 use crate::switch::{AppRoute, AppRouter};
 
 pub struct Model {
@@ -46,6 +46,10 @@ impl Model {
 
             AppRoute::Home => {
                 html! { <Home /> }
+            }
+
+            AppRoute::Settings => {
+                html! { <Settings /> }
             }
 
             AppRoute::PageNotFound(Permissive(Some(route))) => {
