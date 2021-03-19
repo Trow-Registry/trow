@@ -4,6 +4,8 @@ use yew_router::{components::RouterAnchor, prelude::*, switch::Permissive};
 pub enum AppRoute {
     #[to = "/repositories"]
     Repositories,
+    #[to = "/settings"]
+    Settings,
     #[to = "/!"]
     Home,
     #[to = "/page-not-found"]
