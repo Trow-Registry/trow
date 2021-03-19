@@ -18,6 +18,11 @@ use tonic::Code;
 mod health;
 mod metrics;
 mod readiness;
+mod catalog;
+mod tags;
+mod manifest;
+mod blob;
+mod login;
 
 //ENORMOUS TODO: at the moment we spawn a whole runtime for each request,
 //which is hugely inefficient. Need to figure out how to use thread-local
@@ -32,10 +37,15 @@ pub fn routes() -> Vec<rocket::Route> {
         readiness::readiness,
         metrics::metrics,
         login,
+        login::options_login,
         get_manifest,
         get_manifest_2level,
         get_manifest_3level,
         get_manifest_4level,
+        manifest::options_manifest,
+        manifest::options_manifest_2level,
+        manifest::options_manifest_3level,
+        manifest::options_manifest_4level,
         put_image_manifest,
         put_image_manifest_2level,
         put_image_manifest_3level,
@@ -44,6 +54,10 @@ pub fn routes() -> Vec<rocket::Route> {
         get_blob_2level,
         get_blob_3level,
         get_blob_4level,
+        blob::options_blob,
+        blob::options_blob_2level,
+        blob::options_blob_3level,
+        blob::options_blob_4level,
         put_blob,
         put_blob_2level,
         put_blob_3level,
@@ -61,7 +75,12 @@ pub fn routes() -> Vec<rocket::Route> {
         list_tags_2level,
         list_tags_3level,
         list_tags_4level,
+        tags::options_tags,
+        tags::options_tags_2level,
+        tags::options_tags_3level,
+        tags::options_tags_4level,
         get_catalog,
+        catalog::options_catalog,
         validate_image,
         delete_blob,
         delete_blob_2level,
