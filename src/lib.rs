@@ -37,7 +37,7 @@ extern crate quickcheck;
 
 use failure::Error;
 use rand::rngs::OsRng;
-use rocket::fairing;
+use rocket::{fairing, http::Method};
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -45,6 +45,8 @@ use std::thread;
 use uuid::Uuid;
 
 mod client_interface;
+mod fairings;
+
 pub mod response;
 #[allow(clippy::too_many_arguments)]
 mod routes;
@@ -57,6 +59,7 @@ use chrono::Utc;
 use client_interface::ClientInterface;
 use rand::RngCore;
 use std::io::Write;
+use fairings::{conditional_fairing::AttachConditionalFairing, cors::CORS};
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -307,6 +310,13 @@ impl TrowBuilder {
         let s = format!("https://{}", self.config.grpc.listen);
         let ci: ClientInterface = build_handlers(s)?;
 
+        let cors = CORS::new()
+            .methods(vec![Method::Get, Method::Options])
+            .origin("*")
+            .headers(vec!["*"])
+            .credentials(Some(true))
+            .build();
+
         rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
             .manage(ci)
@@ -324,6 +334,7 @@ impl TrowBuilder {
                     resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
                 },
             ))
+            .attach_if(true, cors)
             .attach(fairing::AdHoc::on_launch("Launch Message", |_| {
                 println!("Trow is up and running!");
             }))
