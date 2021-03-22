@@ -3,11 +3,11 @@ use std::io::Seek;
 use thiserror::Error;
 
 pub use blob_storage::{BlobReader, BlobStorage, ContentInfo, UploadInfo};
-pub use catalog_operations::CatalogOperations;
+pub use catalog_operations::{CatalogOperations, ManifestHistory};
 pub use digest::{Digest, DigestAlgorithm};
 pub use manifest_storage::{ManifestReader, ManifestStorage};
-pub use metrics::{Metrics, MetricsError};
-pub use validation::{Validation, ValidationError};
+pub use metrics::{Metrics, MetricsError, MetricsResponse};
+pub use validation::{AdmissionRequest, AdmissionResponse, Validation, ValidationError};
 
 pub mod blob_storage;
 pub mod catalog_operations;
@@ -16,11 +16,6 @@ pub mod digest;
 pub mod manifest_storage;
 pub mod metrics;
 pub mod validation;
-
-// TODO: move types to interface
-// Move below code to separate files
-
-//==================================================================================================\
 
 // Storage Driver Error
 #[derive(Error, Debug)]

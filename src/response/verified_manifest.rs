@@ -26,15 +26,20 @@ impl<'r> Responder<'r> for VerifiedManifest {
 
 #[cfg(test)]
 mod test {
+    use crate::registry_interface::{Digest, DigestAlgorithm};
     use crate::response::test_helper::test_route;
-    use crate::types::{create_verified_manifest, Digest, RepoName};
+    use crate::types::{create_verified_manifest, RepoName};
     use rocket::http::Status;
 
     #[test]
     fn accepted_ok() {
         let response = test_route(create_verified_manifest(
             RepoName("repo_name".to_string()),
-            Digest("digest".to_string()),
+            Digest {
+                algo: DigestAlgorithm::Sha256,
+                hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
+                    .to_string(),
+            },
             "ref".to_string(),
         ));
         assert_eq!(response.status(), Status::Created);

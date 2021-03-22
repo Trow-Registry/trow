@@ -3,7 +3,8 @@ use crate::registry_interface::digest as if_digest;
 use crate::registry_interface::validation::Validation;
 use crate::registry_interface::ContentInfo;
 use crate::registry_interface::{
-    BlobReader, BlobStorage, CatalogOperations, ManifestReader, ManifestStorage, StorageDriverError,
+    validation, BlobReader, BlobStorage, CatalogOperations, ManifestReader, ManifestStorage,
+    StorageDriverError, ManifestHistory
 };
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
@@ -331,7 +332,7 @@ fn put_blob(
         })?;
 
     Ok(create_accepted_upload(
-        Digest(digest),
+        digest_obj,
         RepoName(repo_name),
         Uuid(uuid),
         (0, (size as u32)),
@@ -700,7 +701,7 @@ fn put_image_manifest(
     match ci.store_manifest(&repo_name, &reference, &mut data) {
         Ok(digest) => Ok(create_verified_manifest(
             RepoName(repo_name),
-            Digest(format!("{}", digest)),
+            digest,
             reference,
         )),
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
@@ -1088,10 +1089,10 @@ fn validate_image(
                 Json(resp_data)
             }
             Err(e) => {
-                resp_data.response = Some(AdmissionResponse {
+                resp_data.response = Some(validation::AdmissionResponse {
                     uid: req.uid.clone(),
                     allowed: false,
-                    status: Some(Status {
+                    status: Some(validation::Status {
                         status: "Failure".to_owned(),
                         message: Some(format!("Internal Error {:?}", e)),
                         code: None,
@@ -1102,10 +1103,10 @@ fn validate_image(
         },
 
         None => {
-            resp_data.response = Some(AdmissionResponse {
+            resp_data.response = Some(validation::AdmissionResponse {
                 uid: "UNKNOWN".to_string(),
                 allowed: false,
-                status: Some(Status {
+                status: Some(validation::Status {
                     status: "Failure".to_owned(),
                     message: Some("No request found in review object".to_owned()),
                     code: None,
