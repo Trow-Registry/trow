@@ -322,10 +322,22 @@ impl TrowBuilder {
 
         if self.config.cors {
             println!("  Cross-Origin Resource Sharing(CORS) requests are allowed");
-            println!("  Allowed Cross-Origin Resource Sharing(CORS) origin is {:?}", self.config.allow_cors_origin);
-            println!("  Allowed Cross-Origin Resource Sharing(CORS) methods are {:?}", self.config.allow_cors_methods);
-            println!("  Allowed Cross-Origin Resource Sharing(CORS) headers are {:?}", self.config.allow_cors_headers);
-            println!("  Allow Cross-Origin Resource Sharing(CORS) credentials is {:?}\n", self.config.allow_cors_credentials);
+            println!(
+                "  Allowed Cross-Origin Resource Sharing(CORS) origin is {:?}",
+                self.config.allow_cors_origin
+            );
+            println!(
+                "  Allowed Cross-Origin Resource Sharing(CORS) methods are {:?}",
+                self.config.allow_cors_methods
+            );
+            println!(
+                "  Allowed Cross-Origin Resource Sharing(CORS) headers are {:?}",
+                self.config.allow_cors_headers
+            );
+            println!(
+                "  Allow Cross-Origin Resource Sharing(CORS) credentials is {:?}\n",
+                self.config.allow_cors_credentials
+            );
         }
 
         if self.config.dry_run {
