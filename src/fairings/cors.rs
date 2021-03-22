@@ -1,4 +1,4 @@
-use std::{collections::HashSet};
+use std::collections::HashSet;
 // --enable-cors
 // --allow-cors-origin
 // --allow-cors-methods GET, OPTIONS
@@ -6,7 +6,7 @@ use std::{collections::HashSet};
 
 use rocket::{
     fairing::{Fairing, Info, Kind},
-    http::{Header},
+    http::Header,
 };
 use rocket::{Request, Response};
 

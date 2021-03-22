@@ -167,10 +167,8 @@ pub fn get_manifest_history_4level(
     )
 }
 
-
 #[options("/v2/_catalog")]
-pub fn options_catalog(
-) -> Json<JsonValue> {
+pub fn options_catalog() -> Json<JsonValue> {
     Json(json!({}))
 }
 
