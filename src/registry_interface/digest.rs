@@ -65,7 +65,7 @@ impl Default for DigestAlgorithm {
     }
 }
 // This contains the algorithm and the hashed value
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Digest {
     pub algo: DigestAlgorithm,
     pub hash: String,

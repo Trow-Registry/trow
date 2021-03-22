@@ -5,7 +5,7 @@ use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
-use crate::types::MetricsResponse;
+use crate::registry_interface::MetricsResponse;
 
 impl<'r> Responder<'r> for MetricsResponse {
     fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
@@ -19,8 +19,8 @@ impl<'r> Responder<'r> for MetricsResponse {
 
 #[cfg(test)]
 mod test {
+    use crate::registry_interface::MetricsResponse;
     use crate::response::test_helper::test_route;
-    use crate::types::MetricsResponse;
     use rocket::http::Status;
 
     fn build_metrics_response() -> MetricsResponse {

@@ -1,7 +1,6 @@
 use crate::client_interface::ClientInterface;
-use crate::types::MetricsResponse;
 
-use crate::registry_interface::Metrics;
+use crate::registry_interface::{Metrics, MetricsResponse};
 use crate::response::errors::Error;
 
 use rocket::State;

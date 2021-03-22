@@ -1,5 +1,11 @@
+use crate::client_interface::ClientInterface;
 use crate::registry_interface::digest as if_digest;
-use crate::registry_interface::Validation;
+use crate::registry_interface::validation::Validation;
+use crate::registry_interface::ContentInfo;
+use crate::registry_interface::{
+    validation, BlobReader, BlobStorage, CatalogOperations, ManifestHistory, ManifestReader,
+    ManifestStorage, StorageDriverError,
+};
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
 use crate::response::html::HTML;
@@ -8,11 +14,6 @@ use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
 use crate::types::*;
 use crate::TrowConfig;
-use crate::{
-    client_interface::ClientInterface,
-    registry_interface::BlobStorage,
-    registry_interface::{CatalogOperations, ManifestStorage, StorageDriverError},
-};
 use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;
@@ -331,7 +332,7 @@ fn put_blob(
         })?;
 
     Ok(create_accepted_upload(
-        Digest(digest),
+        digest_obj,
         RepoName(repo_name),
         Uuid(uuid),
         (0, (size as u32)),
@@ -700,7 +701,7 @@ fn put_image_manifest(
     match ci.store_manifest(&repo_name, &reference, &mut data) {
         Ok(digest) => Ok(create_verified_manifest(
             RepoName(repo_name),
-            Digest(format!("{}", digest)),
+            digest,
             reference,
         )),
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
@@ -1088,10 +1089,10 @@ fn validate_image(
                 Json(resp_data)
             }
             Err(e) => {
-                resp_data.response = Some(AdmissionResponse {
+                resp_data.response = Some(validation::AdmissionResponse {
                     uid: req.uid.clone(),
                     allowed: false,
-                    status: Some(Status {
+                    status: Some(validation::Status {
                         status: "Failure".to_owned(),
                         message: Some(format!("Internal Error {:?}", e)),
                         code: None,
@@ -1102,10 +1103,10 @@ fn validate_image(
         },
 
         None => {
-            resp_data.response = Some(AdmissionResponse {
+            resp_data.response = Some(validation::AdmissionResponse {
                 uid: "UNKNOWN".to_string(),
                 allowed: false,
-                status: Some(Status {
+                status: Some(validation::Status {
                     status: "Failure".to_owned(),
                     message: Some("No request found in review object".to_owned()),
                     code: None,
