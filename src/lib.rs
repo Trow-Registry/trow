@@ -37,7 +37,7 @@ extern crate quickcheck;
 
 use failure::Error;
 use rand::rngs::OsRng;
-use rocket::{fairing, http::Method};
+use rocket::fairing;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -94,6 +94,11 @@ pub struct TrowConfig {
     dry_run: bool,
     token_secret: String,
     user: Option<UserConfig>,
+    cors: bool,
+    allow_cors_origin: String,
+    allow_cors_headers: Vec<String>,
+    allow_cors_methods: Vec<String>,
+    allow_cors_credentials: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -186,6 +191,11 @@ impl TrowBuilder {
         deny_prefixes: Vec<String>,
         deny_images: Vec<String>,
         dry_run: bool,
+        cors: bool,
+        allow_cors_origin: String,
+        allow_cors_headers: Vec<String>,
+        allow_cors_methods: Vec<String>,
+        allow_cors_credentials: bool,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -203,6 +213,11 @@ impl TrowBuilder {
             dry_run,
             token_secret: Uuid::new_v4().to_string(),
             user: None,
+            cors,
+            allow_cors_origin,
+            allow_cors_headers,
+            allow_cors_methods,
+            allow_cors_credentials,
         };
         TrowBuilder { config }
     }
@@ -302,8 +317,17 @@ impl TrowBuilder {
         );
 
         if self.config.proxy_hub {
-            println!("Docker Hub repostories are being proxy-cached under f/docker/\n");
+            println!("  Docker Hub repostories are being proxy-cached under f/docker/\n");
         }
+
+        if self.config.cors {
+            println!("  Cross-Origin Resource Sharing(CORS) requests are allowed");
+            println!("  Allowed Cross-Origin Resource Sharing(CORS) origin is {:?}", self.config.allow_cors_origin);
+            println!("  Allowed Cross-Origin Resource Sharing(CORS) methods are {:?}", self.config.allow_cors_methods);
+            println!("  Allowed Cross-Origin Resource Sharing(CORS) headers are {:?}", self.config.allow_cors_headers);
+            println!("  Allow Cross-Origin Resource Sharing(CORS) credentials is {:?}\n", self.config.allow_cors_credentials);
+        }
+
         if self.config.dry_run {
             println!("Dry run, exiting.");
             std::process::exit(0);
@@ -312,10 +336,10 @@ impl TrowBuilder {
         let ci: ClientInterface = build_handlers(s)?;
 
         let cors = CORS::new()
-            .methods(vec![Method::Get, Method::Options])
-            .origin("*")
-            .headers(vec!["*"])
-            .credentials(Some(true))
+            .methods(self.config.allow_cors_methods.clone())
+            .origin(self.config.allow_cors_origin.clone())
+            .headers(self.config.allow_cors_headers.clone())
+            .credentials(Some(self.config.allow_cors_credentials.clone()))
             .build();
 
         rocket::custom(rocket_config.clone())
@@ -335,7 +359,7 @@ impl TrowBuilder {
                     resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
                 },
             ))
-            .attach_if(true, cors)
+            .attach_if(self.config.cors, cors)
             .attach(fairing::AdHoc::on_launch("Launch Message", |_| {
                 println!("Trow is up and running!");
             }))
