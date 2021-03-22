@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use crate::types::ManifestHistory;
+use crate::registry_interface::ManifestHistory;
 use rocket::http::ContentType;
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};

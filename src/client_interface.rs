@@ -2,9 +2,10 @@ pub mod trow_proto {
     include!("../lib/protobuf/out/trow.rs");
 }
 
-use crate::registry_interface::digest::{Digest as if_digest, DigestAlgorithm};
+use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
 use crate::registry_interface::{
-    CatalogOperations, Metrics, MetricsError, Validation, ValidationError,
+    validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
+    Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
 };
 use tokio::runtime::Runtime;
 use trow_proto::{
@@ -23,15 +24,14 @@ use crate::{
 };
 use failure::Error;
 use serde_json::Value;
+use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::prelude::*;
-use std::{convert::TryInto, str::FromStr};
 
 // BIG TODO:
 // Creating a new runtime for each request is awful.
-// Wasn't clear how to manage this in rocket, might need to pass runtime in or something.
-
+// Best fix is to move to Rocket 0.5 or another framework
 pub struct ClientInterface {
     server: String,
 }
@@ -94,24 +94,12 @@ impl ManifestStorage for ClientInterface {
         name: &str,
         tag: &str,
         data: &mut Box<dyn Read>,
-    ) -> Result<if_digest, StorageDriverError> {
+    ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
         let mut rt = Runtime::new().unwrap();
         match rt.block_on(self.upload_manifest(&repo, &tag, data)) {
-            Ok(vm) => {
-                let mut iter = vm.digest().0.split(":");
-                let algo = DigestAlgorithm::from_str(iter.next().unwrap_or("sha256"))
-                    .unwrap_or(DigestAlgorithm::Sha256);
-                let hash = iter
-                    .next()
-                    .ok_or_else(|| {
-                        warn!("Error decoding digest: {}", vm.digest());
-                        StorageDriverError::Internal
-                    })?
-                    .to_string();
-                Ok(if_digest { algo, hash })
-            }
+            Ok(vm) => Ok(vm.digest().clone()),
             Err(RegistryError::InvalidName) => {
                 Err(StorageDriverError::InvalidName(format!("{}:{}", name, tag)))
             }
@@ -120,9 +108,8 @@ impl ManifestStorage for ClientInterface {
         }
     }
 
-    fn delete_manifest(&self, name: &str, digest: &if_digest) -> Result<(), StorageDriverError> {
+    fn delete_manifest(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         let repo = RepoName(name.to_string());
-        let digest = Digest(format!("{}", digest));
         let r = self.delete_by_manifest(&repo, &digest);
         Runtime::new().unwrap().block_on(r).map_err(|e| {
             let e = e.downcast::<tonic::Status>();
@@ -145,10 +132,9 @@ impl ManifestStorage for ClientInterface {
 }
 
 impl BlobStorage for ClientInterface {
-    fn get_blob(&self, name: &str, digest: &if_digest) -> Result<BlobReader, StorageDriverError> {
+    fn get_blob(&self, name: &str, digest: &Digest) -> Result<BlobReader, StorageDriverError> {
         let mut rt = Runtime::new().unwrap();
         let rn = RepoName(name.to_string());
-        let digest = Digest(format!("{}", digest).to_string());
         let f = self.get_reader_for_blob(&rn, &digest);
         let br = rt.block_on(f).map_err(|e| {
             warn!("Error getting manifest {:?}", e);
@@ -213,7 +199,7 @@ impl BlobStorage for ClientInterface {
         &self,
         name: &str,
         session_id: &str,
-        digest: &if_digest,
+        digest: &Digest,
     ) -> Result<(), StorageDriverError> {
         let mut rt = Runtime::new().unwrap();
 
@@ -241,12 +227,11 @@ impl BlobStorage for ClientInterface {
         })
     }
 
-    fn delete_blob(&self, name: &str, digest: &if_digest) -> Result<(), StorageDriverError> {
+    fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         info!("Attempting to delete blob {} in {}", digest, name);
         let rn = RepoName(name.to_string());
-        let dig = Digest(digest.to_string());
         let mut rt = Runtime::new().unwrap();
-        rt.block_on(self.delete_blob_local(&rn, &dig))
+        rt.block_on(self.delete_blob_local(&rn, &digest))
             .map_err(|_| StorageDriverError::InvalidDigest)?;
         Ok(())
     }
@@ -263,7 +248,7 @@ impl BlobStorage for ClientInterface {
         todo!()
     }
 
-    fn has_blob(&self, _name: &str, _digest: &if_digest) -> bool {
+    fn has_blob(&self, _name: &str, _digest: &Digest) -> bool {
         todo!()
     }
 }
@@ -320,9 +305,9 @@ impl CatalogOperations for ClientInterface {
 impl Validation for ClientInterface {
     fn validate_admission(
         &self,
-        admission_req: &AdmissionRequest,
+        admission_req: &validation::AdmissionRequest,
         host_names: &Vec<String>,
-    ) -> Result<AdmissionResponse, ValidationError> {
+    ) -> Result<validation::AdmissionResponse, ValidationError> {
         Runtime::new()
             .unwrap()
             .block_on(self.validate_admission_internal(admission_req, host_names))
@@ -393,7 +378,7 @@ impl ClientInterface {
         &self,
         repo_name: &str,
         uuid: &str,
-        digest: &if_digest,
+        digest: &Digest,
     ) -> Result<(), Error> {
         info!(
             "Complete Upload called for repository {} with upload id {} digest {}",
@@ -536,7 +521,12 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let mr = create_manifest_reader(Box::new(file), resp.content_type, Digest(resp.digest));
+        let digest = digest::parse(&resp.digest)?;
+        let mr = ManifestReader {
+            reader: Box::new(file),
+            content_type: resp.content_type,
+            digest,
+        };
         Ok(mr)
     }
 
@@ -585,7 +575,7 @@ impl ClientInterface {
     ) -> Result<BlobReader, Error> {
         info!("Getting read location for blob {} in {}", digest, repo_name);
         let br = BlobRef {
-            digest: digest.0.clone(),
+            digest: digest.to_string(),
             repo_name: repo_name.0.clone(),
         };
 
@@ -598,7 +588,10 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let reader = create_blob_reader(Box::new(file), digest.clone());
+        let reader = BlobReader {
+            reader: Box::new(file),
+            digest: digest.clone(),
+        };
         Ok(reader)
     }
 
@@ -609,7 +602,7 @@ impl ClientInterface {
     ) -> Result<BlobDeleted, Error> {
         info!("Attempting to delete blob {} in {}", digest, repo_name);
         let br = BlobRef {
-            digest: digest.0.clone(),
+            digest: digest.to_string(),
             repo_name: repo_name.0.clone(),
         };
 
@@ -646,11 +639,8 @@ impl ClientInterface {
             .await?
             .into_inner();
 
-        let vm = create_verified_manifest(
-            repo_name.clone(),
-            Digest(resp.digest.to_owned()),
-            reference.to_string(),
-        );
+        let digest = digest::parse(&resp.digest)?;
+        let vm = create_verified_manifest(repo_name.clone(), digest, reference.to_string());
         Ok(vm)
     }
 
@@ -661,7 +651,7 @@ impl ClientInterface {
     ) -> Result<ManifestDeleted, Error> {
         info!("Attempting to delete manifest {} in {}", digest, repo_name);
         let mr = ManifestRef {
-            reference: digest.0.clone(),
+            reference: digest.to_string(),
             repo_name: repo_name.0.clone(),
         };
 
@@ -734,9 +724,9 @@ impl ClientInterface {
      */
     async fn validate_admission_internal(
         &self,
-        req: &types::AdmissionRequest,
+        req: &validation::AdmissionRequest,
         host_names: &[String],
-    ) -> Result<types::AdmissionResponse, Error> {
+    ) -> Result<validation::AdmissionResponse, Error> {
         info!(
             "Validating admission request {} host_names {:?}",
             req.uid, host_names
@@ -761,20 +751,20 @@ impl ClientInterface {
 
         //TODO: again, this should be an automatic conversion
         let st = if resp.is_allowed {
-            types::Status {
+            validation::Status {
                 status: "Success".to_owned(),
                 message: None,
                 code: None,
             }
         } else {
             //Not sure "Failure" is correct
-            types::Status {
+            validation::Status {
                 status: "Failure".to_owned(),
                 message: Some(resp.reason.to_string()),
                 code: None,
             }
         };
-        Ok(types::AdmissionResponse {
+        Ok(validation::AdmissionResponse {
             uid: req.uid.clone(),
             allowed: resp.is_allowed,
             status: Some(st),
@@ -855,7 +845,7 @@ impl ClientInterface {
 
      Returns disk and total request metrics(blobs, manifests).
     */
-    async fn get_metrics(&self) -> Result<types::MetricsResponse, Error> {
+    async fn get_metrics(&self) -> Result<MetricsResponse, Error> {
         debug!("Getting metrics");
         let req = Request::new(MetricsRequest {});
         let resp = self
@@ -865,7 +855,7 @@ impl ClientInterface {
             .await?
             .into_inner();
 
-        Ok(types::MetricsResponse {
+        Ok(MetricsResponse {
             metrics: resp.metrics,
         })
     }
