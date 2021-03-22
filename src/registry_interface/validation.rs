@@ -1,5 +1,5 @@
-use thiserror::Error;
 use crate::types::{AdmissionRequest, AdmissionResponse};
+use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum ValidationError {
     #[error("Internal validation error")]

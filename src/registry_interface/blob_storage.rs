@@ -1,6 +1,6 @@
-use super::digest::{Digest};
-use super::StorageDriverError;
+use super::digest::Digest;
 use super::SeekRead;
+use super::StorageDriverError;
 use std::io::Read;
 
 pub struct ContentInfo {

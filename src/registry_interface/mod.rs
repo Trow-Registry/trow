@@ -1,22 +1,21 @@
-
-use thiserror::Error;
 use std::io::Read;
 use std::io::Seek;
+use thiserror::Error;
 
-pub use digest::{Digest, DigestAlgorithm};
-pub use manifest_storage::{ManifestStorage, ManifestReader};
-pub use blob_storage::{BlobStorage, ContentInfo, UploadInfo, BlobReader};
+pub use blob_storage::{BlobReader, BlobStorage, ContentInfo, UploadInfo};
 pub use catalog_operations::CatalogOperations;
+pub use digest::{Digest, DigestAlgorithm};
+pub use manifest_storage::{ManifestReader, ManifestStorage};
 pub use metrics::{Metrics, MetricsError};
 pub use validation::{Validation, ValidationError};
 
-#[allow(dead_code)]
-pub mod digest;
 pub mod blob_storage;
 pub mod catalog_operations;
+#[allow(dead_code)]
+pub mod digest;
 pub mod manifest_storage;
-pub mod validation;
 pub mod metrics;
+pub mod validation;
 
 // TODO: move types to interface
 // Move below code to separate files
@@ -40,11 +39,10 @@ pub enum StorageDriverError {
     Internal,
 }
 
-
 //If there's a better solution, please let me know.
 //I'd much rather not have to write an impl for every class :(
-    pub trait SeekRead: Read + Seek {}
-    impl SeekRead for std::fs::File {}
+pub trait SeekRead: Read + Seek {}
+impl SeekRead for std::fs::File {}
 
 // Super trait
 pub trait RegistryStorage: ManifestStorage + BlobStorage + CatalogOperations {
