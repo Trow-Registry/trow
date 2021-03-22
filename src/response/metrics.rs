@@ -19,8 +19,8 @@ impl<'r> Responder<'r> for MetricsResponse {
 
 #[cfg(test)]
 mod test {
-    use crate::response::test_helper::test_route;
     use crate::registry_interface::MetricsResponse;
+    use crate::response::test_helper::test_route;
     use rocket::http::Status;
 
     fn build_metrics_response() -> MetricsResponse {

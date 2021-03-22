@@ -4,8 +4,8 @@ pub mod trow_proto {
 
 use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
 use crate::registry_interface::{
-    validation, BlobReader, CatalogOperations, ContentInfo, ManifestReader, Metrics, MetricsError,
-    Validation, ValidationError, ManifestHistory, MetricsResponse
+    validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
+    Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
 };
 use tokio::runtime::Runtime;
 use trow_proto::{
@@ -24,10 +24,10 @@ use crate::{
 };
 use failure::Error;
 use serde_json::Value;
+use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::prelude::*;
-use std::convert::TryInto;
 
 // BIG TODO:
 // Creating a new runtime for each request is awful.

@@ -3,8 +3,8 @@ use crate::registry_interface::digest as if_digest;
 use crate::registry_interface::validation::Validation;
 use crate::registry_interface::ContentInfo;
 use crate::registry_interface::{
-    validation, BlobReader, BlobStorage, CatalogOperations, ManifestReader, ManifestStorage,
-    StorageDriverError, ManifestHistory
+    validation, BlobReader, BlobStorage, CatalogOperations, ManifestHistory, ManifestReader,
+    ManifestStorage, StorageDriverError,
 };
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;

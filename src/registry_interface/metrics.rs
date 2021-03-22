@@ -6,7 +6,7 @@ pub enum MetricsError {
     Internal,
 }
 
-/* 
+/*
 Could just use a string here, but later on we probably want more structure.
 */
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

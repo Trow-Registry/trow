@@ -151,8 +151,6 @@ impl From<Vec<String>> for RepoCatalog {
     }
 }
 
-
-
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TagList {
     #[serde(rename = "name")]
@@ -211,4 +209,3 @@ pub struct ReadinessResponse {
     pub message: String,
     pub is_ready: bool,
 }
-
