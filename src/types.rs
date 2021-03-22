@@ -2,6 +2,8 @@ use crate::registry_interface::{validation, Digest};
 
 use derive_more::Display;
 
+// TODO: Kill this file. Move types and methods to where they're used.
+
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]
 pub struct Uuid(pub String);

@@ -31,8 +31,7 @@ use std::io::prelude::*;
 
 // BIG TODO:
 // Creating a new runtime for each request is awful.
-// Wasn't clear how to manage this in rocket, might need to pass runtime in or something.
-
+// Best fix is to move to Rocket 0.5 or another framework
 pub struct ClientInterface {
     server: String,
 }
