@@ -13,7 +13,16 @@ Trow. The Cloud Native Registry.
 
 -   requirements
 
-    -   Trow registry instance running
+    -   Trow registry instance running **with Cross-Origin Resource Sharing(CORS) support enabled**.
+        
+        `--enable-cors --allow-cors-methods '*' --allow-cors-headers '*' --allow-cors-credentials --allow-cors-origin '*'`
+   
+    - Current GUI CORS requirements:
+        
+        - Methods: `GET`, `OPTIONS`     
+
+        - Headers `Content-Type`     
+        
     -   [Install](https://rustwasm.github.io/wasm-pack/installer/#) `wasm-pack` for your platform 
     -   Add cargo bin path - `export PATH="$PATH:$HOME/.cargo/bin"` - to `~/.bashrc` or equivalent
 
