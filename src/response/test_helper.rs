@@ -33,6 +33,12 @@ pub fn test_route<'r, A: Responder<'r>>(handler: A) -> rocket::Response<'r> {
         dry_run: false,
         token_secret: "secret".to_string(),
         user: None,
+        cors: false,
+        allow_cors_origin: "".to_string(),
+        allow_cors_headers: vec![],
+        allow_cors_methods: vec![],
+        allow_cors_credentials: false,
+
     };
     let rocket = rocket::Rocket::ignite().manage(trow_config);
     let client = Client::new(rocket).expect("valid rocket instance");
