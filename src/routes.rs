@@ -1,18 +1,16 @@
 use crate::registry_interface::digest as if_digest;
-use crate::registry_interface::Validation;
+use crate::registry_interface::validation::Validation;
 use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
 use crate::response::html::HTML;
 use crate::response::trow_token::ValidBasicToken;
 use crate::response::trow_token::{self, TrowToken};
 use crate::response::upload_info::UploadInfo;
+use crate::registry_interface::ContentInfo;
 use crate::types::*;
 use crate::TrowConfig;
-use crate::{
-    client_interface::ClientInterface,
-    registry_interface::BlobStorage,
-    registry_interface::{CatalogOperations, ManifestStorage, StorageDriverError},
-};
+use crate::client_interface::ClientInterface;
+use crate::registry_interface::{ManifestReader, BlobReader, BlobStorage, CatalogOperations, ManifestStorage, StorageDriverError};
 use rocket::http::uri::{Origin, Uri};
 use rocket::request::Request;
 use rocket::State;

@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use derive_more::Display;
-use std::io::{Read, Seek};
 
 #[derive(Clone, Debug, Display, Serialize)]
 #[display(fmt = "{}", _0)]
@@ -21,10 +20,6 @@ pub struct UploadInfo {
     range: (u32, u32),
 }
 
-pub struct ContentInfo {
-    pub length: u64,
-    pub range: (u64, u64),
-}
 
 pub struct BlobDeleted {}
 
@@ -125,61 +120,6 @@ pub fn create_verified_manifest(
         digest,
         tag,
     }
-}
-
-//If there's a better solution, please let me know.
-//I'd much rather not have to write an impl for every class :(
-pub trait SeekRead: Read + Seek {}
-impl SeekRead for std::fs::File {}
-pub struct ManifestReader {
-    content_type: String,
-    digest: Digest,
-    reader: Box<dyn SeekRead>,
-}
-
-impl ManifestReader {
-    pub fn get_reader(self) -> Box<dyn SeekRead> {
-        self.reader
-    }
-
-    pub fn content_type(&self) -> &str {
-        &self.content_type
-    }
-
-    pub fn digest(&self) -> &Digest {
-        &self.digest
-    }
-}
-
-pub fn create_manifest_reader(
-    reader: Box<dyn SeekRead>,
-    content_type: String,
-    digest: Digest,
-) -> ManifestReader {
-    ManifestReader {
-        reader,
-        content_type,
-        digest,
-    }
-}
-
-pub struct BlobReader {
-    digest: Digest,
-    reader: Box<dyn SeekRead>,
-}
-
-impl BlobReader {
-    pub fn get_reader(self) -> Box<dyn SeekRead> {
-        self.reader
-    }
-
-    pub fn digest(&self) -> &Digest {
-        &self.digest
-    }
-}
-
-pub fn create_blob_reader(reader: Box<dyn SeekRead>, digest: Digest) -> BlobReader {
-    BlobReader { reader, digest }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq)]

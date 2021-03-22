@@ -1,5 +1,5 @@
 use crate::client_interface::ClientInterface;
-use crate::registry_interface::Metrics;
+use crate::registry_interface::metrics::Metrics;
 use crate::types::HealthResponse;
 
 use rocket::State;

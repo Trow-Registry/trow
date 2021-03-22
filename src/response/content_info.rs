@@ -1,5 +1,5 @@
 use crate::response::errors::Error;
-use crate::types::ContentInfo;
+use crate::registry_interface::blob_storage::ContentInfo;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::Outcome;

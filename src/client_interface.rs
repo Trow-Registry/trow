@@ -4,7 +4,7 @@ pub mod trow_proto {
 
 use crate::registry_interface::digest::{Digest as if_digest, DigestAlgorithm};
 use crate::registry_interface::{
-    CatalogOperations, Metrics, MetricsError, Validation, ValidationError,
+    BlobReader, ManifestReader, ContentInfo, CatalogOperations, Metrics, MetricsError, Validation, ValidationError,
 };
 use tokio::runtime::Runtime;
 use trow_proto::{
@@ -331,6 +331,7 @@ impl Validation for ClientInterface {
 }
 
 impl Metrics for ClientInterface {
+
     fn is_healthy(&self) -> bool {
         Runtime::new()
             .unwrap()
@@ -536,7 +537,8 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let mr = create_manifest_reader(Box::new(file), resp.content_type, Digest(resp.digest));
+        let digest = crate::registry_interface::digest::parse(&resp.digest)?;
+        let mr = ManifestReader {reader: Box::new(file), content_type: resp.content_type, digest};
         Ok(mr)
     }
 
@@ -598,7 +600,8 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         let file = OpenOptions::new().read(true).open(resp.path)?;
-        let reader = create_blob_reader(Box::new(file), digest.clone());
+        let digest = crate::registry_interface::digest::parse(&digest.0)?;
+        let reader = BlobReader {reader: Box::new(file), digest};
         Ok(reader)
     }
 
