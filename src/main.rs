@@ -196,6 +196,34 @@ Must be used with --hub-token or --hub-token-file")
             .help("Location of file with token that can be used for accessing the Docker Hub, used when proxying Docker Hub images")
             .takes_value(true)
         )
+        .arg(
+            Arg::with_name("enable-cors")
+                .long("enable-cors")
+                .help("Enable Cross-Origin Resource Sharing(CORS) requests. Default: false")
+        )
+        .arg(
+            Arg::with_name("allow-cors-headers")
+                .long("allow-cors-headers")
+                .help("Allowed Cross-Origin Resource Sharing(CORS) headers. Separate with a comma or use quotes and spaces.  Default: [] ")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("allow-cors-methods")
+                .long("allow-cors-methods")
+                .help("Allowed Cross-Origin Resource Sharing(CORS) headers. Separate with a comma or use quotes and spaces.  Default: [] ")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("allow-cors-origin")
+                .long("allow-cors-origin")
+                .help("Allowed Cross-Origin Resource Sharing(CORS) origin. Default: '' ")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("allow-cors-credentials")
+                .long("allow-cors-credentials")
+                .help("Allow Cross-Origin Resource Sharing(CORS) requests with credentials.  Default: false")
+        )
         .get_matches()
 }
 
@@ -240,6 +268,12 @@ fn main() {
     let deny_prefixes = parse_list(matches.value_of("disallow-local-prefixes").unwrap_or(""));
     let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
 
+    let cors = matches.is_present("enable-cors");
+    let allow_cors_origin = matches.value_of("allow-cors-origin").unwrap_or("");
+    let allow_cors_headers = parse_list(matches.value_of("allow-cors-headers").unwrap_or(""));
+    let allow_cors_methods = parse_list(matches.value_of("allow-cors-methods").unwrap_or(""));
+    let allow_cors_credentials = matches.is_present("allow-cors-credentials");
+
     let addr = NetAddr {
         host: host.to_string(),
         port,
@@ -255,6 +289,11 @@ fn main() {
         deny_prefixes,
         deny_images,
         dry_run,
+        cors,
+        allow_cors_origin.to_string(),
+        allow_cors_headers,
+        allow_cors_methods,
+        allow_cors_credentials,
     );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
