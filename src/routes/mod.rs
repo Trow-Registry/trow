@@ -69,16 +69,6 @@ pub fn routes() -> Vec<rocket::Route> {
         readiness::readiness,
         metrics::metrics
     ]
-    /* The following routes used to have stub methods, but I removed them as they were cluttering the code
-          post_blob_uuid,
-          get_upload_progress,
-          delete_upload,
-          admin routes,
-          admin_get_uuids
-
-    To find the stubs, go to https://github.com/ContainerSolutions/trow/tree/4b007088bb0657a98238870d9aaca638e01f6487
-    Please add tests for any routes that you recover.
-    */
 }
 
 pub fn catchers() -> Vec<rocket::Catcher> {
