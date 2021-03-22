@@ -1,25 +1,29 @@
-use std::collections::HashSet;
+use std::{collections::HashSet};
+// --enable-cors
+// --allow-cors-origin
+// --allow-cors-methods GET, OPTIONS
+// --allow-cors-headers
 
 use rocket::{
     fairing::{Fairing, Info, Kind},
-    http::{Header, Method},
+    http::{Header},
 };
 use rocket::{Request, Response};
 
 #[derive(Default, Clone)]
 pub struct CORS {
-    pub allow_origin: &'static str,
-    pub expose_headers: HashSet<&'static str>,
+    pub allow_origin: String,
+    pub expose_headers: HashSet<String>,
     pub allow_credentials: Option<bool>,
-    pub allow_headers: HashSet<&'static str>,
-    pub allow_methods: HashSet<Method>,
+    pub allow_headers: HashSet<String>,
+    pub allow_methods: HashSet<String>,
     pub max_age: Option<usize>,
 }
 
 impl CORS {
     pub fn new() -> CORS {
         CORS {
-            allow_origin: "",
+            allow_origin: "".to_string(),
             expose_headers: HashSet::new(),
             allow_credentials: None,
             allow_headers: HashSet::new(),
@@ -34,7 +38,7 @@ impl CORS {
     }
 
     #[allow(dead_code)]
-    pub fn headers(mut self, headers: Vec<&'static str>) -> CORS {
+    pub fn headers(mut self, headers: Vec<String>) -> CORS {
         for header in headers {
             self.allow_headers.insert(header);
         }
@@ -43,7 +47,7 @@ impl CORS {
     }
 
     #[allow(dead_code)]
-    pub fn methods(mut self, methods: Vec<Method>) -> CORS {
+    pub fn methods(mut self, methods: Vec<String>) -> CORS {
         for method in methods {
             self.allow_methods.insert(method);
         }
@@ -52,7 +56,7 @@ impl CORS {
     }
 
     #[allow(dead_code)]
-    pub fn origin(mut self, origin: &'static str) -> CORS {
+    pub fn origin(mut self, origin: String) -> CORS {
         self.allow_origin = origin;
         self
     }
@@ -84,7 +88,7 @@ impl Fairing for CORS {
                 if i != 0 {
                     methods.push_str(", ")
                 }
-                methods.push_str(method.as_str());
+                methods.push_str(method);
             }
             response.set_header(Header::new("Access-Control-Allow-Methods", methods));
         }
@@ -92,7 +96,7 @@ impl Fairing for CORS {
         if !self.allow_origin.is_empty() {
             response.set_header(Header::new(
                 "Access-Control-Allow-Origin",
-                String::from(self.allow_origin),
+                self.allow_origin.clone(),
             ));
         }
 
@@ -108,10 +112,11 @@ impl Fairing for CORS {
         }
 
         match self.allow_credentials {
-            Some(allow) => response.set_header(Header::new(
+            Some(true) => response.set_header(Header::new(
                 "Access-Control-Allow-Credentials",
-                allow.to_string(),
+                true.to_string(),
             )),
+            Some(false) => false,
             None => false,
         };
     }
