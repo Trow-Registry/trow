@@ -18,34 +18,38 @@ impl TagsSvc {
         repository: String,
         callback: Callback<Result<TagsResponse, ApiError>>,
     ) -> FetchTask {
+        self.svc
+            .get::<TagsResponse>(format!("/v2/{}/tags/list", repository), None, callback)
+    }
+
+    #[allow(dead_code)]
+    pub fn fetch_by_limit(
+        &mut self,
+        limit: u32,
+        repository: String,
+        callback: Callback<Result<TagsResponse, ApiError>>,
+    ) -> FetchTask {
         self.svc.get::<TagsResponse>(
-            format!("{}/v2/{}/tags/list", self.svc.base_url, repository),
+            format!("/v2/{}/tags/list?{}", repository, limit),
+            None,
             callback,
         )
     }
 
-    // pub fn fetch_by_limit(
-    //     &mut self,
-    //     limit: u32,
-    //     repository: String,
-    //     callback: Callback<Result<TagsResponse, ApiError>>,
-    // ) -> FetchTask {
-    //     self.svc
-    //         .get::<TagsResponse>(format!("/v2/{}/tags/list?{}", repository, limit), callback)
-    // }
-
-    // pub fn fetch_by_limit_and_last_tag(
-    //     &mut self,
-    //     limit: u32,
-    //     repository: String,
-    //     last_tag: String,
-    //     callback: Callback<Result<TagsResponse, ApiError>>,
-    // ) -> FetchTask {
-    //     self.svc.get::<TagsResponse>(
-    //         format!("/v2/{}/tags/list?{}&{}", repository, limit, last_tag),
-    //         callback,
-    //     )
-    // }
+    #[allow(dead_code)]
+    pub fn fetch_by_limit_and_last_tag(
+        &mut self,
+        limit: u32,
+        repository: String,
+        last_tag: String,
+        callback: Callback<Result<TagsResponse, ApiError>>,
+    ) -> FetchTask {
+        self.svc.get::<TagsResponse>(
+            format!("/v2/{}/tags/list?{}&{}", repository, limit, last_tag),
+            None,
+            callback,
+        )
+    }
 }
 
 #[derive(Serialize, Default, Deserialize, Debug)]

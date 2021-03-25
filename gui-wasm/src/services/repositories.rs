@@ -25,7 +25,7 @@ impl RepositoriesSvc {
         callback: Callback<Result<RepositoriesResponse, ApiError>>,
     ) -> FetchTask {
         self.svc
-            .get::<RepositoriesResponse>(format!("{}/v2/_catalog", self.svc.base_url), callback)
+            .get::<RepositoriesResponse>(format!("/v2/_catalog"), None, callback)
     }
 
     #[allow(dead_code)]
@@ -35,7 +35,7 @@ impl RepositoriesSvc {
         callback: Callback<Result<RepositoriesResponse, ApiError>>,
     ) -> FetchTask {
         self.svc
-            .get::<RepositoriesResponse>(format!("v2/_catalog?{}", limit), callback)
+            .get::<RepositoriesResponse>(format!("/v2/_catalog?{}", limit), None, callback)
     }
 
     #[allow(dead_code)]
@@ -45,7 +45,10 @@ impl RepositoriesSvc {
         last_repo: String,
         callback: Callback<Result<RepositoriesResponse, ApiError>>,
     ) -> FetchTask {
-        self.svc
-            .get::<RepositoriesResponse>(format!("v2/_catalog?{}&{}", limit, last_repo), callback)
+        self.svc.get::<RepositoriesResponse>(
+            format!("/v2/_catalog?{}&{}", limit, last_repo),
+            None,
+            callback,
+        )
     }
 }
