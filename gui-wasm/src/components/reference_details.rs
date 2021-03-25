@@ -1,3 +1,5 @@
+use yew::format::Json;
+use yew::services::storage::{Area, StorageService};
 use yew::{prelude::*, services::fetch::FetchTask};
 
 use crate::error::ApiError;
@@ -15,6 +17,7 @@ pub struct ReferenceDetails {
     fetch_task_manifest: Option<FetchTask>,
     manifest_svc: ManifestSvc,
     blob_svc: BlobSvc,
+    storage: StorageService,
 }
 
 #[derive(Clone, Debug, PartialEq, Properties)]
@@ -34,6 +37,8 @@ impl Component for ReferenceDetails {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let storage = StorageService::new(Area::Local).expect("storage was disabled by the user");
+
         let mut ref_details = Self {
             props,
             link,
@@ -44,6 +49,7 @@ impl Component for ReferenceDetails {
             fetch_task_manifest: None,
             manifest_svc: ManifestSvc::new(),
             blob_svc: BlobSvc::new(),
+            storage,
         };
         let repo = ref_details.props.repository.clone();
         let reference = ref_details.props.reference.clone();
@@ -137,24 +143,22 @@ impl Component for ReferenceDetails {
 
 impl ReferenceDetails {
     fn view_pull_details(&self) -> Html {
-        let wn = yew::utils::window().location().host();
-        match wn {
-            Ok(host) => {
-                let pull_command = format!(
-                    "docker pull {}/{}:{}",
-                    host, &self.props.repository, &self.props.reference
-                );
-                html! {
+        let registry_url =
+            if let Json(Ok(registry_url_value)) = self.storage.restore(crate::REGISTRY_KEY) {
+                registry_url_value
+            } else {
+                String::from(crate::DEFAULT_REGISTRY_URL)
+            };
 
-                    <code class="uk-align-right">{pull_command}</code>
-                }
-            }
+        let pull_command = format!(
+            "docker pull {}/{}:{}",
+            registry_url.replace("https://", ""),
+            &self.props.repository,
+            &self.props.reference
+        );
 
-            _ => {
-                html! {
-                    <p></p>
-                }
-            }
+        html! {
+            <code class="uk-align-right">{pull_command}</code>
         }
     }
 

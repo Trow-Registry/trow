@@ -1,9 +1,12 @@
+use yew::format::Json;
+use yew::services::storage::{Area, StorageService};
 use yew::{prelude::*, services::fetch::FetchTask, Callback};
 
 use crate::error::ApiError;
 use crate::services::tags::{TagsResponse, TagsSvc};
 
 pub struct Repository {
+    storage: StorageService,
     props: Props,
     link: ComponentLink<Self>,
     tags: Option<Vec<String>>,
@@ -31,6 +34,8 @@ impl Component for Repository {
     type Message = Msg;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let storage = StorageService::new(Area::Local).expect("storage was disabled by the user");
+
         let mut repository = Self {
             props,
             link,
@@ -38,6 +43,7 @@ impl Component for Repository {
             fetch_task_tags: None,
             fetching: false,
             tags_svc: TagsSvc::new(),
+            storage,
         };
 
         if !repository.props.repository.is_empty() {
@@ -115,20 +121,20 @@ impl Component for Repository {
 
 impl Repository {
     fn view_pull_details(&self) -> Html {
-        let wn = yew::utils::window().location().host();
-        match wn {
-            Ok(host) => {
-                let pull_command = format!("docker pull {}/{}", host, &self.props.repository);
-                html! {
-                    <code class="uk-align-right">{pull_command}</code>
-                }
-            }
+        let registry_url =
+            if let Json(Ok(registry_url_value)) = self.storage.restore(crate::REGISTRY_KEY) {
+                registry_url_value
+            } else {
+                String::from(crate::DEFAULT_REGISTRY_URL)
+            };
 
-            _ => {
-                html! {
-                    <p></p>
-                }
-            }
+        let pull_command = format!(
+            "docker pull {}/{}",
+            registry_url.replace("https://", ""),
+            &self.props.repository
+        );
+        html! {
+                <code class="uk-align-right">{pull_command}</code>
         }
     }
 
