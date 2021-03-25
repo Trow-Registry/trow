@@ -1,8 +1,6 @@
-use yew::services::fetch::Request;
-
 use serde::Deserialize;
 use yew::services::{
-    fetch::{FetchService, FetchTask, Response},
+    fetch::{FetchService, FetchTask, Request, Response},
     storage::{Area, StorageService},
 };
 use yew::{
@@ -11,9 +9,6 @@ use yew::{
 };
 
 use crate::error::ApiError;
-
-const REGISTRY_KEY: &str = "trow.gui.registry_url";
-const DEFAULT_REGISTRY_URL: &str = "https://0.0.0.0:8443";
 
 #[derive(Default)]
 pub struct Api {
@@ -27,11 +22,13 @@ pub struct Api {
 impl Api {
     pub fn new() -> Self {
         let storage = StorageService::new(Area::Local).expect("storage was disabled by the user");
-        let registry_url = if let Json(Ok(registry_url_value)) = storage.restore(REGISTRY_KEY) {
-            registry_url_value
-        } else {
-            String::from(DEFAULT_REGISTRY_URL)
-        };
+
+        let registry_url =
+            if let Json(Ok(registry_url_value)) = storage.restore(crate::REGISTRY_KEY) {
+                registry_url_value
+            } else {
+                String::from(crate::DEFAULT_REGISTRY_URL)
+            };
 
         Self {
             base_url: registry_url,
@@ -43,16 +40,32 @@ impl Api {
         method: &str,
         url: String,
         body: B,
+        auth: Option<String>,
         callback: Callback<Result<T, ApiError>>,
     ) -> FetchTask
     where
         for<'de> T: Deserialize<'de> + 'static + std::fmt::Debug,
         B: Into<Text> + std::fmt::Debug,
     {
+        let session_storage =
+            StorageService::new(Area::Session).expect("storage was disabled by the user");
+
         let mut req_builder = Request::builder()
             .method(method)
-            .uri(url.as_str())
+            .uri(format!("{}{}", self.base_url, url))
             .header("Content-Type", "application/json");
+
+        if let Some(b64_auth_string) = auth {
+            req_builder = req_builder.header("Authorization", format!("Basic {}", b64_auth_string));
+        } else {
+            let auth_token = session_storage.restore(crate::AUTH_TOKEN_KEY);
+
+            let token_auth_value = if let Json(Ok(auth_token_value)) = auth_token {
+                auth_token_value
+            };
+            req_builder =
+                req_builder.header("Authorization", format!("Bearer {:?}", token_auth_value))
+        }
 
         let handler = move |response: Response<Text>| {
             if let (meta, Ok(data)) = response.into_parts() {
@@ -75,10 +88,15 @@ impl Api {
         FetchService::fetch(request, handler.into()).unwrap()
     }
 
-    pub fn get<T>(&mut self, url: String, callback: Callback<Result<T, ApiError>>) -> FetchTask
+    pub fn get<T>(
+        &mut self,
+        url: String,
+        auth: Option<String>,
+        callback: Callback<Result<T, ApiError>>,
+    ) -> FetchTask
     where
         for<'de> T: Deserialize<'de> + 'static + std::fmt::Debug,
     {
-        self.builder("GET", url, Nothing, callback)
+        self.builder("GET", url, Nothing, auth, callback)
     }
 }
