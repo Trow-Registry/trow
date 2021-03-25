@@ -5,14 +5,12 @@ use yew::{events::KeyboardEvent, InputData};
 
 use crate::components::nav::Nav;
 
-const REGISTRY_KEY: &str = "trow.gui.registry_url";
-
 pub struct Settings {
-    // props: Props,
     storage: StorageService,
     link: ComponentLink<Self>,
     state: State,
 }
+
 pub struct State {
     registry_value: String,
 }
@@ -53,7 +51,7 @@ impl Component for Settings {
             Msg::SaveUpdate => {
                 if !self.state.registry_value.is_empty() {
                     self.storage
-                        .store(REGISTRY_KEY, Json(&self.state.registry_value));
+                        .store(crate::REGISTRY_KEY, Json(&self.state.registry_value));
                 };
             }
 
