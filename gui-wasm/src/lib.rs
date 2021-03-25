@@ -7,6 +7,10 @@ cfg_if::cfg_if! {
     }
 }
 
+const REGISTRY_KEY: &str = "trow.gui.registry_url";
+const AUTH_TOKEN_KEY: &str = "trow.gui.auth_token";
+const DEFAULT_REGISTRY_URL: &str = "https://0.0.0.0:8443";
+
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
