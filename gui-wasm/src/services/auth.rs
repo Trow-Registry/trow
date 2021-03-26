@@ -3,7 +3,6 @@ use yew::{format::Nothing, services::fetch::FetchTask, Callback};
 
 use crate::error::ApiError;
 use crate::services::api::Api;
-use crate::types::manifest::Manifest;
 
 #[derive(Serialize, Default, Deserialize, Debug)]
 #[serde(default, rename_all = "camelCase")]
