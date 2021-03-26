@@ -58,13 +58,14 @@ impl Api {
         if let Some(b64_auth_string) = auth {
             req_builder = req_builder.header("Authorization", format!("Basic {}", b64_auth_string));
         } else {
-            let auth_token = session_storage.restore(crate::AUTH_TOKEN_KEY);
+            let token =
+                if let Json(Ok(token_value)) = session_storage.restore(crate::AUTH_TOKEN_KEY) {
+                    token_value
+                } else {
+                    "".to_string()
+                };
 
-            let token_auth_value = if let Json(Ok(auth_token_value)) = auth_token {
-                auth_token_value
-            };
-            req_builder =
-                req_builder.header("Authorization", format!("Bearer {:?}", token_auth_value))
+            req_builder = req_builder.header("Authorization", format!("Bearer {}", token))
         }
 
         let handler = move |response: Response<Text>| {
