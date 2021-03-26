@@ -155,10 +155,18 @@ pub fn new(vbt: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, fra
 /*
  * Responder returns token as JSON body
  */
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TrowTokenResponse {
+    token: String,
+}
+
 impl<'r> Responder<'r> for TrowToken {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
         //TODO: would be better to use serde here
-        let formatted_body = Cursor::new(format!("{{\"token\": \"{}\"}}", self.token));
+        let token = TrowTokenResponse { token: self.token };
+        let serialized_token = serde_json::to_string(&token).unwrap();
+        let formatted_body = Cursor::new(serialized_token);
         Response::build()
             .status(Status::Ok)
             .header(ContentType::JSON)
