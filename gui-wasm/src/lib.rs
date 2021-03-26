@@ -8,6 +8,7 @@ cfg_if::cfg_if! {
 }
 
 const REGISTRY_KEY: &str = "trow.gui.registry_url";
+const USERNAME_KEY: &str = "trow.gui.username";
 const AUTH_TOKEN_KEY: &str = "trow.gui.auth_token";
 const DEFAULT_REGISTRY_URL: &str = "https://0.0.0.0:8443";
 
