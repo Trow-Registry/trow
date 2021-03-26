@@ -16,6 +16,7 @@ pub struct Login {
     authenticating: bool,
     auth_svc: AuthSvc,
     storage: StorageService,
+    session_storage: StorageService,
     auth_task: Option<FetchTask>,
 }
 
@@ -31,6 +32,7 @@ pub enum Msg {
     UpdatePassword(String),
     Authenticate,
     AuthenticateReady(Result<AuthResponse, ApiError>),
+    Logout,
     Nothing,
 }
 
@@ -39,7 +41,9 @@ impl Component for Login {
     type Properties = Props;
 
     fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let storage = StorageService::new(Area::Session).expect("storage was disabled by the user");
+        let session_storage =
+            StorageService::new(Area::Session).expect("storage was disabled by the user");
+        let storage = StorageService::new(Area::Local).expect("storage was disabled by the user");
 
         let state = State {
             username: "".into(),
@@ -52,6 +56,7 @@ impl Component for Login {
             authenticating: false,
             auth_svc: AuthSvc::new(),
             storage,
+            session_storage,
             auth_task: None,
         }
     }
@@ -75,15 +80,18 @@ impl Component for Login {
                     self.state.password.clone(),
                     callback,
                 );
+
+                self.storage
+                    .store(crate::USERNAME_KEY, Json(&self.state.username));
+
                 self.auth_task = Some(task);
                 true
             }
+
             Msg::AuthenticateReady(Ok(response)) => {
                 self.authenticating = false;
                 self.auth_task = None;
-                log::debug!("token: {}", response.token);
-
-                self.storage
+                self.session_storage
                     .store(crate::AUTH_TOKEN_KEY, Json(&response.token));
 
                 true
@@ -94,6 +102,14 @@ impl Component for Login {
                 false
             }
 
+            Msg::Logout => {
+                self.storage.remove(crate::USERNAME_KEY);
+
+                self.session_storage.remove(crate::AUTH_TOKEN_KEY);
+
+                true
+            }
+
             Msg::Nothing => false,
         }
     }
@@ -102,53 +118,80 @@ impl Component for Login {
         false
     }
     fn view(&self) -> Html {
-        html! {
+        let username = if let Json(Ok(username_value)) = self.storage.restore(crate::USERNAME_KEY) {
+            username_value
+        } else {
+            "".to_string()
+        };
 
-            <div class="home-segment-login">
-                <form>
-                    <div class="uk-margin">
-                        <div class="uk-inline">
-                            <span class="uk-form-icon" uk-icon="icon: user"></span>
-                            <input
-                                class="uk-input"
-                                type="username"
-                                placeholder="Username"
-                                oninput=self.link.callback(|e: InputData| Msg::UpdateUsername(e.value))
-                            />
-                        </div>
-                    </div>
-
-                    <div class="uk-margin">
-                        <div class="uk-inline">
-                            <span class="uk-form-icon" uk-icon="icon: lock"></span>
-                            <input
-                                class="uk-input"
-                                type="password"
-                                placeholder="Password"
-                                oninput=self.link.callback(|e: InputData| Msg::UpdatePassword(e.value))
-                                onkeypress=self.link.callback(|e: KeyboardEvent| {
-                                    if e.key() == "Enter" { Msg::Authenticate } else { Msg::Nothing }
-                                })
+        if username.is_empty() {
+            html! {
+                <div class="home-segment-login">
+                    <form>
+                        <div class="uk-margin">
+                            <div class="uk-inline">
+                                <span class="uk-form-icon" uk-icon="icon: user"></span>
+                                <input
+                                    class="uk-input"
+                                    type="username"
+                                    placeholder="Username"
+                                    oninput=self.link.callback(|e: InputData| Msg::UpdateUsername(e.value))
                                 />
+                            </div>
                         </div>
-                    </div>
 
+                        <div class="uk-margin">
+                            <div class="uk-inline">
+                                <span class="uk-form-icon" uk-icon="icon: lock"></span>
+                                <input
+                                    class="uk-input"
+                                    type="password"
+                                    placeholder="Password"
+                                    oninput=self.link.callback(|e: InputData| Msg::UpdatePassword(e.value))
+                                    onkeypress=self.link.callback(|e: KeyboardEvent| {
+                                        if e.key() == "Enter" { Msg::Authenticate } else { Msg::Nothing }
+                                    })
+                                    />
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <p class="control">
+                            <button
+                                onclick=self.link.callback(|ev: MouseEvent| {
+                                    ev.prevent_default();
+                                    Msg::Authenticate
+                                })
+                                class="uk-button uk-button-default">
+                                {"Login"}
+
+                            </button>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            }
+        } else {
+            html! {
+                <div class="home-segment-login username">
+                    <div class="uk-container-large">
+                        <div class="uk-heading-small">{username}</div>
+                    </div>
                     <div class="field">
                         <p class="control">
                         <button
                             onclick=self.link.callback(|ev: MouseEvent| {
                                 ev.prevent_default();
-                                Msg::Authenticate
+                                Msg::Logout
                             })
                             class="uk-button uk-button-default">
-                            {"Login"}
+                            {"Logout"}
 
                         </button>
                         </p>
                     </div>
-                </form>
-
-            </div>
+                </div>
+            }
         }
     }
 }
