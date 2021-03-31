@@ -1,0 +1,14 @@
+# Adds namespace to all resources.
+namespace: trow-gui
+
+# Note that it should also match with the prefix (text before '-') of the namespace
+# field above.
+namePrefix: trow-
+
+# Labels to add to all resources and selectors.
+commonLabels:
+  gui-version: alpha
+
+bases:
+- ./gui
+

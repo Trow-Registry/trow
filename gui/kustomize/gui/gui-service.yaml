@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gui-service
+  namespace: system
+  labels:
+    component: gui
+spec:
+  selector:
+    app: trow-gui
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+    - protocol: TCP
+      port: 443
+      targetPort: 80

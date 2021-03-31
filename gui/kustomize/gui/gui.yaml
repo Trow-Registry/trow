@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gui-app
+  namespace: system
+  labels:
+    component: gui
+    app: trow-gui
+spec:
+  selector:
+    matchLabels:
+      component: gui
+      app: trow-gui
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: gui
+        app: trow-gui
+    spec:
+      containers:
+      - image: trow-gui:latest
+        name: trow-gui
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+      terminationGracePeriodSeconds: 10
