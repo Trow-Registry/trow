@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use yew::{format::Nothing, services::fetch::FetchTask, Callback};
+use yew::{services::fetch::FetchTask, Callback};
 
 use crate::error::ApiError;
 use crate::services::api::Api;
