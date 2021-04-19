@@ -49,7 +49,7 @@ through `rustfmt` prior to opening a PR.
 On opening a PR, a GitHub action will execute the test suite against the new code. All code is
 required to pass the tests, and new code must be accompanied by new tests. 
 
-All PRs have to be reviewed and signed off by another developer before being merged to the master
+All PRs have to be reviewed and signed off by another developer before being merged to the main
 branch. This review will likely ask for some changes to the code - please don't be alarmed or upset
 at this; it is expected that all PRs will need tweaks and a normal part of the process.
 
@@ -58,6 +58,6 @@ Be aware that all Trow code is released under the [Apache 2.0 licence](LICENSE).
 ### Thanks
 
 These guidelines were best on several sources, including
-[Atom](https://github.com/atom/atom/blob/master/CONTRIBUTING.md), [PurpleBooth's
+[Atom](https://github.com/atom/atom/blob/main/CONTRIBUTING.md), [PurpleBooth's
 advice](https://gist.github.com/PurpleBooth/b24679402957c63ec426) and the [Contributor
 Covenant](https://www.contributor-covenant.org/).

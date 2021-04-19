@@ -3,7 +3,8 @@ Welcome to Trow!
 Please set the DNS entry for your registry to point to Trow
 
 If you are running Trow on http, there will need to be a TLS ingress in front of it as Trow needs to be run over TLS.
-Please see the examples found on the docs at https://github.com/ContainerSolutions/trow/blob/master/docs/HELM_INSTALL.md
+Please see the examples found on the docs at
+https://github.com/ContainerSolutions/trow/blob/main/docs/HELM_INSTALL.md
 
 To test you can run and login with the credentials for {{ .Values.trow.user }}
 

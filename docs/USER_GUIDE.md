@@ -121,7 +121,7 @@ Trow is up and running!
 ## Listing Repositories and Tags
 
 Trow implements the [OCI Distribution
-Specification](https://github.com/opencontainers/distribution-spec/blob/master/spec.md) which
+Specification](https://github.com/opencontainers/distribution-spec/blob/main/spec.md) which
 includes API methods for listing repositories and tags. Unfortunately the Docker CLI doesn't support
 these endpoints, so we need to use a third-party tool. It is possible to use curl, but this gets
 complicated when dealing with password protected registries, so we recommend the [docker-ls
