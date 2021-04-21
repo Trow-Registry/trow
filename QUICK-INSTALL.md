@@ -114,8 +114,9 @@ containers:
   args: ["-n", "trow:31000 trow.kube-public:31000", "-c", "/certs/domain.crt","--allow-docker-official","--allow-prefixes","registry.container-solutions.com/"]
 ```
 To apply the changes and restart Trow, run the following:
+
 ```
-$ kubectl apply -f install/trow.yaml 
+$ sed "s/{{namespace}}/kube-public/" install/trow.yaml | kubectl apply -f -
 
 serviceaccount/trow unchanged
 role.rbac.authorization.k8s.io/trow unchanged
@@ -126,6 +127,8 @@ deployment.apps/trow-deploy configured
 service/trow unchanged
 ```
 
+This assumes you installed Trow to the default namespace of `kube-public`. If you installed Trow to
+a different namespace than `kube-public`, replace as appropriate.
 
 ### Enable Authentication
 
