@@ -37,7 +37,7 @@ jobs:
       - run: |
           echo "NEW_VERSION=$(cat new-version.txt)" >> $GITHUB_ENV;
           #TODO: finish
-
+          
   update_and_commit_trow_version_kustomize:
     runs-on: ubuntu-latest
     needs: ["create_and_deploy_docker_images"]
@@ -87,7 +87,7 @@ jobs:
           body: ${{ steps.tag_version.outputs.changelog }}
           draft: false
           prerelease: false
-
+  
   # Deploy our helm chart
   # 1. Generate the .tgz file (helm package charts/trow/)
   # 2. Update index.yaml (helm repo index . --merge charts/index.yaml --url https://trow.io/ )
