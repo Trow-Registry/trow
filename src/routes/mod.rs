@@ -1,14 +1,15 @@
-use crate::response::authenticate::Authenticate;
+use actix_web::{HttpResponse, Responder, Scope, web};
+
+/*use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
 use crate::response::html::HTML;
 use crate::response::trow_token::ValidBasicToken;
 use crate::response::trow_token::{self, TrowToken};
+*/
 use crate::TrowConfig;
-use rocket::request::Request;
-use rocket::State;
-use rocket_contrib::json::{Json, JsonValue};
 use std::str;
 
+/*
 mod blob;
 mod catalog;
 mod health;
@@ -16,7 +17,81 @@ mod manifest;
 mod metrics;
 mod readiness;
 mod validation;
+*/
 
+pub fn root_config() -> Scope {
+
+    web::scope("/v2").configure(v2_config)
+}
+
+pub fn v2_config(cfg: &mut web::ServiceConfig) {
+ 
+    // Root
+    cfg.service(web::resource("/").route(web::get().to(dummy)));
+
+    //tags
+    cfg.service(web::resource("/{name:((?:[^/]*/)*)(.*)}/tags/list")
+        .route(web::get().to(dummy)));
+
+    // manifests
+    cfg.service(
+        web::resource("/{name:((?:[^/]*/)*)(.*)}/manifests/{reference}")
+            // get the full manifest
+            .route(web::get().to(dummy))
+
+            // get the digest only of the manifest
+            .route(web::head().to(dummy))
+
+            // upload a new manifest
+            .route(web::put().to(dummy))
+
+            // delete an existing
+            .route(web::delete().to(dummy)),
+    );
+
+    //blobs
+    cfg.service(
+        web::resource("/{name:((?:[^/]*/)*)(.*)}/blobs/{reference}")
+            // retrieve a blob -
+            .route(web::get().to(dummy))
+
+            // check the existence of a blob -
+            .route(web::head().to(dummy))
+
+            // Delete the blob -
+            .route(web::delete().to(dummy))
+    );
+
+    // blob upload
+    cfg.service(
+        web::resource("/{name:((?:[^/]*/)*)(.*)}/blobs/uploads/{session_id}")
+            // upload blob chunks -
+            .route(web::patch().to(dummy))
+
+            // get the status of the blob upload via the session_id -
+            .route(web::get().to(dummy))
+
+            // cancel the upload of a blob -
+            .route(web::delete().to(dummy))
+
+            // complete the upload -
+            .route(web::put().to(dummy))
+
+    );
+
+    // Upload start
+    cfg.service(
+        web::resource("/{name:((?:[^/]*/)*)(.*)}/blobs/uploads/")
+            // start the upload of a blob -
+            .route(web::post().to(dummy))
+    );
+}
+
+async fn dummy() -> impl Responder {
+    HttpResponse::Ok().body("Dummy response")
+}
+
+/*
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
@@ -114,3 +189,4 @@ fn no_auth(_req: &Request) -> Authenticate {
 fn login(auth_user: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, Error> {
     trow_token::new(auth_user, tc).map_err(|_| Error::InternalError)
 }
+*/

@@ -1,6 +1,6 @@
 use crate::TrowConfig;
-use rocket::request::Request;
 
+/*
 pub mod accepted_upload;
 pub mod authenticate;
 pub mod blob_deleted;
@@ -21,11 +21,14 @@ mod test_helper;
 pub mod trow_token;
 pub mod upload_info;
 pub mod verified_manifest;
+*/
 
-/// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
-/// Falls back to hostname if it doesn't exist.
-///
-/// Move this.
+// Gets the base URL e.g. <http://registry:8000> using the HOST value from the request header.
+// Falls back to hostname if it doesn't exist.
+//
+// Move this.
+// Think there is some set hostname thing on actix we can use to fix this
+/*
 fn get_base_url(req: &Request) -> String {
     let host = get_domain_name(req);
 
@@ -57,3 +60,4 @@ fn get_domain_name(req: &Request) -> String {
         Some(s_host) => s_host.to_string(),
     }
 }
+*/

@@ -8,10 +8,6 @@ extern crate base64;
 extern crate futures;
 extern crate hostname;
 extern crate hyper;
-#[macro_use]
-extern crate rocket;
-#[macro_use]
-extern crate rocket_contrib;
 extern crate argon2;
 extern crate chrono;
 extern crate data_encoding;
@@ -23,6 +19,9 @@ extern crate serde;
 extern crate serde_json;
 extern crate trow_server;
 extern crate uuid;
+extern crate actix_web;
+extern crate rustls;
+
 use env_logger::Env;
 use log::{LevelFilter, SetLoggerError};
 
@@ -36,11 +35,11 @@ extern crate serde_derive;
 extern crate quickcheck;
 
 use failure::Error;
-use rand::rngs::OsRng;
-use rocket::fairing;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::io::BufReader;
+use std::fs::File;
 use std::thread;
 use uuid::Uuid;
 
@@ -56,8 +55,11 @@ mod users;
 
 use chrono::Utc;
 use client_interface::ClientInterface;
-use rand::RngCore;
 use std::io::Write;
+
+use actix_web::{App, HttpServer, middleware::{self, Logger}};
+use rustls::internal::pemfile::{certs, pkcs8_private_keys};
+use rustls::{NoClientAuth, ServerConfig};
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -68,6 +70,12 @@ pub struct ConfigError {}
 pub struct NetAddr {
     pub host: String,
     pub port: u16,
+}
+
+impl NetAddr {
+    pub fn as_pair(&self) -> (&str, u16) {
+        (self.host.as_str(), self.port)
+    }
 }
 
 /*
@@ -229,43 +237,15 @@ impl TrowBuilder {
         self
     }
 
-    fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
-        // When run in production, Rocket wants a secret key for private cookies.
-        // As we don't use private cookies, we just generate it here.
-        let mut key = [0u8; 32];
-        OsRng.fill_bytes(&mut key);
-        let secret_key = base64::encode(&key);
-
-        /*
-        Keep Alive has to be turned off to mitigate issue whereby some transfers would be cut off.
-        Seems to be caused by an old version of hyper in Rocket.
-        Keep Alive can be restored when Rocket is upgraded or by moving to different framework.
-        See #24
-        */
-        let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
-            .address(self.config.addr.host.clone())
-            .port(self.config.addr.port)
-            .keep_alive(0) // Needed to mitigate #24. See above.
-            .secret_key(secret_key)
-            .workers(256);
-
-        if let Some(ref tls) = self.config.tls {
-            if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
-                return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
-            }
-            cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
-        }
-        let cfg = cfg.finalize()?;
-        Ok(cfg)
-    }
-
     pub fn start(&self) -> Result<(), Error> {
-        init_logger()?;
 
-        let rocket_config = &self.build_rocket_config()?;
+        let sys = actix_web::rt::System::new();
+       
+        init_logger().unwrap();
+
 
         // Start GRPC Backend thread.
-        let _backend_thread = init_trow_server(self.config.clone())?;
+        let _backend_thread = init_trow_server(self.config.clone()).unwrap();
 
         println!(
             "Starting Trow {} on {}:{}",
@@ -306,42 +286,43 @@ impl TrowBuilder {
             std::process::exit(0);
         }
         let s = format!("https://{}", self.config.grpc.listen);
-        let ci: ClientInterface = build_handlers(s)?;
 
-        rocket::custom(rocket_config.clone())
-            .manage(self.config.clone())
-            .manage(ci)
-            .attach(fairing::AdHoc::on_attach(
-                "SIGTERM handler",
-                |r| match attach_sigterm() {
-                    Ok(_) => Ok(r),
-                    Err(_) => Err(r),
-                },
-            ))
-            .attach(fairing::AdHoc::on_response(
-                "Set API Version Header",
-                |_, resp| {
-                    //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
-                    resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
-                },
-            ))
-            .attach(fairing::AdHoc::on_launch("Launch Message", |_| {
-                println!("Trow is up and running!");
-            }))
-            .mount("/", routes::routes())
-            .register(routes::catchers())
-            .launch();
+        //TODO: figure out how to attach ci
+        let _ci: ClientInterface = build_handlers(s).unwrap();
+
+        let mut hs = HttpServer::new(|| {
+            App::new()
+                .wrap(Logger::default())
+                .wrap(middleware::DefaultHeaders::new().header("Docker-Distribution-API-Version", "registry/2.0"))
+                .service(routes::root_config())
+        });
+
+        hs = match self.config.tls {
+            Some(ref tls) => {
+                if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
+                    return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
+                }
+
+                let mut tls_config = ServerConfig::new(NoClientAuth::new());
+                let cert_file = &mut BufReader::new(File::open(&tls.cert_file).unwrap());
+                let key_file = &mut BufReader::new(File::open(&tls.key_file).unwrap());
+                let cert_chain = certs(cert_file).unwrap();
+	                    let mut keys = pkcs8_private_keys(key_file).unwrap();
+	                    tls_config.set_single_cert(cert_chain, keys.remove(0)).unwrap();
+
+                hs.bind_rustls(self.config.addr.as_pair(), tls_config).unwrap()
+            }
+            None => hs.bind(self.config.addr.as_pair()).unwrap(),
+        };
+        
+        sys.block_on(async move {
+            println!("Trow is up and running");
+            hs.run().await}
+        )?;
 
         Ok(())
+        
     }
-}
-
-fn attach_sigterm() -> Result<(), Error> {
-    ctrlc::set_handler(|| {
-        info!("SIGTERM caught, shutting down...");
-        std::process::exit(0);
-    })
-    .map_err(|e| e.into())
 }
 
 pub fn build_handlers(listen_addr: String) -> Result<ClientInterface, Error> {

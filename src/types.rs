@@ -81,7 +81,6 @@ impl AcceptedUpload {
     }
 }
 
-#[derive(Responder)]
 pub enum Upload {
     Accepted(AcceptedUpload),
     Info(UploadInfo),
