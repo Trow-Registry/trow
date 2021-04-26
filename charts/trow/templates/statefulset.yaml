@@ -22,7 +22,7 @@ spec:
     {{- end }}
       containers:
       - name: trow-pod
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
           - "--no-tls" 
