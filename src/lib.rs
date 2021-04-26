@@ -285,10 +285,10 @@ impl TrowBuilder {
             println!("Dry run, exiting.");
             std::process::exit(0);
         }
-        let s = format!("https://{}", self.config.grpc.listen);
+        //let s = format!("https://{}", self.config.grpc.listen);
 
         //TODO: figure out how to attach ci
-        let _ci: ClientInterface = build_handlers(s).unwrap();
+        //let _ci: ClientInterface = build_handlers(s).unwrap();
 
         let mut hs = HttpServer::new(|| {
             App::new()
@@ -304,15 +304,19 @@ impl TrowBuilder {
                 }
 
                 let mut tls_config = ServerConfig::new(NoClientAuth::new());
-                let cert_file = &mut BufReader::new(File::open(&tls.cert_file).unwrap());
-                let key_file = &mut BufReader::new(File::open(&tls.key_file).unwrap());
-                let cert_chain = certs(cert_file).unwrap();
-	                    let mut keys = pkcs8_private_keys(key_file).unwrap();
-	                    tls_config.set_single_cert(cert_chain, keys.remove(0)).unwrap();
+                let cert_file = &mut BufReader::new(File::open(&tls.cert_file)?);
+                let key_file = &mut BufReader::new(File::open(&tls.key_file)?);
+                let cert_chain  = certs(cert_file).map_err(
+                    |_| format_err!("Error reading TLS cert")
+                )?;
+	            let mut keys: Vec<rustls::PrivateKey> = pkcs8_private_keys(key_file).map_err(
+                    |_| format_err!("Error reading TLS key")
+                )?;
+	            tls_config.set_single_cert(cert_chain, keys.remove(0))?;
 
-                hs.bind_rustls(self.config.addr.as_pair(), tls_config).unwrap()
+                hs.bind_rustls(self.config.addr.as_pair(), tls_config)?
             }
-            None => hs.bind(self.config.addr.as_pair()).unwrap(),
+            None => hs.bind(self.config.addr.as_pair())?,
         };
         
         sys.block_on(async move {
