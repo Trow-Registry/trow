@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, Responder, Scope, web};
+use actix_web::{HttpResponse, Resource, Responder, Scope, web};
 
 /*use crate::response::authenticate::Authenticate;
 use crate::response::errors::Error;
@@ -6,8 +6,11 @@ use crate::response::html::HTML;
 use crate::response::trow_token::ValidBasicToken;
 use crate::response::trow_token::{self, TrowToken};
 */
-use crate::TrowConfig;
+use crate::{TrowConfig, auth_middleware::AuthGuard};
 use std::str;
+use actix_web::http::header::ContentType;
+use actix_web::HttpServer;
+
 
 /*
 mod blob;
@@ -19,15 +22,15 @@ mod readiness;
 mod validation;
 */
 
-pub fn root_config() -> Scope {
 
-    web::scope("/v2").configure(v2_config)
+pub fn homepage(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::resource("/").route(web::get().to(get_homepage)));
 }
 
-pub fn v2_config(cfg: &mut web::ServiceConfig) {
+pub fn registry_config(cfg: &mut web::ServiceConfig) {
  
     // Root
-    cfg.service(web::resource("/").route(web::get().to(dummy)));
+    cfg.service(web::resource("/").wrap(AuthGuard).route(web::get().to(dummy)));
 
     //tags
     cfg.service(web::resource("/{name:((?:[^/]*/)*)(.*)}/tags/list")
@@ -90,6 +93,19 @@ pub fn v2_config(cfg: &mut web::ServiceConfig) {
 async fn dummy() -> impl Responder {
     HttpResponse::Ok().body("Dummy response")
 }
+
+/*
+ * Welcome message
+ */
+async fn get_homepage<'a>() -> HttpResponse {
+    const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
+ <h1>Welcome to Trow, the cluster registry</h1>
+ </body></html>";
+
+    HttpResponse::Ok().insert_header(
+        ContentType::html()
+    ).body(ROOT_RESPONSE)
+ }
 
 /*
 pub fn routes() -> Vec<rocket::Route> {
@@ -157,17 +173,7 @@ pub fn catchers() -> Vec<rocket::Catcher> {
 fn get_v2root(_auth_user: TrowToken) -> Json<JsonValue> {
     Json(json!({}))
 }
-/*
- * Welcome message
- */
-#[get("/")]
-fn get_homepage<'a>() -> HTML<'a> {
-    const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
-<h1>Welcome to Trow, the cluster registry</h1>
-</body></html>";
 
-    HTML(ROOT_RESPONSE)
-}
 
 // Want non HTML return for 404 for docker client
 #[catch(404)]

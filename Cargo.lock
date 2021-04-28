@@ -2321,6 +2321,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-pemfile"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eebeaeb360c87bfb72e84abdb3447159c0eaececf1bef2aecd65a8be949d1c9"
+dependencies = [
+ "base64 0.13.0",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3154,6 +3163,9 @@ dependencies = [
 name = "trow"
 version = "0.3.2"
 dependencies = [
+ "actix-http",
+ "actix-service",
+ "actix-utils",
  "actix-web",
  "assert_cli",
  "base64 0.12.3",
@@ -3176,6 +3188,7 @@ dependencies = [
  "libc",
  "log",
  "openssl",
+ "pin-project 1.0.5",
  "prost",
  "prost-types",
  "quickcheck",
@@ -3185,6 +3198,7 @@ dependencies = [
  "rusqlite",
  "rust-argon2",
  "rustls",
+ "rustls-pemfile",
  "serde",
  "serde_derive",
  "serde_json",

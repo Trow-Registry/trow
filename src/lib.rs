@@ -20,7 +20,10 @@ extern crate serde_json;
 extern crate trow_server;
 extern crate uuid;
 extern crate actix_web;
+extern crate actix_utils;
+extern crate actix_http;
 extern crate rustls;
+extern crate pin_project;
 
 use env_logger::Env;
 use log::{LevelFilter, SetLoggerError};
@@ -52,14 +55,17 @@ pub mod types;
 mod registry_interface;
 #[cfg(feature = "sqlite")]
 mod users;
+mod auth_middleware;
 
 use chrono::Utc;
 use client_interface::ClientInterface;
 use std::io::Write;
 
-use actix_web::{App, HttpServer, middleware::{self, Logger}};
+use actix_web::{App, HttpServer, middleware::{self, Logger}, web};
 use rustls::internal::pemfile::{certs, pkcs8_private_keys};
 use rustls::{NoClientAuth, ServerConfig};
+
+use crate::auth_middleware::AuthGuard;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -294,7 +300,8 @@ impl TrowBuilder {
             App::new()
                 .wrap(Logger::default())
                 .wrap(middleware::DefaultHeaders::new().header("Docker-Distribution-API-Version", "registry/2.0"))
-                .service(routes::root_config())
+                .service(web::scope("/v2").configure(routes::registry_config))
+                .configure(routes::homepage)
         });
 
         hs = match self.config.tls {

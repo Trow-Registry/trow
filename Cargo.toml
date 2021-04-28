@@ -9,7 +9,12 @@ sqlite = []
 
 [dependencies]
 actix-web = { version = "4.0.0-beta", features = ["rustls"] }
+actix-utils = "3"
+actix-http = "3.0.0-beta.6"
+actix-service = "2"
+pin-project = "1"
 rustls = "0.19"
+rustls-pemfile = "0.2"
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
 hyper = "0.13"
