@@ -1,11 +1,11 @@
 name: gui
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     tags:
       - '*'
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
 
@@ -38,28 +38,28 @@ jobs:
         IS_LATEST=false
         IMAGE_REPOSITORY=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
         DOCKER_IMAGE=ghcr.io/${IMAGE_REPOSITORY}
-        VERSION=gui-edge
+        VERSION=trow-gui-edge
         
         if [[ $GITHUB_REF == refs/tags/* ]]; then
-          VERSION=gui-${GITHUB_REF#refs/tags/}
+          VERSION=trow-gui-${GITHUB_REF#refs/tags/}
           IS_LATEST=true
         elif [[ $GITHUB_REF == refs/heads/* ]]; then
-          VERSION=gui-$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          VERSION=trow-gui-$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
           if [[ $GITHUB_REF == refs/heads/master ]]; then
             IS_LATEST=true
           fi
         elif [[ $GITHUB_REF == refs/pull/* ]]; then
-          VERSION=gui-pr-${{ github.event.number }}
+          VERSION=trow-gui-pr-${{ github.event.number }}
         fi
 
         TAGS="${DOCKER_IMAGE}:${VERSION}"
 
         if [ "$IS_LATEST" = true ] ; then
-          TAGS="$TAGS,${DOCKER_IMAGE}:gui-latest"
+          TAGS="$TAGS,${DOCKER_IMAGE}:trow-gui-latest"
         fi
 
         if [ "${{ github.event_name }}" = "push" ]; then
-          TAGS="$TAGS,${DOCKER_IMAGE}:gui-sha-${GITHUB_SHA::8}"
+          TAGS="$TAGS,${DOCKER_IMAGE}:trow-gui-sha-${GITHUB_SHA::8}"
         fi
 
         PUSH_IMAGE=true
