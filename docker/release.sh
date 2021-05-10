@@ -21,7 +21,7 @@ Before running this, please check:
  - all dependencies have been updated (if not, do a PR)
  - all tests are passing
  - the version is correct in Cargo.toml and this file (currently $VERSION)
- - you are on the master branch and in sync with remote
+ - you are on the main branch and in sync with remote
 
 Version in this script $VERSION
 Version in Cargo.toml $CARGO_VERSION
@@ -73,9 +73,9 @@ sed -i "s|{{TROW_ARMV7_IMAGE}}|containersol/trow:$VERSION-armv7|" ./release-mani
 sed -i "s|{{TROW_ARM64_IMAGE}}|containersol/trow:$VERSION-arm64|" ./release-manifest.yaml
 manifest-tool push from-spec ./release-manifest.yaml
 
-if [[ $(git rev-parse --abbrev-ref HEAD) != "master" ]]
+if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]
 then
-    echo "Not on master branch. Refusing to tag."
+    echo "Not on main branch. Refusing to tag."
     exit 1
 fi
 

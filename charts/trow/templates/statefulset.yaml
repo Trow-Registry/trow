@@ -24,7 +24,7 @@ spec:
       - name: trow-pod
         image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        args: 
+        args:
           - "--no-tls" 
           - "-n" 
           - {{ .Values.trow.domain | quote }}
@@ -34,7 +34,10 @@ spec:
           - "--password-file" 
           - "/etc/trow/pass"
           {{- end }}
-        {{- with .Values.trow.validation }}
+        {{- with .Values.trow.validation }} 
+          {{- if .proxyDockerHub }}
+          - "--proxy-docker-hub"
+          {{- end }}
           {{- if .allowDocker }}
           - "--allow-docker-official"
           {{- end }}
