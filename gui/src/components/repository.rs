@@ -110,7 +110,7 @@ impl Component for Repository {
                             {self.view_tags()}
                         </li>
                         <li>
-                            <strong>{"Name:"}</strong> {&self.props.repository}
+                            <strong>{"Name: "}</strong> {&self.props.repository}
                         </li>
                     </ul>
                 </div>
