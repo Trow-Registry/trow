@@ -191,7 +191,7 @@ impl Component for Login {
                             {"Logout"}
 
                         </button>
-                        </p>    
+                        </p>
                     </div>
                 </div>
             }
