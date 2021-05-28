@@ -40,7 +40,7 @@ static UPLOADS_DIR: &str = "scratch";
 
 static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
-static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
+static HUB_ADDRESS: &str = "registry-1.docker.io";
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
@@ -59,6 +59,7 @@ pub struct TrowServer {
     manifests_path: PathBuf,
     blobs_path: PathBuf,
     scratch_path: PathBuf,
+    proxy_registry_config_dir: String,
     proxy_hub: bool,
     hub_user: Option<String>,
     hub_pass: Option<String>,
@@ -110,6 +111,17 @@ impl Image {
 pub struct Auth {
     pub user: Option<String>, //DockerHub has anon auth
     pub pass: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Dockerconfigjson {
+    auths: HashMap<String, DockerconfigjsonAuths>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct DockerconfigjsonAuths {
+    Username: Option<String>,
+    Password: Option<String>,
 }
 
 fn create_accept_header() -> HeaderMap {
@@ -249,6 +261,7 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
 impl TrowServer {
     pub fn new(
         data_path: &str,
+        proxy_registry_config_dir: String,
         proxy_hub: bool,
         hub_user: Option<String>,
         hub_pass: Option<String>,
@@ -265,6 +278,7 @@ impl TrowServer {
             manifests_path,
             blobs_path,
             scratch_path,
+            proxy_registry_config_dir,
             proxy_hub,
             hub_user,
             hub_pass,
@@ -392,31 +406,112 @@ impl TrowServer {
     ) -> Option<(Image, Option<Auth>)> {
         //All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
-            let proxy_name = repo_name.strip_prefix(PROXY_DIR).unwrap();
-
-            if self.proxy_hub && proxy_name.starts_with(HUB_PROXY_DIR) {
-                let mut repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
-
-                //Official images have to use the library/ repository
-                if !repo.contains('/') {
-                    repo = format!("library/{}", repo).to_string();
+            match self.try_get_proxy_address_and_auth(&repo_name, &reference) {
+                Ok(i) => return Some(i),
+                Err(e) => {
+                    error!("{:?}", e);
+                    return None;
                 }
-
-                return Some((
-                    Image {
-                        host: HUB_ADDRESS.to_string(),
-                        repo,
-                        tag: reference.to_string(),
-                    },
-                    Some(Auth {
-                        user: self.hub_user.clone(),
-                        pass: self.hub_pass.clone(),
-                    }),
-                ));
             }
         }
-
         None
+    }
+
+    fn try_get_proxy_address_and_auth(
+        &self,
+        repo_name: &str,
+        reference: &str,
+    ) -> Result<(Image, Option<Auth>), Error> {
+        let proxy_name = repo_name.strip_prefix(PROXY_DIR).unwrap().to_string();
+
+        if self.proxy_hub && proxy_name.starts_with(HUB_PROXY_DIR) {
+            self.get_proxy_image_and_auth(
+                reference,
+                proxy_name,
+                HUB_ADDRESS.to_string(),
+                HUB_PROXY_DIR.strip_suffix("/").unwrap().to_string(),
+                Auth {
+                    user: self.hub_user.clone(),
+                    pass: self.hub_pass.clone(),
+                },
+            )
+        } else {
+            let nextSlash = proxy_name.find("/");
+            match nextSlash {
+                Some(i) => {
+                    let mut registry_config_dir_name = proxy_name[..i].to_string();
+                    debug!("Registry config name {}", registry_config_dir_name);
+
+                    let docker_config_json = Path::new(&self.proxy_registry_config_dir)
+                        .join(registry_config_dir_name.clone())
+                        .join(".dockerconfigjson");
+                    if !docker_config_json.is_file() {
+                        return Err(format_err!(
+                            "Registry config file does not exists {:?}",
+                            docker_config_json.to_str()
+                        ));
+                    }
+
+                    debug!(
+                        "Registry config file exists {:?}",
+                        docker_config_json.to_str()
+                    );
+
+                    let mut f = File::open(docker_config_json.clone())?;
+
+                    let mut buffer = Vec::new();
+                    f.read_to_end(&mut buffer)?;
+
+                    let config: Dockerconfigjson = serde_json::from_slice(&buffer)?;
+
+                    match config.auths.iter().next() {
+                        Some(auths) => self.get_proxy_image_and_auth(
+                            reference,
+                            proxy_name,
+                            auths.0.clone(),
+                            registry_config_dir_name,
+                            Auth {
+                                user: auths.1.Username.clone(),
+                                pass: auths.1.Password.clone(),
+                            },
+                        ),
+                        None => Err(format_err!(
+                            "Registry config can't be parsed {:?}",
+                            docker_config_json.to_str()
+                        )),
+                    }
+                }
+                None => Err(format_err!("Registry config name can't be determined")),
+            }
+        }
+    }
+
+    fn get_proxy_image_and_auth(
+        &self,
+        reference: &str,
+        proxy_name: String,
+        address: String,
+        config_dir: String,
+        auth: Auth,
+    ) -> Result<(Image, Option<Auth>), Error> {
+        let mut repo = proxy_name
+            .strip_prefix(format!("{}/", config_dir).as_str())
+            .unwrap()
+            .to_string();
+
+        //Official images have to use the library/ repository
+        if !repo.contains('/') {
+            repo = format!("library/{}", repo).to_string();
+        }
+
+        Ok((
+            Image {
+                host: format!("https://{}/v2", address),
+                repo,
+                tag: reference.to_string(),
+            },
+            Some(auth),
+        ))
     }
 
     async fn download_manifest_and_layers<T: Display>(

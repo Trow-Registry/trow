@@ -33,6 +33,7 @@ pub mod manifest;
 pub struct TrowServerBuilder {
     data_path: String,
     listen_addr: std::net::SocketAddr,
+    proxy_registry_config_dir: String,
     proxy_hub: bool,
     hub_user: Option<String>,
     hub_pass: Option<String>,
@@ -48,6 +49,7 @@ pub struct TrowServerBuilder {
 pub fn build_server(
     data_path: &str,
     listen_addr: std::net::SocketAddr,
+    proxy_registry_config_dir: String,
     proxy_hub: bool,
     hub_user: Option<String>,
     hub_pass: Option<String>,
@@ -59,6 +61,7 @@ pub fn build_server(
     TrowServerBuilder {
         data_path: data_path.to_string(),
         listen_addr,
+        proxy_registry_config_dir,
         proxy_hub,
         hub_user,
         hub_pass,
@@ -104,6 +107,7 @@ impl TrowServerBuilder {
     pub fn get_server_future(self) -> impl Future<Output = Result<(), tonic::transport::Error>> {
         let ts = TrowServer::new(
             &self.data_path,
+            self.proxy_registry_config_dir,
             self.proxy_hub,
             self.hub_user,
             self.hub_pass,
