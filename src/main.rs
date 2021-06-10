@@ -139,7 +139,7 @@ For example 'beta/myapp:tag' will match myhost.com/beta/myapp:tag assuming myhos
             .short("u")
             .value_name("user")
             .help("Set the username that can be used to access Trow (e.g. via docker login).
-Must be used with --pass or --pass-file")
+Must be used with --password or --password-file")
             .takes_value(true)
         )
         .arg(
@@ -287,7 +287,7 @@ fn main() {
 
             builder.with_user(user.to_string(), pass);
         } else {
-            eprintln!("Either --pass or --password-file must be set if --user is set");
+            eprintln!("Either --password or --password-file must be set if --user is set");
             std::process::exit(1);
         }
     }
@@ -321,7 +321,7 @@ fn main() {
 
             builder.with_hub_auth(hub_user.to_string(), token);
         } else {
-            eprintln!("Either --pass or --password-file must be set if --user is set");
+            eprintln!("Either --password or --password-file must be set if --user is set");
             std::process::exit(1);
         }
     }
