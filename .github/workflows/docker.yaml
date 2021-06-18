@@ -4,7 +4,7 @@ name: OCI Conformance
 on:
   push:
     branches:
-    - master
+    - main
 
 jobs:
   upload_images:
