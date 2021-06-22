@@ -147,8 +147,12 @@ mod interface_tests {
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
 
-        get_manifest(&client, "f/docker/library/alpine", "latest").await;
-        get_manifest(&client, "f/docker/library/alpine", "latest").await;
+        //NOTE: if tag is updated also update nginx tag
+        get_manifest(&client, "f/docker/library/alpine", "3.13").await;
+        get_manifest(&client, "f/docker/library/alpine", "3.13").await;
+
+        //This should use same alpine image as base (so partially cached)
+        get_manifest(&client, "f/docker/library/nginx", "1.21.0-alpine").await;
 
         //Need to special case single name repos
         get_manifest(&client, "f/docker/alpine", "latest").await;
