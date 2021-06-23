@@ -85,8 +85,7 @@ pub mod manifest_media_type {
     pub const DOCKER_V1: &str = "application/vnd.docker.distribution.manifest.v1+json";
     pub const DOCKER_V2: &str = "application/vnd.docker.distribution.manifest.v2+json";
     pub const OCI_V1: &str = "application/vnd.oci.image.manifest.v1+json";
-    pub const DOCKER_LIST: &str =
-        "application/vnd.docker.distribution.manifest.list.v2+json";
+    pub const DOCKER_LIST: &str = "application/vnd.docker.distribution.manifest.list.v2+json";
     pub const OCI_INDEX: &str = "application/vnd.oci.image.index.v1+json";
 
     // Weirdly the media type is optional in the JSON, so assume OCI_V1.
@@ -112,7 +111,8 @@ fn schema_2(raw: &Value) -> Result<Manifest, Error> {
 
         unknown => Err(InvalidManifest {
             err: format!("Media Type {} is not supported.", unknown),
-        }.into()),
+        }
+        .into()),
     }
 }
 
@@ -124,11 +124,13 @@ impl FromJson for Manifest {
         match schema_version {
             1 => Err(InvalidManifest {
                 err: "Manifest Schema version 1 is not supported. Please update.".to_owned(),
-            }.into()),
+            }
+            .into()),
             2 => schema_2(raw),
             n => Err(InvalidManifest {
                 err: format!("Unsupported version: {}", n),
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -176,8 +178,8 @@ impl Manifest {
 mod test {
     use super::FromJson;
     use super::Manifest;
-    use serde_json::{self, Value};
     use crate::digest::sha256_tag_digest;
+    use serde_json::{self, Value};
     use std::io::BufReader;
 
     #[test]
