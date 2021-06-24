@@ -175,7 +175,10 @@ impl Component for Login {
             html! {
                 <div class="home-segment-login username">
                     <div class="uk-container-large">
-                        <div class="uk-heading-small">{username}</div>
+                        <span uk-icon="icon: user; ratio: 3"></span>
+                        <div class="uk-text-large">
+                             { username }
+                        </div>
                     </div>
                     <div class="field">
                         <p class="control">
