@@ -201,6 +201,12 @@ Must be used with --hub-token or --hub-token-file")
                 .long("enable-cors")
                 .help("Enable Cross-Origin Resource Sharing(CORS) requests. Default: false")
         )
+        .arg(
+            Arg::with_name("allow-cors-origin")
+                .long("allow-cors-origin")
+                .help("Allowed Cross-Origin Resource Sharing(CORS) origin. Default: '*' ")
+                .takes_value(true)
+        )
         .get_matches()
 }
 
