@@ -4,9 +4,8 @@
 #Not a big fan of using nightly, but such is our lot currently
 #Note we build on amd64 and cross-compile to arch
 FROM --platform=linux/amd64 rust:latest as builder
-RUN rustup update nightly-2021-01-30 && rustup default nightly-2021-01-30 && \
-    rustup component add rustfmt && rustup target install aarch64-unknown-linux-gnu && \
-    rustup toolchain install nightly-aarch64-unknown-linux-gnu
+RUN rustup toolchain install nightly --allow-downgrade -c rustfmt && rustup default nightly && \
+    rustup target add aarch64-unknown-linux-gnu 
 RUN apt-get update && apt-get install -y unzip gcc-aarch64-linux-gnu
 WORKDIR /usr/src/trow
 

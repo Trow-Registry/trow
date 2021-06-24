@@ -91,7 +91,7 @@ This will disable the transfer limit (it can alternatively be set to a large val
 to allow blobs up to 1000 MB in size). More details can be found in the [NGINX Ingress
 guide](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#custom-max-body-size).
 There is also an [Trow kustomize overlay with an NGINX
-ingress](https://github.com/ContainerSolutions/trow/blob/master/install/overlays/cert-manager-nginx/ingress.yaml)
+ingress](https://github.com/ContainerSolutions/trow/blob/main/install/overlays/cert-manager-nginx/ingress.yaml)
 that may be useful.
 
 ## Full TLS

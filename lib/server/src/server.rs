@@ -1,7 +1,12 @@
-use crate::manifest::{FromJson, Manifest, manifest_media_type};
+use crate::manifest::{manifest_media_type, FromJson, Manifest};
 use chrono::prelude::*;
+use core::fmt::Display;
 use failure::{self, Error, Fail};
 use prost_types::Timestamp;
+use reqwest::{
+    self,
+    header::{HeaderMap, HeaderValue},
+};
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
@@ -12,8 +17,6 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
-use core::fmt::Display;
-use reqwest::{self, header::{HeaderMap, HeaderValue}};
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
@@ -67,7 +70,6 @@ struct Upload {
     uuid: String,
 }
 
-
 #[derive(Fail, Debug)]
 #[fail(display = "Error getting proxied repo {}", msg)]
 pub struct ProxyError {
@@ -78,7 +80,7 @@ pub struct ProxyError {
 #[fail(display = "Expected digest {} but got {}", user_digest, actual_digest)]
 pub struct DigestValidationError {
     user_digest: String,
-    actual_digest: String
+    actual_digest: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -95,7 +97,6 @@ impl fmt::Display for Image {
 }
 
 impl Image {
-
     fn get_manifest_url(&self) -> String {
         format!("{}/{}/manifests/{}", self.host, self.repo, self.tag)
     }
@@ -110,9 +111,16 @@ pub struct Auth {
 }
 
 fn create_accept_header() -> HeaderMap {
-
     let mut headers = HeaderMap::new();
-    headers.insert(reqwest::header::ACCEPT, HeaderValue::from_str(&format!("{}, {}", manifest_media_type::OCI_V1, manifest_media_type::DOCKER_V2)).unwrap());
+    headers.insert(
+        reqwest::header::ACCEPT,
+        HeaderValue::from_str(&format!(
+            "{}, {}",
+            manifest_media_type::OCI_V1,
+            manifest_media_type::DOCKER_V2
+        ))
+        .unwrap(),
+    );
     headers
 }
 
@@ -200,7 +208,10 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
             "Upload did not match given digest. Was given {} but got {}",
             digest, calculated_digest
         );
-        Err(DigestValidationError {user_digest: digest.to_string(), actual_digest: calculated_digest})?;
+        Err(DigestValidationError {
+            user_digest: digest.to_string(),
+            actual_digest: calculated_digest,
+        })?;
     }
 
     Ok(())
@@ -269,17 +280,15 @@ impl TrowServer {
 
     fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf, Error> {
         let mut iter = digest.split(':');
-        let alg = iter.next().ok_or_else(|| format_err!(
-            "Digest {} did not contain alg component",
-            digest
-        ))?;
+        let alg = iter
+            .next()
+            .ok_or_else(|| format_err!("Digest {} did not contain alg component", digest))?;
         if !SUPPORTED_DIGESTS.contains(&alg) {
             return Err(format_err!("Hash algorithm {} not supported", alg));
         }
-        let val = iter.next().ok_or_else(|| format_err!(
-            "Digest {} did not contain value component",
-            digest
-        ))?;
+        let val = iter
+            .next()
+            .ok_or_else(|| format_err!("Digest {} did not contain value component", digest))?;
         assert_eq!(None, iter.next());
         Ok(self.blobs_path.join(alg).join(val))
     }
@@ -374,15 +383,16 @@ impl TrowServer {
     If repo is proxied to another registry, this will return the details of the remote image.
     If the repo isn't proxied None is returned
     **/
-    fn get_proxy_address_and_auth(&self, repo_name: &str, reference: &str) -> Option<(Image, Option<Auth>)> {
-
+    fn get_proxy_address_and_auth(
+        &self,
+        repo_name: &str,
+        reference: &str,
+    ) -> Option<(Image, Option<Auth>)> {
         //All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
-
             let proxy_name = repo_name.strip_prefix(PROXY_DIR).unwrap();
 
             if self.proxy_hub && proxy_name.starts_with(HUB_PROXY_DIR) {
-
                 let mut repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
 
                 //Official images have to use the library/ repository
@@ -391,21 +401,31 @@ impl TrowServer {
                 }
 
                 return Some((
-                    Image{host: HUB_ADDRESS.to_string(), repo, tag: reference.to_string()},
-                    Some(Auth{
-                        endpoint: HUB_AUTH_ENDPOINT.to_string(), 
-                        resource: HUB_RESOURCE.to_string(), 
-                        user: self.hub_user.clone(), 
+                    Image {
+                        host: HUB_ADDRESS.to_string(),
+                        repo,
+                        tag: reference.to_string(),
+                    },
+                    Some(Auth {
+                        endpoint: HUB_AUTH_ENDPOINT.to_string(),
+                        resource: HUB_RESOURCE.to_string(),
+                        user: self.hub_user.clone(),
                         pass: self.hub_pass.clone(),
-                    })))
-            } 
+                    }),
+                ));
+            }
         }
 
         None
     }
 
-    async fn download_manifest_and_layers<T: Display>(&self, cl: &reqwest::Client, token: &Option<T>, remote_image: &Image, local_repo_name: &str) -> Result<(), Error> {
-
+    async fn download_manifest_and_layers<T: Display>(
+        &self,
+        cl: &reqwest::Client,
+        token: &Option<T>,
+        remote_image: &Image,
+        local_repo_name: &str,
+    ) -> Result<(), Error> {
         let mut resp = cl.get(&remote_image.get_manifest_url());
         if let Some(auth) = token {
             resp = resp.bearer_auth(auth);
@@ -414,7 +434,11 @@ impl TrowServer {
         let resp = resp.headers(create_accept_header()).send().await?;
 
         if !resp.status().is_success() {
-            return Err(failure::err_msg(format!("GET {} returned unexpected {}", &remote_image.get_manifest_url(), resp.status())));
+            return Err(failure::err_msg(format!(
+                "GET {} returned unexpected {}",
+                &remote_image.get_manifest_url(),
+                resp.status()
+            )));
         }
 
         //First save as bytes
@@ -429,13 +453,16 @@ impl TrowServer {
         let mut paths = vec![];
         //TODO: change to perform dloads async
         for digest in mani.get_local_asset_digests() {
-
-            //break if have digest
+            //skip only blob if it already exists in local storage
+            //we need to continue as docker images may share blobs
             if self.get_catalog_path_for_blob(digest)?.exists() {
-                info!("Already have blob {}", digest);    
-                break;
+                info!("Already have blob {}", digest);
+                continue;
             }
-            let addr = format!("{}/{}/blobs/{}", remote_image.host, remote_image.repo, digest);
+            let addr = format!(
+                "{}/{}/blobs/{}",
+                remote_image.host, remote_image.repo, digest
+            );
             info!("Downloading blob {}", addr);
 
             let resp = if let Some(auth) = token {
@@ -444,17 +471,16 @@ impl TrowServer {
                 cl.get(&addr).send().await?
             };
             let path = self.scratch_path.join(digest);
-            
+
             let mut buf = File::create(&path)?;
             buf.write_all(&resp.bytes().await?)?; //Is this going to be buffered?
             paths.push((path, digest));
-            
         }
 
         for (path, digest) in &paths {
             self.save_blob(&path, digest)?;
         }
-        
+
         //Save out manifest
         let f = File::open(&temp_mani_path)?;
         let reader = BufReader::new(f);
@@ -465,26 +491,38 @@ impl TrowServer {
 
         //Delete all the temp stuff
         fs::remove_file(&temp_mani_path)
-                    .unwrap_or_else(|e| error!("Failure deleting downloaded manifest {:?}", e));
+            .unwrap_or_else(|e| error!("Failure deleting downloaded manifest {:?}", e));
 
         for (path, _digest) in paths {
-            fs::remove_file(path).unwrap_or_else(|e| error!("Failure deleting downloaded blob {:?}", e));
+            fs::remove_file(path)
+                .unwrap_or_else(|e| error!("Failure deleting downloaded blob {:?}", e));
         }
 
         Ok(())
     }
 
-    async fn get_auth_token(&self, cl: &reqwest::Client, image: &Image, auth: &Auth) -> Option<String> {
-
+    async fn get_auth_token(
+        &self,
+        cl: &reqwest::Client,
+        image: &Image,
+        auth: &Auth,
+    ) -> Option<String> {
         //Fucking annoyingly, anonymous requests have to use GET whilst user based requests have to be POST
 
         let resp = if !&auth.pass.is_some() {
             info!("Making anonymous auth request to Docker Hub");
-            let req = format!("{}?service={}&scope=repository:{}:pull", &auth.endpoint, auth.resource, image.repo).to_string();
+            let req = format!(
+                "{}?service={}&scope=repository:{}:pull",
+                &auth.endpoint, auth.resource, image.repo
+            )
+            .to_string();
 
             cl.get(&req).send().await
-        } else {            
-            let mut auth_req = format!("&grant_type=password&client_id=trow_proxy&service={}&scope=repository:{}:pull", auth.resource, image.repo);
+        } else {
+            let mut auth_req = format!(
+                "&grant_type=password&client_id=trow_proxy&service={}&scope=repository:{}:pull",
+                auth.resource, image.repo
+            );
 
             if let Some(user) = &auth.user {
                 info!("Making request to Docker Hub as {}", &user);
@@ -496,26 +534,28 @@ impl TrowServer {
 
             cl.post(&auth.endpoint)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .body(auth_req).send().await
+                .body(auth_req)
+                .send()
+                .await
         };
 
         let resp = match resp {
             Ok(r) => r,
             Err(e) => {
                 error!("Remote registry didn't repsond to auth request: {}", e);
-                return None
+                return None;
             }
         };
 
         if !resp.status().is_success() {
             error!("Failed to authenticate to {}", auth.endpoint);
-            return None
+            return None;
         }
-        
+
         let auth = match resp.json::<serde_json::Value>().await {
             Ok(auth) => auth,
-            Err(e) => { 
-                error!("Failed to deserialize auth response {}", e); 
+            Err(e) => {
+                error!("Failed to deserialize auth response {}", e);
                 return None;
             }
         };
@@ -523,36 +563,45 @@ impl TrowServer {
         match auth["access_token"].as_str() {
             Some(t) => Some(t.to_string()),
             None => {
-                error!("Failed to find auth token in auth repsonse"); 
+                error!("Failed to find auth token in auth repsonse");
                 None
             }
         }
     }
 
-    async fn get_digest_from_header(&self, cl: &reqwest::Client, image: &Image, auth_token: &Option<String>) -> Option<String> {
-
+    async fn get_digest_from_header(
+        &self,
+        cl: &reqwest::Client,
+        image: &Image,
+        auth_token: &Option<String>,
+    ) -> Option<String> {
         let resp = if let Some(auth) = auth_token {
-            cl.head(&image.get_manifest_url()).bearer_auth(&auth).headers(create_accept_header()).send().await
+            cl.head(&image.get_manifest_url())
+                .bearer_auth(&auth)
+                .headers(create_accept_header())
+                .send()
+                .await
         } else {
             cl.head(&image.get_manifest_url())
-                .headers(create_accept_header()).send().await
+                .headers(create_accept_header())
+                .send()
+                .await
         };
 
         let resp = match resp {
             Ok(r) => r,
             Err(e) => {
                 error!("Remote registry didn't respond to HEAD request {}", e);
-                return None
+                return None;
             }
         };
 
         if let Some(digest) = resp.headers().get(DIGEST_HEADER) {
-            let digest=format!("{:?}", digest);
+            let digest = format!("{:?}", digest);
             Some(digest.trim_matches('"').to_string())
         } else {
             None
         }
-
     }
 
     async fn create_manifest_read_location(
@@ -561,15 +610,18 @@ impl TrowServer {
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
-
-        if let Some((proxy_image, proxy_auth)) = self.get_proxy_address_and_auth(&repo_name, &reference) {
-
+        if let Some((proxy_image, proxy_auth)) =
+            self.get_proxy_address_and_auth(&repo_name, &reference)
+        {
             //TODO: May want to consider download tracking in case of simultaneous requests
             //In short term this isn't a big problem as should just copy over itself in worst case
-            info!("Request for proxied repo {}:{} maps to {}", repo_name, reference, proxy_image);
+            info!(
+                "Request for proxied repo {}:{} maps to {}",
+                repo_name, reference, proxy_image
+            );
 
             let cl = reqwest::Client::new();
-           
+
             let mut have_manifest = false;
             //Get auth token
 
@@ -578,31 +630,42 @@ impl TrowServer {
             } else {
                 None
             };
-            let digest = self.get_digest_from_header(&cl, &proxy_image, &auth_token).await;
+            let digest = self
+                .get_digest_from_header(&cl, &proxy_image, &auth_token)
+                .await;
 
             if let Some(digest) = digest {
                 if self.get_catalog_path_for_blob(&digest)?.exists() {
-                    info!("Have up to date manifest for {} digest {}", repo_name, digest);
+                    info!(
+                        "Have up to date manifest for {} digest {}",
+                        repo_name, digest
+                    );
                     have_manifest = true;
 
                     //Make sure our tag exists and is up-to-date
                     if !is_digest(&reference) {
                         let our_digest = self.get_digest_from_manifest(&repo_name, &reference);
                         if our_digest.is_err() || (our_digest.unwrap() != digest) {
-                           let res = self.save_tag(&digest, &repo_name, &reference);
+                            let res = self.save_tag(&digest, &repo_name, &reference);
                             if res.is_err() {
-                                error!("Internal error updating tag for proxied image {:?}", res.unwrap());
+                                error!(
+                                    "Internal error updating tag for proxied image {:?}",
+                                    res.unwrap()
+                                );
                             }
-                        }            
-                    }                 
+                        }
+                    }
                 }
             }
 
             if !have_manifest {
-                if let Err(e) = self.download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name).await{ 
+                if let Err(e) = self
+                    .download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name)
+                    .await
+                {
                     //Note that we may still have an out-of-date version that will be returned
                     error!("Failed to download proxied image {}", e);
-                }   
+                }
             }
         }
 
@@ -705,7 +768,6 @@ impl TrowServer {
     }
 
     fn is_writable_repo(&self, repo_name: &str) -> bool {
-
         if repo_name.starts_with(PROXY_DIR) {
             return false;
         }
@@ -720,27 +782,22 @@ impl Registry for TrowServer {
         &self,
         request: Request<UploadRequest>,
     ) -> Result<Response<UploadDetails>, Status> {
-
         let repo_name = request.into_inner().repo_name;
         if self.is_writable_repo(&repo_name) {
-
             let uuid = Uuid::new_v4().to_string();
             let reply = UploadDetails { uuid: uuid.clone() };
-            let upload = Upload {
-                repo_name,
-                uuid,
-            };
+            let upload = Upload { repo_name, uuid };
             {
                 self.active_uploads.write().unwrap().insert(upload);
                 debug!("Upload Table: {:?}", self.active_uploads);
             }
             Ok(Response::new(reply))
         } else {
-
-            Err(Status::invalid_argument(format!("Repository {} is not writable", repo_name)))
+            Err(Status::invalid_argument(format!(
+                "Repository {} is not writable",
+                repo_name
+            )))
         }
-
-        
     }
 
     async fn get_write_location_for_blob(
@@ -850,12 +907,10 @@ impl Registry for TrowServer {
 
     async fn get_write_details_for_manifest(
         &self,
-        req: Request<ManifestRef>, 
+        req: Request<ManifestRef>,
     ) -> Result<Response<ManifestWriteDetails>, Status> {
-        
         let repo_name = req.into_inner().repo_name;
         if self.is_writable_repo(&repo_name) {
-
             //Give the manifest a UUID and save it to the uploads dir
             let uuid = Uuid::new_v4().to_string();
 
@@ -865,7 +920,10 @@ impl Registry for TrowServer {
                 uuid,
             }))
         } else {
-            Err(Status::invalid_argument(format!("Repository {} is not writable", repo_name)))
+            Err(Status::invalid_argument(format!(
+                "Repository {} is not writable",
+                repo_name
+            )))
         }
     }
 
@@ -878,7 +936,10 @@ impl Registry for TrowServer {
         let mr = req.into_inner();
         metrics::TOTAL_MANIFEST_REQUESTS.inc();
         // TODO refactor to return directly
-        match self.create_manifest_read_location(mr.repo_name, mr.reference, true).await {
+        match self
+            .create_manifest_read_location(mr.repo_name, mr.reference, true)
+            .await
+        {
             Ok(vm) => Ok(Response::new(vm)),
             Err(e) => {
                 warn!("Internal error with manifest {:?}", e);
@@ -936,17 +997,13 @@ impl Registry for TrowServer {
             Ok(_) => Ok(Response::new(CompletedUpload {
                 digest: cr.user_digest.clone(),
             })),
-            Err(e) => {
-                match e.downcast::<DigestValidationError>() {
-                    Ok(v_e)    => { 
-                        Err(Status::invalid_argument(v_e.to_string()))
-                     }
-                    Err(e)      => { 
-                        warn!("Failure when saving layer: {:?}", e);
-                        Err(Status::internal("Internal error saving layer")) 
-                    }
-                }   
-            }
+            Err(e) => match e.downcast::<DigestValidationError>() {
+                Ok(v_e) => Err(Status::invalid_argument(v_e.to_string())),
+                Err(e) => {
+                    warn!("Failure when saving layer: {:?}", e);
+                    Err(Status::internal("Internal error saving layer"))
+                }
+            },
         };
 
         //delete uuid from uploads tracking
@@ -1183,9 +1240,7 @@ impl Registry for TrowServer {
                 Ok(Response::new(reply))
             }
 
-            Err(error) => {
-                Err(Status::unavailable(error.to_string()))
-            }
+            Err(error) => Err(Status::unavailable(error.to_string())),
         }
     }
 }
