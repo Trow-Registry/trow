@@ -252,12 +252,6 @@ fn main() {
     let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
 
     let cors = matches.is_present("enable-cors");
-<<<<<<< HEAD
-    let allow_cors_origin = matches.value_of("allow-cors-origin").unwrap_or("");
-    let allow_cors_headers = parse_list(matches.value_of("allow-cors-headers").unwrap_or(""));
-    let allow_cors_methods = parse_list(matches.value_of("allow-cors-methods").unwrap_or(""));
-    let allow_cors_credentials = matches.is_present("allow-cors-credentials");
-=======
     let allow_cors_origin = matches.value_of("allow-cors-origin").unwrap_or("*");
     let mut allow_cors_headers= vec![];
     let mut allow_cors_methods = vec![];
@@ -268,7 +262,6 @@ fn main() {
         allow_cors_methods.extend_from_slice(&["GET".to_string(),"OPTIONS".to_string()]);
         allow_cors_credentials = true;
     }
->>>>>>> 92c43738ce510aa2728bcd0c703771f02a100140
 
     let addr = NetAddr {
         host: host.to_string(),
