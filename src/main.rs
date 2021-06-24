@@ -202,27 +202,10 @@ Must be used with --hub-token or --hub-token-file")
                 .help("Enable Cross-Origin Resource Sharing(CORS) requests. Default: false")
         )
         .arg(
-            Arg::with_name("allow-cors-headers")
-                .long("allow-cors-headers")
-                .help("Allowed Cross-Origin Resource Sharing(CORS) headers. Separate with a comma or use quotes and spaces.  Default: [] ")
-                .takes_value(true)
-        )
-        .arg(
-            Arg::with_name("allow-cors-methods")
-                .long("allow-cors-methods")
-                .help("Allowed Cross-Origin Resource Sharing(CORS) headers. Separate with a comma or use quotes and spaces.  Default: [] ")
-                .takes_value(true)
-        )
-        .arg(
             Arg::with_name("allow-cors-origin")
                 .long("allow-cors-origin")
-                .help("Allowed Cross-Origin Resource Sharing(CORS) origin. Default: '' ")
+                .help("Allowed Cross-Origin Resource Sharing(CORS) origin. Default: '*' ")
                 .takes_value(true)
-        )
-        .arg(
-            Arg::with_name("allow-cors-credentials")
-                .long("allow-cors-credentials")
-                .help("Allow Cross-Origin Resource Sharing(CORS) requests with credentials.  Default: false")
         )
         .get_matches()
 }
@@ -269,10 +252,23 @@ fn main() {
     let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
 
     let cors = matches.is_present("enable-cors");
+<<<<<<< HEAD
     let allow_cors_origin = matches.value_of("allow-cors-origin").unwrap_or("");
     let allow_cors_headers = parse_list(matches.value_of("allow-cors-headers").unwrap_or(""));
     let allow_cors_methods = parse_list(matches.value_of("allow-cors-methods").unwrap_or(""));
     let allow_cors_credentials = matches.is_present("allow-cors-credentials");
+=======
+    let allow_cors_origin = matches.value_of("allow-cors-origin").unwrap_or("*");
+    let mut allow_cors_headers= vec![];
+    let mut allow_cors_methods = vec![];
+    let mut allow_cors_credentials = false;
+    
+    if matches.is_present("enable-cors") {
+        allow_cors_headers.extend_from_slice(&["Authorization".to_string(), "Content-Type".to_string()]);
+        allow_cors_methods.extend_from_slice(&["GET".to_string(),"OPTIONS".to_string()]);
+        allow_cors_credentials = true;
+    }
+>>>>>>> 92c43738ce510aa2728bcd0c703771f02a100140
 
     let addr = NetAddr {
         host: host.to_string(),
