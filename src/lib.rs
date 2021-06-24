@@ -58,9 +58,9 @@ mod users;
 
 use chrono::Utc;
 use client_interface::ClientInterface;
+use fairings::{conditional_fairing::AttachConditionalFairing, cors::CORS};
 use rand::RngCore;
 use std::io::Write;
-use fairings::{conditional_fairing::AttachConditionalFairing, cors::CORS};
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]

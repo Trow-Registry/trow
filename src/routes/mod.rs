@@ -22,6 +22,7 @@ pub fn routes() -> Vec<rocket::Route> {
         get_v2root,
         get_homepage,
         login,
+        options_login,
         manifest::get_manifest,
         manifest::get_manifest_2level,
         manifest::get_manifest_3level,
@@ -30,6 +31,10 @@ pub fn routes() -> Vec<rocket::Route> {
         manifest::put_image_manifest_2level,
         manifest::put_image_manifest_3level,
         manifest::put_image_manifest_4level,
+        manifest::options_manifest,
+        manifest::options_manifest_2level,
+        manifest::options_manifest_3level,
+        manifest::options_manifest_4level,
         manifest::delete_image_manifest,
         manifest::delete_image_manifest_2level,
         manifest::delete_image_manifest_3level,
@@ -42,6 +47,10 @@ pub fn routes() -> Vec<rocket::Route> {
         blob::put_blob_2level,
         blob::put_blob_3level,
         blob::put_blob_4level,
+        blob::options_blob,
+        blob::options_blob_2level,
+        blob::options_blob_3level,
+        blob::options_blob_4level,
         blob::patch_blob,
         blob::patch_blob_2level,
         blob::patch_blob_3level,
@@ -55,6 +64,7 @@ pub fn routes() -> Vec<rocket::Route> {
         blob::delete_blob_2level,
         blob::delete_blob_3level,
         blob::delete_blob_4level,
+        catalog::options_catalog,
         catalog::list_tags,
         catalog::list_tags_2level,
         catalog::list_tags_3level,
@@ -64,6 +74,10 @@ pub fn routes() -> Vec<rocket::Route> {
         catalog::get_manifest_history_2level,
         catalog::get_manifest_history_3level,
         catalog::get_manifest_history_4level,
+        catalog::options_tags,
+        catalog::options_tags_2level,
+        catalog::options_tags_3level,
+        catalog::options_tags_4level,
         validation::validate_image,
         health::healthz,
         readiness::readiness,
@@ -113,4 +127,9 @@ fn no_auth(_req: &Request) -> Authenticate {
 #[get("/login")]
 fn login(auth_user: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, Error> {
     trow_token::new(auth_user, tc).map_err(|_| Error::InternalError)
+}
+
+#[options("/login")]
+pub fn options_login() -> Json<JsonValue> {
+    Json(json!({}))
 }
