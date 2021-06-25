@@ -107,4 +107,77 @@ mod cli {
             .contains("Local images with these prefixes are explicitly denied: [\"beta/\"]")
             .unwrap();
     }
+
+    #[test]
+    fn cors() {
+        assert_cli::Assert::main_binary()
+            .with_args(&["--enable-cors", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Cross-Origin Resource Sharing(CORS) requests are allowed")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--enable-cors", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Allowed Cross-Origin Resource Sharing(CORS) origin is \"*\"")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&[
+                "--enable-cors",
+                "--dry-run",
+            ])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Allowed Cross-Origin Resource Sharing(CORS) headers are [\"Authorization\", \"Content-Type\"]")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--enable-cors", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains(
+                "Allowed Cross-Origin Resource Sharing(CORS) methods are [\"GET\", \"OPTIONS\"]",
+            )
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--enable-cors", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains(
+                "Allowed Cross-Origin Resource Sharing(CORS) methods are [\"GET\", \"OPTIONS\"]",
+            )
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&[
+                "--enable-cors",
+                "--allow-cors-origin",
+                "https://trow.local",
+                "--dry-run",
+            ])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains(
+                "Allowed Cross-Origin Resource Sharing(CORS) origin is \"https://trow.local\"",
+            )
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--enable-cors", "--allow-cors-origin" , "https://trow.local,https://trow.test", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Allowed Cross-Origin Resource Sharing(CORS) origin is \"https://trow.local,https://trow.test\"")
+            .unwrap();
+    }
 }
