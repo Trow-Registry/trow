@@ -253,13 +253,14 @@ fn main() {
 
     let cors = matches.is_present("enable-cors");
     let allow_cors_origin = matches.value_of("allow-cors-origin").unwrap_or("*");
-    let mut allow_cors_headers= vec![];
+    let mut allow_cors_headers = vec![];
     let mut allow_cors_methods = vec![];
     let mut allow_cors_credentials = false;
-    
+
     if matches.is_present("enable-cors") {
-        allow_cors_headers.extend_from_slice(&["Authorization".to_string(), "Content-Type".to_string()]);
-        allow_cors_methods.extend_from_slice(&["GET".to_string(),"OPTIONS".to_string()]);
+        allow_cors_headers
+            .extend_from_slice(&["Authorization".to_string(), "Content-Type".to_string()]);
+        allow_cors_methods.extend_from_slice(&["GET".to_string(), "OPTIONS".to_string()]);
         allow_cors_credentials = true;
     }
 
