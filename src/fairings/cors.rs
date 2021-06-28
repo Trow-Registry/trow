@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 // --enable-cors
-// --allow-cors-origin
-// --allow-cors-methods GET, OPTIONS
-// --allow-cors-headers
+// --allow-cors-origin "*"
 
 use rocket::{
     fairing::{Fairing, Info, Kind},
