@@ -3,8 +3,11 @@ WORKDIR /usr/src/gui
 RUN rustup target add wasm32-unknown-unknown
 
 COPY Cargo.toml Cargo.lock ./
-COPY . .
+RUN mkdir src/ \ 
+    && echo 'fn main() { println!("caching"); }' > src/lib.rs
+RUN cargo build --release
 
+COPY . .
 RUN cargo install wasm-pack trunk wasm-bindgen-cli 
 RUN trunk build --release
 
