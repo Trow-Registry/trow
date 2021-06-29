@@ -146,7 +146,7 @@ impl Catalog {
     fn view_repo(&self) -> Html {
         if !self.props.repository.is_empty() {
             let callback_reference = self.link.callback(Msg::SetCurrentReference);
-            html! { <Repository reference=&self.props.reference repository=&self.props.repository callback_reference=callback_reference/> }
+            html! { <Repository reference=self.props.reference.clone() repository=self.props.repository.clone() callback_reference=callback_reference/> }
         } else {
             html! { <p></p> }
         }
@@ -154,7 +154,7 @@ impl Catalog {
 
     fn view_reference_details(&self) -> Html {
         if !self.props.reference.is_empty() {
-            html! { <ReferenceDetails reference=&self.props.reference repository=&self.props.repository/> }
+            html! { <ReferenceDetails reference=self.props.reference.clone() repository=self.props.repository.clone() /> }
         } else {
             html! { <p></p> }
         }
