@@ -1,47 +1,29 @@
-# Trow GUI -wasm
+# Trow GUI 
 
-Trow. The Cloud Native Registry.
+Trow GUI component.
 
 -   pre-requisites
-    > Node v15+ 
 
-    > Yarn 1.22.10+ 
 
-    > Rust 1.51.0
-    
-    > [Wasm-pack](https://rustwasm.github.io/wasm-pack/installer/#)
-
--   requirements
+    > Rust 1.53.0
+    -   Add cargo bin directory to PATH to `~/.bashrc` or equivalent
+        
+        `export PATH="$PATH:$HOME/.cargo/bin"` 
 
     -   Trow registry instance running **with Cross-Origin Resource Sharing(CORS) support enabled**.
         
-        `--enable-cors --allow-cors-methods '*' --allow-cors-headers '*' --allow-cors-credentials --allow-cors-origin '*'`
+        `cargo run -- --enable-cors `
+
+    - Install wasm-pack,trunk and wasm-bindgen-cli
+
+        `cargo install wasm-pack trunk wasm-bindgen-cli`
    
-    - Current GUI CORS requirements:
-        
-        - Methods: `GET`, `OPTIONS`     
+    
+-   start gui and update registry endpoint on the settings page, default set to:  `https://0.0.0.0:8443`
 
-        - Headers `Content-Type`     
-        
-    -   [Install](https://rustwasm.github.io/wasm-pack/installer/#) `wasm-pack` for your platform 
-    -   Add cargo bin path - `export PATH="$PATH:$HOME/.cargo/bin"` - to `~/.bashrc` or equivalent
+    `trunk serve`
 
-<!-- 
+-  gui will be available at:
+    
+    >http://localhost:8080 
 
-cargo +nightly install miniserve
-wasm-pack build --target web --out-name wasm --out-dir ./static
-miniserve ./static --index index.html
-
- -->
-
--   start gui and update registry endpoint on the settings page, default set to: `https://0.0.0.0:8443`
-
-```
-    > yarn serve
-```
-
-
-``` 
- http://localhost:9000 - gui
-
-```
