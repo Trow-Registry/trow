@@ -1,17 +1,12 @@
-FROM --platform=${BUILDPLATFORM:-linux/amd64} rust:1.52.0 as builder
-RUN curl -fsSL https://deb.nodesource.com/setup_15.x | bash - && \
-    apt update && \
-    apt install -y nodejs && \
-    npm install --global yarn
-
+FROM --platform=${BUILDPLATFORM:-linux/amd64} rust:1.53.0 as builder
 WORKDIR /usr/src/gui
-COPY package.json yarn.lock ./
-RUN yarn 
+RUN rustup target add wasm32-unknown-unknown
 
+COPY Cargo.toml Cargo.lock ./
 COPY . .
 
-RUN cargo install wasm-pack
-RUN yarn build
+RUN cargo install wasm-pack trunk wasm-bindgen-cli 
+RUN trunk build --release
 
 FROM --platform=${BUILDPLATFORM:-linux/amd64} nginx:alpine
 COPY --from=builder /usr/src/gui/dist /usr/share/nginx/html
