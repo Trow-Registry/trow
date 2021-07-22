@@ -58,9 +58,13 @@ mod users;
 
 use chrono::Utc;
 use client_interface::ClientInterface;
-use fairings::{conditional_fairing::AttachConditionalFairing, cors::CORS};
+use fairings::conditional_fairing::AttachConditionalFairing;
 use rand::RngCore;
 use std::io::Write;
+
+use rocket::http::Method;
+use rocket_cors::AllowedHeaders;
+use rocket_cors::AllowedOrigins;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -95,10 +99,6 @@ pub struct TrowConfig {
     token_secret: String,
     user: Option<UserConfig>,
     cors: bool,
-    allow_cors_origin: String,
-    allow_cors_headers: Vec<String>,
-    allow_cors_methods: Vec<String>,
-    allow_cors_credentials: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -192,10 +192,6 @@ impl TrowBuilder {
         deny_images: Vec<String>,
         dry_run: bool,
         cors: bool,
-        allow_cors_origin: String,
-        allow_cors_headers: Vec<String>,
-        allow_cors_methods: Vec<String>,
-        allow_cors_credentials: bool,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -214,10 +210,6 @@ impl TrowBuilder {
             token_secret: Uuid::new_v4().to_string(),
             user: None,
             cors,
-            allow_cors_origin,
-            allow_cors_headers,
-            allow_cors_methods,
-            allow_cors_credentials,
         };
         TrowBuilder { config }
     }
@@ -321,23 +313,7 @@ impl TrowBuilder {
         }
 
         if self.config.cors {
-            println!("  Cross-Origin Resource Sharing(CORS) requests are allowed");
-            println!(
-                "  Allowed Cross-Origin Resource Sharing(CORS) origin is {:?}",
-                self.config.allow_cors_origin
-            );
-            println!(
-                "  Allowed Cross-Origin Resource Sharing(CORS) methods are {:?}",
-                self.config.allow_cors_methods
-            );
-            println!(
-                "  Allowed Cross-Origin Resource Sharing(CORS) headers are {:?}",
-                self.config.allow_cors_headers
-            );
-            println!(
-                "  Allow Cross-Origin Resource Sharing(CORS) credentials is {:?}\n",
-                self.config.allow_cors_credentials
-            );
+            println!("  Cross-Origin Resource Sharing(CORS) requests are allowed\n");
         }
 
         if self.config.dry_run {
@@ -347,12 +323,17 @@ impl TrowBuilder {
         let s = format!("https://{}", self.config.grpc.listen);
         let ci: ClientInterface = build_handlers(s)?;
 
-        let cors = CORS::new()
-            .methods(self.config.allow_cors_methods.clone())
-            .origin(self.config.allow_cors_origin.clone())
-            .headers(self.config.allow_cors_headers.clone())
-            .credentials(Some(self.config.allow_cors_credentials.clone()))
-            .build();
+        let cors = rocket_cors::CorsOptions {
+            allowed_origins: AllowedOrigins::all(),
+            allowed_methods: vec![Method::Get, Method::Post, Method::Options]
+                .into_iter()
+                .map(From::from)
+                .collect(),
+            allowed_headers: AllowedHeaders::some(&["Authorization", "Content-Type"]),
+            allow_credentials: true,
+            ..Default::default()
+        }
+        .to_cors()?;
 
         rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
@@ -371,11 +352,11 @@ impl TrowBuilder {
                     resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
                 },
             ))
-            .attach_if(self.config.cors, cors)
             .attach(fairing::AdHoc::on_launch("Launch Message", |_| {
                 println!("Trow is up and running!");
             }))
             .mount("/", routes::routes())
+            .attach_if(self.config.cors, cors.clone())
             .register(routes::catchers())
             .launch();
 
