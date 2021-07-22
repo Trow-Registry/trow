@@ -201,12 +201,6 @@ Must be used with --hub-token or --hub-token-file")
                 .long("enable-cors")
                 .help("Enable Cross-Origin Resource Sharing(CORS) requests. Default: false")
         )
-        .arg(
-            Arg::with_name("allow-cors-origin")
-                .long("allow-cors-origin")
-                .help("Allowed Cross-Origin Resource Sharing(CORS) origin. Default: '*' ")
-                .takes_value(true)
-        )
         .get_matches()
 }
 
@@ -252,17 +246,6 @@ fn main() {
     let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
 
     let cors = matches.is_present("enable-cors");
-    let allow_cors_origin = matches.value_of("allow-cors-origin").unwrap_or("*");
-    let mut allow_cors_headers = vec![];
-    let mut allow_cors_methods = vec![];
-    let mut allow_cors_credentials = false;
-
-    if matches.is_present("enable-cors") {
-        allow_cors_headers
-            .extend_from_slice(&["Authorization".to_string(), "Content-Type".to_string()]);
-        allow_cors_methods.extend_from_slice(&["GET".to_string(), "OPTIONS".to_string()]);
-        allow_cors_credentials = true;
-    }
 
     let addr = NetAddr {
         host: host.to_string(),
@@ -280,10 +263,6 @@ fn main() {
         deny_images,
         dry_run,
         cors,
-        allow_cors_origin.to_string(),
-        allow_cors_headers,
-        allow_cors_methods,
-        allow_cors_credentials,
     );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
