@@ -4,7 +4,6 @@ use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{RepoCatalog, TagList};
 
-
 #[get("/v2/_catalog?<n>&<last>")]
 pub fn get_catalog(
     _auth_user: TrowToken,

@@ -15,6 +15,11 @@ mod cors_tests {
     use environment::Environment;
 
     use base64::encode;
+    use reqwest::header::HeaderMap;
+    use reqwest::header::{
+        ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
+        ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_REQUEST_METHOD, AUTHORIZATION, ORIGIN,
+    };
     use reqwest::StatusCode;
     use std::fs::{self, File};
     use std::io::Read;
@@ -22,11 +27,8 @@ mod cors_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use reqwest::header::{ORIGIN, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_REQUEST_METHOD, AUTHORIZATION};
-    use reqwest::header::HeaderMap;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
-
 
     struct TrowInstance {
         pid: Child,
@@ -90,23 +92,34 @@ mod cors_tests {
         headers.insert(ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS".parse().unwrap());
 
         let resp = cl
-            .request(hyper::Method::OPTIONS,&(TROW_ADDRESS.to_owned()))
+            .request(hyper::Method::OPTIONS, &(TROW_ADDRESS.to_owned()))
             .headers(headers)
             .send()
             .await
             .unwrap();
-            assert_eq!(resp.status(), StatusCode::NO_CONTENT);   
-            assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "https://example.com"); 
-            assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_CREDENTIALS).unwrap(), "true"); 
-            let res_cors_methods = resp.headers().get(ACCESS_CONTROL_ALLOW_METHODS).unwrap().to_str().unwrap();
-            assert!(res_cors_methods.clone().contains("GET"));
-            assert!(res_cors_methods.clone().contains("OPTIONS"));
-            assert!(res_cors_methods.contains("POST"));
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            "https://example.com"
+        );
+        assert_eq!(
+            resp.headers()
+                .get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+                .unwrap(),
+            "true"
+        );
+        let res_cors_methods = resp
+            .headers()
+            .get(ACCESS_CONTROL_ALLOW_METHODS)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(res_cors_methods.clone().contains("GET"));
+        assert!(res_cors_methods.clone().contains("OPTIONS"));
+        assert!(res_cors_methods.contains("POST"));
     }
 
-
     async fn test_cors_method_get(cl: &reqwest::Client) {
-
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned()))
             .header(ORIGIN, "https://example.com")
@@ -114,9 +127,17 @@ mod cors_tests {
             .send()
             .await
             .unwrap();
-            assert_eq!(resp.status(), StatusCode::OK);   
-            assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "https://example.com"); 
-            assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_CREDENTIALS).unwrap(), "true"); 
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            "https://example.com"
+        );
+        assert_eq!(
+            resp.headers()
+                .get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+                .unwrap(),
+            "true"
+        );
     }
 
     async fn test_cors_headers_authorization(cl: &reqwest::Client) {
@@ -129,13 +150,19 @@ mod cors_tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-       
-        assert_eq!(resp.status(), StatusCode::OK);   
-        assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "https://example.com"); 
-        assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_CREDENTIALS).unwrap(), "true"); 
-    }
 
-    
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            "https://example.com"
+        );
+        assert_eq!(
+            resp.headers()
+                .get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+                .unwrap(),
+            "true"
+        );
+    }
 
     #[tokio::test]
     async fn test_runner() {

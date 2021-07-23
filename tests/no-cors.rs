@@ -14,6 +14,11 @@ mod no_cors_tests {
     use crate::common;
     use environment::Environment;
 
+    use reqwest::header::HeaderMap;
+    use reqwest::header::{
+        ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_REQUEST_METHOD,
+        ORIGIN,
+    };
     use reqwest::StatusCode;
     use std::fs::{self, File};
     use std::io::Read;
@@ -21,11 +26,8 @@ mod no_cors_tests {
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    use reqwest::header::{ORIGIN, ACCESS_CONTROL_REQUEST_METHOD, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN};
-    use reqwest::header::HeaderMap;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
-
 
     struct TrowInstance {
         pid: Child,
@@ -83,19 +85,16 @@ mod no_cors_tests {
         headers.insert(ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS".parse().unwrap());
 
         let resp = cl
-            .request(hyper::Method::OPTIONS,&(TROW_ADDRESS.to_owned()))
+            .request(hyper::Method::OPTIONS, &(TROW_ADDRESS.to_owned()))
             .headers(headers)
             .send()
             .await
             .unwrap();
-        
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);  
-        assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_METHODS), None);
-        assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN), None); 
 
-        
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_METHODS), None);
+        assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN), None);
     }
-    
 
     #[tokio::test]
     async fn test_runner() {
