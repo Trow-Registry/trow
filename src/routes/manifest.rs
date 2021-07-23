@@ -4,7 +4,6 @@ use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{create_verified_manifest, ManifestDeleted, RepoName, VerifiedManifest};
 
-use rocket_contrib::json::{Json, JsonValue};
 use std::io::Read;
 
 /*

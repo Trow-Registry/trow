@@ -7,7 +7,6 @@ use crate::types::{
     create_accepted_upload, create_upload_info, AcceptedUpload, BlobDeleted, RepoName, Upload, Uuid,
 };
 use rocket::http::uri::{Origin, Uri};
-use rocket_contrib::json::{Json, JsonValue};
 
 use std::io::Read;
 
