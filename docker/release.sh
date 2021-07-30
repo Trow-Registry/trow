@@ -12,6 +12,7 @@ VERSION="$MAJOR_VERSION.$MINOR_VERSION.$PATCH_VERSION$NAME"
 
 CARGO_VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 SERVER_CARGO_VERSION=$(sed '/^version = */!d; s///;q' ../lib/server/Cargo.toml | sed s/\"//g)
+BRANCH=$(git branch --show-current)
 
 echo """
 Release script for Trow. This script is dependent on docker and manifest-tool. 
@@ -27,6 +28,7 @@ Before running this, please check:
 Version in this script $VERSION
 Version in Cargo.toml $CARGO_VERSION
 Version in lib/server/Cargo.toml $SERVER_CARGO_VERSION
+You are currently on $BRANCH
 
 """
 
