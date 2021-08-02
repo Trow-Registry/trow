@@ -10,12 +10,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: engineerd/setup-kind@v0.5.0
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v1
       with:
-          version: "v0.9.0"
-          config: ci-config/kind.yaml
-          name: trow-test
+          version: v3.4.0
+
+    - uses: actions/setup-python@v2
+      with:
+          python-version: 3.7
+
+    - name: Create kind cluster
+      uses: helm/kind-action@v1.2.0
+
     - name: Install Ingress
       run: |
           ./ci-config/install-kind-ingress.sh
@@ -43,8 +52,5 @@ jobs:
       run: |
         kubectl wait pod/trow-test-0 --for condition=ready --timeout=300s
         docker push  trow.test/test/nginx:alpine
-    - name: Clean Up Cluster
-      run: |
-        kind delete cluster --name trow-test
         
     
