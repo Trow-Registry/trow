@@ -28,6 +28,7 @@ jobs:
     - name: Install Ingress
       run: |
           ./ci-config/install-kind-ingress.sh
+          kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
     - name: Generate Certs
       run: |
         openssl req -new -config ci-config/cert.config -keyout trow.test.key -x509 -days 1 -out trow.test.crt
