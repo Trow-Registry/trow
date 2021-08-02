@@ -14,6 +14,6 @@ do
         ingress_running=true
     fi
     sleep 1
-    time_out--
+    ((time_out--))
 done
 echo "Ingress Running"
