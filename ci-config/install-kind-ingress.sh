@@ -6,14 +6,14 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 # Script to wait for ingress to be up and running
 ingress_running=false
-timeout = 300 # seconds
-while [[ "$ingress_running" != "true" -a $timeout -gt 0 ]]
+time_out=300 # seconds
+while [[ "$ingress_running" != "true" && $time_out -gt 0 ]]
 do
     status=$(kubectl -n ingress-nginx get deployment ingress-nginx-controller -o jsonpath="{.status.availableReplicas}")
     if [[ "$status" = "1" ]]; then
         ingress_running=true
     fi
     sleep 1
-    timeout--
+    time_out--
 done
 echo "Ingress Running"
