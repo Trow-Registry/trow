@@ -199,7 +199,7 @@ Must be used with --hub-token or --hub-token-file")
         .arg(
             Arg::with_name("enable-cors")
                 .long("enable-cors")
-                .help("Enable Cross-Origin Resource Sharing(CORS) requests. Default: false")
+                .help("Enable Cross-Origin Resource Sharing(CORS) requests. Used to allow access from web apps (e.g. GUIs).")
         )
         .get_matches()
 }
