@@ -107,4 +107,15 @@ mod cli {
             .contains("Local images with these prefixes are explicitly denied: [\"beta/\"]")
             .unwrap();
     }
+
+    #[test]
+    fn cors() {
+        assert_cli::Assert::main_binary()
+            .with_args(&["--enable-cors", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("Cross-Origin Resource Sharing(CORS) requests are allowed")
+            .unwrap();
+    }
 }

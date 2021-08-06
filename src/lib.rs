@@ -45,6 +45,8 @@ use std::thread;
 use uuid::Uuid;
 
 mod client_interface;
+mod fairings;
+
 pub mod response;
 #[allow(clippy::too_many_arguments)]
 mod routes;
@@ -56,8 +58,13 @@ mod users;
 
 use chrono::Utc;
 use client_interface::ClientInterface;
+use fairings::conditional_fairing::AttachConditionalFairing;
 use rand::RngCore;
 use std::io::Write;
+
+use rocket::http::Method;
+use rocket_cors::AllowedHeaders;
+use rocket_cors::AllowedOrigins;
 
 //TODO: Make this take a cause or description
 #[derive(Fail, Debug)]
@@ -91,6 +98,7 @@ pub struct TrowConfig {
     dry_run: bool,
     token_secret: String,
     user: Option<UserConfig>,
+    cors: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -183,6 +191,7 @@ impl TrowBuilder {
         deny_prefixes: Vec<String>,
         deny_images: Vec<String>,
         dry_run: bool,
+        cors: bool,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -200,6 +209,7 @@ impl TrowBuilder {
             dry_run,
             token_secret: Uuid::new_v4().to_string(),
             user: None,
+            cors,
         };
         TrowBuilder { config }
     }
@@ -299,14 +309,31 @@ impl TrowBuilder {
         );
 
         if self.config.proxy_hub {
-            println!("Docker Hub repostories are being proxy-cached under f/docker/\n");
+            println!("  Docker Hub repostories are being proxy-cached under f/docker/\n");
         }
+
+        if self.config.cors {
+            println!("  Cross-Origin Resource Sharing(CORS) requests are allowed\n");
+        }
+
         if self.config.dry_run {
             println!("Dry run, exiting.");
             std::process::exit(0);
         }
         let s = format!("https://{}", self.config.grpc.listen);
         let ci: ClientInterface = build_handlers(s)?;
+
+        let cors = rocket_cors::CorsOptions {
+            allowed_origins: AllowedOrigins::all(),
+            allowed_methods: vec![Method::Get, Method::Post, Method::Options]
+                .into_iter()
+                .map(From::from)
+                .collect(),
+            allowed_headers: AllowedHeaders::some(&["Authorization", "Content-Type"]),
+            allow_credentials: true,
+            ..Default::default()
+        }
+        .to_cors()?;
 
         rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
@@ -329,6 +356,7 @@ impl TrowBuilder {
                 println!("Trow is up and running!");
             }))
             .mount("/", routes::routes())
+            .attach_if(self.config.cors, cors.clone())
             .register(routes::catchers())
             .launch();
 

@@ -196,6 +196,11 @@ Must be used with --hub-token or --hub-token-file")
             .help("Location of file with token that can be used for accessing the Docker Hub, used when proxying Docker Hub images")
             .takes_value(true)
         )
+        .arg(
+            Arg::with_name("enable-cors")
+                .long("enable-cors")
+                .help("Enable Cross-Origin Resource Sharing(CORS) requests. Used to allow access from web apps (e.g. GUIs).")
+        )
         .get_matches()
 }
 
@@ -240,6 +245,8 @@ fn main() {
     let deny_prefixes = parse_list(matches.value_of("disallow-local-prefixes").unwrap_or(""));
     let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
 
+    let cors = matches.is_present("enable-cors");
+
     let addr = NetAddr {
         host: host.to_string(),
         port,
@@ -255,6 +262,7 @@ fn main() {
         deny_prefixes,
         deny_images,
         dry_run,
+        cors,
     );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
