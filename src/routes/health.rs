@@ -10,7 +10,7 @@ use rocket::State;
 */
 
 #[get("/healthz")]
-pub fn healthz(ci: State<ClientInterface>) -> HealthResponse {
+pub fn healthz(ci: &State<ClientInterface>) -> HealthResponse {
     HealthResponse {
         message: "".to_string(),
         is_healthy: ci.is_healthy(),

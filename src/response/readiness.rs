@@ -7,19 +7,19 @@ use rocket::response::{Responder, Response};
 
 use crate::types::ReadinessResponse;
 
-impl<'r> Responder<'r> for ReadinessResponse {
-    fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for ReadinessResponse {
+    fn respond_to(self, _req: &Request) -> Result<Response<'static>, Status> {
         let json = serde_json::to_string(&self).unwrap_or_default();
 
         match self.is_ready {
             true => Response::build()
                 .header(ContentType::JSON)
-                .sized_body(Cursor::new(json))
+                .sized_body(None, Cursor::new(json))
                 .status(Status::Ok)
                 .ok(),
             false => Response::build()
                 .header(ContentType::JSON)
-                .sized_body(Cursor::new(json))
+                .sized_body(None, Cursor::new(json))
                 .status(Status::ServiceUnavailable)
                 .ok(),
         }

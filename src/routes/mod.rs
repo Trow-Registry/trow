@@ -6,7 +6,7 @@ use crate::response::trow_token::{self, TrowToken};
 use crate::TrowConfig;
 use rocket::request::Request;
 use rocket::State;
-use rocket_contrib::json::{Json, JsonValue};
+use rocket::serde::json::{json, Json, Value};
 use std::str;
 
 mod blob;
@@ -79,7 +79,7 @@ pub fn catchers() -> Vec<rocket::Catcher> {
  * v2 - throw Empty
  */
 #[get("/v2")]
-fn get_v2root(_auth_user: TrowToken) -> Json<JsonValue> {
+fn get_v2root(_auth_user: TrowToken) -> Json<Value> {
     Json(json!({}))
 }
 /*

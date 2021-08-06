@@ -7,7 +7,7 @@ use crate::types::{RepoCatalog, TagList};
 #[get("/v2/_catalog?<n>&<last>")]
 pub fn get_catalog(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     n: Option<u32>,
     last: Option<String>,
 ) -> Result<RepoCatalog, Error> {
@@ -24,7 +24,7 @@ pub fn get_catalog(
 #[get("/v2/<repo_name>/tags/list?<last>&<n>")]
 pub fn list_tags(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     repo_name: String,
     last: Option<String>,
     n: Option<u32>,
@@ -41,7 +41,7 @@ pub fn list_tags(
 #[get("/v2/<user>/<repo>/tags/list?<last>&<n>")]
 pub fn list_tags_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     last: Option<String>,
@@ -53,7 +53,7 @@ pub fn list_tags_2level(
 #[get("/v2/<org>/<user>/<repo>/tags/list?<last>&<n>")]
 pub fn list_tags_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
@@ -66,7 +66,7 @@ pub fn list_tags_3level(
 #[get("/v2/<fourth>/<org>/<user>/<repo>/tags/list?<last>&<n>")]
 pub fn list_tags_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,
@@ -87,7 +87,7 @@ pub fn list_tags_4level(
 #[get("/<onename>/manifest_history/<reference>?<last>&<n>")]
 pub fn get_manifest_history(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     onename: String,
     reference: String,
     last: Option<String>,
@@ -105,7 +105,7 @@ pub fn get_manifest_history(
 #[get("/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 pub fn get_manifest_history_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
@@ -125,7 +125,7 @@ pub fn get_manifest_history_2level(
 #[get("/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 pub fn get_manifest_history_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
@@ -146,7 +146,7 @@ pub fn get_manifest_history_3level(
 #[get("/<fourth>/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 pub fn get_manifest_history_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,

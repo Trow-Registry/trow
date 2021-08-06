@@ -29,7 +29,7 @@ Accept: manifest-version
 #[get("/v2/<onename>/manifests/<reference>")]
 pub fn get_manifest(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     onename: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
@@ -40,7 +40,7 @@ pub fn get_manifest(
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 pub fn get_manifest_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
@@ -54,7 +54,7 @@ pub fn get_manifest_2level(
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 pub fn get_manifest_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
@@ -74,7 +74,7 @@ pub fn get_manifest_3level(
 #[get("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 pub fn get_manifest_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,
@@ -100,7 +100,7 @@ Content-Type: <manifest media type>
 #[put("/v2/<repo_name>/manifests/<reference>", data = "<chunk>")]
 pub fn put_image_manifest(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     repo_name: String,
     reference: String,
     chunk: rocket::data::Data,
@@ -125,7 +125,7 @@ pub fn put_image_manifest(
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 pub fn put_image_manifest_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
@@ -146,7 +146,7 @@ pub fn put_image_manifest_2level(
 #[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 pub fn put_image_manifest_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
@@ -171,7 +171,7 @@ pub fn put_image_manifest_3level(
 )]
 pub fn put_image_manifest_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,
@@ -197,7 +197,7 @@ DELETE /v2/<name>/manifests/<reference>
 #[delete("/v2/<repo>/manifests/<digest>")]
 pub fn delete_image_manifest(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
@@ -213,7 +213,7 @@ pub fn delete_image_manifest(
 #[delete("/v2/<user>/<repo>/manifests/<digest>")]
 pub fn delete_image_manifest_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     digest: String,
@@ -224,7 +224,7 @@ pub fn delete_image_manifest_2level(
 #[delete("/v2/<org>/<user>/<repo>/manifests/<digest>")]
 pub fn delete_image_manifest_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
@@ -236,7 +236,7 @@ pub fn delete_image_manifest_3level(
 #[delete("/v2/<fourth>/<org>/<user>/<repo>/manifests/<digest>")]
 pub fn delete_image_manifest_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,

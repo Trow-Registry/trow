@@ -10,7 +10,7 @@ use rocket::State;
 */
 
 #[get("/readiness")]
-pub fn readiness(ci: State<ClientInterface>) -> ReadinessResponse {
+pub fn readiness(ci: &State<ClientInterface>) -> ReadinessResponse {
     ReadinessResponse {
         message: "".to_string(),
         is_ready: ci.is_ready(),

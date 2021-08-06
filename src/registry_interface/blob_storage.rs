@@ -1,7 +1,10 @@
+use rocket::tokio::io::AsyncRead;
+
 use super::digest::Digest;
-use super::SeekRead;
+use super::AsyncSeekRead;
 use super::StorageDriverError;
 use std::io::Read;
+use std::pin::Pin;
 
 pub struct ContentInfo {
     pub length: u64,
@@ -18,11 +21,11 @@ pub struct UploadInfo {
 
 pub struct BlobReader {
     pub digest: Digest,
-    pub reader: Box<dyn SeekRead>,
+    pub reader: Pin<Box<dyn AsyncSeekRead>>,
 }
 
 impl BlobReader {
-    pub fn get_reader(self) -> Box<dyn SeekRead> {
+    pub fn get_reader(self) -> Pin<Box<dyn AsyncSeekRead>> {
         self.reader
     }
 
@@ -62,7 +65,7 @@ pub trait BlobStorage {
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: &mut Box<dyn Read>,
+        data: &mut Box<dyn AsyncRead>,
     ) -> Result<u64, StorageDriverError>;
 
     /// Finalises the upload of the given session_id.

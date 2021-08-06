@@ -126,8 +126,8 @@ impl error::Error for Error {
     }
 }
 
-impl<'r> Responder<'r> for Error {
-    fn respond_to(self, _req: &Request) -> response::Result<'r> {
+impl<'r> Responder<'r, 'static> for Error {
+    fn respond_to(self, _req: &Request) -> response::Result<'static> {
         let json = format!("{}", self);
 
         let status = match self {
@@ -143,7 +143,7 @@ impl<'r> Responder<'r> for Error {
         };
         Response::build()
             .header(ContentType::JSON)
-            .sized_body(Cursor::new(json))
+            .sized_body(None,Cursor::new(json))
             .status(status)
             .ok()
     }

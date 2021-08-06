@@ -26,11 +26,11 @@ pub mod verified_manifest;
 /// Falls back to hostname if it doesn't exist.
 ///
 /// Move this.
-fn get_base_url(req: &Request) -> String {
+fn get_base_url(req: &Request<'_>) -> String {
     let host = get_domain_name(req);
 
     let config = req
-        .guard::<rocket::State<TrowConfig>>()
+        .rocket().state::<TrowConfig>()
         .expect("TrowConfig not present!");
 
     // Check if we have an upstream load balancer doing TLS termination

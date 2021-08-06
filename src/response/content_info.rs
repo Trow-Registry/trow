@@ -2,15 +2,16 @@ use crate::registry_interface::blob_storage::ContentInfo;
 use crate::response::errors::Error;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
-use rocket::Outcome;
+use rocket::outcome::Outcome;
 
 /**
  * ContentInfo should always be wrapped an Option in routes to avoid failure returns.
  */
-impl<'a, 'r> FromRequest<'a, 'r> for ContentInfo {
+ #[rocket::async_trait]
+impl<'r> FromRequest<'r> for ContentInfo {
     type Error = Error;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Error> {
+    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Error> {
         let length = match request.headers().get_one("Content-Length") {
             Some(l) => match l.parse::<u64>() {
                 Ok(i) => i,

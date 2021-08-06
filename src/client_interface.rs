@@ -520,10 +520,10 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = OpenOptions::new().read(true).open(resp.path)?;
+        let file = rocket::tokio::fs::File::open(resp.path).await?;
         let digest = digest::parse(&resp.digest)?;
         let mr = ManifestReader {
-            reader: Box::new(file),
+            reader: Box::pin(file),
             content_type: resp.content_type,
             digest,
         };
@@ -587,9 +587,9 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = OpenOptions::new().read(true).open(resp.path)?;
+        let file = rocket::tokio::fs::File::open(resp.path).await?;
         let reader = BlobReader {
-            reader: Box::new(file),
+            reader: Box::pin(file),
             digest: digest.clone(),
         };
         Ok(reader)

@@ -5,8 +5,8 @@ use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
-impl<'r> Responder<'r> for VerifiedManifest {
-    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for VerifiedManifest {
+    fn respond_to(self, req: &Request) -> Result<Response<'static>, Status> {
         //The front end is responsible for assembling URLs, backend should deal in arguments
         let location = format!(
             "{}/v2/{}/manifests/{}",

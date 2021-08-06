@@ -7,6 +7,9 @@ use crate::types::{
     create_accepted_upload, create_upload_info, AcceptedUpload, BlobDeleted, RepoName, Upload, Uuid,
 };
 use rocket::http::uri::{Origin, Uri};
+use rocket::data::{Data, ToByteUnit};
+use rocket::tokio::io::AsyncRead;
+use rocket::http::RawStr;
 
 use std::io::Read;
 
@@ -25,7 +28,7 @@ digest - unique identifier for the blob to be downoaded
 #[get("/v2/<name_repo>/blobs/<digest>")]
 pub fn get_blob(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     name_repo: String,
     digest: String,
 ) -> Option<BlobReader> {
@@ -43,7 +46,7 @@ pub fn get_blob(
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
 pub fn get_blob_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     name: String,
     repo: String,
     digest: String,
@@ -57,7 +60,7 @@ pub fn get_blob_2level(
 #[get("/v2/<org>/<name>/<repo>/blobs/<digest>")]
 pub fn get_blob_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     org: String,
     name: String,
     repo: String,
@@ -72,7 +75,7 @@ pub fn get_blob_3level(
 #[get("/v2/<fourth>/<org>/<name>/<repo>/blobs/<digest>")]
 pub fn get_blob_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     name: String,
@@ -103,13 +106,13 @@ Content-Type: application/octet-stream
 #[put("/v2/<repo_name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
 pub fn put_blob(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
     digest: String,
     chunk: rocket::data::Data,
 ) -> Result<AcceptedUpload, Error> {
-    let mut data: Box<dyn Read> = Box::new(chunk.open());
+    let mut data: Box<dyn AsyncRead> = Box::new(chunk.open(100.mebibytes()));
 
     let size = match ci.store_blob_chunk(&repo_name, &uuid, None, &mut data) {
         Ok(size) => size,
@@ -139,7 +142,7 @@ pub fn put_blob(
 #[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
 pub fn put_blob_2level(
     auth_user: TrowToken,
-    config: rocket::State<ClientInterface>,
+    config:&rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
@@ -165,7 +168,7 @@ pub fn put_blob_2level(
 )]
 pub fn put_blob_3level(
     auth_user: TrowToken,
-    config: rocket::State<ClientInterface>,
+    config:&rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
@@ -192,7 +195,7 @@ pub fn put_blob_3level(
 )]
 pub fn put_blob_4level(
     auth_user: TrowToken,
-    config: rocket::State<ClientInterface>,
+    config:&rocket::State<ClientInterface>,
 
     fourth: String,
     org: String,
@@ -234,7 +237,7 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 pub fn patch_blob(
     _auth_user: TrowToken,
     info: Option<ContentInfo>,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
     chunk: rocket::data::Data,
@@ -260,7 +263,7 @@ pub fn patch_blob(
 pub fn patch_blob_2level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
@@ -283,7 +286,7 @@ pub fn patch_blob_2level(
 pub fn patch_blob_3level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
-    handler: rocket::State<ClientInterface>,
+    handler:&rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
@@ -310,7 +313,7 @@ pub fn patch_blob_3level(
 pub fn patch_blob_4level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
-    handler: rocket::State<ClientInterface>,
+    handler:&rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     repo: String,
@@ -340,7 +343,7 @@ pub fn patch_blob_4level(
 pub fn post_blob_upload(
     uri: &Origin, // This is a mess, but needed to check for ?digest
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     repo_name: String,
     data: rocket::data::Data,
 ) -> Result<Upload, Error> {
@@ -364,7 +367,8 @@ pub fn post_blob_upload(
         if digest.starts_with("digest=") {
             //Have a monolithic upload with data
 
-            let digest = &Uri::percent_decode_lossy(&digest["digest=".len()..].as_bytes());
+            //Unwrap must be safe given above statement
+            let digest = digest.strip_prefix("digest=").unwrap().percent_decode_lossy();
             return put_blob(
                 auth_user,
                 ci,
@@ -392,7 +396,7 @@ pub fn post_blob_upload_2level(
     //digest: PossibleDigest, //create requestguard to handle /?digest
     uri: &Origin,
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     repo: String,
     name: String,
     data: rocket::data::Data,
@@ -408,7 +412,7 @@ pub fn post_blob_upload_3level(
     //digest: PossibleDigest, //create requestguard to handle /?digest
     uri: &Origin,
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
@@ -431,7 +435,7 @@ pub fn post_blob_upload_4level(
     //digest: PossibleDigest, //create requestguard to handle /?digest
     uri: &Origin,
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     repo: String,
@@ -484,7 +488,7 @@ pub fn post_blob_upload_5level(
 #[delete("/v2/<repo>/blobs/<digest>")]
 pub fn delete_blob(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     repo: String,
     digest: String,
 ) -> Result<BlobDeleted, Error> {
@@ -497,7 +501,7 @@ pub fn delete_blob(
 #[delete("/v2/<user>/<repo>/blobs/<digest>")]
 pub fn delete_blob_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     user: String,
     repo: String,
     digest: String,
@@ -508,7 +512,7 @@ pub fn delete_blob_2level(
 #[delete("/v2/<org>/<user>/<repo>/blobs/<digest>")]
 pub fn delete_blob_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
@@ -520,7 +524,7 @@ pub fn delete_blob_3level(
 #[delete("/v2/<fourth>/<org>/<user>/<repo>/blobs/<digest>")]
 pub fn delete_blob_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci:&rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,

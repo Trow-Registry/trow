@@ -3,15 +3,15 @@ use crate::registry_interface::validation::{self, Validation};
 
 use crate::types::AdmissionReview;
 use crate::TrowConfig;
-use rocket_contrib::json::Json;
+use rocket::serde::json::Json;
 
 //Kubernetes webhooks for admitting images
 //Update to use rocket_contrib::Json
 //Just using String for debugging
 #[post("/validate-image", data = "<image_data>")]
 pub fn validate_image(
-    ci: rocket::State<ClientInterface>,
-    tc: rocket::State<TrowConfig>,
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
     image_data: Json<AdmissionReview>,
 ) -> Json<AdmissionReview> {
     /*

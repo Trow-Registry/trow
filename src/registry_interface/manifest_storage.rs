@@ -1,16 +1,17 @@
-use super::SeekRead;
+use super::AsyncSeekRead;
 use super::StorageDriverError;
 use super::{Digest, DigestAlgorithm};
 use std::io::Read;
+use std::pin::Pin;
 
 pub struct ManifestReader {
     pub content_type: String,
     pub digest: Digest,
-    pub reader: Box<dyn SeekRead>,
+    pub reader: Pin<Box<dyn AsyncSeekRead>>,
 }
 
 impl ManifestReader {
-    pub fn get_reader(self) -> Box<dyn SeekRead> {
+    pub fn get_reader(self) -> Pin<Box<dyn AsyncSeekRead>> {
         self.reader
     }
 

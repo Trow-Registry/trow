@@ -7,11 +7,11 @@ use rocket::response::{Responder, Response};
 
 use crate::registry_interface::MetricsResponse;
 
-impl<'r> Responder<'r> for MetricsResponse {
-    fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for MetricsResponse {
+    fn respond_to(self, _req: &Request) -> Result<Response<'static>, Status> {
         Response::build()
             .header(ContentType::Plain)
-            .sized_body(Cursor::new(self.metrics))
+            .sized_body(None, Cursor::new(self.metrics))
             .status(Status::Ok)
             .ok()
     }

@@ -4,8 +4,8 @@ use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
-impl<'r> Responder<'r> for UploadInfo {
-    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for UploadInfo {
+    fn respond_to(self, req: &Request) -> Result<Response<'static>, Status> {
         let location_url = format!(
             "{}/v2/{}/blobs/uploads/{}",
             get_base_url(req),

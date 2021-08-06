@@ -10,8 +10,6 @@ extern crate hostname;
 extern crate hyper;
 #[macro_use]
 extern crate rocket;
-#[macro_use]
-extern crate rocket_contrib;
 extern crate argon2;
 extern crate chrono;
 extern crate data_encoding;
@@ -20,7 +18,6 @@ extern crate env_logger;
 extern crate frank_jwt;
 extern crate rand;
 extern crate serde;
-extern crate serde_json;
 extern crate trow_server;
 extern crate uuid;
 use env_logger::Env;
@@ -246,26 +243,23 @@ impl TrowBuilder {
         OsRng.fill_bytes(&mut key);
         let secret_key = base64::encode(&key);
 
-        /*
-        Keep Alive has to be turned off to mitigate issue whereby some transfers would be cut off.
-        Seems to be caused by an old version of hyper in Rocket.
-        Keep Alive can be restored when Rocket is upgraded or by moving to different framework.
-        See #24
-        */
-        let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
-            .address(self.config.addr.host.clone())
-            .port(self.config.addr.port)
-            .keep_alive(0) // Needed to mitigate #24. See above.
-            .secret_key(secret_key)
-            .workers(256);
+        //TODO: with Rocket 0.5 should be able to pass our config file and let Rocket pick out the parts it wants
+        //This will be simpler and allow more flexibility.
+        let figment = rocket::Config::figment()
+            .merge(("address", self.config.addr.host.clone()))
+            .merge(("port", self.config.addr.port))
+            .merge(("workers", 256))
+            .merge(("secret_key", secret_key));
 
         if let Some(ref tls) = self.config.tls {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
                 return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
             }
-            cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
+            
+            let tls_config = rocket::config::TlsConfig::from_paths(tls.cert_file.clone(), tls.key_file.clone());
+            figment.merge(("tls", tls_config));
         }
-        let cfg = cfg.finalize()?;
+        let cfg = rocket::Config::from(figment);
         Ok(cfg)
     }
 
@@ -338,26 +332,20 @@ impl TrowBuilder {
         rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
             .manage(ci)
-            .attach(fairing::AdHoc::on_attach(
-                "SIGTERM handler",
-                |r| match attach_sigterm() {
-                    Ok(_) => Ok(r),
-                    Err(_) => Err(r),
-                },
-            ))
             .attach(fairing::AdHoc::on_response(
                 "Set API Version Header",
-                |_, resp| {
+                |_, resp| Box::pin(async move {
                     //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
                     resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
                 },
-            ))
-            .attach(fairing::AdHoc::on_launch("Launch Message", |_| {
-                println!("Trow is up and running!");
-            }))
-            .mount("/", routes::routes())
+            )))
+            .attach(fairing::AdHoc::on_liftoff("Launch Message", |_| 
+                Box::pin(async move {
+                    println!("Trow is up and running!");
+            })))
             .attach_if(self.config.cors, cors.clone())
-            .register(routes::catchers())
+            .mount("/", routes::routes())
+            .register("/", routes::catchers())
             .launch();
 
         Ok(())

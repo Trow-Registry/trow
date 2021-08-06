@@ -5,8 +5,8 @@ use rocket::response::{Responder, Response};
 #[derive(Debug, Serialize)]
 pub struct Empty;
 
-impl<'r> Responder<'r> for Empty {
-    fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for Empty {
+    fn respond_to(self, _: &Request) -> Result<Response<'static>, Status> {
         Response::build().ok()
     }
 }

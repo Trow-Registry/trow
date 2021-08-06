@@ -2,10 +2,11 @@ use crate::response::get_base_url;
 use crate::types::AcceptedUpload;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
-use rocket::response::{Responder, Response};
+use rocket::response::{self, Responder, Response};
 
-impl<'r> Responder<'r> for AcceptedUpload {
-    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
+#[rocket::async_trait]
+impl<'r> Responder<'r, 'static> for AcceptedUpload {
+    fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
         let location = format!(
             "{}/v2/{}/blobs/{}",
             get_base_url(req),
