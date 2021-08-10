@@ -7,11 +7,10 @@ use crate::TrowConfig;
 #[cfg(test)]
 #[cfg(test)]
 use rocket::local::blocking::Client;
-#[cfg(test)]
-use rocket::response::Responder;
 
 #[cfg(test)]
-pub fn test_route<'r, A: Responder<'r, 'static>>(handler: A) -> rocket::Response<'static> {
+pub fn test_client() -> Client {
+   
     let trow_config = TrowConfig {
         data_dir: "".to_string(),
         addr: NetAddr {
@@ -35,10 +34,6 @@ pub fn test_route<'r, A: Responder<'r, 'static>>(handler: A) -> rocket::Response
         user: None,
         cors: false,
     };
-    let rocket = rocket::Rocket::build().manage(trow_config);
-    let client = Client::tracked(rocket).expect("valid rocket instance");
-    let request = client.get("/");
-    let request = request.inner();
-
-    handler.respond_to(&request).unwrap()
+    let rocket = rocket::Rocket::build().manage(trow_config).mount("/", vec![]);
+    Client::tracked(rocket).expect("valid rocket instance")
 }

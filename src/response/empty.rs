@@ -14,13 +14,16 @@ impl<'r> Responder<'r, 'static> for Empty {
 #[cfg(test)]
 mod test {
     use crate::response::empty::Empty;
-    use rocket::http::Status;
+    use rocket::{http::Status, response::Responder};
 
-    use crate::response::test_helper::test_route;
+    use crate::response::test_helper::test_client;
 
     #[test]
     fn empty_ok() {
-        let response = test_route(Empty);
+        
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = Empty{}.respond_to(req.inner()).unwrap();
         assert_eq!(response.status(), Status::Ok);
     }
 }

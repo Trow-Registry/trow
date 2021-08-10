@@ -27,9 +27,10 @@ impl<'r> Responder<'r, 'static> for ReadinessResponse {
 }
 #[cfg(test)]
 mod test {
-    use crate::response::test_helper::test_route;
+    use crate::response::test_helper::test_client;
     use crate::types::ReadinessResponse;
     use rocket::http::Status;
+    use rocket::response::Responder;
 
     fn build_ready_response() -> ReadinessResponse {
         ReadinessResponse {
@@ -47,13 +48,18 @@ mod test {
 
     #[test]
     fn test_ready_resp() {
-        let response = test_route(build_ready_response());
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = build_ready_response().respond_to(req.inner()).unwrap();
+
         assert_eq!(response.status(), Status::Ok);
     }
 
     #[test]
     fn test_not_ready_resp() {
-        let response = test_route(build_not_ready_response());
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = build_not_ready_response().respond_to(req.inner()).unwrap();
         assert_eq!(response.status(), Status::ServiceUnavailable);
     }
 }

@@ -28,9 +28,10 @@ impl<'r> Responder<'r, 'static> for HealthResponse {
 
 #[cfg(test)]
 mod test {
-    use crate::response::test_helper::test_route;
+    use crate::response::test_helper::test_client;
     use crate::types::HealthResponse;
     use rocket::http::Status;
+    use rocket::response::Responder;
 
     fn build_healthy_response() -> HealthResponse {
         HealthResponse {
@@ -48,13 +49,20 @@ mod test {
 
     #[test]
     fn test_healthy_resp() {
-        let response = test_route(build_healthy_response());
+
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = build_healthy_response().respond_to(req.inner()).unwrap();
+
         assert_eq!(response.status(), Status::Ok);
     }
 
     #[test]
     fn test_unhealthy_response() {
-        let response = test_route(build_unhealthy_response());
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = build_unhealthy_response().respond_to(req.inner()).unwrap();
+
         assert_eq!(response.status(), Status::ServiceUnavailable);
     }
 }
