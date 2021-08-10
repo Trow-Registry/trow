@@ -1,3 +1,6 @@
+use rocket::data::ToByteUnit;
+use rocket::tokio::io::AsyncRead;
+
 use crate::client_interface::ClientInterface;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
 use crate::response::errors::Error;
@@ -5,6 +8,7 @@ use crate::response::trow_token::TrowToken;
 use crate::types::{create_verified_manifest, ManifestDeleted, RepoName, VerifiedManifest};
 
 use std::io::Read;
+use std::pin::Pin;
 
 /*
 ---
@@ -98,16 +102,16 @@ Content-Type: <manifest media type>
 
  */
 #[put("/v2/<repo_name>/manifests/<reference>", data = "<chunk>")]
-pub fn put_image_manifest(
+pub async fn put_image_manifest(
     _auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
     repo_name: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
-    let mut data: Box<dyn Read> = Box::new(chunk.open());
+    let mut data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(chunk.open(100.mebibytes()));
 
-    match ci.store_manifest(&repo_name, &reference, &mut data) {
+    match ci.store_manifest(&repo_name, &reference, data) {
         Ok(digest) => Ok(create_verified_manifest(
             RepoName(repo_name),
             digest,
@@ -123,13 +127,13 @@ pub fn put_image_manifest(
  * Parse 2 level <user>/<repo> style path and pass it to put_image_manifest
  */
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
-pub fn put_image_manifest_2level(
+pub async fn put_image_manifest_2level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
         auth_user,
@@ -137,21 +141,21 @@ pub fn put_image_manifest_2level(
         format!("{}/{}", user, repo),
         reference,
         chunk,
-    )
+    ).await
 }
 
 /*
  * Parse 3 level <org>/<user>/<repo> style path and pass it to put_image_manifest
  */
 #[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
-pub fn put_image_manifest_3level(
+pub async fn put_image_manifest_3level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
         auth_user,
@@ -159,7 +163,7 @@ pub fn put_image_manifest_3level(
         format!("{}/{}/{}", org, user, repo),
         reference,
         chunk,
-    )
+    ).await
 }
 
 /*
@@ -169,7 +173,7 @@ pub fn put_image_manifest_3level(
     "/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>",
     data = "<chunk>"
 )]
-pub fn put_image_manifest_4level(
+pub async fn put_image_manifest_4level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
     fourth: String,
@@ -177,7 +181,7 @@ pub fn put_image_manifest_4level(
     user: String,
     repo: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
         auth_user,
@@ -185,7 +189,7 @@ pub fn put_image_manifest_4level(
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
         chunk,
-    )
+    ).await
 }
 
 /*

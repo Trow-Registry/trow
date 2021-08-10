@@ -7,6 +7,7 @@ use crate::registry_interface::{
     validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
     Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
 };
+use rocket::tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite};
 use tokio::runtime::Runtime;
 use trow_proto::{
     admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
@@ -26,8 +27,9 @@ use failure::Error;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fs::OpenOptions;
-use std::io;
+use std::io::{self, SeekFrom};
 use std::io::prelude::*;
+use std::pin::Pin;
 
 // BIG TODO:
 // Creating a new runtime for each request is awful.
@@ -64,6 +66,8 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
     images
 }
 
+
+
 // TODO: Each function should have it's own enum of the errors it can return
 // There must be a standard pattern for this somewhere...
 #[derive(Debug, Fail)]
@@ -89,11 +93,11 @@ impl ManifestStorage for ClientInterface {
         Ok(mr)
     }
 
-    fn store_manifest(
+    fn store_manifest<'a>(
         &self,
         name: &str,
         tag: &str,
-        data: &mut Box<dyn Read>,
+        data: Pin<Box<dyn AsyncRead + Send + 'a>>,
     ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
@@ -131,6 +135,8 @@ impl ManifestStorage for ClientInterface {
     }
 }
 
+
+#[rocket::async_trait]
 impl BlobStorage for ClientInterface {
     fn get_blob(&self, name: &str, digest: &Digest) -> Result<BlobReader, StorageDriverError> {
         let mut rt = Runtime::new().unwrap();
@@ -144,12 +150,12 @@ impl BlobStorage for ClientInterface {
         Ok(br)
     }
 
-    fn store_blob_chunk(
+    async fn store_blob_chunk<'a>(
         &self,
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: &mut Box<dyn Read>,
+        mut data: Pin<Box<dyn AsyncRead + Send + 'a>>,
     ) -> Result<u64, StorageDriverError> {
         let mut rt = Runtime::new().unwrap();
         let rn = RepoName(name.to_string());
@@ -166,7 +172,8 @@ impl BlobStorage for ClientInterface {
             range: (0, 0),
         });
 
-        let start_index = sink.stream_len().unwrap_or(0);
+        
+        let start_index = sink.seek(SeekFrom::End(0)).await.unwrap_or(0);
         if have_range && (start_index != info.range.0) {
             warn!(
                 "Asked to store blob with invalid start index. Expected {} got {}",
@@ -175,12 +182,12 @@ impl BlobStorage for ClientInterface {
             return Err(StorageDriverError::InvalidContentRange);
         }
 
-        let len = io::copy(data, &mut sink).map_err(|e| {
+        let len = rocket::tokio::io::copy(&mut data, &mut sink).await.map_err(|e| {
             warn!("Error writing blob {:?}", e);
             StorageDriverError::Internal
         })?;
 
-        let total = sink.stream_len().unwrap_or(len);
+        let total = sink.seek(SeekFrom::End(0)).await.unwrap_or(len);
         if have_range {
             if (info.range.1 + 1) != total {
                 warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
@@ -403,7 +410,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
-    ) -> Result<impl Write + Seek, Error> {
+    ) -> Result<impl AsyncWrite + AsyncSeek, Error> {
         info!(
             "Getting write location for blob in repo {} with upload id {}",
             repo_name, uuid
@@ -421,10 +428,10 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = OpenOptions::new()
+        let file = rocket::tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(resp.path)?;
+            .open(resp.path).await?;
         Ok(file)
     }
 
@@ -432,7 +439,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-        manifest: &mut Box<dyn Read + 'a>,
+        mut manifest: Pin<Box<dyn AsyncRead + Send + 'a>>,
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)
@@ -449,7 +456,7 @@ impl ClientInterface {
                 }
             })?;
 
-        io::copy(manifest, &mut sink_loc).map_err(|e| {
+        rocket::tokio::io::copy(&mut manifest, &mut sink_loc).await.map_err(|e| {
             warn!("Error wirting out manifest {:?}", e);
             RegistryError::Internal
         })?;
@@ -473,7 +480,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-    ) -> Result<(impl Write, String), Error> {
+    ) -> Result<(impl AsyncWrite, String), Error> {
         info!(
             "Getting write location for manifest in repo {} with ref {}",
             repo_name, reference
@@ -492,10 +499,10 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         //Manifests don't append; just overwrite
-        let file = OpenOptions::new()
+        let file = rocket::tokio::fs::OpenOptions::new()
             .create(true)
             .write(true)
-            .open(resp.path)?;
+            .open(resp.path).await?;
         Ok((file, resp.uuid))
     }
 

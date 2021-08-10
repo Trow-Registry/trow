@@ -245,7 +245,7 @@ impl TrowBuilder {
 
         //TODO: with Rocket 0.5 should be able to pass our config file and let Rocket pick out the parts it wants
         //This will be simpler and allow more flexibility.
-        let figment = rocket::Config::figment()
+        let mut figment = rocket::Config::figment()
             .merge(("address", self.config.addr.host.clone()))
             .merge(("port", self.config.addr.port))
             .merge(("workers", 256))
@@ -257,7 +257,7 @@ impl TrowBuilder {
             }
             
             let tls_config = rocket::config::TlsConfig::from_paths(tls.cert_file.clone(), tls.key_file.clone());
-            figment.merge(("tls", tls_config));
+            figment = figment.merge(("tls", tls_config));
         }
         let cfg = rocket::Config::from(figment);
         Ok(cfg)
@@ -330,6 +330,7 @@ impl TrowBuilder {
         .to_cors()?;
 
         rocket::custom(rocket_config.clone())
+        let f = rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
             .manage(ci)
             .attach(fairing::AdHoc::on_response(
@@ -347,6 +348,15 @@ impl TrowBuilder {
             .mount("/", routes::routes())
             .register("/", routes::catchers())
             .launch();
+
+        rocket::tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(4) //fixme
+            // NOTE: graceful shutdown depends on the "rocket-worker" prefix.
+            .thread_name("rocket-worker-thread")
+            .enable_all()
+            .build()
+            .expect("create tokio runtime")
+            .block_on(f)?;
 
         Ok(())
     }

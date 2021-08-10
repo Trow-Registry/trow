@@ -126,7 +126,7 @@ struct TokenClaim {
  * Create new jsonwebtoken.
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
-pub fn new(vbt: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, frank_jwt::Error> {
+pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, frank_jwt::Error> {
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");

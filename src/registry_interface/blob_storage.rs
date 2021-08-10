@@ -34,6 +34,8 @@ impl BlobReader {
     }
 }
 
+
+#[rocket::async_trait]
 pub trait BlobStorage {
     /// Retrieve the blob from the registry identified by digest.
     /// A HEAD request can also be issued to this endpoint to obtain resource information without receiving all data.
@@ -60,12 +62,12 @@ pub trait BlobStorage {
     /// as its identifier.
     /// Passed optional ContentInfo which describes range of data.
     /// Returns current size of blob, including any previous chunks
-    fn store_blob_chunk(
+    async fn store_blob_chunk<'a>(
         &self,
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: &mut Box<dyn AsyncRead>,
+        data: Pin<Box<dyn AsyncRead + Send +'a>>,
     ) -> Result<u64, StorageDriverError>;
 
     /// Finalises the upload of the given session_id.

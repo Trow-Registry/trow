@@ -1,7 +1,6 @@
-use super::AsyncSeekRead;
-use super::StorageDriverError;
+use rocket::tokio::io::AsyncRead;
+use super::{AsyncSeekRead, StorageDriverError};
 use super::{Digest, DigestAlgorithm};
-use std::io::Read;
 use std::pin::Pin;
 
 pub struct ManifestReader {
@@ -38,11 +37,11 @@ pub trait ManifestStorage {
     /// data is a link to reader for supplying the bytes of the manifest.
     /// Returns digest of the manifest.
     /// PUT: /v2/<name>/manifests/<tag>
-    fn store_manifest(
+    fn store_manifest<'a>(
         &self,
         name: &str,
         tag: &str,
-        data: &mut Box<dyn Read>,
+        data: Pin<Box<dyn AsyncRead + Send + 'a>>,
     ) -> Result<Digest, StorageDriverError>;
 
     // Store a manifest via Writer trait for drivers which support it

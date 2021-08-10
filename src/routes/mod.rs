@@ -111,6 +111,6 @@ fn no_auth(_req: &Request) -> Authenticate {
  * If login is called with a valid bearer token, return session token
  */
 #[get("/login")]
-fn login(auth_user: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, Error> {
+fn login(auth_user: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, Error> {
     trow_token::new(auth_user, tc).map_err(|_| Error::InternalError)
 }
