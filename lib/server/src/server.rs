@@ -1029,7 +1029,7 @@ impl Registry for TrowServer {
         let cr = request.into_inner();
         let limit = cr.limit as usize;
 
-        let (mut tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(4);
         let catalog: HashSet<String> = RepoIterator::new(&self.manifests_path)
             .map_err(|e| {
                 error!("Error accessing catalog {:?}", e);
@@ -1071,7 +1071,7 @@ impl Registry for TrowServer {
         &self,
         request: Request<ListTagsRequest>,
     ) -> Result<Response<Self::ListTagsStream>, Status> {
-        let (mut tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(4);
         let mut path = PathBuf::from(&self.manifests_path);
 
         let ltr = request.into_inner();
@@ -1137,7 +1137,7 @@ impl Registry for TrowServer {
         // It's safe to unwrap here
         let reader = BufReader::new(file.unwrap());
 
-        let (mut tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
             let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
 

@@ -84,7 +84,7 @@ impl TrowServerBuilder {
     }
 
     pub fn start_trow_sync(self) {
-        let mut rt = Runtime::new().expect("Failed to start Tokio runtime");
+        let rt = Runtime::new().expect("Failed to start Tokio runtime");
         let ts = TrowServer::new(
             &self.data_path,
             self.proxy_hub,

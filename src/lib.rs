@@ -1,7 +1,3 @@
-#![feature(proc_macro_hygiene, decl_macro)]
-#![feature(plugin)]
-#![feature(seek_stream_len)]
-
 #[macro_use]
 extern crate failure;
 extern crate base64;
@@ -353,8 +349,7 @@ impl TrowBuilder {
             // NOTE: graceful shutdown depends on the "rocket-worker" prefix.
             .thread_name("rocket-worker-thread")
             .enable_all()
-            .build()
-            .expect("create tokio runtime")
+            .build()?
             .block_on(f)?;
 
         Ok(())
