@@ -11,6 +11,6 @@ use rocket::State;
 */
 
 #[get("/metrics")]
-pub fn metrics(ci: &State<ClientInterface>) -> Result<MetricsResponse, Error> {
-    ci.get_metrics().map_err(|_| Error::InternalError)
+pub async fn metrics(ci: &State<ClientInterface>) -> Result<MetricsResponse, Error> {
+    ci.get_metrics().await.map_err(|_| Error::InternalError)
 }

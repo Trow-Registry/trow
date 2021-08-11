@@ -9,9 +9,7 @@ sqlite = []
 
 [dependencies]
 futures = "0.3"
-tokio = { version = "0.2", features = ["full"] }
 rocket = { version = "0.5.0-rc", features = ["tls", "json"] }
-hyper = "0.13"
 rand = "0.7"
 jwt = "0.10"
 frank_jwt = "3.1"
@@ -27,13 +25,12 @@ failure = "0.1"
 trow-protobuf = { path = "./lib/protobuf" }
 trow-server = { path = "./lib/server" }
 derive_more = "0.99"
-ctrlc = { version = "3.1", features = ["termination"] }
 hostname = "0.3"
 clap = "~2.33"
-tonic = "0.3"
-prost = "0.6"
-prost-types = "0.6"
-bytes = "0.4"
+tonic = "0.5"
+prost = "0.8"
+prost-types = "0.8"
+bytes = "1"
 chrono = { version="^0.4", features = ["serde"] }
 rusqlite = "0.23.1"
 data-encoding = "2.3"
@@ -52,8 +49,9 @@ futures = "0.3"
 quickcheck = "^0.6"
 assert_cli = "^0.5"
 environment = "^0.1"
-hyper = "0.13"
+hyper = "0.14"
 rand = "^0.7.2"
-reqwest = { version = "0.10", features = ["blocking", "json", "gzip"] }
+reqwest = { version = "0.11", features = ["blocking", "json", "gzip"] }
 libc = "0.2"
 derive_more = "0.99"
+tokio = { version = "1", features = ["macros"] }

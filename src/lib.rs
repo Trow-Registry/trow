@@ -7,7 +7,6 @@ extern crate failure;
 extern crate base64;
 extern crate futures;
 extern crate hostname;
-extern crate hyper;
 #[macro_use]
 extern crate rocket;
 extern crate argon2;
@@ -360,14 +359,6 @@ impl TrowBuilder {
 
         Ok(())
     }
-}
-
-fn attach_sigterm() -> Result<(), Error> {
-    ctrlc::set_handler(|| {
-        info!("SIGTERM caught, shutting down...");
-        std::process::exit(0);
-    })
-    .map_err(|e| e.into())
 }
 
 pub fn build_handlers(listen_addr: String) -> Result<ClientInterface, Error> {

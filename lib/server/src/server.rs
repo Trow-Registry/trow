@@ -15,6 +15,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 pub mod trow_server {
@@ -1019,7 +1020,7 @@ impl Registry for TrowServer {
         ret
     }
 
-    type GetCatalogStream = mpsc::Receiver<Result<CatalogEntry, Status>>;
+    type GetCatalogStream = ReceiverStream<Result<CatalogEntry, Status>>;
 
     async fn get_catalog(
         &self,
@@ -1061,10 +1062,10 @@ impl Registry for TrowServer {
                 tx.send(Ok(ce)).await.expect("Error streaming catalog");
             }
         });
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
-    type ListTagsStream = mpsc::Receiver<Result<Tag, Status>>;
+    type ListTagsStream = ReceiverStream<Result<Tag, Status>>;
 
     async fn list_tags(
         &self,
@@ -1106,10 +1107,10 @@ impl Registry for TrowServer {
                 .expect("Error streaming tags");
             }
         });
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
-    type GetManifestHistoryStream = mpsc::Receiver<Result<ManifestHistoryEntry, Status>>;
+    type GetManifestHistoryStream = ReceiverStream<Result<ManifestHistoryEntry, Status>>;
 
     async fn get_manifest_history(
         &self,
@@ -1189,7 +1190,7 @@ impl Registry for TrowServer {
                 }
             }
         });
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     // Readiness check

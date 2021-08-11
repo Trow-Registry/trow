@@ -9,7 +9,7 @@ use rocket::serde::json::Json;
 //Update to use rocket_contrib::Json
 //Just using String for debugging
 #[post("/validate-image", data = "<image_data>")]
-pub fn validate_image(
+pub async fn validate_image(
     ci: &rocket::State<ClientInterface>,
     tc: &rocket::State<TrowConfig>,
     image_data: Json<AdmissionReview>,
@@ -23,7 +23,7 @@ pub fn validate_image(
      */
     let mut resp_data = image_data.clone();
     match image_data.0.request {
-        Some(req) => match ci.validate_admission(&req, &tc.host_names) {
+        Some(req) => match ci.validate_admission(&req, &tc.host_names).await {
             Ok(res) => {
                 resp_data.response = Some(res);
                 Json(resp_data)
