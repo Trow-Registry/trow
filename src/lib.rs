@@ -16,6 +16,7 @@ extern crate serde;
 extern crate trow_server;
 extern crate uuid;
 use env_logger::Env;
+use futures::Future;
 use log::{LevelFilter, SetLoggerError};
 
 #[macro_use]
@@ -33,7 +34,6 @@ use rocket::fairing;
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::thread;
 use uuid::Uuid;
 
 mod client_interface;
@@ -110,7 +110,9 @@ struct UserConfig {
     hash_encoded: String, //Surprised not bytes
 }
 
-fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, Error> {
+fn init_trow_server(config: TrowConfig) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>, Error>
+{
+
     debug!("Starting Trow server");
 
     //Could pass full config here.
@@ -135,9 +137,7 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
         ts
     };
 
-    Ok(thread::spawn(move || {
-        ts.start_trow_sync();
-    }))
+    Ok(ts.get_server_future())
 }
 
 /// Build the logging agent with formatting.
@@ -263,8 +263,6 @@ impl TrowBuilder {
 
         let rocket_config = &self.build_rocket_config()?;
 
-        // Start GRPC Backend thread.
-        let _backend_thread = init_trow_server(self.config.clone())?;
 
         println!(
             "Starting Trow {} on {}:{}",
@@ -344,13 +342,18 @@ impl TrowBuilder {
             .register("/", routes::catchers())
             .launch();
 
-        rocket::tokio::runtime::Builder::new_multi_thread()
+        let rt = rocket::tokio::runtime::Builder::new_multi_thread()
             .worker_threads(4) //fixme
             // NOTE: graceful shutdown depends on the "rocket-worker" prefix.
             .thread_name("rocket-worker-thread")
             .enable_all()
-            .build()?
-            .block_on(f)?;
+            .build()?;
+
+
+        // Start GRPC Backend thread.
+        rt.spawn(init_trow_server(self.config.clone())?);
+        //And now rocket
+        rt.block_on(f)?;
 
         Ok(())
     }
