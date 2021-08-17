@@ -88,6 +88,8 @@ pub struct TrowConfig {
     deny_prefixes: Vec<String>,
     deny_images: Vec<String>,
     dry_run: bool,
+    max_manifest_size: u32,
+    max_blob_size: u32,
     token_secret: String,
     user: Option<UserConfig>,
     cors: bool,
@@ -184,6 +186,8 @@ impl TrowBuilder {
         deny_images: Vec<String>,
         dry_run: bool,
         cors: bool,
+        max_manifest_size: u32,
+        max_blob_size: u32
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -199,6 +203,8 @@ impl TrowBuilder {
             deny_prefixes,
             deny_images,
             dry_run,
+            max_manifest_size,
+            max_blob_size,
             token_secret: Uuid::new_v4().to_string(),
             user: None,
             cors,
@@ -270,6 +276,9 @@ impl TrowBuilder {
             self.config.addr.host,
             self.config.addr.port
         );
+        println!("\nMaximum blob size: {} Mebibytes", self.config.max_blob_size );
+        println!("Maximum manifest size: {} Mebibytes", self.config.max_manifest_size);
+
         println!("\n**Validation callback configuration\n");
 
         println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
@@ -322,7 +331,6 @@ impl TrowBuilder {
         }
         .to_cors()?;
 
-        rocket::custom(rocket_config.clone())
         let f = rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
             .manage(ci)
@@ -343,12 +351,10 @@ impl TrowBuilder {
             .launch();
 
         let rt = rocket::tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(4) //fixme
             // NOTE: graceful shutdown depends on the "rocket-worker" prefix.
             .thread_name("rocket-worker-thread")
             .enable_all()
             .build()?;
-
 
         // Start GRPC Backend thread.
         rt.spawn(init_trow_server(self.config.clone())?);

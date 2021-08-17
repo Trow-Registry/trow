@@ -30,6 +30,8 @@ pub fn test_client() -> Client {
         deny_prefixes: vec![],
         deny_images: vec![],
         dry_run: false,
+        max_manifest_size: 1,
+        max_blob_size: 100,
         token_secret: "secret".to_string(),
         user: None,
         cors: false,

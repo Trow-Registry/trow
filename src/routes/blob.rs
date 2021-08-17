@@ -1,3 +1,4 @@
+use crate::TrowConfig;
 use crate::client_interface::ClientInterface;
 use crate::registry_interface::{digest, BlobReader, BlobStorage, ContentInfo, StorageDriverError};
 use crate::response::errors::Error;
@@ -105,13 +106,14 @@ Content-Type: application/octet-stream
 pub async fn put_blob(
     _auth_user: TrowToken,
     ci:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     repo_name: String,
     uuid: String,
     digest: String,
     chunk: rocket::data::Data<'_>,
 ) -> Result<AcceptedUpload, Error> {
 
-    let ds = chunk.open(100.mebibytes());
+    let ds = chunk.open(tc.max_blob_size.mebibytes());
     let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(ds);
 
     let size = match ci.store_blob_chunk(&repo_name, &uuid, None, data).await {
@@ -143,6 +145,7 @@ pub async fn put_blob(
 pub async fn put_blob_2level(
     auth_user: TrowToken,
     config:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     repo: String,
     name: String,
     uuid: String,
@@ -152,6 +155,7 @@ pub async fn put_blob_2level(
     put_blob(
         auth_user,
         config,
+        tc,
         format!("{}/{}", repo, name),
         uuid,
         digest,
@@ -169,6 +173,7 @@ pub async fn put_blob_2level(
 pub async fn put_blob_3level(
     auth_user: TrowToken,
     config:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     org: String,
     repo: String,
     name: String,
@@ -179,6 +184,7 @@ pub async fn put_blob_3level(
     put_blob(
         auth_user,
         config,
+        tc,
         format!("{}/{}/{}", org, repo, name),
         uuid,
         digest,
@@ -196,7 +202,7 @@ pub async fn put_blob_3level(
 pub async fn put_blob_4level(
     auth_user: TrowToken,
     config:&rocket::State<ClientInterface>,
-
+    tc:&rocket::State<TrowConfig>,
     fourth: String,
     org: String,
     repo: String,
@@ -208,6 +214,7 @@ pub async fn put_blob_4level(
     put_blob(
         auth_user,
         config,
+        tc,
         format!("{}/{}/{}/{}", fourth, org, repo, name),
         uuid,
         digest,
@@ -238,11 +245,12 @@ pub async fn patch_blob(
     _auth_user: TrowToken,
     info: Option<ContentInfo>,
     ci:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     repo_name: String,
     uuid: String,
     chunk: rocket::data::Data<'_>,
 ) -> Result<UploadInfo, Error> {
-    let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(chunk.open(100.mebibytes()));
+    let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(chunk.open(tc.max_blob_size.mebibytes()));
 
     match ci.store_blob_chunk(&repo_name, &uuid, info, data).await {
         Ok(size) => {
@@ -264,6 +272,7 @@ pub async fn patch_blob_2level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
     ci:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     repo: String,
     name: String,
     uuid: String,
@@ -273,6 +282,7 @@ pub async fn patch_blob_2level(
         auth_user,
         info,
         ci,
+        tc,
         format!("{}/{}", repo, name),
         uuid,
         chunk,
@@ -287,6 +297,7 @@ pub async fn patch_blob_3level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
     handler:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     org: String,
     repo: String,
     name: String,
@@ -297,6 +308,7 @@ pub async fn patch_blob_3level(
         auth_user,
         info,
         handler,
+        tc,
         format!("{}/{}/{}", org, repo, name),
         uuid,
         chunk,
@@ -314,6 +326,7 @@ pub async fn patch_blob_4level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
     handler:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     fourth: String,
     org: String,
     repo: String,
@@ -325,6 +338,7 @@ pub async fn patch_blob_4level(
         auth_user,
         info,
         handler,
+        tc,
         format!("{}/{}/{}/{}", fourth, org, repo, name),
         uuid,
         chunk,
@@ -344,6 +358,7 @@ pub async fn post_blob_upload(
     uri: &Origin<'_>, // This is a mess, but needed to check for ?digest
     auth_user: TrowToken,
     ci:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     repo_name: String,
     data: rocket::data::Data<'_>,
 ) -> Result<Upload, Error> {
@@ -372,6 +387,7 @@ pub async fn post_blob_upload(
             return put_blob(
                 auth_user,
                 ci,
+                tc,
                 repo_name.to_string(),
                 uuid,
                 digest.to_string(),
@@ -397,11 +413,12 @@ pub async fn post_blob_upload_2level(
     uri: &Origin<'_>,
     auth_user: TrowToken,
     ci:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     repo: String,
     name: String,
     data: rocket::data::Data<'_>,
 ) -> Result<Upload, Error> {
-    post_blob_upload(uri, auth_user, ci, format!("{}/{}", repo, name), data).await
+    post_blob_upload(uri, auth_user, ci, tc, format!("{}/{}", repo, name), data).await
 }
 
 /*
@@ -413,6 +430,7 @@ pub async fn post_blob_upload_3level(
     uri: &Origin<'_>,
     auth_user: TrowToken,
     ci:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     org: String,
     repo: String,
     name: String,
@@ -422,6 +440,7 @@ pub async fn post_blob_upload_3level(
         uri,
         auth_user,
         ci,
+        tc,
         format!("{}/{}/{}", org, repo, name),
         data,
     ).await
@@ -436,6 +455,7 @@ pub async fn post_blob_upload_4level(
     uri: &Origin<'_>,
     auth_user: TrowToken,
     ci:&rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     fourth: String,
     org: String,
     repo: String,
@@ -446,6 +466,7 @@ pub async fn post_blob_upload_4level(
         uri,
         auth_user,
         ci,
+        tc,
         format!("{}/{}/{}/{}", fourth, org, repo, name),
         data,
     ).await

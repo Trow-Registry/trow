@@ -1,6 +1,7 @@
 use rocket::data::ToByteUnit;
 use rocket::tokio::io::AsyncRead;
 
+use crate::TrowConfig;
 use crate::client_interface::ClientInterface;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
 use crate::response::errors::Error;
@@ -103,11 +104,12 @@ Content-Type: <manifest media type>
 pub async fn put_image_manifest(
     _auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     repo_name: String,
     reference: String,
     chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
-    let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(chunk.open(100.mebibytes()));
+    let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(chunk.open(tc.max_manifest_size.mebibytes()));
 
     match ci.store_manifest(&repo_name, &reference, data).await {
         Ok(digest) => Ok(create_verified_manifest(
@@ -128,6 +130,7 @@ pub async fn put_image_manifest(
 pub async fn put_image_manifest_2level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     user: String,
     repo: String,
     reference: String,
@@ -136,6 +139,7 @@ pub async fn put_image_manifest_2level(
     put_image_manifest(
         auth_user,
         ci,
+        tc,
         format!("{}/{}", user, repo),
         reference,
         chunk,
@@ -149,6 +153,7 @@ pub async fn put_image_manifest_2level(
 pub async fn put_image_manifest_3level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     org: String,
     user: String,
     repo: String,
@@ -158,6 +163,7 @@ pub async fn put_image_manifest_3level(
     put_image_manifest(
         auth_user,
         ci,
+        tc,
         format!("{}/{}/{}", org, user, repo),
         reference,
         chunk,
@@ -174,6 +180,7 @@ pub async fn put_image_manifest_3level(
 pub async fn put_image_manifest_4level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
+    tc:&rocket::State<TrowConfig>,
     fourth: String,
     org: String,
     user: String,
@@ -184,6 +191,7 @@ pub async fn put_image_manifest_4level(
     put_image_manifest(
         auth_user,
         ci,
+        tc,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
         chunk,

@@ -118,4 +118,27 @@ mod cli {
             .contains("Cross-Origin Resource Sharing(CORS) requests are allowed")
             .unwrap();
     }
+
+    #[test]
+    fn file_size_parsing() {
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--max-manifest-size", "3", "--dry-run"])
+            .succeeds()
+            .and()
+            .stdout()
+            .contains("manifest size: 3")
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--max-manifest-size", "-4"])
+            .fails()
+            .unwrap();
+
+        assert_cli::Assert::main_binary()
+            .with_args(&["--max-manifest-size", "1.1"])
+            .fails()
+            .unwrap();
+            
+    }
 }

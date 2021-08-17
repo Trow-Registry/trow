@@ -201,6 +201,20 @@ Must be used with --hub-token or --hub-token-file")
                 .long("enable-cors")
                 .help("Enable Cross-Origin Resource Sharing(CORS) requests. Used to allow access from web apps (e.g. GUIs).")
         )
+        .arg(
+            Arg::with_name("max-manifest-size")
+            .long("max-manifest-size")
+            .value_name("max-manifest-size")
+            .help("Maximum size in mebibytes of manifest file that can be uploaded. This is JSON metada, so usually relatively small.")
+            .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("max-blob-size")
+            .long("max-blob-size")
+            .value_name("max-blob-size")
+            .help("Maximum size in mebibytes of \"blob\" that can be uploaded (a single layer of an image). This can be very large in some images (GBs).")
+            .takes_value(true)
+        )
         .get_matches()
 }
 
@@ -224,7 +238,7 @@ fn main() {
     let default_port = if no_tls { 8000 } else { 8443 };
     let port: u16 = matches
         .value_of("port")
-        .map_or(default_port, |x| x.parse().unwrap());
+        .map_or(default_port, |x| x.parse().expect("Failed to parse port number"));
     let cert_path = matches.value_of("cert").unwrap_or("./certs/domain.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
@@ -232,6 +246,13 @@ fn main() {
     let host_names = parse_list(&host_names_str);
     let dry_run = matches.is_present("dry-run");
     let proxy_hub = matches.is_present("proxy-docker-hub");
+
+    let default_manifest_size: u32 = 4; //mebibytes
+    let default_blob_size: u32 = 8192; //mebibytes
+    let max_manifest_size =  matches.value_of("max-manifest-size")
+        .map_or(default_manifest_size, |x| x.parse().expect("Failed to parse max manifest size"));
+    let max_blob_size =  matches.value_of("max-blob-size")
+        .map_or(default_blob_size, |x| x.parse().expect("Failed to parse max blob size"));
 
     let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
     if matches.is_present("allow-docker-official") {
@@ -263,6 +284,8 @@ fn main() {
         deny_images,
         dry_run,
         cors,
+        max_manifest_size,
+        max_blob_size
     );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
