@@ -30,7 +30,7 @@ COPY lib lib
 COPY src src
 # Must build protobuf first for generated code
 RUN cd lib/protobuf && cargo build --release
-RUN cargo build --release -Z unstable-options --out-dir ./out
+RUN cargo build --release
 
 FROM debian:stable-slim
 
@@ -42,7 +42,7 @@ RUN apt-get update \
   && apt-get clean\
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/src/trow/out/trow /trow
+COPY --from=builder /usr/src/trow/target/release/trow /trow
 
 COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
