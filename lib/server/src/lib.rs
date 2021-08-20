@@ -25,8 +25,8 @@ mod validate;
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
-use tokio::runtime::Runtime;
 use std::future::Future;
+use tokio::runtime::Runtime;
 
 pub mod manifest;
 
@@ -85,7 +85,6 @@ impl TrowServerBuilder {
     }
 
     pub fn start_trow_sync(self) {
-
         let server = self.get_server_future();
         let rt = Runtime::new().expect("Failed to start Tokio runtime");
 
@@ -102,9 +101,7 @@ impl TrowServerBuilder {
         }
     }
 
-    pub fn get_server_future(self) -> impl Future<Output = Result<(), tonic::transport::Error>>
-    {
-
+    pub fn get_server_future(self) -> impl Future<Output = Result<(), tonic::transport::Error>> {
         let ts = TrowServer::new(
             &self.data_path,
             self.proxy_hub,
@@ -122,6 +119,5 @@ impl TrowServerBuilder {
             .add_service(AdmissionControllerServer::new(ts))
             .serve(self.listen_addr);
         future
-
     }
 }
