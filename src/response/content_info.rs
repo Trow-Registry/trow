@@ -17,13 +17,13 @@ impl<'r> FromRequest<'r> for ContentInfo {
                 Ok(i) => i,
                 Err(_) => {
                     warn!("Received request with invalid Content-Length header");
-                    return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid));
+                    return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid("Invalid Content-Length".to_string())));
                 }
             },
             None => {
                 // This probably just means we don't have ContentInfo
                 // Should be caught by an option in the RequestGuard
-                return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid));
+                return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid("Expected Content-Length header".to_string())));
             }
         };
 
@@ -41,6 +41,6 @@ impl<'r> FromRequest<'r> for ContentInfo {
             }
         }
         warn!("Received request with invalid Content-Range header");
-        Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid))
+        Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid("Invalid Content-Range".to_string())))
     }
 }

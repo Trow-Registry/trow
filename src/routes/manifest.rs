@@ -1,5 +1,4 @@
 use rocket::data::ToByteUnit;
-use rocket::tokio::io::AsyncRead;
 
 use crate::TrowConfig;
 use crate::client_interface::ClientInterface;
@@ -7,7 +6,6 @@ use crate::registry_interface::{digest, ManifestReader, ManifestStorage, Storage
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{create_verified_manifest, ManifestDeleted, RepoName, VerifiedManifest};
-use std::pin::Pin;
 
 /*
 ---
@@ -109,7 +107,7 @@ pub async fn put_image_manifest(
     reference: String,
     chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
-    let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(chunk.open(tc.max_manifest_size.mebibytes()));
+    let data = chunk.open(tc.max_manifest_size.mebibytes());
 
     match ci.store_manifest(&repo_name, &reference, data).await {
         Ok(digest) => Ok(create_verified_manifest(
@@ -118,7 +116,8 @@ pub async fn put_image_manifest(
             reference,
         )),
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid),
+        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid("".to_string())),
+        Err(StorageDriverError::InvalidContentRange) => Err(Error::ManifestInvalid(format!("Content over data limit {} mebibytes", tc.max_blob_size))),
         Err(_) => Err(Error::InternalError),
     }
 }

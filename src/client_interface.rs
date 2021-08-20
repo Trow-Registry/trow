@@ -2,12 +2,14 @@ pub mod trow_proto {
     include!("../lib/protobuf/out/trow.rs");
 }
 
+use crate::registry_interface::blob_storage::Stored;
 use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
 use crate::registry_interface::{
     validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
     Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
 };
-use rocket::tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite};
+use rocket::data::DataStream;
+use rocket::tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite};
 use trow_proto::{
     admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
     BlobRef, CatalogRequest, CompleteRequest, HealthRequest, ListTagsRequest,
@@ -26,7 +28,6 @@ use failure::Error;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::io::SeekFrom;
-use std::pin::Pin;
 
 // BIG TODO:
 // Creating a new runtime for each request is awful.
@@ -74,6 +75,8 @@ pub enum RegistryError {
     #[fail(display = "Invalid manifest")]
     InvalidManifest,
     #[fail(display = "Invalid Range")]
+    ManifestClipped,
+    #[fail(display = "Manifest over data limit")]
     Internal,
 }
 
@@ -94,7 +97,7 @@ impl ManifestStorage for ClientInterface {
         &self,
         name: &str,
         tag: &str,
-        data: Pin<Box<dyn AsyncRead + Send + 'a>>,
+        data: DataStream<'a>
     ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
@@ -104,6 +107,7 @@ impl ManifestStorage for ClientInterface {
                 Err(StorageDriverError::InvalidName(format!("{}:{}", name, tag)))
             }
             Err(RegistryError::InvalidManifest) => Err(StorageDriverError::InvalidManifest),
+            Err(RegistryError::ManifestClipped) => Err(StorageDriverError::InvalidContentRange),
             Err(_) => Err(StorageDriverError::Internal),
         }
     }
@@ -149,8 +153,8 @@ impl BlobStorage for ClientInterface {
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        mut data: Pin<Box<dyn AsyncRead + Send + 'a>>,
-    ) -> Result<u64, StorageDriverError> {
+        data: DataStream<'a>,
+    ) -> Result<Stored, StorageDriverError> {
 
         let rn = RepoName(name.to_string());
         let uuid = Uuid(session_id.to_string());
@@ -175,24 +179,28 @@ impl BlobStorage for ClientInterface {
             return Err(StorageDriverError::InvalidContentRange);
         }
 
-        let len = rocket::tokio::io::copy(&mut data, &mut sink).await.map_err(|e| {
+        let stream_res = data.stream_to(&mut sink).await.map_err(|e| {
             warn!("Error writing blob {:?}", e);
             StorageDriverError::Internal
         })?;
 
-        let total = sink.seek(SeekFrom::End(0)).await.unwrap_or(len);
+        let chunk_len = stream_res.written;
+        let complete = stream_res.complete;
+
+        let total = sink.seek(SeekFrom::End(0)).await.unwrap_or(chunk_len);
         if have_range {
             if (info.range.1 + 1) != total {
                 warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
                 return Err(StorageDriverError::InvalidContentRange);
             }
             //Check length if chunked upload
-            if info.length != len {
-                warn!("info.length {} len {}", info.length, len);
+            if info.length != chunk_len {
+                warn!("info.length {} len {}", info.length, chunk_len);
                 return Err(StorageDriverError::InvalidContentRange);
             }
         }
-        Ok(total)
+    
+        Ok(Stored{total_stored: total, chunk: chunk_len, complete})
     }
 
     async fn complete_and_verify_blob_upload(
@@ -424,7 +432,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-        mut manifest: Pin<Box<dyn AsyncRead + Send + 'a>>,
+        manifest: DataStream<'a>,
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)
@@ -441,10 +449,16 @@ impl ClientInterface {
                 }
             })?;
 
-        rocket::tokio::io::copy(&mut manifest, &mut sink_loc).await.map_err(|e| {
-            warn!("Error wirting out manifest {:?}", e);
+        let stream_res = manifest.stream_to(&mut sink_loc).await.map_err(|e| {
+            warn!("Error writing out manifest {:?}", e);
             RegistryError::Internal
         })?;
+
+        //It's not going to verify if it's clipped
+        if !stream_res.complete {
+            warn!("Manifest {}:{} clipped by transfer limits", repo_name, reference);
+            return Err(RegistryError::ManifestClipped);
+        } 
 
         self.verify_manifest(repo_name, reference, &uuid)
             .await

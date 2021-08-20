@@ -9,8 +9,6 @@ use crate::types::{
 };
 use rocket::http::uri::Origin;
 use rocket::data::ToByteUnit;
-use rocket::tokio::io::AsyncRead;
-use std::pin::Pin;
 
 /*
 ---
@@ -114,12 +112,18 @@ pub async fn put_blob(
 ) -> Result<AcceptedUpload, Error> {
 
     let ds = chunk.open(tc.max_blob_size.mebibytes());
-    let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(ds);
 
-    let size = match ci.store_blob_chunk(&repo_name, &uuid, None, data).await {
-        Ok(size) => size,
+    let size = match ci.store_blob_chunk(&repo_name, &uuid, None, ds).await {
+        Ok(stored) => {
+            
+                if !stored.complete {
+                    return Err(Error::BlobUploadInvalid(format!("Content over data limit {} mebibytes", tc.max_blob_size)))
+                } else {
+                    stored.total_stored
+                }
+        },
         Err(StorageDriverError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidContentRange) => return Err(Error::BlobUploadInvalid),
+        Err(StorageDriverError::InvalidContentRange) => return Err(Error::BlobUploadInvalid("Invalid Content Range".to_string())),
         Err(_) => return Err(Error::InternalError),
     };
 
@@ -235,7 +239,7 @@ Content-Type: application/octet-stream
 <Layer Chunk Binary Data>
 ---
 
-Uploads a blob or chunk of a blog.
+Uploads a blob or chunk of a blob.
 
 Checks UUID. Returns UploadInfo with range set to correct position.
 
@@ -250,16 +254,21 @@ pub async fn patch_blob(
     uuid: String,
     chunk: rocket::data::Data<'_>,
 ) -> Result<UploadInfo, Error> {
-    let data: Pin<Box<dyn AsyncRead + Send>> = Box::pin(chunk.open(tc.max_blob_size.mebibytes()));
+
+    let data= chunk.open(tc.max_blob_size.mebibytes());
 
     match ci.store_blob_chunk(&repo_name, &uuid, info, data).await {
-        Ok(size) => {
+        Ok(stored) => {
             let repo_name = RepoName(repo_name);
             let uuid = Uuid(uuid);
-            Ok(create_upload_info(uuid, repo_name, (0, size as u32)))
+            if !stored.complete {
+                Err(Error::BlobUploadInvalid(format!("Content over data limit {} mebibytes", tc.max_blob_size)))
+            } else {
+                Ok(create_upload_info(uuid, repo_name, (0, stored.total_stored as u32)))
+            }
         }
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidContentRange) => Err(Error::BlobUploadInvalid),
+        Err(StorageDriverError::InvalidContentRange) => Err(Error::BlobUploadInvalid("Invalid Content Range".to_string())),
         Err(_) => Err(Error::InternalError),
     }
 }

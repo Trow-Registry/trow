@@ -1,4 +1,4 @@
-use rocket::tokio::io::AsyncRead;
+use rocket::data::DataStream;
 
 use super::digest::Digest;
 use super::AsyncSeekRead;
@@ -21,6 +21,11 @@ pub struct UploadInfo {
 pub struct BlobReader {
     pub digest: Digest,
     pub reader: Pin<Box<dyn AsyncSeekRead>>,
+}
+pub struct Stored {
+    pub total_stored: u64,
+    pub chunk: u64,
+    pub complete: bool // true if whole stream was read, false if hit data cap
 }
 
 impl BlobReader {
@@ -61,13 +66,17 @@ pub trait BlobStorage {
     /// as its identifier.
     /// Passed optional ContentInfo which describes range of data.
     /// Returns current size of blob, including any previous chunks
+    ///
+    /// TODO: Really should not be using Rocket specific DataStream object.
+    /// It's used to determine if max transfer cap was hit.
+    /// Solution may be to return method that gets write sink (see old code). 
     async fn store_blob_chunk<'a>(
         &self,
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: Pin<Box<dyn AsyncRead + Send +'a>>,
-    ) -> Result<u64, StorageDriverError>;
+        data: DataStream<'a>,
+    ) -> Result<Stored, StorageDriverError>;
 
     /// Finalises the upload of the given session_id.
     /// Also verfies uploaded blob matches user digest

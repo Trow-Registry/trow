@@ -1,4 +1,4 @@
-use rocket::tokio::io::AsyncRead;
+use rocket::data::DataStream;
 use super::{AsyncSeekRead, StorageDriverError};
 use super::{Digest, DigestAlgorithm};
 use std::pin::Pin;
@@ -34,15 +34,19 @@ pub trait ManifestStorage {
 
     // Stores should take a reader that has the data, possibly a second method that returns byte array
 
+    /// TODO: DataStream is currently tied to Rocket implementation to handle transfers that get capped.
+    /// Fixing this means either changing the interface to return a sink the route can write to or coming up with a
+    /// new interface type.
+     
     /// Put the manifest identified by name and tag. (Note that manifests cannot be pushed by digest)
     /// data is a link to reader for supplying the bytes of the manifest.
     /// Returns digest of the manifest.
-    /// PUT: /v2/<name>/manifests/<tag>
+    /// 
     async fn store_manifest<'a>(
         &self,
         name: &str,
         tag: &str,
-        data: Pin<Box<dyn AsyncRead + Send + 'a>>,
+        data: DataStream<'a>,
     ) -> Result<Digest, StorageDriverError>;
 
     // Store a manifest via Writer trait for drivers which support it
