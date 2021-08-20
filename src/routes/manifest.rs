@@ -1,10 +1,11 @@
+use rocket::data::ToByteUnit;
+
 use crate::client_interface::ClientInterface;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{create_verified_manifest, ManifestDeleted, RepoName, VerifiedManifest};
-
-use std::io::Read;
+use crate::TrowConfig;
 
 /*
 ---
@@ -27,34 +28,35 @@ Accept: manifest-version
 404 - manifest not known to the registry
  */
 #[get("/v2/<onename>/manifests/<reference>")]
-pub fn get_manifest(
+pub async fn get_manifest(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     onename: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
     ci.get_manifest(&onename, &reference)
+        .await
         .map_err(|_| Error::ManifestUnknown(reference))
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
-pub fn get_manifest_2level(
+pub async fn get_manifest_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     reference: String,
 ) -> Result<ManifestReader, Error> {
-    get_manifest(auth_user, ci, format!("{}/{}", user, repo), reference)
+    get_manifest(auth_user, ci, format!("{}/{}", user, repo), reference).await
 }
 
 /*
  * Process 3 level manifest path
  */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
-pub fn get_manifest_3level(
+pub async fn get_manifest_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
@@ -66,15 +68,16 @@ pub fn get_manifest_3level(
         format!("{}/{}/{}", org, user, repo),
         reference,
     )
+    .await
 }
 
 /*
  * Process 4 level manifest path
  */
 #[get("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
-pub fn get_manifest_4level(
+pub async fn get_manifest_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,
@@ -87,6 +90,7 @@ pub fn get_manifest_4level(
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
     )
+    .await
 }
 
 /*
@@ -98,23 +102,28 @@ Content-Type: <manifest media type>
 
  */
 #[put("/v2/<repo_name>/manifests/<reference>", data = "<chunk>")]
-pub fn put_image_manifest(
+pub async fn put_image_manifest(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
     repo_name: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
-    let mut data: Box<dyn Read> = Box::new(chunk.open());
+    let data = chunk.open(tc.max_manifest_size.mebibytes());
 
-    match ci.store_manifest(&repo_name, &reference, &mut data) {
+    match ci.store_manifest(&repo_name, &reference, data).await {
         Ok(digest) => Ok(create_verified_manifest(
             RepoName(repo_name),
             digest,
             reference,
         )),
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid),
+        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid("".to_string())),
+        Err(StorageDriverError::InvalidContentRange) => Err(Error::ManifestInvalid(format!(
+            "Content over data limit {} mebibytes",
+            tc.max_blob_size
+        ))),
         Err(_) => Err(Error::InternalError),
     }
 }
@@ -123,43 +132,49 @@ pub fn put_image_manifest(
  * Parse 2 level <user>/<repo> style path and pass it to put_image_manifest
  */
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
-pub fn put_image_manifest_2level(
+pub async fn put_image_manifest_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
     user: String,
     repo: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
         auth_user,
         ci,
+        tc,
         format!("{}/{}", user, repo),
         reference,
         chunk,
     )
+    .await
 }
 
 /*
  * Parse 3 level <org>/<user>/<repo> style path and pass it to put_image_manifest
  */
 #[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
-pub fn put_image_manifest_3level(
+pub async fn put_image_manifest_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
     org: String,
     user: String,
     repo: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
         auth_user,
         ci,
+        tc,
         format!("{}/{}/{}", org, user, repo),
         reference,
         chunk,
     )
+    .await
 }
 
 /*
@@ -169,23 +184,26 @@ pub fn put_image_manifest_3level(
     "/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>",
     data = "<chunk>"
 )]
-pub fn put_image_manifest_4level(
+pub async fn put_image_manifest_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
     fourth: String,
     org: String,
     user: String,
     repo: String,
     reference: String,
-    chunk: rocket::data::Data,
+    chunk: rocket::data::Data<'_>,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
         auth_user,
         ci,
+        tc,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
         chunk,
     )
+    .await
 }
 
 /*
@@ -195,14 +213,14 @@ DELETE /v2/<name>/manifests/<reference>
 */
 
 #[delete("/v2/<repo>/manifests/<digest>")]
-pub fn delete_image_manifest(
+pub async fn delete_image_manifest(
     _auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
     let digest = digest::parse(&digest).map_err(|_| Error::Unsupported)?;
-    match ci.delete_manifest(&repo, &digest) {
+    match ci.delete_manifest(&repo, &digest).await {
         Ok(_) => Ok(ManifestDeleted {}),
         Err(StorageDriverError::Unsupported) => Err(Error::Unsupported),
         Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestUnknown(repo)),
@@ -211,32 +229,32 @@ pub fn delete_image_manifest(
 }
 
 #[delete("/v2/<user>/<repo>/manifests/<digest>")]
-pub fn delete_image_manifest_2level(
+pub async fn delete_image_manifest_2level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     user: String,
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, ci, format!("{}/{}", user, repo), digest)
+    delete_image_manifest(auth_user, ci, format!("{}/{}", user, repo), digest).await
 }
 
 #[delete("/v2/<org>/<user>/<repo>/manifests/<digest>")]
-pub fn delete_image_manifest_3level(
+pub async fn delete_image_manifest_3level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     org: String,
     user: String,
     repo: String,
     digest: String,
 ) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest)
+    delete_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest).await
 }
 
 #[delete("/v2/<fourth>/<org>/<user>/<repo>/manifests/<digest>")]
-pub fn delete_image_manifest_4level(
+pub async fn delete_image_manifest_4level(
     auth_user: TrowToken,
-    ci: rocket::State<ClientInterface>,
+    ci: &rocket::State<ClientInterface>,
     fourth: String,
     org: String,
     user: String,
@@ -249,4 +267,5 @@ pub fn delete_image_manifest_4level(
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         digest,
     )
+    .await
 }

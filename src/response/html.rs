@@ -6,11 +6,11 @@ use rocket::response::{Responder, Response};
 
 pub struct HTML<'a>(pub &'a str);
 
-impl<'a> Responder<'a> for HTML<'a> {
+impl<'a> Responder<'a, 'a> for HTML<'a> {
     fn respond_to(self, _: &Request) -> Result<Response<'a>, Status> {
         Response::build()
             .header(ContentType::HTML)
-            .sized_body(Cursor::new(self.0))
+            .sized_body(None, Cursor::new(self.0))
             .ok()
     }
 }

@@ -1,17 +1,10 @@
-#![feature(proc_macro_hygiene, decl_macro)]
-#![feature(plugin)]
-#![feature(seek_stream_len)]
-
 #[macro_use]
 extern crate failure;
 extern crate base64;
 extern crate futures;
 extern crate hostname;
-extern crate hyper;
 #[macro_use]
 extern crate rocket;
-#[macro_use]
-extern crate rocket_contrib;
 extern crate argon2;
 extern crate chrono;
 extern crate data_encoding;
@@ -20,10 +13,10 @@ extern crate env_logger;
 extern crate frank_jwt;
 extern crate rand;
 extern crate serde;
-extern crate serde_json;
 extern crate trow_server;
 extern crate uuid;
 use env_logger::Env;
+use futures::Future;
 use log::{LevelFilter, SetLoggerError};
 
 #[macro_use]
@@ -41,7 +34,6 @@ use rocket::fairing;
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::thread;
 use uuid::Uuid;
 
 mod client_interface;
@@ -96,6 +88,8 @@ pub struct TrowConfig {
     deny_prefixes: Vec<String>,
     deny_images: Vec<String>,
     dry_run: bool,
+    max_manifest_size: u32,
+    max_blob_size: u32,
     token_secret: String,
     user: Option<UserConfig>,
     cors: bool,
@@ -118,7 +112,9 @@ struct UserConfig {
     hash_encoded: String, //Surprised not bytes
 }
 
-fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, Error> {
+fn init_trow_server(
+    config: TrowConfig,
+) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>, Error> {
     debug!("Starting Trow server");
 
     //Could pass full config here.
@@ -143,9 +139,7 @@ fn init_trow_server(config: TrowConfig) -> Result<std::thread::JoinHandle<()>, E
         ts
     };
 
-    Ok(thread::spawn(move || {
-        ts.start_trow_sync();
-    }))
+    Ok(ts.get_server_future())
 }
 
 /// Build the logging agent with formatting.
@@ -192,6 +186,8 @@ impl TrowBuilder {
         deny_images: Vec<String>,
         dry_run: bool,
         cors: bool,
+        max_manifest_size: u32,
+        max_blob_size: u32,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -207,6 +203,8 @@ impl TrowBuilder {
             deny_prefixes,
             deny_images,
             dry_run,
+            max_manifest_size,
+            max_blob_size,
             token_secret: Uuid::new_v4().to_string(),
             user: None,
             cors,
@@ -246,26 +244,24 @@ impl TrowBuilder {
         OsRng.fill_bytes(&mut key);
         let secret_key = base64::encode(&key);
 
-        /*
-        Keep Alive has to be turned off to mitigate issue whereby some transfers would be cut off.
-        Seems to be caused by an old version of hyper in Rocket.
-        Keep Alive can be restored when Rocket is upgraded or by moving to different framework.
-        See #24
-        */
-        let mut cfg = rocket::config::Config::build(rocket::config::Environment::Production)
-            .address(self.config.addr.host.clone())
-            .port(self.config.addr.port)
-            .keep_alive(0) // Needed to mitigate #24. See above.
-            .secret_key(secret_key)
-            .workers(256);
+        //TODO: with Rocket 0.5 should be able to pass our config file and let Rocket pick out the parts it wants
+        //This will be simpler and allow more flexibility.
+        let mut figment = rocket::Config::figment()
+            .merge(("address", self.config.addr.host.clone()))
+            .merge(("port", self.config.addr.port))
+            .merge(("workers", 256))
+            .merge(("secret_key", secret_key));
 
         if let Some(ref tls) = self.config.tls {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
                 return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
             }
-            cfg = cfg.tls(tls.cert_file.clone(), tls.key_file.clone());
+
+            let tls_config =
+                rocket::config::TlsConfig::from_paths(tls.cert_file.clone(), tls.key_file.clone());
+            figment = figment.merge(("tls", tls_config));
         }
-        let cfg = cfg.finalize()?;
+        let cfg = rocket::Config::from(figment);
         Ok(cfg)
     }
 
@@ -274,15 +270,21 @@ impl TrowBuilder {
 
         let rocket_config = &self.build_rocket_config()?;
 
-        // Start GRPC Backend thread.
-        let _backend_thread = init_trow_server(self.config.clone())?;
-
         println!(
             "Starting Trow {} on {}:{}",
             env!("CARGO_PKG_VERSION"),
             self.config.addr.host,
             self.config.addr.port
         );
+        println!(
+            "\nMaximum blob size: {} Mebibytes",
+            self.config.max_blob_size
+        );
+        println!(
+            "Maximum manifest size: {} Mebibytes",
+            self.config.max_manifest_size
+        );
+
         println!("\n**Validation callback configuration\n");
 
         println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
@@ -335,41 +337,41 @@ impl TrowBuilder {
         }
         .to_cors()?;
 
-        rocket::custom(rocket_config.clone())
+        let f = rocket::custom(rocket_config.clone())
             .manage(self.config.clone())
             .manage(ci)
-            .attach(fairing::AdHoc::on_attach(
-                "SIGTERM handler",
-                |r| match attach_sigterm() {
-                    Ok(_) => Ok(r),
-                    Err(_) => Err(r),
-                },
-            ))
             .attach(fairing::AdHoc::on_response(
                 "Set API Version Header",
                 |_, resp| {
-                    //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
-                    resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
+                    Box::pin(async move {
+                        //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
+                        resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
+                    })
                 },
             ))
-            .attach(fairing::AdHoc::on_launch("Launch Message", |_| {
-                println!("Trow is up and running!");
+            .attach(fairing::AdHoc::on_liftoff("Launch Message", |_| {
+                Box::pin(async move {
+                    println!("Trow is up and running!");
+                })
             }))
-            .mount("/", routes::routes())
             .attach_if(self.config.cors, cors.clone())
-            .register(routes::catchers())
+            .mount("/", routes::routes())
+            .register("/", routes::catchers())
             .launch();
+
+        let rt = rocket::tokio::runtime::Builder::new_multi_thread()
+            // NOTE: graceful shutdown depends on the "rocket-worker" prefix.
+            .thread_name("rocket-worker-thread")
+            .enable_all()
+            .build()?;
+
+        // Start GRPC Backend thread.
+        rt.spawn(init_trow_server(self.config.clone())?);
+        //And now rocket
+        rt.block_on(f)?;
 
         Ok(())
     }
-}
-
-fn attach_sigterm() -> Result<(), Error> {
-    ctrlc::set_handler(|| {
-        info!("SIGTERM caught, shutting down...");
-        std::process::exit(0);
-    })
-    .map_err(|e| e.into())
 }
 
 pub fn build_handlers(listen_addr: String) -> Result<ClientInterface, Error> {

@@ -4,8 +4,8 @@ use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
-impl<'r> Responder<'r> for UploadInfo {
-    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for UploadInfo {
+    fn respond_to(self, req: &Request) -> Result<Response<'static>, Status> {
         let location_url = format!(
             "{}/v2/{}/blobs/uploads/{}",
             get_base_url(req),
@@ -36,8 +36,9 @@ mod test {
     use crate::response::upload_info::{create_upload_info, UploadInfo};
     use crate::types::{RepoName, Uuid};
     use rocket::http::Status;
+    use rocket::response::Responder;
 
-    use crate::response::test_helper::test_route;
+    use crate::response::test_helper::test_client;
     fn build_response() -> UploadInfo {
         create_upload_info(
             Uuid("whatever".to_owned()),
@@ -48,7 +49,9 @@ mod test {
 
     #[test]
     fn uuid_uuid() {
-        let response = test_route(build_response());
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = build_response().respond_to(req.inner()).unwrap();
         let headers = response.headers();
         assert_eq!(response.status(), Status::Accepted);
         assert!(headers.contains("Docker-Upload-UUID"));

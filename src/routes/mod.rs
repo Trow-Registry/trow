@@ -5,8 +5,8 @@ use crate::response::trow_token::ValidBasicToken;
 use crate::response::trow_token::{self, TrowToken};
 use crate::TrowConfig;
 use rocket::request::Request;
+use rocket::serde::json::{json, Json, Value};
 use rocket::State;
-use rocket_contrib::json::{Json, JsonValue};
 use std::str;
 
 mod blob;
@@ -79,7 +79,7 @@ pub fn catchers() -> Vec<rocket::Catcher> {
  * v2 - throw Empty
  */
 #[get("/v2")]
-fn get_v2root(_auth_user: TrowToken) -> Json<JsonValue> {
+fn get_v2root(_auth_user: TrowToken) -> Json<Value> {
     Json(json!({}))
 }
 /*
@@ -111,6 +111,6 @@ fn no_auth(_req: &Request) -> Authenticate {
  * If login is called with a valid bearer token, return session token
  */
 #[get("/login")]
-fn login(auth_user: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, Error> {
+fn login(auth_user: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, Error> {
     trow_token::new(auth_user, tc).map_err(|_| Error::InternalError)
 }

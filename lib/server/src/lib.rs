@@ -25,6 +25,7 @@ mod validate;
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
+use std::future::Future;
 use tokio::runtime::Runtime;
 
 pub mod manifest;
@@ -84,23 +85,8 @@ impl TrowServerBuilder {
     }
 
     pub fn start_trow_sync(self) {
-        let mut rt = Runtime::new().expect("Failed to start Tokio runtime");
-        let ts = TrowServer::new(
-            &self.data_path,
-            self.proxy_hub,
-            self.hub_user,
-            self.hub_pass,
-            self.allow_prefixes,
-            self.allow_images,
-            self.deny_prefixes,
-            self.deny_images,
-        )
-        .expect("Failure configuring Trow Server");
-
-        let server = Server::builder()
-            .add_service(RegistryServer::new(ts.clone()))
-            .add_service(AdmissionControllerServer::new(ts))
-            .serve(self.listen_addr);
+        let server = self.get_server_future();
+        let rt = Runtime::new().expect("Failed to start Tokio runtime");
 
         debug!("Trow backend service running");
 
@@ -113,5 +99,25 @@ impl TrowServerBuilder {
                 std::process::exit(1);
             }
         }
+    }
+
+    pub fn get_server_future(self) -> impl Future<Output = Result<(), tonic::transport::Error>> {
+        let ts = TrowServer::new(
+            &self.data_path,
+            self.proxy_hub,
+            self.hub_user,
+            self.hub_pass,
+            self.allow_prefixes,
+            self.allow_images,
+            self.deny_prefixes,
+            self.deny_images,
+        )
+        .expect("Failure configuring Trow Server");
+
+        let future = Server::builder()
+            .add_service(RegistryServer::new(ts.clone()))
+            .add_service(AdmissionControllerServer::new(ts))
+            .serve(self.listen_addr);
+        future
     }
 }

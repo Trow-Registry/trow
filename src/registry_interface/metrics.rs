@@ -14,8 +14,9 @@ pub struct MetricsResponse {
     pub metrics: String,
 }
 
+#[rocket::async_trait]
 pub trait Metrics {
-    fn is_healthy(&self) -> bool;
-    fn is_ready(&self) -> bool;
-    fn get_metrics(&self) -> Result<MetricsResponse, MetricsError>;
+    async fn is_healthy(&self) -> bool;
+    async fn is_ready(&self) -> bool;
+    async fn get_metrics(&self) -> Result<MetricsResponse, MetricsError>;
 }

@@ -7,11 +7,11 @@ use rocket::response::{Responder, Response};
 
 use crate::registry_interface::MetricsResponse;
 
-impl<'r> Responder<'r> for MetricsResponse {
-    fn respond_to(self, _req: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for MetricsResponse {
+    fn respond_to(self, _req: &Request) -> Result<Response<'static>, Status> {
         Response::build()
             .header(ContentType::Plain)
-            .sized_body(Cursor::new(self.metrics))
+            .sized_body(None, Cursor::new(self.metrics))
             .status(Status::Ok)
             .ok()
     }
@@ -20,8 +20,9 @@ impl<'r> Responder<'r> for MetricsResponse {
 #[cfg(test)]
 mod test {
     use crate::registry_interface::MetricsResponse;
-    use crate::response::test_helper::test_route;
+    use crate::response::test_helper::test_client;
     use rocket::http::Status;
+    use rocket::response::Responder;
 
     fn build_metrics_response() -> MetricsResponse {
         MetricsResponse {
@@ -31,7 +32,9 @@ mod test {
 
     #[test]
     fn test_metrics_resp() {
-        let response = test_route(build_metrics_response());
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = build_metrics_response().respond_to(req.inner()).unwrap();
         assert_eq!(response.status(), Status::Ok);
     }
 }
