@@ -1,6 +1,6 @@
-use rocket::data::DataStream;
 use super::{AsyncSeekRead, StorageDriverError};
 use super::{Digest, DigestAlgorithm};
+use rocket::data::DataStream;
 use std::pin::Pin;
 
 pub struct ManifestReader {
@@ -30,18 +30,22 @@ pub trait ManifestStorage {
     /// A HEAD request can also be issued to this endpoint to obtain resource information without receiving all data.
     /// GET: /v2/<name>/manifests/<reference>
     /// HEAD: /v2/<name>/manifests/<reference>
-    async fn get_manifest(&self, name: &str, tag: &str) -> Result<ManifestReader, StorageDriverError>;
+    async fn get_manifest(
+        &self,
+        name: &str,
+        tag: &str,
+    ) -> Result<ManifestReader, StorageDriverError>;
 
     // Stores should take a reader that has the data, possibly a second method that returns byte array
 
     /// TODO: DataStream is currently tied to Rocket implementation to handle transfers that get capped.
     /// Fixing this means either changing the interface to return a sink the route can write to or coming up with a
     /// new interface type.
-     
+
     /// Put the manifest identified by name and tag. (Note that manifests cannot be pushed by digest)
     /// data is a link to reader for supplying the bytes of the manifest.
     /// Returns digest of the manifest.
-    /// 
+    ///
     async fn store_manifest<'a>(
         &self,
         name: &str,

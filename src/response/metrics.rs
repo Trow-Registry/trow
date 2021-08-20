@@ -32,7 +32,6 @@ mod test {
 
     #[test]
     fn test_metrics_resp() {
-
         let cl = test_client();
         let req = cl.get("/");
         let response = build_metrics_response().respond_to(req.inner()).unwrap();

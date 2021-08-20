@@ -1,13 +1,13 @@
 use crate::registry_interface::blob_storage::ContentInfo;
 use crate::response::errors::Error;
 use rocket::http::Status;
-use rocket::request::{self, FromRequest, Request};
 use rocket::outcome::Outcome;
+use rocket::request::{self, FromRequest, Request};
 
 /**
  * ContentInfo should always be wrapped an Option in routes to avoid failure returns.
  */
- #[rocket::async_trait]
+#[rocket::async_trait]
 impl<'r> FromRequest<'r> for ContentInfo {
     type Error = Error;
 
@@ -17,13 +17,19 @@ impl<'r> FromRequest<'r> for ContentInfo {
                 Ok(i) => i,
                 Err(_) => {
                     warn!("Received request with invalid Content-Length header");
-                    return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid("Invalid Content-Length".to_string())));
+                    return Outcome::Failure((
+                        Status::BadRequest,
+                        Error::BlobUploadInvalid("Invalid Content-Length".to_string()),
+                    ));
                 }
             },
             None => {
                 // This probably just means we don't have ContentInfo
                 // Should be caught by an option in the RequestGuard
-                return Outcome::Failure((Status::BadRequest, Error::BlobUploadInvalid("Expected Content-Length header".to_string())));
+                return Outcome::Failure((
+                    Status::BadRequest,
+                    Error::BlobUploadInvalid("Expected Content-Length header".to_string()),
+                ));
             }
         };
 
@@ -41,6 +47,9 @@ impl<'r> FromRequest<'r> for ContentInfo {
             }
         }
         warn!("Received request with invalid Content-Range header");
-        Outcome::Failure((rocket::http::Status::BadRequest, Error::BlobUploadInvalid("Invalid Content-Range".to_string())))
+        Outcome::Failure((
+            rocket::http::Status::BadRequest,
+            Error::BlobUploadInvalid("Invalid Content-Range".to_string()),
+        ))
     }
 }

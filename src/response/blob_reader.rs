@@ -9,7 +9,7 @@ impl<'r> Responder<'r, 'static> for BlobReader {
         let digest = Header::new("Docker-Content-Digest", self.digest().to_string());
 
         // Important to used sized_body in order to have content length set correctly
-        let mut resp = Response::build().sized_body(None,self.get_reader()).ok()?;
+        let mut resp = Response::build().sized_body(None, self.get_reader()).ok()?;
         resp.set_header(ct);
         resp.set_header(digest);
 

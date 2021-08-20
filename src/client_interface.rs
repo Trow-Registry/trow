@@ -64,8 +64,6 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
     images
 }
 
-
-
 // TODO: Each function should have it's own enum of the errors it can return
 // There must be a standard pattern for this somewhere...
 #[derive(Debug, Fail)]
@@ -82,8 +80,11 @@ pub enum RegistryError {
 
 #[rocket::async_trait]
 impl ManifestStorage for ClientInterface {
-   
-    async fn get_manifest(&self, name: &str, tag: &str) -> Result<ManifestReader, StorageDriverError> {
+    async fn get_manifest(
+        &self,
+        name: &str,
+        tag: &str,
+    ) -> Result<ManifestReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let mr = self.get_reader_for_manifest(&rn, tag).await.map_err(|e| {
             warn!("Error getting manifest {:?}", e);
@@ -97,7 +98,7 @@ impl ManifestStorage for ClientInterface {
         &self,
         name: &str,
         tag: &str,
-        data: DataStream<'a>
+        data: DataStream<'a>,
     ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
@@ -134,11 +135,13 @@ impl ManifestStorage for ClientInterface {
     }
 }
 
-
 #[rocket::async_trait]
 impl BlobStorage for ClientInterface {
-    async fn get_blob(&self, name: &str, digest: &Digest) -> Result<BlobReader, StorageDriverError> {
-        
+    async fn get_blob(
+        &self,
+        name: &str,
+        digest: &Digest,
+    ) -> Result<BlobReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let br = self.get_reader_for_blob(&rn, &digest).await.map_err(|e| {
             warn!("Error getting manifest {:?}", e);
@@ -155,13 +158,15 @@ impl BlobStorage for ClientInterface {
         data_info: Option<ContentInfo>,
         data: DataStream<'a>,
     ) -> Result<Stored, StorageDriverError> {
-
         let rn = RepoName(name.to_string());
         let uuid = Uuid(session_id.to_string());
-        let mut sink = self.get_write_sink_for_upload(&rn, &uuid).await.map_err(|e| {
-            warn!("Error finding write sink for blob {:?}", e);
-            StorageDriverError::InvalidName(format!("{} {}", name, session_id))
-        })?;
+        let mut sink = self
+            .get_write_sink_for_upload(&rn, &uuid)
+            .await
+            .map_err(|e| {
+                warn!("Error finding write sink for blob {:?}", e);
+                StorageDriverError::InvalidName(format!("{} {}", name, session_id))
+            })?;
 
         let have_range = data_info.is_some();
         let info = data_info.unwrap_or(ContentInfo {
@@ -169,7 +174,6 @@ impl BlobStorage for ClientInterface {
             range: (0, 0),
         });
 
-        
         let start_index = sink.seek(SeekFrom::End(0)).await.unwrap_or(0);
         if have_range && (start_index != info.range.0) {
             warn!(
@@ -199,8 +203,12 @@ impl BlobStorage for ClientInterface {
                 return Err(StorageDriverError::InvalidContentRange);
             }
         }
-    
-        Ok(Stored{total_stored: total, chunk: chunk_len, complete})
+
+        Ok(Stored {
+            total_stored: total,
+            chunk: chunk_len,
+            complete,
+        })
     }
 
     async fn complete_and_verify_blob_upload(
@@ -209,8 +217,8 @@ impl BlobStorage for ClientInterface {
         session_id: &str,
         digest: &Digest,
     ) -> Result<(), StorageDriverError> {
-
-        self.complete_upload(name, session_id, &digest).await
+        self.complete_upload(name, session_id, &digest)
+            .await
             .map_err(|e| match e.downcast::<tonic::Status>() {
                 Ok(ts) => match ts.code() {
                     Code::InvalidArgument => StorageDriverError::InvalidDigest,
@@ -225,7 +233,6 @@ impl BlobStorage for ClientInterface {
     }
 
     async fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError> {
-        
         self.request_upload(name).await.map_err(|e| {
             match e.downcast::<tonic::Status>().map(|s| s.code()) {
                 Ok(Code::InvalidArgument) => StorageDriverError::InvalidName(name.to_string()),
@@ -237,8 +244,9 @@ impl BlobStorage for ClientInterface {
     async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         info!("Attempting to delete blob {} in {}", digest, name);
         let rn = RepoName(name.to_string());
-        
-        self.delete_blob_local(&rn, &digest).await
+
+        self.delete_blob_local(&rn, &digest)
+            .await
             .map_err(|_| StorageDriverError::InvalidDigest)?;
         Ok(())
     }
@@ -251,7 +259,11 @@ impl BlobStorage for ClientInterface {
         todo!()
     }
 
-    async fn cancel_blob_upload(&self, _name: &str, _session_id: &str) -> Result<(), StorageDriverError> {
+    async fn cancel_blob_upload(
+        &self,
+        _name: &str,
+        _session_id: &str,
+    ) -> Result<(), StorageDriverError> {
         todo!()
     }
 
@@ -259,7 +271,6 @@ impl BlobStorage for ClientInterface {
         todo!()
     }
 }
-
 
 #[rocket::async_trait]
 impl CatalogOperations for ClientInterface {
@@ -271,7 +282,8 @@ impl CatalogOperations for ClientInterface {
         let num_results = num_results.unwrap_or(u32::MAX);
         let start_value = start_value.unwrap_or_default();
 
-        self.get_catalog_part(num_results, start_value).await
+        self.get_catalog_part(num_results, start_value)
+            .await
             .map_err(|_| StorageDriverError::Internal)
             .map(|rc| rc.raw())
     }
@@ -285,7 +297,8 @@ impl CatalogOperations for ClientInterface {
         let num_results = num_results.unwrap_or(u32::MAX);
         let start_value = start_value.unwrap_or_default();
 
-       self.list_tags(repo, num_results, start_value).await
+        self.list_tags(repo, num_results, start_value)
+            .await
             .map_err(|_| StorageDriverError::Internal)
             .map(|rc| rc.raw())
     }
@@ -300,7 +313,8 @@ impl CatalogOperations for ClientInterface {
         let num_results = num_results.unwrap_or(u32::MAX);
         let start_value = start_value.unwrap_or_default();
 
-        self.get_manifest_history(repo, name, num_results, start_value).await
+        self.get_manifest_history(repo, name, num_results, start_value)
+            .await
             .map_err(|_| StorageDriverError::Internal)
     }
 }
@@ -312,26 +326,26 @@ impl Validation for ClientInterface {
         admission_req: &validation::AdmissionRequest,
         host_names: &Vec<String>,
     ) -> Result<validation::AdmissionResponse, ValidationError> {
-        self.validate_admission_internal(admission_req, host_names).await
+        self.validate_admission_internal(admission_req, host_names)
+            .await
             .map_err(|_| ValidationError::Internal)
     }
 }
 
-
 #[rocket::async_trait]
 impl Metrics for ClientInterface {
     async fn is_healthy(&self) -> bool {
-        self.is_healthy().await
-            .is_healthy
+        self.is_healthy().await.is_healthy
     }
 
     async fn is_ready(&self) -> bool {
         self.is_ready().await.is_ready
     }
 
-    async fn get_metrics(&self) -> Result<MetricsResponse, crate::registry_interface::MetricsError> {
-       self.get_metrics().await
-            .map_err(|_| MetricsError::Internal)
+    async fn get_metrics(
+        &self,
+    ) -> Result<MetricsResponse, crate::registry_interface::MetricsError> {
+        self.get_metrics().await.map_err(|_| MetricsError::Internal)
     }
 }
 
@@ -424,7 +438,8 @@ impl ClientInterface {
         let file = rocket::tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(resp.path).await?;
+            .open(resp.path)
+            .await?;
         Ok(file)
     }
 
@@ -456,9 +471,12 @@ impl ClientInterface {
 
         //It's not going to verify if it's clipped
         if !stream_res.complete {
-            warn!("Manifest {}:{} clipped by transfer limits", repo_name, reference);
+            warn!(
+                "Manifest {}:{} clipped by transfer limits",
+                repo_name, reference
+            );
             return Err(RegistryError::ManifestClipped);
-        } 
+        }
 
         self.verify_manifest(repo_name, reference, &uuid)
             .await
@@ -501,7 +519,8 @@ impl ClientInterface {
         let file = rocket::tokio::fs::OpenOptions::new()
             .create(true)
             .write(true)
-            .open(resp.path).await?;
+            .open(resp.path)
+            .await?;
         Ok((file, resp.uuid))
     }
 

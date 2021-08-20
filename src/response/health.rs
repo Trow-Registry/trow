@@ -49,7 +49,6 @@ mod test {
 
     #[test]
     fn test_healthy_resp() {
-
         let cl = test_client();
         let req = cl.get("/");
         let response = build_healthy_response().respond_to(req.inner()).unwrap();

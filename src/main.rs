@@ -236,9 +236,9 @@ fn main() {
     let no_tls = matches.is_present("no-tls");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
     let default_port = if no_tls { 8000 } else { 8443 };
-    let port: u16 = matches
-        .value_of("port")
-        .map_or(default_port, |x| x.parse().expect("Failed to parse port number"));
+    let port: u16 = matches.value_of("port").map_or(default_port, |x| {
+        x.parse().expect("Failed to parse port number")
+    });
     let cert_path = matches.value_of("cert").unwrap_or("./certs/domain.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
@@ -249,10 +249,16 @@ fn main() {
 
     let default_manifest_size: u32 = 4; //mebibytes
     let default_blob_size: u32 = 8192; //mebibytes
-    let max_manifest_size =  matches.value_of("max-manifest-size")
-        .map_or(default_manifest_size, |x| x.parse().expect("Failed to parse max manifest size"));
-    let max_blob_size =  matches.value_of("max-blob-size")
-        .map_or(default_blob_size, |x| x.parse().expect("Failed to parse max blob size"));
+    let max_manifest_size = matches
+        .value_of("max-manifest-size")
+        .map_or(default_manifest_size, |x| {
+            x.parse().expect("Failed to parse max manifest size")
+        });
+    let max_blob_size = matches
+        .value_of("max-blob-size")
+        .map_or(default_blob_size, |x| {
+            x.parse().expect("Failed to parse max blob size")
+        });
 
     let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
     if matches.is_present("allow-docker-official") {
@@ -285,7 +291,7 @@ fn main() {
         dry_run,
         cors,
         max_manifest_size,
-        max_blob_size
+        max_blob_size,
     );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());

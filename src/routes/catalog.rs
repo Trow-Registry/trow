@@ -15,7 +15,8 @@ pub async fn get_catalog(
     let last_repo = last.unwrap_or_default();
 
     let cat = ci
-        .get_catalog(Some(&last_repo), Some(limit)).await
+        .get_catalog(Some(&last_repo), Some(limit))
+        .await
         .map_err(|_| Error::InternalError)?;
 
     Ok(RepoCatalog::from(cat))
@@ -33,7 +34,8 @@ pub async fn list_tags(
     let last_tag = last.unwrap_or_default();
 
     let tags = ci
-        .get_tags(&repo_name, Some(&last_tag), Some(limit)).await
+        .get_tags(&repo_name, Some(&last_tag), Some(limit))
+        .await
         .map_err(|_| Error::InternalError)?;
     Ok(TagList::new_filled(repo_name, tags))
 }
@@ -80,7 +82,8 @@ pub async fn list_tags_4level(
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         last,
         n,
-    ).await
+    )
+    .await
 }
 
 // TODO add support for pagination
@@ -97,7 +100,8 @@ pub async fn get_manifest_history(
     let last_digest = last.unwrap_or_default();
 
     let mh = ci
-        .get_history(&onename, &reference, Some(&last_digest), Some(limit)).await
+        .get_history(&onename, &reference, Some(&last_digest), Some(limit))
+        .await
         .map_err(|_| Error::InternalError)?;
     Ok(mh)
 }
@@ -119,7 +123,8 @@ pub async fn get_manifest_history_2level(
         reference,
         last,
         n,
-    ).await
+    )
+    .await
 }
 
 #[get("/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
@@ -140,7 +145,8 @@ pub async fn get_manifest_history_3level(
         reference,
         last,
         n,
-    ).await
+    )
+    .await
 }
 
 #[get("/<fourth>/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
@@ -162,5 +168,6 @@ pub async fn get_manifest_history_4level(
         reference,
         last,
         n,
-    ).await
+    )
+    .await
 }

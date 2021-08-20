@@ -58,7 +58,7 @@ impl fmt::Display for Error {
                 f,
                 "BLOB_UPLOAD_INVALID",
                 "Invalid request to blob upload",
-                Some(json!({"Reason": detail})),
+                Some(json!({ "Reason": detail })),
             ),
             // TODO: INTERNAL_ERROR code is not in the distribution spec
             Error::InternalError => {
@@ -70,9 +70,12 @@ impl fmt::Display for Error {
                 "Provided digest did not match uploaded content",
                 None,
             ),
-            Error::ManifestInvalid(ref detail) => {
-                format_error_json(f, "MANIFEST_INVALID", "Manifest invalid", Some(json!({"detail": detail})),)
-            }
+            Error::ManifestInvalid(ref detail) => format_error_json(
+                f,
+                "MANIFEST_INVALID",
+                "Manifest invalid",
+                Some(json!({ "detail": detail })),
+            ),
             Error::ManifestUnknown(ref tag) => format_error_json(
                 f,
                 "MANIFEST_UNKNOWN",
@@ -143,7 +146,7 @@ impl<'r> Responder<'r, 'static> for Error {
         };
         Response::build()
             .header(ContentType::JSON)
-            .sized_body(None,Cursor::new(json))
+            .sized_body(None, Cursor::new(json))
             .status(status)
             .ok()
     }

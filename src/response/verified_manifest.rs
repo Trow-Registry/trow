@@ -43,8 +43,10 @@ mod test {
                 hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
                     .to_string(),
             },
-            "ref".to_string(),     
-        ).respond_to(req.inner()).unwrap();
+            "ref".to_string(),
+        )
+        .respond_to(req.inner())
+        .unwrap();
         assert_eq!(response.status(), Status::Created);
     }
 }

@@ -25,7 +25,8 @@ impl<'r> FromRequest<'r> for ValidBasicToken {
     type Error = ();
     async fn from_request(req: &'r Request<'_>) -> request::Outcome<ValidBasicToken, ()> {
         let config = req
-            .guard::<&rocket::State<TrowConfig>>().await
+            .guard::<&rocket::State<TrowConfig>>()
+            .await
             .expect("TrowConfig not present!");
 
         let user_cfg = match config.user {
@@ -172,9 +173,9 @@ impl<'r> Responder<'r, 'static> for TrowToken {
 impl<'r> FromRequest<'r> for TrowToken {
     type Error = ();
     async fn from_request(req: &'r Request<'_>) -> request::Outcome<TrowToken, ()> {
-
         let config = req
-            .guard::<&rocket::State<TrowConfig>>().await
+            .guard::<&rocket::State<TrowConfig>>()
+            .await
             .expect("TrowConfig not present!");
 
         if config.user.is_none() {

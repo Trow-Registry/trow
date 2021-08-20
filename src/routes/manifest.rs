@@ -1,11 +1,11 @@
 use rocket::data::ToByteUnit;
 
-use crate::TrowConfig;
 use crate::client_interface::ClientInterface;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{create_verified_manifest, ManifestDeleted, RepoName, VerifiedManifest};
+use crate::TrowConfig;
 
 /*
 ---
@@ -35,7 +35,8 @@ pub async fn get_manifest(
     reference: String,
 ) -> Result<ManifestReader, Error> {
     ci.get_manifest(&onename, &reference)
-        .await.map_err(|_| Error::ManifestUnknown(reference))
+        .await
+        .map_err(|_| Error::ManifestUnknown(reference))
 }
 
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
@@ -66,7 +67,8 @@ pub async fn get_manifest_3level(
         ci,
         format!("{}/{}/{}", org, user, repo),
         reference,
-    ).await
+    )
+    .await
 }
 
 /*
@@ -87,7 +89,8 @@ pub async fn get_manifest_4level(
         ci,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
-    ).await
+    )
+    .await
 }
 
 /*
@@ -102,7 +105,7 @@ Content-Type: <manifest media type>
 pub async fn put_image_manifest(
     _auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
-    tc:&rocket::State<TrowConfig>,
+    tc: &rocket::State<TrowConfig>,
     repo_name: String,
     reference: String,
     chunk: rocket::data::Data<'_>,
@@ -117,7 +120,10 @@ pub async fn put_image_manifest(
         )),
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
         Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid("".to_string())),
-        Err(StorageDriverError::InvalidContentRange) => Err(Error::ManifestInvalid(format!("Content over data limit {} mebibytes", tc.max_blob_size))),
+        Err(StorageDriverError::InvalidContentRange) => Err(Error::ManifestInvalid(format!(
+            "Content over data limit {} mebibytes",
+            tc.max_blob_size
+        ))),
         Err(_) => Err(Error::InternalError),
     }
 }
@@ -129,7 +135,7 @@ pub async fn put_image_manifest(
 pub async fn put_image_manifest_2level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
-    tc:&rocket::State<TrowConfig>,
+    tc: &rocket::State<TrowConfig>,
     user: String,
     repo: String,
     reference: String,
@@ -142,7 +148,8 @@ pub async fn put_image_manifest_2level(
         format!("{}/{}", user, repo),
         reference,
         chunk,
-    ).await
+    )
+    .await
 }
 
 /*
@@ -152,7 +159,7 @@ pub async fn put_image_manifest_2level(
 pub async fn put_image_manifest_3level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
-    tc:&rocket::State<TrowConfig>,
+    tc: &rocket::State<TrowConfig>,
     org: String,
     user: String,
     repo: String,
@@ -166,7 +173,8 @@ pub async fn put_image_manifest_3level(
         format!("{}/{}/{}", org, user, repo),
         reference,
         chunk,
-    ).await
+    )
+    .await
 }
 
 /*
@@ -179,7 +187,7 @@ pub async fn put_image_manifest_3level(
 pub async fn put_image_manifest_4level(
     auth_user: TrowToken,
     ci: &rocket::State<ClientInterface>,
-    tc:&rocket::State<TrowConfig>,
+    tc: &rocket::State<TrowConfig>,
     fourth: String,
     org: String,
     user: String,
@@ -194,7 +202,8 @@ pub async fn put_image_manifest_4level(
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         reference,
         chunk,
-    ).await
+    )
+    .await
 }
 
 /*
@@ -257,5 +266,6 @@ pub async fn delete_image_manifest_4level(
         ci,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
         digest,
-    ).await
+    )
+    .await
 }

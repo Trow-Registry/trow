@@ -5,8 +5,8 @@ use crate::response::trow_token::ValidBasicToken;
 use crate::response::trow_token::{self, TrowToken};
 use crate::TrowConfig;
 use rocket::request::Request;
-use rocket::State;
 use rocket::serde::json::{json, Json, Value};
+use rocket::State;
 use std::str;
 
 mod blob;

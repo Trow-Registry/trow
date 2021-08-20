@@ -54,11 +54,10 @@ mod test {
 
     #[test]
     fn test_resp() {
-        
         let cl = test_client();
         let req = cl.get("/");
         let response = build_response().respond_to(req.inner()).unwrap();
- 
+
         let headers = response.headers();
         assert_eq!(response.status(), Status::Created);
         assert!(headers.contains("Location"));

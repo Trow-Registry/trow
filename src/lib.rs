@@ -112,9 +112,9 @@ struct UserConfig {
     hash_encoded: String, //Surprised not bytes
 }
 
-fn init_trow_server(config: TrowConfig) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>, Error>
-{
-
+fn init_trow_server(
+    config: TrowConfig,
+) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>, Error> {
     debug!("Starting Trow server");
 
     //Could pass full config here.
@@ -187,7 +187,7 @@ impl TrowBuilder {
         dry_run: bool,
         cors: bool,
         max_manifest_size: u32,
-        max_blob_size: u32
+        max_blob_size: u32,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -256,8 +256,9 @@ impl TrowBuilder {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
                 return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
             }
-            
-            let tls_config = rocket::config::TlsConfig::from_paths(tls.cert_file.clone(), tls.key_file.clone());
+
+            let tls_config =
+                rocket::config::TlsConfig::from_paths(tls.cert_file.clone(), tls.key_file.clone());
             figment = figment.merge(("tls", tls_config));
         }
         let cfg = rocket::Config::from(figment);
@@ -269,15 +270,20 @@ impl TrowBuilder {
 
         let rocket_config = &self.build_rocket_config()?;
 
-
         println!(
             "Starting Trow {} on {}:{}",
             env!("CARGO_PKG_VERSION"),
             self.config.addr.host,
             self.config.addr.port
         );
-        println!("\nMaximum blob size: {} Mebibytes", self.config.max_blob_size );
-        println!("Maximum manifest size: {} Mebibytes", self.config.max_manifest_size);
+        println!(
+            "\nMaximum blob size: {} Mebibytes",
+            self.config.max_blob_size
+        );
+        println!(
+            "Maximum manifest size: {} Mebibytes",
+            self.config.max_manifest_size
+        );
 
         println!("\n**Validation callback configuration\n");
 
@@ -336,15 +342,17 @@ impl TrowBuilder {
             .manage(ci)
             .attach(fairing::AdHoc::on_response(
                 "Set API Version Header",
-                |_, resp| Box::pin(async move {
-                    //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
-                    resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
+                |_, resp| {
+                    Box::pin(async move {
+                        //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
+                        resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
+                    })
                 },
-            )))
-            .attach(fairing::AdHoc::on_liftoff("Launch Message", |_| 
+            ))
+            .attach(fairing::AdHoc::on_liftoff("Launch Message", |_| {
                 Box::pin(async move {
                     println!("Trow is up and running!");
-            })))
+            })}))
             .attach_if(self.config.cors, cors.clone())
             .mount("/", routes::routes())
             .register("/", routes::catchers())

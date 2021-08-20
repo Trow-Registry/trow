@@ -25,7 +25,7 @@ pub struct BlobReader {
 pub struct Stored {
     pub total_stored: u64,
     pub chunk: u64,
-    pub complete: bool // true if whole stream was read, false if hit data cap
+    pub complete: bool, // true if whole stream was read, false if hit data cap
 }
 
 impl BlobReader {
@@ -38,13 +38,13 @@ impl BlobReader {
     }
 }
 
-
 #[rocket::async_trait]
 pub trait BlobStorage {
     /// Retrieve the blob from the registry identified by digest.
     /// A HEAD request can also be issued to this endpoint to obtain resource information without receiving all data.
     /// GET: /v2/<name>/blobs/<digest>
-    async fn get_blob(&self, name: &str, digest: &Digest) -> Result<BlobReader, StorageDriverError>;
+    async fn get_blob(&self, name: &str, digest: &Digest)
+        -> Result<BlobReader, StorageDriverError>;
 
     /// Delete the blob identified by name and digest
     /// DELETE: /v2/<name>/blobs/<digest>
@@ -69,7 +69,7 @@ pub trait BlobStorage {
     ///
     /// TODO: Really should not be using Rocket specific DataStream object.
     /// It's used to determine if max transfer cap was hit.
-    /// Solution may be to return method that gets write sink (see old code). 
+    /// Solution may be to return method that gets write sink (see old code).
     async fn store_blob_chunk<'a>(
         &self,
         name: &str,
@@ -91,7 +91,11 @@ pub trait BlobStorage {
     /// If this is not called, the unfinished uploads will eventually timeout.
     /// DELETE: /v2/<name>/blobs/uploads/<session_id>
     /// Here we need to delete the existing temporary file/location based on its identifier: the session_id
-    async fn cancel_blob_upload(&self, name: &str, session_id: &str) -> Result<(), StorageDriverError>;
+    async fn cancel_blob_upload(
+        &self,
+        name: &str,
+        session_id: &str,
+    ) -> Result<(), StorageDriverError>;
 
     /// Whether the specific blob exists
     /// AM: Assume this is for HEAD requests?

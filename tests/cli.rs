@@ -121,7 +121,6 @@ mod cli {
 
     #[test]
     fn file_size_parsing() {
-
         assert_cli::Assert::main_binary()
             .with_args(&["--max-manifest-size", "3", "--dry-run"])
             .succeeds()
@@ -139,6 +138,5 @@ mod cli {
             .with_args(&["--max-manifest-size", "1.1"])
             .fails()
             .unwrap();
-            
     }
 }

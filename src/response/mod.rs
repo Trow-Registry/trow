@@ -30,7 +30,8 @@ fn get_base_url(req: &Request<'_>) -> String {
     let host = get_domain_name(req);
 
     let config = req
-        .rocket().state::<TrowConfig>()
+        .rocket()
+        .state::<TrowConfig>()
         .expect("TrowConfig not present!");
 
     // Check if we have an upstream load balancer doing TLS termination

@@ -20,10 +20,9 @@ mod test {
 
     #[test]
     fn empty_ok() {
-        
         let cl = test_client();
         let req = cl.get("/");
-        let response = Empty{}.respond_to(req.inner()).unwrap();
+        let response = Empty {}.respond_to(req.inner()).unwrap();
         assert_eq!(response.status(), Status::Ok);
     }
 }

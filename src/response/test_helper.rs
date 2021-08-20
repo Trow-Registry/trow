@@ -10,7 +10,6 @@ use rocket::local::blocking::Client;
 
 #[cfg(test)]
 pub fn test_client() -> Client {
-   
     let trow_config = TrowConfig {
         data_dir: "".to_string(),
         addr: NetAddr {
@@ -36,6 +35,8 @@ pub fn test_client() -> Client {
         user: None,
         cors: false,
     };
-    let rocket = rocket::Rocket::build().manage(trow_config).mount("/", vec![]);
+    let rocket = rocket::Rocket::build()
+        .manage(trow_config)
+        .mount("/", vec![]);
     Client::tracked(rocket).expect("valid rocket instance")
 }
