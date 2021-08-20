@@ -352,7 +352,8 @@ impl TrowBuilder {
             .attach(fairing::AdHoc::on_liftoff("Launch Message", |_| {
                 Box::pin(async move {
                     println!("Trow is up and running!");
-            })}))
+                })
+            }))
             .attach_if(self.config.cors, cors.clone())
             .mount("/", routes::routes())
             .register("/", routes::catchers())
