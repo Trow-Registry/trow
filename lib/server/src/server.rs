@@ -15,6 +15,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 pub mod trow_server {
@@ -1019,7 +1020,7 @@ impl Registry for TrowServer {
         ret
     }
 
-    type GetCatalogStream = mpsc::Receiver<Result<CatalogEntry, Status>>;
+    type GetCatalogStream = ReceiverStream<Result<CatalogEntry, Status>>;
 
     async fn get_catalog(
         &self,
@@ -1028,7 +1029,7 @@ impl Registry for TrowServer {
         let cr = request.into_inner();
         let limit = cr.limit as usize;
 
-        let (mut tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(4);
         let catalog: HashSet<String> = RepoIterator::new(&self.manifests_path)
             .map_err(|e| {
                 error!("Error accessing catalog {:?}", e);
@@ -1061,16 +1062,16 @@ impl Registry for TrowServer {
                 tx.send(Ok(ce)).await.expect("Error streaming catalog");
             }
         });
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
-    type ListTagsStream = mpsc::Receiver<Result<Tag, Status>>;
+    type ListTagsStream = ReceiverStream<Result<Tag, Status>>;
 
     async fn list_tags(
         &self,
         request: Request<ListTagsRequest>,
     ) -> Result<Response<Self::ListTagsStream>, Status> {
-        let (mut tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(4);
         let mut path = PathBuf::from(&self.manifests_path);
 
         let ltr = request.into_inner();
@@ -1106,10 +1107,10 @@ impl Registry for TrowServer {
                 .expect("Error streaming tags");
             }
         });
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
-    type GetManifestHistoryStream = mpsc::Receiver<Result<ManifestHistoryEntry, Status>>;
+    type GetManifestHistoryStream = ReceiverStream<Result<ManifestHistoryEntry, Status>>;
 
     async fn get_manifest_history(
         &self,
@@ -1136,7 +1137,7 @@ impl Registry for TrowServer {
         // It's safe to unwrap here
         let reader = BufReader::new(file.unwrap());
 
-        let (mut tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
             let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
 
@@ -1189,7 +1190,7 @@ impl Registry for TrowServer {
                 }
             }
         });
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     // Readiness check

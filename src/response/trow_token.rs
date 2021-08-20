@@ -5,7 +5,7 @@ use rocket::http::ContentType;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::{Responder, Response};
-use rocket::{Outcome, State};
+use rocket::{outcome::Outcome, State};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::Cursor;
@@ -20,11 +20,13 @@ pub struct ValidBasicToken {
     user: String,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for ValidBasicToken {
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for ValidBasicToken {
     type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<ValidBasicToken, ()> {
+    async fn from_request(req: &'r Request<'_>) -> request::Outcome<ValidBasicToken, ()> {
         let config = req
-            .guard::<rocket::State<TrowConfig>>()
+            .guard::<&rocket::State<TrowConfig>>()
+            .await
             .expect("TrowConfig not present!");
 
         let user_cfg = match config.user {
@@ -125,7 +127,7 @@ struct TokenClaim {
  * Create new jsonwebtoken.
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
-pub fn new(vbt: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, frank_jwt::Error> {
+pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, frank_jwt::Error> {
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
@@ -155,14 +157,8 @@ pub fn new(vbt: ValidBasicToken, tc: State<TrowConfig>) -> Result<TrowToken, fra
 /*
  * Responder returns token as JSON body
  */
-
-#[derive(Serialize, Deserialize, Debug)]
-struct TrowTokenResponse {
-    token: String,
-}
-
-impl<'r> Responder<'r> for TrowToken {
-    fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for TrowToken {
+    fn respond_to(self, _: &Request) -> Result<Response<'static>, Status> {
         //TODO: would be better to use serde here
         let token = TrowTokenResponse { token: self.token };
         let serialized_token = serde_json::to_string(&token).unwrap();
@@ -170,19 +166,18 @@ impl<'r> Responder<'r> for TrowToken {
         Response::build()
             .status(Status::Ok)
             .header(ContentType::JSON)
-            .sized_body(formatted_body)
+            .sized_body(None, formatted_body)
             .ok()
     }
 }
 
-/*
- *
- */
-impl<'a, 'r> FromRequest<'a, 'r> for TrowToken {
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for TrowToken {
     type Error = ();
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<TrowToken, ()> {
+    async fn from_request(req: &'r Request<'_>) -> request::Outcome<TrowToken, ()> {
         let config = req
-            .guard::<rocket::State<TrowConfig>>()
+            .guard::<&rocket::State<TrowConfig>>()
+            .await
             .expect("TrowConfig not present!");
 
         if config.user.is_none() {

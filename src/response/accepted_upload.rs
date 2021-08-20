@@ -2,10 +2,11 @@ use crate::response::get_base_url;
 use crate::types::AcceptedUpload;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
-use rocket::response::{Responder, Response};
+use rocket::response::{self, Responder, Response};
 
-impl<'r> Responder<'r> for AcceptedUpload {
-    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
+#[rocket::async_trait]
+impl<'r> Responder<'r, 'static> for AcceptedUpload {
+    fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
         let location = format!(
             "{}/v2/{}/blobs/{}",
             get_base_url(req),
@@ -34,8 +35,9 @@ mod test {
     use crate::registry_interface::Digest;
     use crate::types::{create_accepted_upload, AcceptedUpload};
     use crate::types::{RepoName, Uuid};
-    use crate::{registry_interface::DigestAlgorithm, response::test_helper::test_route};
+    use crate::{registry_interface::DigestAlgorithm, response::test_helper::test_client};
     use rocket::http::Status;
+    use rocket::response::Responder;
 
     fn build_response() -> AcceptedUpload {
         create_accepted_upload(
@@ -52,7 +54,10 @@ mod test {
 
     #[test]
     fn test_resp() {
-        let response = test_route(build_response());
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = build_response().respond_to(req.inner()).unwrap();
+
         let headers = response.headers();
         assert_eq!(response.status(), Status::Created);
         assert!(headers.contains("Location"));

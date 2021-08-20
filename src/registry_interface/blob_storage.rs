@@ -1,7 +1,9 @@
+use rocket::data::DataStream;
+
 use super::digest::Digest;
-use super::SeekRead;
+use super::AsyncSeekRead;
 use super::StorageDriverError;
-use std::io::Read;
+use std::pin::Pin;
 
 pub struct ContentInfo {
     pub length: u64,
@@ -18,11 +20,16 @@ pub struct UploadInfo {
 
 pub struct BlobReader {
     pub digest: Digest,
-    pub reader: Box<dyn SeekRead>,
+    pub reader: Pin<Box<dyn AsyncSeekRead>>,
+}
+pub struct Stored {
+    pub total_stored: u64,
+    pub chunk: u64,
+    pub complete: bool, // true if whole stream was read, false if hit data cap
 }
 
 impl BlobReader {
-    pub fn get_reader(self) -> Box<dyn SeekRead> {
+    pub fn get_reader(self) -> Pin<Box<dyn AsyncSeekRead>> {
         self.reader
     }
 
@@ -31,24 +38,26 @@ impl BlobReader {
     }
 }
 
+#[rocket::async_trait]
 pub trait BlobStorage {
     /// Retrieve the blob from the registry identified by digest.
     /// A HEAD request can also be issued to this endpoint to obtain resource information without receiving all data.
     /// GET: /v2/<name>/blobs/<digest>
-    fn get_blob(&self, name: &str, digest: &Digest) -> Result<BlobReader, StorageDriverError>;
+    async fn get_blob(&self, name: &str, digest: &Digest)
+        -> Result<BlobReader, StorageDriverError>;
 
     /// Delete the blob identified by name and digest
     /// DELETE: /v2/<name>/blobs/<digest>
-    fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError>;
+    async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError>;
 
     /// Requests to start a resumable upload for the given repository.
     /// Returns a session identifier for the upload.
-    fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError>;
+    async fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError>;
 
     /// Retrieve status of upload identified by session_id.
     /// The primary purpose of this endpoint is to resolve the current status of a resumable upload.
     /// GET: /v2/<name>/blobs/uploads/<session_id>
-    fn status_blob_upload(&self, name: &str, session_id: &str) -> UploadInfo;
+    async fn status_blob_upload(&self, name: &str, session_id: &str) -> UploadInfo;
 
     /// Upload a chunk of data for the specified upload.
     /// PATCH: /v2/<name>/blobs/uploads/<session_id>
@@ -57,17 +66,21 @@ pub trait BlobStorage {
     /// as its identifier.
     /// Passed optional ContentInfo which describes range of data.
     /// Returns current size of blob, including any previous chunks
-    fn store_blob_chunk(
+    ///
+    /// TODO: Really should not be using Rocket specific DataStream object.
+    /// It's used to determine if max transfer cap was hit.
+    /// Solution may be to return method that gets write sink (see old code).
+    async fn store_blob_chunk<'a>(
         &self,
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: &mut Box<dyn Read>,
-    ) -> Result<u64, StorageDriverError>;
+        data: DataStream<'a>,
+    ) -> Result<Stored, StorageDriverError>;
 
     /// Finalises the upload of the given session_id.
     /// Also verfies uploaded blob matches user digest
-    fn complete_and_verify_blob_upload(
+    async fn complete_and_verify_blob_upload(
         &self,
         name: &str,
         session_id: &str,
@@ -78,9 +91,13 @@ pub trait BlobStorage {
     /// If this is not called, the unfinished uploads will eventually timeout.
     /// DELETE: /v2/<name>/blobs/uploads/<session_id>
     /// Here we need to delete the existing temporary file/location based on its identifier: the session_id
-    fn cancel_blob_upload(&self, name: &str, session_id: &str) -> Result<(), StorageDriverError>;
+    async fn cancel_blob_upload(
+        &self,
+        name: &str,
+        session_id: &str,
+    ) -> Result<(), StorageDriverError>;
 
     /// Whether the specific blob exists
     /// AM: Assume this is for HEAD requests?
-    fn has_blob(&self, name: &str, digest: &Digest) -> bool;
+    async fn has_blob(&self, name: &str, digest: &Digest) -> bool;
 }

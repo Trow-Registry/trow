@@ -1,9 +1,7 @@
 #Not a big fan of using nightly, but such is our lot currently
 FROM rust:latest as builder
 
-#RUN rustup default nightly-2021-01-30 && rustup component add rustfmt
-RUN rustup toolchain install nightly --allow-downgrade -c rustfmt
-RUN rustup default nightly
+RUN rustup component add rustfmt
 RUN apt-get update && apt-get install -y unzip
 
 WORKDIR /usr/src/trow

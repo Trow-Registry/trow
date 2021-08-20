@@ -2,12 +2,14 @@ pub mod trow_proto {
     include!("../lib/protobuf/out/trow.rs");
 }
 
+use crate::registry_interface::blob_storage::Stored;
 use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
 use crate::registry_interface::{
     validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
     Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
 };
-use tokio::runtime::Runtime;
+use rocket::data::DataStream;
+use rocket::tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite};
 use trow_proto::{
     admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
     BlobRef, CatalogRequest, CompleteRequest, HealthRequest, ListTagsRequest,
@@ -25,9 +27,7 @@ use crate::{
 use failure::Error;
 use serde_json::Value;
 use std::convert::TryInto;
-use std::fs::OpenOptions;
-use std::io;
-use std::io::prelude::*;
+use std::io::SeekFrom;
 
 // BIG TODO:
 // Creating a new runtime for each request is awful.
@@ -73,15 +73,20 @@ pub enum RegistryError {
     #[fail(display = "Invalid manifest")]
     InvalidManifest,
     #[fail(display = "Invalid Range")]
+    ManifestClipped,
+    #[fail(display = "Manifest over data limit")]
     Internal,
 }
 
+#[rocket::async_trait]
 impl ManifestStorage for ClientInterface {
-    fn get_manifest(&self, name: &str, tag: &str) -> Result<ManifestReader, StorageDriverError> {
-        let mut rt = Runtime::new().unwrap();
+    async fn get_manifest(
+        &self,
+        name: &str,
+        tag: &str,
+    ) -> Result<ManifestReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
-        let f = self.get_reader_for_manifest(&rn, tag);
-        let mr = rt.block_on(f).map_err(|e| {
+        let mr = self.get_reader_for_manifest(&rn, tag).await.map_err(|e| {
             warn!("Error getting manifest {:?}", e);
             StorageDriverError::Internal
         })?;
@@ -89,29 +94,28 @@ impl ManifestStorage for ClientInterface {
         Ok(mr)
     }
 
-    fn store_manifest(
+    async fn store_manifest<'a>(
         &self,
         name: &str,
         tag: &str,
-        data: &mut Box<dyn Read>,
+        data: DataStream<'a>,
     ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
-        let mut rt = Runtime::new().unwrap();
-        match rt.block_on(self.upload_manifest(&repo, &tag, data)) {
+        match self.upload_manifest(&repo, &tag, data).await {
             Ok(vm) => Ok(vm.digest().clone()),
             Err(RegistryError::InvalidName) => {
                 Err(StorageDriverError::InvalidName(format!("{}:{}", name, tag)))
             }
             Err(RegistryError::InvalidManifest) => Err(StorageDriverError::InvalidManifest),
+            Err(RegistryError::ManifestClipped) => Err(StorageDriverError::InvalidContentRange),
             Err(_) => Err(StorageDriverError::Internal),
         }
     }
 
-    fn delete_manifest(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
+    async fn delete_manifest(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         let repo = RepoName(name.to_string());
-        let r = self.delete_by_manifest(&repo, &digest);
-        Runtime::new().unwrap().block_on(r).map_err(|e| {
+        self.delete_by_manifest(&repo, &digest).await.map_err(|e| {
             let e = e.downcast::<tonic::Status>();
             if let Ok(ts) = e {
                 match ts.code() {
@@ -126,17 +130,20 @@ impl ManifestStorage for ClientInterface {
         Ok(())
     }
 
-    fn has_manifest(&self, _name: &str, _algo: &DigestAlgorithm, _reference: &str) -> bool {
+    async fn has_manifest(&self, _name: &str, _algo: &DigestAlgorithm, _reference: &str) -> bool {
         todo!()
     }
 }
 
+#[rocket::async_trait]
 impl BlobStorage for ClientInterface {
-    fn get_blob(&self, name: &str, digest: &Digest) -> Result<BlobReader, StorageDriverError> {
-        let mut rt = Runtime::new().unwrap();
+    async fn get_blob(
+        &self,
+        name: &str,
+        digest: &Digest,
+    ) -> Result<BlobReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
-        let f = self.get_reader_for_blob(&rn, &digest);
-        let br = rt.block_on(f).map_err(|e| {
+        let br = self.get_reader_for_blob(&rn, &digest).await.map_err(|e| {
             warn!("Error getting manifest {:?}", e);
             StorageDriverError::Internal
         })?;
@@ -144,21 +151,22 @@ impl BlobStorage for ClientInterface {
         Ok(br)
     }
 
-    fn store_blob_chunk(
+    async fn store_blob_chunk<'a>(
         &self,
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: &mut Box<dyn Read>,
-    ) -> Result<u64, StorageDriverError> {
-        let mut rt = Runtime::new().unwrap();
+        data: DataStream<'a>,
+    ) -> Result<Stored, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let uuid = Uuid(session_id.to_string());
-        let f = self.get_write_sink_for_upload(&rn, &uuid);
-        let mut sink = rt.block_on(f).map_err(|e| {
-            warn!("Error finding write sink for blob {:?}", e);
-            StorageDriverError::InvalidName(format!("{} {}", name, session_id))
-        })?;
+        let mut sink = self
+            .get_write_sink_for_upload(&rn, &uuid)
+            .await
+            .map_err(|e| {
+                warn!("Error finding write sink for blob {:?}", e);
+                StorageDriverError::InvalidName(format!("{} {}", name, session_id))
+            })?;
 
         let have_range = data_info.is_some();
         let info = data_info.unwrap_or(ContentInfo {
@@ -166,7 +174,7 @@ impl BlobStorage for ClientInterface {
             range: (0, 0),
         });
 
-        let start_index = sink.stream_len().unwrap_or(0);
+        let start_index = sink.seek(SeekFrom::End(0)).await.unwrap_or(0);
         if have_range && (start_index != info.range.0) {
             warn!(
                 "Asked to store blob with invalid start index. Expected {} got {}",
@@ -175,35 +183,42 @@ impl BlobStorage for ClientInterface {
             return Err(StorageDriverError::InvalidContentRange);
         }
 
-        let len = io::copy(data, &mut sink).map_err(|e| {
+        let stream_res = data.stream_to(&mut sink).await.map_err(|e| {
             warn!("Error writing blob {:?}", e);
             StorageDriverError::Internal
         })?;
 
-        let total = sink.stream_len().unwrap_or(len);
+        let chunk_len = stream_res.written;
+        let complete = stream_res.complete;
+
+        let total = sink.seek(SeekFrom::End(0)).await.unwrap_or(chunk_len);
         if have_range {
             if (info.range.1 + 1) != total {
                 warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
                 return Err(StorageDriverError::InvalidContentRange);
             }
             //Check length if chunked upload
-            if info.length != len {
-                warn!("info.length {} len {}", info.length, len);
+            if info.length != chunk_len {
+                warn!("info.length {} len {}", info.length, chunk_len);
                 return Err(StorageDriverError::InvalidContentRange);
             }
         }
-        Ok(total)
+
+        Ok(Stored {
+            total_stored: total,
+            chunk: chunk_len,
+            complete,
+        })
     }
 
-    fn complete_and_verify_blob_upload(
+    async fn complete_and_verify_blob_upload(
         &self,
         name: &str,
         session_id: &str,
         digest: &Digest,
     ) -> Result<(), StorageDriverError> {
-        let mut rt = Runtime::new().unwrap();
-
-        rt.block_on(self.complete_upload(name, session_id, &digest))
+        self.complete_upload(name, session_id, &digest)
+            .await
             .map_err(|e| match e.downcast::<tonic::Status>() {
                 Ok(ts) => match ts.code() {
                     Code::InvalidArgument => StorageDriverError::InvalidDigest,
@@ -217,9 +232,8 @@ impl BlobStorage for ClientInterface {
         Ok(())
     }
 
-    fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError> {
-        let mut rt = Runtime::new().unwrap();
-        rt.block_on(self.request_upload(name)).map_err(|e| {
+    async fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError> {
+        self.request_upload(name).await.map_err(|e| {
             match e.downcast::<tonic::Status>().map(|s| s.code()) {
                 Ok(Code::InvalidArgument) => StorageDriverError::InvalidName(name.to_string()),
                 _ => StorageDriverError::Internal,
@@ -227,16 +241,17 @@ impl BlobStorage for ClientInterface {
         })
     }
 
-    fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
+    async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         info!("Attempting to delete blob {} in {}", digest, name);
         let rn = RepoName(name.to_string());
-        let mut rt = Runtime::new().unwrap();
-        rt.block_on(self.delete_blob_local(&rn, &digest))
+
+        self.delete_blob_local(&rn, &digest)
+            .await
             .map_err(|_| StorageDriverError::InvalidDigest)?;
         Ok(())
     }
 
-    fn status_blob_upload(
+    async fn status_blob_upload(
         &self,
         _name: &str,
         _session_id: &str,
@@ -244,17 +259,22 @@ impl BlobStorage for ClientInterface {
         todo!()
     }
 
-    fn cancel_blob_upload(&self, _name: &str, _session_id: &str) -> Result<(), StorageDriverError> {
+    async fn cancel_blob_upload(
+        &self,
+        _name: &str,
+        _session_id: &str,
+    ) -> Result<(), StorageDriverError> {
         todo!()
     }
 
-    fn has_blob(&self, _name: &str, _digest: &Digest) -> bool {
+    async fn has_blob(&self, _name: &str, _digest: &Digest) -> bool {
         todo!()
     }
 }
 
+#[rocket::async_trait]
 impl CatalogOperations for ClientInterface {
-    fn get_catalog(
+    async fn get_catalog(
         &self,
         start_value: Option<&str>,
         num_results: Option<u32>,
@@ -262,14 +282,13 @@ impl CatalogOperations for ClientInterface {
         let num_results = num_results.unwrap_or(u32::MAX);
         let start_value = start_value.unwrap_or_default();
 
-        Runtime::new()
-            .unwrap()
-            .block_on(self.get_catalog_part(num_results, start_value))
+        self.get_catalog_part(num_results, start_value)
+            .await
             .map_err(|_| StorageDriverError::Internal)
             .map(|rc| rc.raw())
     }
 
-    fn get_tags(
+    async fn get_tags(
         &self,
         repo: &str,
         start_value: Option<&str>,
@@ -278,14 +297,13 @@ impl CatalogOperations for ClientInterface {
         let num_results = num_results.unwrap_or(u32::MAX);
         let start_value = start_value.unwrap_or_default();
 
-        Runtime::new()
-            .unwrap()
-            .block_on(self.list_tags(repo, num_results, start_value))
+        self.list_tags(repo, num_results, start_value)
+            .await
             .map_err(|_| StorageDriverError::Internal)
             .map(|rc| rc.raw())
     }
 
-    fn get_history(
+    async fn get_history(
         &self,
         repo: &str,
         name: &str,
@@ -295,43 +313,39 @@ impl CatalogOperations for ClientInterface {
         let num_results = num_results.unwrap_or(u32::MAX);
         let start_value = start_value.unwrap_or_default();
 
-        Runtime::new()
-            .unwrap()
-            .block_on(self.get_manifest_history(repo, name, num_results, start_value))
+        self.get_manifest_history(repo, name, num_results, start_value)
+            .await
             .map_err(|_| StorageDriverError::Internal)
     }
 }
 
+#[rocket::async_trait]
 impl Validation for ClientInterface {
-    fn validate_admission(
+    async fn validate_admission(
         &self,
         admission_req: &validation::AdmissionRequest,
         host_names: &Vec<String>,
     ) -> Result<validation::AdmissionResponse, ValidationError> {
-        Runtime::new()
-            .unwrap()
-            .block_on(self.validate_admission_internal(admission_req, host_names))
+        self.validate_admission_internal(admission_req, host_names)
+            .await
             .map_err(|_| ValidationError::Internal)
     }
 }
 
+#[rocket::async_trait]
 impl Metrics for ClientInterface {
-    fn is_healthy(&self) -> bool {
-        Runtime::new()
-            .unwrap()
-            .block_on(self.is_healthy())
-            .is_healthy
+    async fn is_healthy(&self) -> bool {
+        self.is_healthy().await.is_healthy
     }
 
-    fn is_ready(&self) -> bool {
-        Runtime::new().unwrap().block_on(self.is_ready()).is_ready
+    async fn is_ready(&self) -> bool {
+        self.is_ready().await.is_ready
     }
 
-    fn get_metrics(&self) -> Result<MetricsResponse, crate::registry_interface::MetricsError> {
-        Runtime::new()
-            .unwrap()
-            .block_on(self.get_metrics())
-            .map_err(|_| MetricsError::Internal)
+    async fn get_metrics(
+        &self,
+    ) -> Result<MetricsResponse, crate::registry_interface::MetricsError> {
+        self.get_metrics().await.map_err(|_| MetricsError::Internal)
     }
 }
 
@@ -403,7 +417,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
-    ) -> Result<impl Write + Seek, Error> {
+    ) -> Result<impl AsyncWrite + AsyncSeek, Error> {
         info!(
             "Getting write location for blob in repo {} with upload id {}",
             repo_name, uuid
@@ -421,10 +435,11 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = OpenOptions::new()
+        let file = rocket::tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(resp.path)?;
+            .open(resp.path)
+            .await?;
         Ok(file)
     }
 
@@ -432,7 +447,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-        manifest: &mut Box<dyn Read + 'a>,
+        manifest: DataStream<'a>,
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)
@@ -449,10 +464,19 @@ impl ClientInterface {
                 }
             })?;
 
-        io::copy(manifest, &mut sink_loc).map_err(|e| {
-            warn!("Error wirting out manifest {:?}", e);
+        let stream_res = manifest.stream_to(&mut sink_loc).await.map_err(|e| {
+            warn!("Error writing out manifest {:?}", e);
             RegistryError::Internal
         })?;
+
+        //It's not going to verify if it's clipped
+        if !stream_res.complete {
+            warn!(
+                "Manifest {}:{} clipped by transfer limits",
+                repo_name, reference
+            );
+            return Err(RegistryError::ManifestClipped);
+        }
 
         self.verify_manifest(repo_name, reference, &uuid)
             .await
@@ -473,7 +497,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-    ) -> Result<(impl Write, String), Error> {
+    ) -> Result<(impl AsyncWrite, String), Error> {
         info!(
             "Getting write location for manifest in repo {} with ref {}",
             repo_name, reference
@@ -492,10 +516,11 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         //Manifests don't append; just overwrite
-        let file = OpenOptions::new()
+        let file = rocket::tokio::fs::OpenOptions::new()
             .create(true)
             .write(true)
-            .open(resp.path)?;
+            .open(resp.path)
+            .await?;
         Ok((file, resp.uuid))
     }
 
@@ -520,10 +545,10 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = OpenOptions::new().read(true).open(resp.path)?;
+        let file = rocket::tokio::fs::File::open(resp.path).await?;
         let digest = digest::parse(&resp.digest)?;
         let mr = ManifestReader {
-            reader: Box::new(file),
+            reader: Box::pin(file),
             content_type: resp.content_type,
             digest,
         };
@@ -587,9 +612,9 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = OpenOptions::new().read(true).open(resp.path)?;
+        let file = rocket::tokio::fs::File::open(resp.path).await?;
         let reader = BlobReader {
-            reader: Box::new(file),
+            reader: Box::pin(file),
             digest: digest.clone(),
         };
         Ok(reader)

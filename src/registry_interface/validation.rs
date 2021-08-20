@@ -33,10 +33,12 @@ pub enum ValidationError {
     #[error("Internal validation error")]
     Internal,
 }
+
+#[rocket::async_trait]
 pub trait Validation {
     // This function signature is very tied to the implementation.
     // If you develop a new front-end and have problems here, we should change it.
-    fn validate_admission(
+    async fn validate_admission(
         &self,
         admission_req: &AdmissionRequest,
         host_names: &Vec<String>,

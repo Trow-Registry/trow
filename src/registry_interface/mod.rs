@@ -1,5 +1,4 @@
-use std::io::Read;
-use std::io::Seek;
+use rocket::tokio::io::{AsyncRead, AsyncSeek};
 use thiserror::Error;
 
 pub use blob_storage::{BlobReader, BlobStorage, ContentInfo, UploadInfo};
@@ -36,8 +35,8 @@ pub enum StorageDriverError {
 
 //If there's a better solution, please let me know.
 //I'd much rather not have to write an impl for every class :(
-pub trait SeekRead: Read + Seek {}
-impl SeekRead for std::fs::File {}
+pub trait AsyncSeekRead: AsyncRead + AsyncSeek + Send {}
+impl AsyncSeekRead for rocket::tokio::fs::File {}
 
 // Super trait
 pub trait RegistryStorage: ManifestStorage + BlobStorage + CatalogOperations {

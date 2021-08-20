@@ -5,8 +5,8 @@ use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
 
-impl<'r> Responder<'r> for VerifiedManifest {
-    fn respond_to(self, req: &Request) -> Result<Response<'r>, Status> {
+impl<'r> Responder<'r, 'static> for VerifiedManifest {
+    fn respond_to(self, req: &Request) -> Result<Response<'static>, Status> {
         //The front end is responsible for assembling URLs, backend should deal in arguments
         let location = format!(
             "{}/v2/{}/manifests/{}",
@@ -27,13 +27,16 @@ impl<'r> Responder<'r> for VerifiedManifest {
 #[cfg(test)]
 mod test {
     use crate::registry_interface::{Digest, DigestAlgorithm};
-    use crate::response::test_helper::test_route;
+    use crate::response::test_helper::test_client;
     use crate::types::{create_verified_manifest, RepoName};
     use rocket::http::Status;
+    use rocket::response::Responder;
 
     #[test]
     fn accepted_ok() {
-        let response = test_route(create_verified_manifest(
+        let cl = test_client();
+        let req = cl.get("/");
+        let response = create_verified_manifest(
             RepoName("repo_name".to_string()),
             Digest {
                 algo: DigestAlgorithm::Sha256,
@@ -41,7 +44,9 @@ mod test {
                     .to_string(),
             },
             "ref".to_string(),
-        ));
+        )
+        .respond_to(req.inner())
+        .unwrap();
         assert_eq!(response.status(), Status::Created);
     }
 }

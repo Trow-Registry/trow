@@ -3,7 +3,6 @@ extern crate environment;
 extern crate hyper;
 extern crate rand;
 extern crate reqwest;
-extern crate rocket_contrib;
 extern crate serde_json;
 
 mod common;
