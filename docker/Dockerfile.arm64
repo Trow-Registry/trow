@@ -3,8 +3,9 @@
 
 #Note we build on amd64 and cross-compile to arch
 FROM --platform=linux/amd64 rust:latest as builder
+ENV PLATFORM=aarch64-unknown-linux-gnu
 RUN rustup component add rustfmt
-RUN rustup target add aarch64-unknown-linux-gnu 
+RUN rustup target add $PLATFORM 
 RUN apt-get update && apt-get install -y unzip gcc-aarch64-linux-gnu
 WORKDIR /usr/src/trow
 
@@ -16,11 +17,11 @@ COPY lib lib
 COPY src src
 
 # Must build protobuf first for generated code
-RUN cd lib/protobuf && cargo build --release --target aarch64-unknown-linux-gnu
-RUN cargo build --release --target aarch64-unknown-linux-gnu -Z unstable-options --out-dir ./out
+RUN cd lib/protobuf && cargo build --release --target $PLATFORM
+RUN cargo build --release --target $PLATFORM
 
 FROM --platform=linux/arm64 debian:stable-slim
-
+ENV PLATFORM=aarch64-unknown-linux-gnu
 RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 # Note that certs are needed for proxying
@@ -29,7 +30,7 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/src/trow/out/trow /trow
+COPY --from=builder /usr/src/trow/target/$PLATFORM/release/trow /trow
 
 COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
