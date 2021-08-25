@@ -157,6 +157,12 @@ pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, fr
 /*
  * Responder returns token as JSON body
  */
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TrowTokenResponse {
+    token: String,
+}
+
 impl<'r> Responder<'r, 'static> for TrowToken {
     fn respond_to(self, _: &Request) -> Result<Response<'static>, Status> {
         //TODO: would be better to use serde here
