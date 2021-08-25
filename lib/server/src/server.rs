@@ -562,7 +562,13 @@ impl TrowServer {
             .headers(create_accept_header())
             .send()
             .await
-            .map_err(|e| format_err!("Attempt to authenticate to {} failed with: {}", &image.get_manifest_url(), e))?;
+            .map_err(|e| {
+                format_err!(
+                    "Attempt to authenticate to {} failed with: {}",
+                    &image.get_manifest_url(),
+                    e
+                )
+            })?;
 
         if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
             return Err(format_err!(
