@@ -11,18 +11,12 @@ use std::sync::{Arc, RwLock};
 
 use chrono::prelude::*;
 use failure::{self, Error, Fail};
-use futures::TryFutureExt;
 use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
-use reqwest::header::ToStrError;
 use reqwest::{
     self,
     header::{HeaderMap, HeaderValue},
-    StatusCode,
 };
-use rustc_serialize::hex::ToHex;
-use rustc_serialize::json::ToJson;
-use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -459,11 +453,10 @@ impl TrowServer {
         let mut paths = vec![];
         //TODO: change to perform dloads async
         for digest in mani.get_local_asset_digests() {
-            //skip only blob if it already exists in local storage
-            //we need to continue as docker images may share blobs
+            //break if have digest
             if self.get_catalog_path_for_blob(digest)?.exists() {
                 info!("Already have blob {}", digest);
-                continue;
+                break;
             }
             let addr = format!(
                 "{}/{}/blobs/{}",
@@ -507,24 +500,19 @@ impl TrowServer {
         Ok(())
     }
 
+    /**
+    Authenticates to proxy server and returns auth token.
+    **/
     async fn get_auth_token(
         &self,
         cl: &reqwest::Client,
         image: &Image,
         auth: &Option<Auth>,
     ) -> Result<String, Error> {
+        //First get auth address from remote server
         let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
         debug!("www_authenticate_header: {}", www_authenticate_header);
-        self.get_auth_token_from_header(cl, auth, www_authenticate_header)
-            .await
-    }
 
-    async fn get_auth_token_from_header(
-        &self,
-        cl: &reqwest::Client,
-        auth: &Option<Auth>,
-        www_authenticate_header: String,
-    ) -> Result<String, Error> {
         let mut bearer_param_map = TrowServer::get_bearer_param_map(www_authenticate_header);
 
         let realm = bearer_param_map
@@ -534,21 +522,16 @@ impl TrowServer {
 
         bearer_param_map.remove("realm");
 
-        let reqBuilder = cl.get(realm.as_str()).query(&bearer_param_map);
+        let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
 
-        let reqBuilder = match auth {
-            Some(a) => {
-                if a.user.is_some() {
-                    debug!("Auth is used with user: {:?}", a.user.as_ref().unwrap());
-                    reqBuilder.basic_auth(&a.user.as_ref().unwrap(), a.pass.as_ref())
-                } else {
-                    reqBuilder
-                }
+        if let Some(a) = auth {
+            if let Some(u) = &a.user {
+                debug!("Attempting proxy authentication with user {}", u);
+                request = request.basic_auth(u, a.pass.as_ref())
             }
-            None => reqBuilder,
-        };
+        }
 
-        let resp = reqBuilder.send().await.or_else(|e| {
+        let resp = request.send().await.or_else(|e| {
             Err(format_err!(
                 "Failed to send authenticate to {} request: {}",
                 realm,
@@ -560,21 +543,12 @@ impl TrowServer {
             return Err(format_err!("Failed to authenticate to {}", realm));
         }
 
-        let auth_json_body = resp
-            .json::<serde_json::Value>()
+        resp.json::<serde_json::Value>()
             .await
-            .or_else(|e| Err(format_err!("Failed to deserialize auth response {}", e)))?;
-
-        let access_token = auth_json_body
+            .map_err(|e| format_err!("Failed to deserialize auth response {}", e))?
             .get("access_token")
-            .ok_or(format_err!("Failed to find auth token in auth repsonse"))?;
-
-        debug!("access_token: {}", access_token);
-
-        access_token
-            .as_str()
             .map(|s| s.to_string())
-            .ok_or(format_err!("Access token string conversion failed"))
+            .ok_or(format_err!("Failed to find auth token in auth repsonse"))
     }
 
     async fn get_www_authenticate_header(
@@ -587,23 +561,25 @@ impl TrowServer {
             .headers(create_accept_header())
             .send()
             .await
-            .or_else(|e| Err(format_err!("Request for authenticate failed: {}", e)))?;
+            .map_err(|e| format_err!("Attempt to authenticate to {} failed with: {}", &image.get_manifest_url(), e))?;
 
-        if resp.status() != 401 {
+        if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
             return Err(format_err!(
-                "Request '{}' should fail with status unauthorized",
+                "Expected request '{}' to fail with status unauthorized",
                 &image.get_manifest_url()
             ));
         }
 
-        let value = resp.headers().get("www-authenticate").ok_or(format_err!(
-            "Request header www-authenticate for authenticate should exists"
-        ))?;
-
-        value
-            .to_str()
-            .map(|s| String::from(s))
-            .map_err(|e| format_err!("Access token string conversion failed: {}", e))
+        resp.headers()
+            .get("www-authenticate")
+            .ok_or(format_err!(
+                "Expected www-authenticate header to identify authentication server"
+            ))
+            .and_then(|v| {
+                v.to_str()
+                    .map_err(|e| format_err!("Failed to read auth header {:?}", e))
+            })
+            .map(|s| s.to_string())
     }
 
     fn get_bearer_param_map(www_authenticate_header: String) -> HashMap<String, String> {
@@ -675,12 +651,13 @@ impl TrowServer {
             let cl = reqwest::Client::new();
 
             let mut have_manifest = false;
-            //Get auth token
 
+            //Get auth token for remote server.
+            //TODO: Consider caching
             let auth_token = match self.get_auth_token(&cl, &proxy_image, &proxy_auth).await {
                 Ok(a) => Some(a),
                 Err(e) => {
-                    error!("Can't get auth_token: {}", e);
+                    error!("Failed to get auth token for {}. Error: {}", proxy_image, e);
                     None
                 }
             };
