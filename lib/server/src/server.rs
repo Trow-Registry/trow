@@ -453,10 +453,11 @@ impl TrowServer {
         let mut paths = vec![];
         //TODO: change to perform dloads async
         for digest in mani.get_local_asset_digests() {
-            //break if have digest
+            //skip blob if it already exists in local storage
+            //we need to continue as docker images may share blobs
             if self.get_catalog_path_for_blob(digest)?.exists() {
                 info!("Already have blob {}", digest);
-                break;
+                continue;
             }
             let addr = format!(
                 "{}/{}/blobs/{}",
