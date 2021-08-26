@@ -426,12 +426,12 @@ impl TrowServer {
         remote_image: &Image,
         local_repo_name: &str,
     ) -> Result<(), Error> {
-        let mut resp = cl.get(&remote_image.get_manifest_url());
+        let mut req = cl.get(&remote_image.get_manifest_url());
         if let Some(auth) = token {
-            resp = resp.bearer_auth(auth);
+            req = req.bearer_auth(auth);
         }
 
-        let resp = resp.headers(create_accept_header()).send().await?;
+        let resp = req.headers(create_accept_header()).send().await?;
 
         if !resp.status().is_success() {
             return Err(failure::err_msg(format!(
@@ -512,14 +512,14 @@ impl TrowServer {
     ) -> Result<String, Error> {
         //First get auth address from remote server
         let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
-        debug!("www_authenticate_header: {}", www_authenticate_header);
+        info!("www_authenticate_header: {}", www_authenticate_header);
 
         let mut bearer_param_map = TrowServer::get_bearer_param_map(www_authenticate_header);
 
         let realm = bearer_param_map
             .get("realm")
             .cloned()
-            .ok_or(format_err!("Realm should exists in Bearer header"))?;
+            .ok_or(format_err!("Expected realm key in authenticate header"))?;
 
         bearer_param_map.remove("realm");
 
@@ -527,7 +527,7 @@ impl TrowServer {
 
         if let Some(a) = auth {
             if let Some(u) = &a.user {
-                debug!("Attempting proxy authentication with user {}", u);
+                info!("Attempting proxy authentication with user {}", u);
                 request = request.basic_auth(u, a.pass.as_ref())
             }
         }
@@ -548,7 +548,8 @@ impl TrowServer {
             .await
             .map_err(|e| format_err!("Failed to deserialize auth response {}", e))?
             .get("access_token")
-            .map(|s| s.to_string())
+            .map(|s| s.as_str().unwrap_or(""))
+            .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
             .ok_or(format_err!("Failed to find auth token in auth repsonse"))
     }
 
@@ -598,7 +599,7 @@ impl TrowServer {
             .map(|vec| {
                 (
                     vec[0].to_string(),
-                    strip_dquotes(vec[1]).unwrap().to_string(),
+                    strip_dquotes(vec[1]).unwrap_or(vec[1]).to_string(),
                 )
             })
             .collect()
