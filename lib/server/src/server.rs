@@ -15,7 +15,7 @@ use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
 use reqwest::{
     self,
-    header::{HeaderMap, HeaderValue},
+    header::{HeaderMap, HeaderValue}
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -436,10 +436,10 @@ impl TrowServer {
                 },
             )
         } else {
-            let nextSlash = proxy_name.find("/");
-            match nextSlash {
+            let next_slash = proxy_name.find("/");
+            match next_slash {
                 Some(i) => {
-                    let mut registry_config_dir_name = proxy_name[..i].to_string();
+                    let registry_config_dir_name = proxy_name[..i].to_string();
                     debug!("Registry config name {}", registry_config_dir_name);
 
                     let docker_config_json = Path::new(&self.proxy_registry_config_dir)

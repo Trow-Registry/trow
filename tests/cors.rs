@@ -113,8 +113,8 @@ mod cors_tests {
             .unwrap()
             .to_str()
             .unwrap();
-        assert!(res_cors_methods.clone().contains("GET"));
-        assert!(res_cors_methods.clone().contains("OPTIONS"));
+        assert!(res_cors_methods.contains("GET"));
+        assert!(res_cors_methods.contains("OPTIONS"));
         assert!(res_cors_methods.contains("POST"));
     }
 

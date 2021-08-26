@@ -443,11 +443,11 @@ impl ClientInterface {
         Ok(file)
     }
 
-    async fn upload_manifest<'a>(
+    async fn upload_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
-        manifest: DataStream<'a>,
+        manifest: DataStream<'_>,
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)

@@ -197,7 +197,7 @@ mod interface_tests {
             TROW_ADDRESS, name, uuid, digest
         );
 
-        let resp = cl.put(loc).body(config.clone()).send().await.unwrap();
+        let resp = cl.put(loc).body(config).send().await.unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
     }
 
@@ -209,7 +209,7 @@ mod interface_tests {
                 "{}/v2/{}/blobs/uploads/?digest={}",
                 TROW_ADDRESS, name, digest
             ))
-            .body(config.clone())
+            .body(config)
             .send()
             .await
             .unwrap();
@@ -222,10 +222,10 @@ mod interface_tests {
         let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         let manifest = format!(
-            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
-                 "config": {{ "digest": "{}", 
-                             "mediaType": "application/vnd.oci.image.config.v1+json", 
-                             "size": {} }}, 
+            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                 "config": {{ "digest": "{}",
+                             "mediaType": "application/vnd.oci.image.config.v1+json",
+                             "size": {} }},
                  "layers": [], "schemaVersion": 2 }}"#,
             config_digest,
             config.len()
@@ -293,10 +293,10 @@ mod interface_tests {
         let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         let manifest = format!(
-            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
-                 "config": {{ "digest": "{}", 
-                             "mediaType": "application/vnd.oci.image.config.v1+json", 
-                             "size": {} }}, 
+            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                 "config": {{ "digest": "{}",
+                             "mediaType": "application/vnd.oci.image.config.v1+json",
+                             "size": {} }},
                  "layers": [
                     {{
                               "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
@@ -395,7 +395,7 @@ mod interface_tests {
 
         let hr: HealthResponse = resp.json().await.unwrap();
 
-        assert_eq!(hr.is_healthy, true);
+        assert!(hr.is_healthy);
     }
 
     async fn get_readiness(cl: &reqwest::Client) {
@@ -409,7 +409,7 @@ mod interface_tests {
 
         let rr: ReadinessResponse = resp.json().await.unwrap();
 
-        assert_eq!(rr.is_ready, true);
+        assert!(rr.is_ready);
     }
 
     async fn get_metrics(cl: &reqwest::Client) {

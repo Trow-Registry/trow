@@ -21,6 +21,7 @@ pub fn test_client() -> Client {
             listen: "trow:51000".to_owned(),
         },
         proxy_hub: true,
+        proxy_registry_config_dir: "./proxy-registry-config".to_string(),
         hub_user: None,
         hub_pass: None,
         host_names: vec![],

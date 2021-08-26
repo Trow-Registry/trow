@@ -9,11 +9,8 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
-
-    use environment::Environment;
-
     use crate::common;
-
+    use environment::Environment;
     use reqwest::StatusCode;
     use std::fs::File;
     use std::io::Read;

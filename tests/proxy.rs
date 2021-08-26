@@ -107,8 +107,7 @@ mod interface_tests {
             digest: "fake".to_string(),
         };
 
-        let mut layers = Vec::new();
-        layers.push(layer);
+        let layers = vec![layer];
         let mani = manifest::ManifestV2 {
             schema_version: 2,
             media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
