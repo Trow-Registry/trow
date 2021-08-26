@@ -15,7 +15,7 @@ use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
 use reqwest::{
     self,
-    header::{HeaderMap, HeaderValue}
+    header::{HeaderMap, HeaderValue},
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -436,52 +436,44 @@ impl TrowServer {
                 },
             )
         } else {
-            let next_slash = proxy_name.find("/");
-            match next_slash {
-                Some(i) => {
-                    let registry_config_dir_name = proxy_name[..i].to_string();
-                    debug!("Registry config name {}", registry_config_dir_name);
+            let registry_config_name = proxy_name
+                .split_once("/")
+                .ok_or_else(|| format_err!("Registry config name can't be determined"))?
+                .0
+                .to_string();
+            debug!("Registry config name {:?}", registry_config_name);
 
-                    let docker_config_json = Path::new(&self.proxy_registry_config_dir)
-                        .join(registry_config_dir_name.clone())
-                        .join(".dockerconfigjson");
-                    if !docker_config_json.is_file() {
-                        return Err(format_err!(
-                            "Registry config file does not exists {:?}",
-                            docker_config_json.to_str()
-                        ));
-                    }
+            let docker_config_json = Path::new(&self.proxy_registry_config_dir)
+                .join(registry_config_name.clone())
+                .join(".dockerconfigjson");
+            if !docker_config_json.is_file() {
+                return Err(format_err!(
+                    "Registry config file does not exists {:?}",
+                    docker_config_json.to_string_lossy()
+                ));
+            }
+            debug!("Registry config file: {:?}", docker_config_json.to_string_lossy());
 
-                    debug!(
-                        "Registry config file exists {:?}",
-                        docker_config_json.to_str()
-                    );
+            let mut f = File::open(docker_config_json.clone())?;
+            let mut buffer = Vec::new();
+            f.read_to_end(&mut buffer)?;
+            let config: Dockerconfigjson = serde_json::from_slice(&buffer)?;
 
-                    let mut f = File::open(docker_config_json.clone())?;
-
-                    let mut buffer = Vec::new();
-                    f.read_to_end(&mut buffer)?;
-
-                    let config: Dockerconfigjson = serde_json::from_slice(&buffer)?;
-
-                    match config.auths.iter().next() {
-                        Some(auths) => self.get_proxy_image_and_auth(
-                            reference,
-                            proxy_name,
-                            auths.0.clone(),
-                            registry_config_dir_name,
-                            Auth {
-                                user: auths.1.Username.clone(),
-                                pass: auths.1.Password.clone(),
-                            },
-                        ),
-                        None => Err(format_err!(
-                            "Registry config can't be parsed {:?}",
-                            docker_config_json.to_str()
-                        )),
-                    }
-                }
-                None => Err(format_err!("Registry config name can't be determined")),
+            match config.auths.iter().next() {
+                Some(auths) => self.get_proxy_image_and_auth(
+                    reference,
+                    proxy_name,
+                    auths.0.clone(),
+                    registry_config_name,
+                    Auth {
+                        user: auths.1.Username.clone(),
+                        pass: auths.1.Password.clone(),
+                    },
+                ),
+                None => Err(format_err!(
+                    "Registry config can't be parsed {:?}",
+                    docker_config_json.to_str()
+                )),
             }
         }
     }
@@ -490,7 +482,7 @@ impl TrowServer {
         &self,
         reference: &str,
         proxy_name: String,
-        address: String,
+        mut address: String,
         config_dir: String,
         auth: Auth,
     ) -> Result<(Image, Option<Auth>), Error> {
@@ -504,9 +496,15 @@ impl TrowServer {
             repo = format!("library/{}", repo).to_string();
         }
 
+        let prefix = if address.starts_with("http://") || address.starts_with("https://") {
+            ""
+        } else {
+            "https://"
+        };
+
         Ok((
             Image {
-                host: format!("https://{}/v2", address),
+                host: format!("{}{}/v2", prefix, address),
                 repo,
                 tag: reference.to_string(),
             },
