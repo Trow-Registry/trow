@@ -512,7 +512,6 @@ impl TrowServer {
     ) -> Result<String, Error> {
         //First get auth address from remote server
         let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
-        info!("www_authenticate_header: {}", www_authenticate_header);
 
         let mut bearer_param_map = TrowServer::get_bearer_param_map(www_authenticate_header);
 
