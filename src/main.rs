@@ -266,7 +266,9 @@ fn main() {
     let host_names_str = matches.value_of("names").unwrap_or(host);
     let host_names = parse_list(host_names_str);
     let dry_run = matches.is_present("dry-run");
-    let proxy_registry_config_dir = matches.value_of("proxy-registry-config-dir").unwrap_or("./proxy-registry-config");;
+    let proxy_registry_config_dir = matches
+        .value_of("proxy-registry-config-dir")
+        .unwrap_or("./proxy-registry-config");
     let proxy_hub = matches.is_present("proxy-docker-hub");
 
     let default_manifest_size: u32 = 4; //mebibytes
