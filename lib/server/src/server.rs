@@ -11,8 +11,10 @@ use std::sync::{Arc, RwLock};
 
 use chrono::prelude::*;
 use failure::{self, Error, Fail};
+use lazy_static::lazy_static;
 use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
+use regex::Regex;
 use reqwest::{
     self,
     header::{HeaderMap, HeaderValue},
@@ -607,14 +609,14 @@ impl TrowServer {
         let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
 
         let mut bearer_param_map = TrowServer::get_bearer_param_map(www_authenticate_header);
-
+        info!("bearer param map: {:?}", bearer_param_map);
         let realm = bearer_param_map
             .get("realm")
             .cloned()
             .ok_or(format_err!("Expected realm key in authenticate header"))?;
 
         bearer_param_map.remove("realm");
-
+        info!("Realm is {}", realm);
         let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
 
         if let Some(a) = auth {
@@ -636,14 +638,19 @@ impl TrowServer {
             return Err(format_err!("Failed to authenticate to {}", realm));
         }
 
-        resp.json::<serde_json::Value>()
+        let resp_json = resp.json::<serde_json::Value>()
             .await
-            .map_err(|e| format_err!("Failed to deserialize auth response {}", e))?
+            .map_err(|e| format_err!("Failed to deserialize auth response {}", e))
+            ?;
+
+        resp_json
             .get("access_token")
-            .map(|s| s.as_str().unwrap_or(""))
+            .or_else(|| resp_json.get("token"))
+            .map(|s| s.as_str())
+            .flatten()
             .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
             .ok_or(format_err!("Failed to find auth token in auth repsonse"))
-    }
+}
 
     async fn get_www_authenticate_header(
         &self,
@@ -683,15 +690,19 @@ impl TrowServer {
     }
 
     fn get_bearer_param_map(www_authenticate_header: String) -> HashMap<String, String> {
-        let base = www_authenticate_header.strip_prefix("Bearer ");
-
-        base.unwrap_or("")
-            .split(',')
-            .map(|kv| kv.split('=').collect::<Vec<&str>>())
-            .map(|vec| {
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",?"#).unwrap();
+        }
+        let base = www_authenticate_header
+            .strip_prefix("Bearer ")
+            .unwrap_or("");
+        info!("base www-auth header: {}", base);
+        RE
+            .captures_iter(base)
+            .map(|m| {
                 (
-                    vec[0].to_string(),
-                    strip_dquotes(vec[1]).unwrap_or(vec[1]).to_string(),
+                    m.name("key").unwrap().as_str().to_string(),
+                    m.name("value").unwrap().as_str().to_string()
                 )
             })
             .collect()

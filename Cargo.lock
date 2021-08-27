@@ -2968,6 +2968,7 @@ dependencies = [
  "prost-types",
  "quoted-string",
  "rand 0.8.4",
+ "regex",
  "reqwest",
  "rustc-serialize",
  "serde",

@@ -26,7 +26,7 @@ serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
 rustc-serialize = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
-
+regex = "1.3.9"
 prometheus = { version = "0.12"}
 lazy_static = "1.4.0"
 fs3 = "0.5.0"
