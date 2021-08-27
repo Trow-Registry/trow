@@ -1,6 +1,6 @@
 [package]
 name = "trow"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
 edition = "2018"
 
