@@ -35,11 +35,6 @@ pub async fn get_blob(
         Err(_) => None,
     }
 }
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to get_blob
- */
-
 #[get("/v2/<name>/<repo>/blobs/<digest>")]
 pub async fn get_blob_2level(
     auth_user: TrowToken,
@@ -50,10 +45,6 @@ pub async fn get_blob_2level(
 ) -> Option<BlobReader> {
     get_blob(auth_user, ci, format!("{}/{}", name, repo), digest).await
 }
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to get_blob
- */
 #[get("/v2/<org>/<name>/<repo>/blobs/<digest>")]
 pub async fn get_blob_3level(
     auth_user: TrowToken,
@@ -65,10 +56,6 @@ pub async fn get_blob_3level(
 ) -> Option<BlobReader> {
     get_blob(auth_user, ci, format!("{}/{}/{}", org, name, repo), digest).await
 }
-
-/*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to get_blob
- */
 #[get("/v2/<fourth>/<org>/<name>/<repo>/blobs/<digest>")]
 pub async fn get_blob_4level(
     auth_user: TrowToken,
@@ -171,10 +158,6 @@ pub async fn put_blob(
         (0, (size as u32)),
     ))
 }
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to put_blob
- */
 #[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
 pub async fn put_blob_2level(
     auth_user: TrowToken,
@@ -197,10 +180,6 @@ pub async fn put_blob_2level(
     )
     .await
 }
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
- */
 #[put(
     "/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
     data = "<chunk>"
@@ -227,10 +206,6 @@ pub async fn put_blob_3level(
     )
     .await
 }
-
-/*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to put_blob
- */
 #[put(
     "/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
     data = "<chunk>"
@@ -345,10 +320,6 @@ pub async fn patch_blob(
         Err(_) => Err(Error::InternalError),
     }
 }
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to patch_blob
- */
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 pub async fn patch_blob_2level(
     auth_user: TrowToken,
@@ -371,10 +342,6 @@ pub async fn patch_blob_2level(
     )
     .await
 }
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to patch_blob
- */
 #[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 pub async fn patch_blob_3level(
     auth_user: TrowToken,
@@ -398,10 +365,6 @@ pub async fn patch_blob_3level(
     )
     .await
 }
-
-/*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to patch_blob
- */
 #[patch(
     "/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>",
     data = "<chunk>"
@@ -527,10 +490,6 @@ pub async fn post_blob_upload(
         (0, 0),
     )))
 }
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to put_blob_upload_onename
- */
 #[post("/v2/<repo>/<name>/blobs/uploads", data = "<data>")]
 pub async fn post_blob_upload_2level(
     //digest: PossibleDigest, //create requestguard to handle /?digest
@@ -544,10 +503,6 @@ pub async fn post_blob_upload_2level(
 ) -> Result<Upload, Error> {
     post_blob_upload(uri, auth_user, ci, tc, format!("{}/{}", repo, name), data).await
 }
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
- */
 #[post("/v2/<org>/<repo>/<name>/blobs/uploads", data = "<data>")]
 pub async fn post_blob_upload_3level(
     //digest: PossibleDigest, //create requestguard to handle /?digest
@@ -570,10 +525,6 @@ pub async fn post_blob_upload_3level(
     )
     .await
 }
-
-/*
- * Parse 4 level <fourth>/<org>/<repo>/<name> style path
- */
 #[post("/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads", data = "<data>")]
 pub async fn post_blob_upload_4level(
     //digest: PossibleDigest, //create requestguard to handle /?digest

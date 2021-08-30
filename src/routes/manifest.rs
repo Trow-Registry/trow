@@ -38,7 +38,6 @@ pub async fn get_manifest(
         .await
         .map_err(|_| Error::ManifestUnknown(reference))
 }
-
 #[get("/v2/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_2level(
     auth_user: TrowToken,
@@ -49,10 +48,6 @@ pub async fn get_manifest_2level(
 ) -> Result<ManifestReader, Error> {
     get_manifest(auth_user, ci, format!("{}/{}", user, repo), reference).await
 }
-
-/*
- * Process 3 level manifest path
- */
 #[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_3level(
     auth_user: TrowToken,
@@ -70,10 +65,6 @@ pub async fn get_manifest_3level(
     )
     .await
 }
-
-/*
- * Process 4 level manifest path
- */
 #[get("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_4level(
     auth_user: TrowToken,
@@ -94,7 +85,7 @@ pub async fn get_manifest_4level(
 }
 
 /*
- * Process 4 level manifest path
+ * Process 5 level manifest path
  */
 #[get("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_5level(
@@ -150,10 +141,6 @@ pub async fn put_image_manifest(
         Err(_) => Err(Error::InternalError),
     }
 }
-
-/*
- * Parse 2 level <user>/<repo> style path and pass it to put_image_manifest
- */
 #[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 pub async fn put_image_manifest_2level(
     auth_user: TrowToken,
@@ -174,10 +161,6 @@ pub async fn put_image_manifest_2level(
     )
     .await
 }
-
-/*
- * Parse 3 level <org>/<user>/<repo> style path and pass it to put_image_manifest
- */
 #[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 pub async fn put_image_manifest_3level(
     auth_user: TrowToken,
@@ -199,10 +182,6 @@ pub async fn put_image_manifest_3level(
     )
     .await
 }
-
-/*
- * Parse 4 level <fourth>/<org>/<user>/<repo> style path and pass it to put_image_manifest
- */
 #[put(
     "/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>",
     data = "<chunk>"
