@@ -122,8 +122,8 @@ struct Dockerconfigjson {
 
 #[derive(Serialize, Deserialize)]
 struct DockerconfigjsonAuths {
-    Username: Option<String>,
-    Password: Option<String>,
+    username: Option<String>,
+    password: Option<String>,
 }
 
 fn create_accept_header() -> HeaderMap {
@@ -258,6 +258,23 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Erro
         .next()
         .unwrap_or(&digest_date)
         .to_string())
+}
+
+fn authenticate_request<T>(
+    req: reqwest::RequestBuilder,
+    bearer_token: &Option<T>,
+    basic_auth: &Option<Auth>,
+) -> reqwest::RequestBuilder
+where
+    T: fmt::Display,
+{
+    if let Some(token) = bearer_token {
+        req.bearer_auth(token)
+    } else if let Some(auth) = basic_auth.as_ref().filter(|a| a.user.is_some()) {
+        req.basic_auth(auth.user.as_ref().unwrap(), auth.pass.as_ref())
+    } else {
+        req
+    }
 }
 
 impl TrowServer {
@@ -454,7 +471,10 @@ impl TrowServer {
                     docker_config_json.to_string_lossy()
                 ));
             }
-            debug!("Registry config file: {:?}", docker_config_json.to_string_lossy());
+            debug!(
+                "Registry config file: {:?}",
+                docker_config_json.to_string_lossy()
+            );
 
             let mut f = File::open(docker_config_json.clone())?;
             let mut buffer = Vec::new();
@@ -468,8 +488,8 @@ impl TrowServer {
                     auths.0.clone(),
                     registry_config_name,
                     Auth {
-                        user: auths.1.Username.clone(),
-                        pass: auths.1.Password.clone(),
+                        user: auths.1.username.clone(),
+                        pass: auths.1.password.clone(),
                     },
                 ),
                 None => Err(format_err!(
@@ -494,7 +514,7 @@ impl TrowServer {
             .to_string();
 
         //Official images have to use the library/ repository
-        if !repo.contains('/') {
+        if config_dir == "docker" && !repo.contains('/') {
             repo = format!("library/{}", repo).to_string();
         }
 
@@ -517,14 +537,13 @@ impl TrowServer {
     async fn download_manifest_and_layers<T: Display>(
         &self,
         cl: &reqwest::Client,
+        basic_auth: &Option<Auth>,
         token: &Option<T>,
         remote_image: &Image,
         local_repo_name: &str,
     ) -> Result<(), Error> {
         let mut req = cl.get(&remote_image.get_manifest_url());
-        if let Some(auth) = token {
-            req = req.bearer_auth(auth);
-        }
+        req = authenticate_request(req, token, basic_auth);
 
         let resp = req.headers(create_accept_header()).send().await?;
 
@@ -559,12 +578,9 @@ impl TrowServer {
                 remote_image.host, remote_image.repo, digest
             );
             info!("Downloading blob {}", addr);
-
-            let resp = if let Some(auth) = token {
-                cl.get(&addr).bearer_auth(auth).send().await?
-            } else {
-                cl.get(&addr).send().await?
-            };
+            let mut req = cl.get(&addr);
+            req = authenticate_request(req, token, basic_auth);
+            let resp = req.send().await?;
             let path = self.scratch_path.join(digest);
 
             let mut buf = File::create(&path)?;
@@ -597,7 +613,7 @@ impl TrowServer {
     }
 
     /**
-    Authenticates to proxy server and returns auth token.
+    Authenticates to proxy server and returns auth token. (Bearer auth only)
     **/
     async fn get_auth_token(
         &self,
@@ -607,6 +623,10 @@ impl TrowServer {
     ) -> Result<String, Error> {
         //First get auth address from remote server
         let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
+
+        if www_authenticate_header.starts_with("Basic") {
+            return Err(format_err!("Registry uses Basic auth"));
+        }
 
         let mut bearer_param_map = TrowServer::get_bearer_param_map(www_authenticate_header);
         info!("bearer param map: {:?}", bearer_param_map);
@@ -622,10 +642,9 @@ impl TrowServer {
         if let Some(a) = auth {
             if let Some(u) = &a.user {
                 info!("Attempting proxy authentication with user {}", u);
-                request = request.basic_auth(u, a.pass.as_ref())
+                request = request.basic_auth(u, a.pass.as_ref());
             }
         }
-
         let resp = request.send().await.or_else(|e| {
             Err(format_err!(
                 "Failed to send authenticate to {} request: {}",
@@ -633,15 +652,15 @@ impl TrowServer {
                 e
             ))
         })?;
-
+        info!("resp: {:?}", resp);
         if !resp.status().is_success() {
             return Err(format_err!("Failed to authenticate to {}", realm));
         }
 
-        let resp_json = resp.json::<serde_json::Value>()
+        let resp_json = resp
+            .json::<serde_json::Value>()
             .await
-            .map_err(|e| format_err!("Failed to deserialize auth response {}", e))
-            ?;
+            .map_err(|e| format_err!("Failed to deserialize auth response {}", e))?;
 
         resp_json
             .get("access_token")
@@ -650,7 +669,7 @@ impl TrowServer {
             .flatten()
             .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
             .ok_or(format_err!("Failed to find auth token in auth repsonse"))
-}
+    }
 
     async fn get_www_authenticate_header(
         &self,
@@ -697,12 +716,11 @@ impl TrowServer {
             .strip_prefix("Bearer ")
             .unwrap_or("");
         info!("base www-auth header: {}", base);
-        RE
-            .captures_iter(base)
+        RE.captures_iter(base)
             .map(|m| {
                 (
                     m.name("key").unwrap().as_str().to_string(),
-                    m.name("value").unwrap().as_str().to_string()
+                    m.name("value").unwrap().as_str().to_string(),
                 )
             })
             .collect()
@@ -712,22 +730,15 @@ impl TrowServer {
         &self,
         cl: &reqwest::Client,
         image: &Image,
+        basic_auth: &Option<Auth>,
         auth_token: &Option<String>,
     ) -> Option<String> {
-        let resp = if let Some(auth) = auth_token {
-            cl.head(&image.get_manifest_url())
-                .bearer_auth(&auth)
-                .headers(create_accept_header())
-                .send()
-                .await
-        } else {
-            cl.head(&image.get_manifest_url())
-                .headers(create_accept_header())
-                .send()
-                .await
-        };
+        let mut req = cl
+            .head(&image.get_manifest_url())
+            .headers(create_accept_header());
+        req = authenticate_request(req, auth_token, basic_auth);
 
-        let resp = match resp {
+        let resp = match req.send().await {
             Ok(r) => r,
             Err(e) => {
                 error!("Remote registry didn't respond to HEAD request {}", e);
@@ -774,7 +785,7 @@ impl TrowServer {
             };
 
             let digest = self
-                .get_digest_from_header(&cl, &proxy_image, &auth_token)
+                .get_digest_from_header(&cl, &proxy_image, &proxy_auth, &auth_token)
                 .await;
 
             if let Some(digest) = digest {
@@ -803,7 +814,13 @@ impl TrowServer {
 
             if !have_manifest {
                 if let Err(e) = self
-                    .download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name)
+                    .download_manifest_and_layers(
+                        &cl,
+                        &proxy_auth,
+                        &auth_token,
+                        &proxy_image,
+                        &repo_name,
+                    )
                     .await
                 {
                     //Note that we may still have an out-of-date version that will be returned
