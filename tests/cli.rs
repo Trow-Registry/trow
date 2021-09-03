@@ -139,4 +139,11 @@ mod cli {
             .fails()
             .unwrap();
     }
+
+    #[test]
+    fn log_level_setting() {
+        assert_cli::Assert::main_binary()
+            .with_args(&["--log-level", "TRACE"])
+            .succeeds();
+    }
 }

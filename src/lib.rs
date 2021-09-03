@@ -34,6 +34,7 @@ use rocket::fairing;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 use uuid::Uuid;
 
 mod client_interface;
@@ -93,6 +94,7 @@ pub struct TrowConfig {
     token_secret: String,
     user: Option<UserConfig>,
     cors: bool,
+    log_level: String
 }
 
 #[derive(Clone, Debug)]
@@ -143,7 +145,7 @@ fn init_trow_server(
 }
 
 /// Build the logging agent with formatting.
-fn init_logger() -> Result<(), SetLoggerError> {
+fn init_logger(log_level: String) -> Result<(), SetLoggerError> {
     // If there env variable RUST_LOG is set, then take the configuration from it.
     if env::var("RUST_LOG").is_ok() {
         env_logger::from_env(Env::default().default_filter_or("error")).init();
@@ -162,7 +164,7 @@ fn init_logger() -> Result<(), SetLoggerError> {
                     record.args()
                 )
             })
-            .filter(None, LevelFilter::Error);
+            .filter(None, LevelFilter::from_str(&log_level).unwrap());
         builder.init();
         Ok(())
     }
@@ -188,6 +190,7 @@ impl TrowBuilder {
         cors: bool,
         max_manifest_size: u32,
         max_blob_size: u32,
+        log_level: String
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -208,6 +211,7 @@ impl TrowBuilder {
             token_secret: Uuid::new_v4().to_string(),
             user: None,
             cors,
+            log_level
         };
         TrowBuilder { config }
     }
@@ -266,10 +270,9 @@ impl TrowBuilder {
     }
 
     pub fn start(&self) -> Result<(), Error> {
-        init_logger()?;
+        init_logger(self.config.log_level.clone())?;
 
         let rocket_config = &self.build_rocket_config()?;
-
         println!(
             "Starting Trow {} on {}:{}",
             env!("CARGO_PKG_VERSION"),

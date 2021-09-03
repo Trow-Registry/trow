@@ -34,6 +34,7 @@ pub fn test_client() -> Client {
         token_secret: "secret".to_string(),
         user: None,
         cors: false,
+        log_level: "error".to_string(),
     };
     let rocket = rocket::Rocket::build()
         .manage(trow_config)

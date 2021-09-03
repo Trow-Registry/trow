@@ -215,6 +215,13 @@ Must be used with --hub-token or --hub-token-file")
             .help("Maximum size in mebibytes of \"blob\" that can be uploaded (a single layer of an image). This can be very large in some images (GBs).")
             .takes_value(true)
         )
+        .arg(
+            Arg::with_name("log-level")
+            .long("log-level")
+            .value_name("log-level")
+            .help("The log level at which to output to stdout, valid values are OFF, ERROR, WARN, INFO, DEBUG and TRACE")
+            .takes_value(true)
+        )
         .get_matches()
 }
 
@@ -232,6 +239,8 @@ fn main() {
         println!("Trow version {} {}", env!("CARGO_PKG_VERSION"), vcs_ref);
         std::process::exit(0);
     }
+
+    let log_level = matches.value_of("log-level").unwrap_or("error");
 
     let no_tls = matches.is_present("no-tls");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
@@ -292,6 +301,7 @@ fn main() {
         cors,
         max_manifest_size,
         max_blob_size,
+        log_level.to_string(),
     );
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
