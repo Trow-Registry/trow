@@ -94,7 +94,7 @@ pub struct TrowConfig {
     token_secret: String,
     user: Option<UserConfig>,
     cors: bool,
-    log_level: String
+    log_level: String,
 }
 
 #[derive(Clone, Debug)]
@@ -190,7 +190,7 @@ impl TrowBuilder {
         cors: bool,
         max_manifest_size: u32,
         max_blob_size: u32,
-        log_level: String
+        log_level: String,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -211,7 +211,7 @@ impl TrowBuilder {
             token_secret: Uuid::new_v4().to_string(),
             user: None,
             cors,
-            log_level
+            log_level,
         };
         TrowBuilder { config }
     }
