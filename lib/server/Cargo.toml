@@ -33,6 +33,7 @@ fs3 = "0.5.0"
 # crypto and crypto related crates
 sha2 = "0.9"
 hex = "0.4"
+quoted-string = "0.6.1"
 
 [build-dependencies]
 tonic-build = "0.5"

@@ -1,32 +1,37 @@
-use crate::manifest::{manifest_media_type, FromJson, Manifest};
-use chrono::prelude::*;
 use core::fmt::Display;
-use failure::{self, Error, Fail};
-use prost_types::Timestamp;
-use reqwest::{
-    self,
-    header::{HeaderMap, HeaderValue},
-};
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
 use std::io;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::str;
 use std::sync::{Arc, RwLock};
+
+use chrono::prelude::*;
+use failure::{self, Error, Fail};
+use prost_types::Timestamp;
+use quoted_string::strip_dquotes;
+use reqwest::{
+    self,
+    header::{HeaderMap, HeaderValue},
+};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+
+use crate::digest::sha256_tag_digest;
+use crate::manifest::{manifest_media_type, FromJson, Manifest};
+use crate::metrics;
+use crate::server::trow_server::registry_server::Registry;
+
+use self::trow_server::*;
+
 pub mod trow_server {
     include!("../../protobuf/out/trow.rs");
 }
-
-use self::trow_server::*;
-use crate::digest::sha256_tag_digest;
-use crate::server::trow_server::registry_server::Registry;
-
-use crate::metrics;
 
 static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 static MANIFESTS_DIR: &str = "manifests";
@@ -36,8 +41,6 @@ static UPLOADS_DIR: &str = "scratch";
 static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
 static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
-static HUB_AUTH_ENDPOINT: &str = "https://auth.docker.io/token";
-static HUB_RESOURCE: &str = "registry.docker.io";
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
@@ -105,8 +108,6 @@ impl Image {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Auth {
-    pub endpoint: String,
-    pub resource: String,
     pub user: Option<String>, //DockerHub has anon auth
     pub pass: Option<String>,
 }
@@ -408,8 +409,6 @@ impl TrowServer {
                         tag: reference.to_string(),
                     },
                     Some(Auth {
-                        endpoint: HUB_AUTH_ENDPOINT.to_string(),
-                        resource: HUB_RESOURCE.to_string(),
                         user: self.hub_user.clone(),
                         pass: self.hub_pass.clone(),
                     }),
@@ -427,12 +426,12 @@ impl TrowServer {
         remote_image: &Image,
         local_repo_name: &str,
     ) -> Result<(), Error> {
-        let mut resp = cl.get(&remote_image.get_manifest_url());
+        let mut req = cl.get(&remote_image.get_manifest_url());
         if let Some(auth) = token {
-            resp = resp.bearer_auth(auth);
+            req = req.bearer_auth(auth);
         }
 
-        let resp = resp.headers(create_accept_header()).send().await?;
+        let resp = req.headers(create_accept_header()).send().await?;
 
         if !resp.status().is_success() {
             return Err(failure::err_msg(format!(
@@ -454,7 +453,7 @@ impl TrowServer {
         let mut paths = vec![];
         //TODO: change to perform dloads async
         for digest in mani.get_local_asset_digests() {
-            //skip only blob if it already exists in local storage
+            //skip blob if it already exists in local storage
             //we need to continue as docker images may share blobs
             if self.get_catalog_path_for_blob(digest)?.exists() {
                 info!("Already have blob {}", digest);
@@ -502,72 +501,107 @@ impl TrowServer {
         Ok(())
     }
 
+    /**
+    Authenticates to proxy server and returns auth token.
+    **/
     async fn get_auth_token(
         &self,
         cl: &reqwest::Client,
         image: &Image,
-        auth: &Auth,
-    ) -> Option<String> {
-        //Fucking annoyingly, anonymous requests have to use GET whilst user based requests have to be POST
+        auth: &Option<Auth>,
+    ) -> Result<String, Error> {
+        //First get auth address from remote server
+        let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
 
-        let resp = if !&auth.pass.is_some() {
-            info!("Making anonymous auth request to Docker Hub");
-            let req = format!(
-                "{}?service={}&scope=repository:{}:pull",
-                &auth.endpoint, auth.resource, image.repo
-            )
-            .to_string();
+        let mut bearer_param_map = TrowServer::get_bearer_param_map(www_authenticate_header);
 
-            cl.get(&req).send().await
-        } else {
-            let mut auth_req = format!(
-                "&grant_type=password&client_id=trow_proxy&service={}&scope=repository:{}:pull",
-                auth.resource, image.repo
-            );
+        let realm = bearer_param_map
+            .get("realm")
+            .cloned()
+            .ok_or(format_err!("Expected realm key in authenticate header"))?;
 
-            if let Some(user) = &auth.user {
-                info!("Making request to Docker Hub as {}", &user);
-                auth_req = format!("{}&username={}", auth_req, user);
+        bearer_param_map.remove("realm");
+
+        let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
+
+        if let Some(a) = auth {
+            if let Some(u) = &a.user {
+                info!("Attempting proxy authentication with user {}", u);
+                request = request.basic_auth(u, a.pass.as_ref())
             }
-            if let Some(pass) = &auth.pass {
-                auth_req = format!("{}&password={}", auth_req, pass);
-            }
+        }
 
-            cl.post(&auth.endpoint)
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .body(auth_req)
-                .send()
-                .await
-        };
-
-        let resp = match resp {
-            Ok(r) => r,
-            Err(e) => {
-                error!("Remote registry didn't repsond to auth request: {}", e);
-                return None;
-            }
-        };
+        let resp = request.send().await.or_else(|e| {
+            Err(format_err!(
+                "Failed to send authenticate to {} request: {}",
+                realm,
+                e
+            ))
+        })?;
 
         if !resp.status().is_success() {
-            error!("Failed to authenticate to {}", auth.endpoint);
-            return None;
+            return Err(format_err!("Failed to authenticate to {}", realm));
         }
 
-        let auth = match resp.json::<serde_json::Value>().await {
-            Ok(auth) => auth,
-            Err(e) => {
-                error!("Failed to deserialize auth response {}", e);
-                return None;
-            }
-        };
+        resp.json::<serde_json::Value>()
+            .await
+            .map_err(|e| format_err!("Failed to deserialize auth response {}", e))?
+            .get("access_token")
+            .map(|s| s.as_str().unwrap_or(""))
+            .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
+            .ok_or(format_err!("Failed to find auth token in auth repsonse"))
+    }
 
-        match auth["access_token"].as_str() {
-            Some(t) => Some(t.to_string()),
-            None => {
-                error!("Failed to find auth token in auth repsonse");
-                None
-            }
+    async fn get_www_authenticate_header(
+        &self,
+        cl: &reqwest::Client,
+        image: &Image,
+    ) -> Result<String, Error> {
+        let resp = cl
+            .head(&image.get_manifest_url())
+            .headers(create_accept_header())
+            .send()
+            .await
+            .map_err(|e| {
+                format_err!(
+                    "Attempt to authenticate to {} failed with: {}",
+                    &image.get_manifest_url(),
+                    e
+                )
+            })?;
+
+        if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
+            return Err(format_err!(
+                "Expected request '{}' to fail with status unauthorized",
+                &image.get_manifest_url()
+            ));
         }
+
+        resp.headers()
+            .get("www-authenticate")
+            .ok_or(format_err!(
+                "Expected www-authenticate header to identify authentication server"
+            ))
+            .and_then(|v| {
+                v.to_str()
+                    .map_err(|e| format_err!("Failed to read auth header {:?}", e))
+            })
+            .map(|s| s.to_string())
+    }
+
+    fn get_bearer_param_map(www_authenticate_header: String) -> HashMap<String, String> {
+        let base = www_authenticate_header.strip_prefix("Bearer ");
+
+        base.unwrap_or("")
+            .split(',')
+            .map(|kv| kv.split('=').collect::<Vec<&str>>())
+            .map(|vec| {
+                (
+                    vec[0].to_string(),
+                    strip_dquotes(vec[1]).unwrap_or(vec[1]).to_string(),
+                )
+            })
+            .collect()
     }
 
     async fn get_digest_from_header(
@@ -624,13 +658,17 @@ impl TrowServer {
             let cl = reqwest::Client::new();
 
             let mut have_manifest = false;
-            //Get auth token
 
-            let auth_token = if let Some(auth) = &proxy_auth {
-                self.get_auth_token(&cl, &proxy_image, &auth).await
-            } else {
-                None
+            //Get auth token for remote server.
+            //TODO: Consider caching
+            let auth_token = match self.get_auth_token(&cl, &proxy_image, &proxy_auth).await {
+                Ok(a) => Some(a),
+                Err(e) => {
+                    error!("Failed to get auth token for {}. Error: {}", proxy_image, e);
+                    None
+                }
             };
+
             let digest = self
                 .get_digest_from_header(&cl, &proxy_image, &auth_token)
                 .await;
