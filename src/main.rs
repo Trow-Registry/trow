@@ -240,8 +240,8 @@ fn main() {
         std::process::exit(0);
     }
 
-    let log_level = matches.value_of("log-level").unwrap_or("error");
-
+    let fallback_log_level = env::var("RUST_LOG").unwrap_or("error".to_string());
+    let log_level = matches.value_of("log-level").unwrap_or(&fallback_log_level);
     let no_tls = matches.is_present("no-tls");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
     let default_port = if no_tls { 8000 } else { 8443 };

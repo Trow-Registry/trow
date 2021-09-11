@@ -15,7 +15,6 @@ extern crate rand;
 extern crate serde;
 extern crate trow_server;
 extern crate uuid;
-use env_logger::Env;
 use futures::Future;
 use log::{LevelFilter, SetLoggerError};
 
@@ -147,27 +146,22 @@ fn init_trow_server(
 /// Build the logging agent with formatting.
 fn init_logger(log_level: String) -> Result<(), SetLoggerError> {
     // If there env variable RUST_LOG is set, then take the configuration from it.
-    if env::var("RUST_LOG").is_ok() {
-        env_logger::from_env(Env::default().default_filter_or("error")).init();
-        Ok(())
-    } else {
-        // Otherwise create a default logger
-        let mut builder = env_logger::Builder::new();
-        builder
-            .format(|buf, record| {
-                writeln!(
-                    buf,
-                    "{} [{}] {} {}",
-                    Utc::now().format("%Y-%m-%dT%H:%M:%S"),
-                    record.target(),
-                    record.level(),
-                    record.args()
-                )
-            })
-            .filter(None, LevelFilter::from_str(&log_level).unwrap());
-        builder.init();
-        Ok(())
-    }
+    // Otherwise create a default logger
+    let mut builder = env_logger::Builder::new();
+    builder
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{} [{}] {} {}",
+                Utc::now().format("%Y-%m-%dT%H:%M:%S"),
+                record.target(),
+                record.level(),
+                record.args()
+            )
+        })
+        .filter(None, LevelFilter::from_str(&log_level).unwrap());
+    builder.init();
+    Ok(())
 }
 
 pub struct TrowBuilder {
