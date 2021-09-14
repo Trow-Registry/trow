@@ -7,6 +7,7 @@ use std::io;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use chrono::prelude::*;
@@ -19,6 +20,8 @@ use reqwest::{
     self,
     header::{HeaderMap, HeaderValue},
 };
+use rusoto_core::region;
+use rusoto_ecr::{Ecr, EcrClient};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -418,14 +421,17 @@ impl TrowServer {
     If repo is proxied to another registry, this will return the details of the remote image.
     If the repo isn't proxied None is returned
     **/
-    fn get_proxy_address_and_auth(
+    async fn get_proxy_address_and_auth(
         &self,
         repo_name: &str,
         reference: &str,
     ) -> Option<(Image, Option<Auth>)> {
         //All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
-            match self.try_get_proxy_address_and_auth(&repo_name, &reference) {
+            match self
+                .try_get_proxy_address_and_auth(&repo_name, &reference)
+                .await
+            {
                 Ok(i) => return Some(i),
                 Err(e) => {
                     error!("{:?}", e);
@@ -436,7 +442,7 @@ impl TrowServer {
         None
     }
 
-    fn try_get_proxy_address_and_auth(
+    async fn try_get_proxy_address_and_auth(
         &self,
         repo_name: &str,
         reference: &str,
@@ -479,10 +485,42 @@ impl TrowServer {
             let mut f = File::open(docker_config_json.clone())?;
             let mut buffer = Vec::new();
             f.read_to_end(&mut buffer)?;
-            let config: Dockerconfigjson = serde_json::from_slice(&buffer)?;
+            let mut config: Dockerconfigjson = serde_json::from_slice(&buffer)?;
 
-            match config.auths.iter().next() {
-                Some(auths) => self.get_proxy_image_and_auth(
+            if let Some(auths) = config.auths.iter_mut().next() {
+                if auths.0.contains("dkr.ecr.")
+                    && auths.0.contains("amazonaws.com")
+                    && auths.1.username.as_ref().filter(|u| **u == "AWS").is_some()
+                {
+                    let region = auths
+                        .0
+                        .split('.')
+                        .nth(3)
+                        .ok_or(format_err!("Could not get region from ECR URL"))?;
+                    let ecr_clt = EcrClient::new(region::Region::from_str(&region)?);
+                    let token_resp =
+                        ecr_clt
+                            .get_authorization_token(
+                                rusoto_ecr::GetAuthorizationTokenRequest::default(),
+                            )
+                            .await;
+                    let token = token_resp?
+                        .authorization_data
+                        .ok_or(format_err!(
+                            "AWS ECR get token response lacks authorization_data"
+                        ))?
+                        .first()
+                        .unwrap()
+                        .authorization_token
+                        .clone()
+                        .unwrap();
+                    // The token is base64(username:password). Here, username is "AWS".
+                    // To get password, we trim "AWS:" from the decoded token.
+                    let password = &base64::decode(token)?[4..];
+                    auths.1.password = Some(std::str::from_utf8(password)?.to_string());
+                }
+
+                self.get_proxy_image_and_auth(
                     reference,
                     proxy_name,
                     auths.0.clone(),
@@ -491,11 +529,12 @@ impl TrowServer {
                         user: auths.1.username.clone(),
                         pass: auths.1.password.clone(),
                     },
-                ),
-                None => Err(format_err!(
+                )
+            } else {
+                Err(format_err!(
                     "Registry config can't be parsed {:?}",
                     docker_config_json.to_str()
-                )),
+                ))
             }
         }
     }
@@ -760,8 +799,9 @@ impl TrowServer {
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation, Error> {
-        if let Some((proxy_image, proxy_auth)) =
-            self.get_proxy_address_and_auth(&repo_name, &reference)
+        if let Some((proxy_image, proxy_auth)) = self
+            .get_proxy_address_and_auth(&repo_name, &reference)
+            .await
         {
             //TODO: May want to consider download tracking in case of simultaneous requests
             //In short term this isn't a big problem as should just copy over itself in worst case

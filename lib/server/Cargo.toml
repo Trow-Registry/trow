@@ -34,6 +34,9 @@ fs3 = "0.5.0"
 sha2 = "0.9"
 hex = "0.4"
 quoted-string = "0.6.1"
+rusoto_core = "0.47"
+rusoto_ecr = "0.47"
+base64 = "0.13"
 
 [build-dependencies]
 tonic-build = "0.5"
