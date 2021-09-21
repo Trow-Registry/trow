@@ -23,13 +23,11 @@ compatible with containerd based distributions such as microk8s (see #14).
  - You've cloned or downloaded this repo
  - Port 31000 can be reached on the worker nodes. You may need to edit the network policy or firewall settings if running in the cloud. For example, run the following if using GKE:
 ```
-$ gcloud compute firewall-rules create trow \
-    --allow tcp:31000 \ 
-    --description "Allow inbound Trow registry traffic" \ 
-    --project <project name>
+$ gcloud compute firewall-rules create trow --allow tcp:31000 --description "Allow inbound Trow registry traffic" --project <project name>
 ```
  - If you're running on GKE or have RBAC configured you may need to expand your
    rights to be able to create the needed service-account (on GKE the user is probably your e-mail address):
+ - The cluster role binding must be created each time you install trow on a new cluster.
 ```
 $ kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=<user>
 clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created

@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: trow-ingress
@@ -13,10 +13,13 @@ spec:
     - host: myregistry.mydomain.io
       http:
         paths:
-          - path: /
-            backend:
-              serviceName: trow-svc
-              servicePort: http-tcp
+        - pathType: Prefix
+          path: /
+          backend:
+            service:
+              name: trow-svc
+              port: 
+                name: http-tcp
   tls: 
     - hosts:
         - myregistry.mydomain.io

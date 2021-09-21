@@ -4,7 +4,7 @@ The easiest way to build Trow is via Dockerfile. Either run `build.sh` from this
 something similar to following:
 
 ```
-docker build -f Dockerfile -t trow ..
+docker build -f docker/Dockerfile -t trow ..
 ```
 
 Note that the build context needs to be the root direcotry of the project (*not* the directory with

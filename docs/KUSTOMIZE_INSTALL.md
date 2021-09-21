@@ -18,30 +18,30 @@ domain name and any special configuration (e.g. ingress). The overlay will refer
 configuration files. By keeping all changes to your own directory, any updates to Trow base
 configuration can be easily merged by just pulling the new commits. 
 
-There is a complete example in the `overlays/example-overlay` directory, which can be used as a basis
+There is a complete example in the `install/overlays/example-overlay` directory, which can be used as a basis
 for getting your cluster running. 
 
 ## Steps
 
 Assuming your cluster has cert-manager installed:
 
- 1) Copy the directory `overlays/example-overlay` to `overlays/mycluster`, changing mycluster to an
+ 1) Copy the directory `install/overlays/example-overlay` to `install/overlays/mycluster`, changing mycluster to an
 appropriate name.
  2) Open the `kustomization.yaml` file. Change the namespace to whatever namespace you want the Trow
 resources to run in. Update the YAML under `secretGenerator` with the user name and password you 
 want to use for the registry. 
  3) In the same `kustomization.yaml`, update the domain name to the domain you wish to use for your 
  registry. Update the user name to the user name you set in the previous step. 
- 2) Run `kubectl apply -k overlays/mycluster` from the install directory.
- 3) Set the DNS for your domain to point to the IP for your ingress, which you can find with `kubectl
- get ingress -n trow`. Note that in GKE, this IP is subject to change unless you obtain a static IP.
+ 4) Run `kubectl apply -k install/overlays/mycluster` from the install directory.
+ 5) Set the DNS for your domain to point to the IP for your ingress, which you can find with `kubectl get ingress -n trow-example`. Note that in GKE, 
+ this IP is subject to change unless you obtain a static IP.
  It may take a moment for the IP address to populate.
- 4) Once the certificate is obtained, TLS will start working and Trow should be available. You may
+ 6) Once the certificate is obtained, TLS will start working and Trow should be available. You may
  get TLS errors whilst the certificate is being provisioned.
 
 If you're using a Google ManagedCertificate, change the base in `kustomization.yaml` to `../gke` and
 replace the `Ingress` patch with a copy of `ManagedCertificate` patch from the
-`overlays/gke/kustomization.yaml` directory and edit as appropriate.
+`install/overlays/gke/kustomization.yaml` directory and edit as appropriate.
 
 For other installs, please use the provided files as a base and consider contributing new
 overlays back to the project.
@@ -71,7 +71,7 @@ And also uncomment the following under `patchesJson6902` and modify the domain v
         version: v1
 ```
 
- 2) Run `kubectl apply -k overlays/mycluster` from the install directory.
+ 2) Run `kubectl apply -k install/overlays/mycluster` from the install directory.
 
 It would be better to point Kubernetes at the internal Trow service in step 2, but as this isn't
 running over TLS within the internal network in the default install, we need to use the external
@@ -91,7 +91,7 @@ This will disable the transfer limit (it can alternatively be set to a large val
 to allow blobs up to 1000 MB in size). More details can be found in the [NGINX Ingress
 guide](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#custom-max-body-size).
 There is also an [Trow kustomize overlay with an NGINX
-ingress](https://github.com/ContainerSolutions/trow/blob/main/install/overlays/cert-manager-nginx/ingress.yaml)
+ingress](https://github.com/ContainerSolutions/trow/blob/main/install/install/overlays/cert-manager-nginx/ingress.yaml)
 that may be useful.
 
 ## Full TLS
@@ -105,7 +105,7 @@ this.
 
 ## Uninstall
 
-This should be as simple as `kubectl delete -k overlays/mycluster`  (changing `overlays/mycluster`
+This should be as simple as `kubectl delete -k install/overlays/mycluster`  (changing `install/overlays/mycluster`
 to the name of your overlay).
 
 ## Troubleshooting

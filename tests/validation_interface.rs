@@ -126,7 +126,7 @@ mod validation_tests {
         },
         "ownerReferences": [
           {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "networking.k8s.io/v1",
             "kind": "ReplicaSet",
             "name": "test3-88c6d6597",
             "uid": "0b4790c2-b607-11e8-a555-42010a8002a3",
