@@ -5,8 +5,7 @@ metadata:
 webhooks:
   - name: validator.trow.io
     sideEffects: None
-    admissionReviewVersions:
-      - v1beta1
+    admissionReviewVersions: ["v1", "v1beta1"]
     rules:
       - apiGroups:
           - ""

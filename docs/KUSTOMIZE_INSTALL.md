@@ -32,7 +32,7 @@ resources to run in. Update the YAML under `secretGenerator` with the user name 
 want to use for the registry. 
  3) In the same `kustomization.yaml`, update the domain name to the domain you wish to use for your 
  registry. Update the user name to the user name you set in the previous step. 
- 4) Run `kubectl apply -k install/overlays/mycluster` from the install directory.
+ 4) Run `kubectl apply -k overlays/mycluster` from the install directory.
  5) Set the DNS for your domain to point to the IP for your ingress, which you can find with `kubectl get ingress -n trow-example`. Note that in GKE, 
  this IP is subject to change unless you obtain a static IP.
  It may take a moment for the IP address to populate.
@@ -71,7 +71,7 @@ And also uncomment the following under `patchesJson6902` and modify the domain v
         version: v1
 ```
 
- 2) Run `kubectl apply -k install/overlays/mycluster` from the install directory.
+ 2) Run `kubectl apply -k overlays/mycluster` from the install directory.
 
 It would be better to point Kubernetes at the internal Trow service in step 2, but as this isn't
 running over TLS within the internal network in the default install, we need to use the external
@@ -105,7 +105,7 @@ this.
 
 ## Uninstall
 
-This should be as simple as `kubectl delete -k install/overlays/mycluster`  (changing `install/overlays/mycluster`
+This should be as simple as `kubectl delete -k overlays/mycluster`  (changing `overlays/mycluster`
 to the name of your overlay).
 
 ## Troubleshooting
