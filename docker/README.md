@@ -7,7 +7,7 @@ something similar to following:
 docker build -f Dockerfile -t trow ..
 ```
 
-Note that the build context needs to be the root direcotry of the project (*not* the directory with
+Note that the build context needs to be the root directory of the project (*not* the directory with
 the Dockerfile).
 
 To run tests, use the `build.sh` script or `Dockerfile.test` image (tests will run as part of the build).
