@@ -1,6 +1,6 @@
 # Building Trow
 
-The easiest way to build Trow is via Dockerfile. Either run `build.sh` from this directory or run
+The easiest way to build Trow is via Dockerfile. From this directory, either run `build.sh` or run
 something similar to following:
 
 ```

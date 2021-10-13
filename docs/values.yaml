@@ -1,0 +1,15 @@
+apiVersion: networking.gke.io/v1beta1
+kind: ManagedCertificate
+metadata:
+  name: trow-certificate
+spec:
+  domains:
+    - myregistry.mydomain.com
+ingress:
+    enabled: true
+    annotations:
+        cert-manager.io/cluster-issuer: nameOfClusterIssuer
+    tls: 
+    - hosts:
+      - myregistry.mydomain.io
+      secretName: myingress-cert

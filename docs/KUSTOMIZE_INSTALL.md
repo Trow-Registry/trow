@@ -18,30 +18,30 @@ domain name and any special configuration (e.g. ingress). The overlay will refer
 configuration files. By keeping all changes to your own directory, any updates to Trow base
 configuration can be easily merged by just pulling the new commits. 
 
-There is a complete example in the `overlays/example-overlay` directory, which can be used as a basis
+There is a complete example in the `install/overlays/example-overlay` directory, which can be used as a basis
 for getting your cluster running. 
 
 ## Steps
 
 Assuming your cluster has cert-manager installed:
 
- 1) Copy the directory `overlays/example-overlay` to `overlays/mycluster`, changing mycluster to an
+ 1) Copy the directory `install/overlays/example-overlay` to `install/overlays/mycluster`, changing mycluster to an
 appropriate name.
  2) Open the `kustomization.yaml` file. Change the namespace to whatever namespace you want the Trow
 resources to run in. Update the YAML under `secretGenerator` with the user name and password you 
 want to use for the registry. 
  3) In the same `kustomization.yaml`, update the domain name to the domain you wish to use for your 
  registry. Update the user name to the user name you set in the previous step. 
- 2) Run `kubectl apply -k overlays/mycluster` from the install directory.
- 3) Set the DNS for your domain to point to the IP for your ingress, which you can find with `kubectl
- get ingress -n trow`. Note that in GKE, this IP is subject to change unless you obtain a static IP.
+ 4) Run `kubectl apply -k overlays/mycluster` from the install directory.
+ 5) Set the DNS for your domain to point to the IP for your ingress, which you can find with `kubectl get ingress -n trow-example`. Note that in GKE, 
+ this IP is subject to change unless you obtain a static IP.
  It may take a moment for the IP address to populate.
- 4) Once the certificate is obtained, TLS will start working and Trow should be available. You may
+ 6) Once the certificate is obtained, TLS will start working and Trow should be available. You may
  get TLS errors whilst the certificate is being provisioned.
 
 If you're using a Google ManagedCertificate, change the base in `kustomization.yaml` to `../gke` and
 replace the `Ingress` patch with a copy of `ManagedCertificate` patch from the
-`overlays/gke/kustomization.yaml` directory and edit as appropriate.
+`install/overlays/gke/kustomization.yaml` directory and edit as appropriate.
 
 For other installs, please use the provided files as a base and consider contributing new
 overlays back to the project.
