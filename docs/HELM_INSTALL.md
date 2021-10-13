@@ -23,7 +23,10 @@ gives examples for GKE managed certificates and cert-manager. Note that you will
 name for Trow.
 
 ### Google Managed Certificates on GKE
-create a managed certificate as follows:
+
+First, create a managed certificate for your domain. You can use the following YAML, replacing
+the domain name as appropriate:
+
 ```yaml
 apiVersion: networking.gke.io/v1beta1
 kind: ManagedCertificate
@@ -34,16 +37,22 @@ spec:
     - myregistry.mydomain.com
 ```
 
-and annotate the ingress using the value `ingress.annotations`:
+Apply the YAML as normal e.g. `kubectl apply -f cert.yaml`.
+
+We then need to update the ingress settings in `values.yaml` to specify we are using GKE and add
+an annotation with the name of the certificate e.g:
+
 ```yaml
 # values.yaml
 ingress:
     enabled: true
     gke: true
     annotations: 
-        networking.gke.io/managed-certificates: trow
+        networking.gke.io/managed-certificates: trow-certificate
 ```
- then install specifying the `values.yaml` from above
+
+Finally we can install Trow as normal, using the updated `values.yaml`:
+
 ```bash
 helm install \
     -f values.yaml  \
