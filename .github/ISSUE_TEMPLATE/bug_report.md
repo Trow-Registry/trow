@@ -27,6 +27,7 @@ Logs for Trow are normally obtained from Kubernetes e.g. `kubectl -n kube-public
 **Kubernetes**
  - Kubernetes distro/host (EKS, GKE, Kind, Minikube etc)
  - Kubernetes version (e.g. 1.19)
+ - Container Runtime (e.g. Docker, can be found via `kubectl get nodes -o wide`)
 
 
 **Additional context**
