@@ -91,8 +91,7 @@ spec:
       serviceAccountName: trow
       containers:
       - name: trow-pod
-        #image: containersol/trow:default
-        image: amouat/trow-test
+        image: containersol/trow:default
         args: ["-n", "trow:31000 trow.{{namespace}}:31000", "-c", "/certs/domain.crt"]
         imagePullPolicy: Always
         ports:
