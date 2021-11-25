@@ -13,9 +13,9 @@ mod interface_tests {
     use environment::Environment;
 
     use crate::common;
-    use reqwest;
+    
     use reqwest::StatusCode;
-    use serde_json;
+    
     use std::fs::{self, File};
     use std::io::{BufReader, Read};
     use std::process::Child;
@@ -432,7 +432,7 @@ mod interface_tests {
         assert!(body.contains("total_manifest_requests{type=\"manifests\"} 6"));
         assert!(body.contains("total_blob_requests{type=\"blobs\"} 8"));
 
-        get_manifest(&cl, "onename", "tag", None).await;
+        get_manifest(cl, "onename", "tag", None).await;
         let manifest_response = cl
             .get(&format!("{}/metrics", TROW_ADDRESS))
             .send()
@@ -443,7 +443,7 @@ mod interface_tests {
 
         assert!(manifest_body.contains("total_manifest_requests{type=\"manifests\"} 7"));
 
-        get_non_existent_blob(&cl).await;
+        get_non_existent_blob(cl).await;
         let blob_response = cl
             .get(&format!("{}/metrics", TROW_ADDRESS))
             .send()

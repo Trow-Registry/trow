@@ -53,8 +53,8 @@ impl std::str::FromStr for DigestAlgorithm {
 impl std::fmt::Display for DigestAlgorithm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DigestAlgorithm::Sha256 => write!(f, "{}", "sha256"),
-            DigestAlgorithm::Sha512 => write!(f, "{}", "sha512"),
+            DigestAlgorithm::Sha256 => write!(f, "sha256"),
+            DigestAlgorithm::Sha512 => write!(f, "sha512"),
         }
     }
 }
@@ -101,7 +101,7 @@ fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
     let digest = sha256_digest(&mut reader)?;
     Ok(format!(
         "{}:{}",
-        DigestAlgorithm::Sha256.to_string(),
+        DigestAlgorithm::Sha256,
         digest
     ))
 }
@@ -114,7 +114,7 @@ fn sha512_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
     let digest = sha512_digest(&mut reader)?;
     Ok(format!(
         "{}:{}",
-        DigestAlgorithm::Sha512.to_string(),
+        DigestAlgorithm::Sha512,
         digest
     ))
 }
@@ -137,8 +137,8 @@ pub fn hash_reference<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<Stri
 
 pub fn parse(component: &str) -> Result<Digest, DigestError> {
     let algo_digest = component
-        .split(":")
-        .map(|token| String::from(token))
+        .split(':')
+        .map(String::from)
         .collect::<Vec<String>>();
 
     // check that we have both parts: algo and digest
@@ -168,7 +168,7 @@ pub fn parse(component: &str) -> Result<Digest, DigestError> {
     }
 
     let algo_enum = DigestAlgorithm::from_str(algo.as_str())
-        .map_err(|e| DigestError::InvalidDigest(e.to_string()))?;
+        .map_err(DigestError::InvalidDigest)?;
 
     Ok(Digest {
         algo: algo_enum,

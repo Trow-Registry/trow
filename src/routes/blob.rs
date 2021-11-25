@@ -430,7 +430,7 @@ pub async fn post_blob_upload(
                 data,
             )
             .await
-            .map(|r| Upload::Accepted(r));
+            .map(Upload::Accepted);
         }
     }
 

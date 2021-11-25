@@ -351,7 +351,7 @@ impl TrowBuilder {
                     println!("Trow is up and running!");
                 })
             }))
-            .attach_if(self.config.cors, cors.clone())
+            .attach_if(self.config.cors, cors)
             .mount("/", routes::routes())
             .register("/", routes::catchers())
             .launch();

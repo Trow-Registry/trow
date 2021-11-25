@@ -240,7 +240,7 @@ fn main() {
         std::process::exit(0);
     }
 
-    let fallback_log_level = env::var("RUST_LOG").unwrap_or("error".to_string());
+    let fallback_log_level = env::var("RUST_LOG").unwrap_or_else(|_| "error".to_string());
     let log_level = matches.value_of("log-level").unwrap_or(&fallback_log_level);
     let no_tls = matches.is_present("no-tls");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
@@ -252,7 +252,7 @@ fn main() {
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
     let host_names_str = matches.value_of("names").unwrap_or(host);
-    let host_names = parse_list(&host_names_str);
+    let host_names = parse_list(host_names_str);
     let dry_run = matches.is_present("dry-run");
     let proxy_hub = matches.is_present("proxy-docker-hub");
 

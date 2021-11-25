@@ -41,7 +41,7 @@ impl AsyncSeekRead for rocket::tokio::fs::File {}
 // Super trait
 pub trait RegistryStorage: ManifestStorage + BlobStorage + CatalogOperations {
     /// Whether the specific name(space) exists
-    fn exists(&self, name: &String) -> Result<bool, StorageDriverError>;
+    fn exists(&self, name: &str) -> Result<bool, StorageDriverError>;
 
     /// Whether the driver supports processing of data chunks in a streaming mode
     /// For example when the client uploads chunks of data, instead of buffering them

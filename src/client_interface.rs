@@ -102,7 +102,7 @@ impl ManifestStorage for ClientInterface {
     ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
-        match self.upload_manifest(&repo, &tag, data).await {
+        match self.upload_manifest(&repo, tag, data).await {
             Ok(vm) => Ok(vm.digest().clone()),
             Err(RegistryError::InvalidName) => {
                 Err(StorageDriverError::InvalidName(format!("{}:{}", name, tag)))
@@ -115,7 +115,7 @@ impl ManifestStorage for ClientInterface {
 
     async fn delete_manifest(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         let repo = RepoName(name.to_string());
-        self.delete_by_manifest(&repo, &digest).await.map_err(|e| {
+        self.delete_by_manifest(&repo, digest).await.map_err(|e| {
             let e = e.downcast::<tonic::Status>();
             if let Ok(ts) = e {
                 match ts.code() {
@@ -143,7 +143,7 @@ impl BlobStorage for ClientInterface {
         digest: &Digest,
     ) -> Result<BlobReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
-        let br = self.get_reader_for_blob(&rn, &digest).await.map_err(|e| {
+        let br = self.get_reader_for_blob(&rn, digest).await.map_err(|e| {
             warn!("Error getting manifest {:?}", e);
             StorageDriverError::Internal
         })?;
@@ -217,7 +217,7 @@ impl BlobStorage for ClientInterface {
         session_id: &str,
         digest: &Digest,
     ) -> Result<(), StorageDriverError> {
-        self.complete_upload(name, session_id, &digest)
+        self.complete_upload(name, session_id, digest)
             .await
             .map_err(|e| match e.downcast::<tonic::Status>() {
                 Ok(ts) => match ts.code() {
@@ -245,7 +245,7 @@ impl BlobStorage for ClientInterface {
         info!("Attempting to delete blob {} in {}", digest, name);
         let rn = RepoName(name.to_string());
 
-        self.delete_blob_local(&rn, &digest)
+        self.delete_blob_local(&rn, digest)
             .await
             .map_err(|_| StorageDriverError::InvalidDigest)?;
         Ok(())
@@ -324,7 +324,7 @@ impl Validation for ClientInterface {
     async fn validate_admission(
         &self,
         admission_req: &validation::AdmissionRequest,
-        host_names: &Vec<String>,
+        host_names: &[String],
     ) -> Result<validation::AdmissionResponse, ValidationError> {
         self.validate_admission_internal(admission_req, host_names)
             .await
