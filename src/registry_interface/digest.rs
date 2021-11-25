@@ -159,8 +159,7 @@ pub fn parse(component: &str) -> Result<Digest, DigestError> {
         )));
     }
 
-    let algo_enum = DigestAlgorithm::from_str(algo.as_str())
-        .map_err(DigestError::InvalidDigest)?;
+    let algo_enum = DigestAlgorithm::from_str(algo.as_str()).map_err(DigestError::InvalidDigest)?;
 
     Ok(Digest {
         algo: algo_enum,
