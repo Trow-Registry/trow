@@ -99,11 +99,7 @@ fn sha256_digest<R: Read>(mut reader: R) -> Result<String, Error> {
 
 fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
     let digest = sha256_digest(&mut reader)?;
-    Ok(format!(
-        "{}:{}",
-        DigestAlgorithm::Sha256,
-        digest
-    ))
+    Ok(format!("{}:{}", DigestAlgorithm::Sha256, digest))
 }
 
 fn sha512_digest<R: Read>(mut reader: R) -> Result<String, Error> {
@@ -112,11 +108,7 @@ fn sha512_digest<R: Read>(mut reader: R) -> Result<String, Error> {
 
 fn sha512_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
     let digest = sha512_digest(&mut reader)?;
-    Ok(format!(
-        "{}:{}",
-        DigestAlgorithm::Sha512,
-        digest
-    ))
+    Ok(format!("{}:{}", DigestAlgorithm::Sha512, digest))
 }
 
 /// Returns a hash in the form of: algo:hash
@@ -167,8 +159,7 @@ pub fn parse(component: &str) -> Result<Digest, DigestError> {
         )));
     }
 
-    let algo_enum = DigestAlgorithm::from_str(algo.as_str())
-        .map_err(DigestError::InvalidDigest)?;
+    let algo_enum = DigestAlgorithm::from_str(algo.as_str()).map_err(DigestError::InvalidDigest)?;
 
     Ok(Digest {
         algo: algo_enum,

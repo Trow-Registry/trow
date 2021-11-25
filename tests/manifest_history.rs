@@ -8,7 +8,7 @@ mod interface_tests {
 
     use crate::common;
     use rand::Rng;
-    
+
     use reqwest::StatusCode;
     use std::fs::{self, File};
     use std::io::{BufReader, Read};
