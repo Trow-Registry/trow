@@ -41,6 +41,6 @@ pub trait Validation {
     async fn validate_admission(
         &self,
         admission_req: &AdmissionRequest,
-        host_names: &Vec<String>,
+        host_names: &[String],
     ) -> Result<AdmissionResponse, ValidationError>;
 }
