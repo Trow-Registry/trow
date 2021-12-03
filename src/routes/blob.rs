@@ -89,6 +89,29 @@ pub async fn get_blob_4level(
 }
 
 /*
+ * Parse 5 level <org>/<repo>/<name> style path and pass it to get_blob
+ */
+#[get("/v2/<fifth>/<fourth>/<org>/<name>/<repo>/blobs/<digest>")]
+pub async fn get_blob_5level(
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    name: String,
+    repo: String,
+    digest: String,
+) -> Option<BlobReader> {
+    get_blob(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, name, repo),
+        digest,
+    )
+    .await
+}
+
+/*
 ---
 Monolithic Upload
 PUT /v2/<name>/blobs/uploads/<uuid>?digest=<digest>
@@ -237,6 +260,38 @@ pub async fn put_blob_4level(
 }
 
 /*
+ * Parse 4 level <org>/<repo>/<name> style path and pass it to put_blob
+ */
+#[put(
+    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
+    data = "<chunk>"
+)]
+pub async fn put_blob_5level(
+    auth_user: TrowToken,
+    config: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    repo: String,
+    name: String,
+    uuid: String,
+    digest: String,
+    chunk: rocket::data::Data<'_>,
+) -> Result<AcceptedUpload, Error> {
+    put_blob(
+        auth_user,
+        config,
+        tc,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, repo, name),
+        uuid,
+        digest,
+        chunk,
+    )
+    .await
+}
+
+/*
 
 ---
 Chunked Upload
@@ -369,6 +424,38 @@ pub async fn patch_blob_4level(
         handler,
         tc,
         format!("{}/{}/{}/{}", fourth, org, repo, name),
+        uuid,
+        chunk,
+    )
+    .await
+}
+
+/*
+ * Parse 5 level <org>/<repo>/<name> style path and pass it to patch_blob
+ */
+#[patch(
+    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>",
+    data = "<chunk>"
+)]
+pub async fn patch_blob_5level(
+    auth_user: TrowToken,
+    info: Option<ContentInfo>,
+    handler: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    repo: String,
+    name: String,
+    uuid: String,
+    chunk: rocket::data::Data<'_>,
+) -> Result<UploadInfo, Error> {
+    patch_blob(
+        auth_user,
+        info,
+        handler,
+        tc,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, repo, name),
         uuid,
         chunk,
     )
@@ -512,7 +599,38 @@ pub async fn post_blob_upload_4level(
 }
 
 /*
- * Parse 5 level path and error.
+ * Parse 5 level <fith>/<fourth>/<org>/<repo>/<name> style path
+ */
+#[post(
+    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads",
+    data = "<data>"
+)]
+pub async fn post_blob_upload_5level(
+    //digest: PossibleDigest, //create requestguard to handle /?digest
+    uri: &Origin<'_>,
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    repo: String,
+    name: String,
+    data: rocket::data::Data<'_>,
+) -> Result<Upload, Error> {
+    post_blob_upload(
+        uri,
+        auth_user,
+        ci,
+        tc,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, repo, name),
+        data,
+    )
+    .await
+}
+
+/*
+ * Parse 6 level path and error.
  *
  * We really shouldn't error any number of paths, but it doesn't seem easy with Rocket.
  *
@@ -520,11 +638,12 @@ pub async fn post_blob_upload_4level(
  * client to retry. Passing non-json causes an error and a reasonable message to the user.
  */
 #[post(
-    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads",
+    "/v2/<sixth>/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads",
     data = "<_data>"
 )]
-pub fn post_blob_upload_5level(
+pub fn post_blob_upload_6level(
     _auth_user: TrowToken,
+    sixth: String,
     fifth: String,
     fourth: String,
     org: String,
@@ -533,8 +652,8 @@ pub fn post_blob_upload_5level(
     _data: rocket::data::Data,
 ) -> rocket::response::status::BadRequest<String> {
     rocket::response::status::BadRequest(Some(format!(
-        "Repository names are limited to 4 levels: {}/{}/{}/{}/{} is not allowed",
-        fifth, fourth, org, repo, name
+        "Repository names are limited to 5 levels: {}/{}/{}/{}/{}/{} is not allowed",
+        sixth, fifth, fourth, org, repo, name
     )))
 }
 
@@ -596,6 +715,26 @@ pub async fn delete_blob_4level(
         auth_user,
         ci,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
+        digest,
+    )
+    .await
+}
+
+#[delete("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/blobs/<digest>")]
+pub async fn delete_blob_5level(
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<BlobDeleted, Error> {
+    delete_blob(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
         digest,
     )
     .await

@@ -374,8 +374,8 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    async fn test_5level_error(cl: &reqwest::Client) {
-        let name = "one/two/three/four/five";
+    async fn test_6level_error(cl: &reqwest::Client) {
+        let name = "one/two/three/four/five/six";
         let resp = cl
             .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
             .send()
@@ -430,7 +430,7 @@ mod interface_tests {
         assert!(body.contains("total_space"));
 
         assert!(body.contains("total_manifest_requests{type=\"manifests\"} 6"));
-        assert!(body.contains("total_blob_requests{type=\"blobs\"} 8"));
+        assert!(body.contains("total_blob_requests{type=\"blobs\"} 9"));
 
         get_manifest(cl, "onename", "tag", None).await;
         let manifest_response = cl
@@ -454,7 +454,7 @@ mod interface_tests {
 
         let blob_body = blob_response.text().await.unwrap();
 
-        assert!(blob_body.contains("total_blob_requests{type=\"blobs\"} 9"));
+        assert!(blob_body.contains("total_blob_requests{type=\"blobs\"} 10"));
     }
 
     #[tokio::test]
@@ -484,6 +484,8 @@ mod interface_tests {
         println!("Running get_blob()");
         get_non_existent_blob(&client).await;
 
+        println!("Running upload_layer(fifth/fourth/repo/image/test:tag)");
+        common::upload_layer(&client, "fifth/fourth/repo/image/test", "tag").await;
         println!("Running upload_layer(fourth/repo/image/test:tag)");
         common::upload_layer(&client, "fourth/repo/image/test", "tag").await;
         println!("Running upload_layer(repo/image/test:tag)");
@@ -500,7 +502,7 @@ mod interface_tests {
         upload_with_post(&client, "posttest").await;
 
         println!("Running test_5level_error()");
-        test_5level_error(&client).await;
+        test_6level_error(&client).await;
 
         println!("Running push_oci_manifest()");
         let digest = push_oci_manifest(&client, "puttest", "puttest1").await;
@@ -536,6 +538,7 @@ mod interface_tests {
         get_manifest(&client, "repo/image/test", "tag", None).await;
 
         let mut rc = RepoCatalog::new();
+        rc.insert("fifth/fourth/repo/image/test".to_string());
         rc.insert("fourth/repo/image/test".to_string());
         rc.insert("repo/image/test".to_string());
         rc.insert("image/test".to_string());
