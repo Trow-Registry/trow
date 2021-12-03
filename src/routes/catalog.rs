@@ -86,6 +86,28 @@ pub async fn list_tags_4level(
     .await
 }
 
+#[get("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/tags/list?<last>&<n>")]
+pub async fn list_tags_5level(
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    last: Option<String>,
+    n: Option<u32>,
+) -> Result<TagList, Error> {
+    list_tags(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
+        last,
+        n,
+    )
+    .await
+}
+
 // TODO add support for pagination
 #[get("/<onename>/manifest_history/<reference>?<last>&<n>")]
 pub async fn get_manifest_history(
@@ -165,6 +187,30 @@ pub async fn get_manifest_history_4level(
         auth_user,
         ci,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
+        reference,
+        last,
+        n,
+    )
+    .await
+}
+
+#[get("/<fifth>/<fourth>/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
+pub async fn get_manifest_history_5level(
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+    last: Option<String>,
+    n: Option<u32>,
+) -> Result<ManifestHistory, Error> {
+    get_manifest_history(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
         reference,
         last,
         n,

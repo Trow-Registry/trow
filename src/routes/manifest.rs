@@ -94,6 +94,29 @@ pub async fn get_manifest_4level(
 }
 
 /*
+ * Process 4 level manifest path
+ */
+#[get("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
+pub async fn get_manifest_5level(
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+) -> Result<ManifestReader, Error> {
+    get_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}/{} ", fifth, fourth, org, user, repo),
+        reference,
+    )
+    .await
+}
+
+/*
 
 ---
 Pushing an image manifest
@@ -207,6 +230,36 @@ pub async fn put_image_manifest_4level(
 }
 
 /*
+ * Parse 5 level <fifth>/<fourth>/<org>/<user>/<repo> style path and pass it to put_image_manifest
+ */
+#[put(
+    "/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<reference>",
+    data = "<chunk>"
+)]
+pub async fn put_image_manifest_5level(
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    reference: String,
+    chunk: rocket::data::Data<'_>,
+) -> Result<VerifiedManifest, Error> {
+    put_image_manifest(
+        auth_user,
+        ci,
+        tc,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
+        reference,
+        chunk,
+    )
+    .await
+}
+
+/*
 ---
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
@@ -265,6 +318,26 @@ pub async fn delete_image_manifest_4level(
         auth_user,
         ci,
         format!("{}/{}/{}/{}", fourth, org, user, repo),
+        digest,
+    )
+    .await
+}
+
+#[delete("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<digest>")]
+pub async fn delete_image_manifest_5level(
+    auth_user: TrowToken,
+    ci: &rocket::State<ClientInterface>,
+    fifth: String,
+    fourth: String,
+    org: String,
+    user: String,
+    repo: String,
+    digest: String,
+) -> Result<ManifestDeleted, Error> {
+    delete_image_manifest(
+        auth_user,
+        ci,
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
         digest,
     )
     .await
