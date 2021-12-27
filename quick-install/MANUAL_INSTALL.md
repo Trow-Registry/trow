@@ -1,6 +1,6 @@
 # Manual Installation
 
-In general it is recommend to use the [standard install with Kustomize](../install/INSTALL.md)). In
+In general it is recommend to use the [standard install with Kustomize](../docs/KUSTOMIZE_INSTALL.md)). In
 some cases - particularly where domain names and certs are not available - you may want to use the
 quick-install method documented here, which uses the Kubernetes CA to generate certs, copies them to
 the correct locations and sets up routing via /etc/hosts.

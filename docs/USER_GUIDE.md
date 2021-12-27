@@ -8,7 +8,7 @@
  * [Troubleshooting](#troubleshooting)
 
 More information is available in the [README](../README.md) and [Installation
-instructions](../install/INSTALL.md).
+instructions](../docs/KUSTOMIZE_INSTALL.md).
 
 ## Persisting Data/Images
 
