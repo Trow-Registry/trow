@@ -3,7 +3,7 @@ set -euo pipefail
 
 MAJOR_VERSION="0"
 MINOR_VERSION="3"
-PATCH_VERSION="3"
+PATCH_VERSION="4"
 # Only use this for "special" release and prefix with "-" 
 # e.g. -SCANNING for scanning preview feature release
 NAME="" 
@@ -24,6 +24,7 @@ Before running this, please check:
  - all tests are passing
  - the version is correct in Cargo.toml and this file (currently $VERSION)
  - you are on the main branch and in sync with remote
+ - you can push to the containersol Hub repo
 
 Version in this script $VERSION
 Version in Cargo.toml $CARGO_VERSION
@@ -94,3 +95,11 @@ do
 done
 git tag v$VERSION
 git push origin v$VERSION
+
+# Next do the Helm Release
+# Update charts/trow/Chart.yaml with correct values
+# Run `helm package charts/trow/ --destination charts/` - this should build tgz
+# Upload tgz to GH release
+# Run `helm repo index charts/ --merge charts/index.yaml --url https://github.com/ContainerSolutions/trow/releases/download/v0.3.4/` 
+# Merge new index.yaml
+# Copy index.yaml to gh-pages branch
