@@ -1,7 +1,7 @@
 # Helm Install Trow
 
 Use the following instructions to install Trow via [Helm](https://helm.sh). You may also find the
-information in the [standard install instructions](../install/INSTALL.md) useful.
+information in the [standard install instructions](../docs/KUSTOMIZE_INSTALL.md) useful.
 
 ## Add the Trow Helm Repo
 
