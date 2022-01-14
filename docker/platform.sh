@@ -12,7 +12,7 @@ case $TARGETARCH in
 	;;
     "arm")
 	echo "armv7-unknown-linux-gnueabihf" > /.platform
-	echo "gcc-aarch64-linux-gnu" > /.compiler
+	echo "gcc-arm-linux-gnueabihf" > /.compiler
 	;;
 esac
 
