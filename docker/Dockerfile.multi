@@ -35,7 +35,8 @@ RUN apt-get update \
 COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
-COPY --from=cross /usr/src/trow/trow /trow # keep this late for concurrency
+# keep this late for concurrency
+COPY --from=cross /usr/src/trow/trow /trow 
 RUN chown -R trow /data /certs /install
 USER trow
 ENTRYPOINT ["/start-trow.sh"]
