@@ -32,11 +32,10 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=cross /usr/src/trow/trow /trow
-
 COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
+COPY --from=cross /usr/src/trow/trow /trow # keep this late for concurrency
 RUN chown -R trow /data /certs /install
 USER trow
 ENTRYPOINT ["/start-trow.sh"]
