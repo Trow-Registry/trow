@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Used in Docker build to set platform dependent variables
+
 case $TARGETARCH in
 
     "amd64")

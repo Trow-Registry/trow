@@ -19,31 +19,16 @@ jobs:
     - name: Install buildx
       run: |
           mkdir -p ~/.docker/cli-plugins
-          curl -fSL -o docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.linux-amd64
-          echo "3f4e77686659766a0726b5a47a87e2cc14c86ebf15abf7f19c45d23b0daff222 *docker-buildx" | sha256sum -c -
+          curl -fSL -o docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.7.1.linux-amd64
+          echo "22fcb78c66905bf6ddf198118aaa9838b0349a25347606264be17e4276d6d5fc *docker-buildx" | sha256sum -c -
           mkdir -p ~/.docker/cli-plugins
           mv docker-buildx ~/.docker/cli-plugins/
           chmod +x ~/.docker/cli-plugins/docker-buildx
-    - name: Install manifest-tool
-      run: |
-         curl -fSL -o ./manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.2/manifest-tool-linux-amd64
-         curl -fSL -o ./manifest-tool.asc https://github.com/estesp/manifest-tool/releases/download/v1.0.2/manifest-tool-linux-amd64.asc
-         export GNUPGHOME="$(mktemp -d)"
-         gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys 27F3EA268A97867EAF0BD05C0F386284C03A1162
-         gpg --batch --verify manifest-tool.asc manifest-tool
-         chmod +x ./manifest-tool
-         rm manifest-tool.asc
-    - name: Build and push multi-arch
+    - name: Build and push multi-arch image
       run: |
           ./docker/multi-arch.sh
-          docker image prune -f
-    - name: Build and push amd64 default target
-      run: |
-          ./docker/build.sh
-    - name: Push multi-arch image
-      run: |
-         cat ./docker/manifest.tmpl
-         ./manifest-tool push from-spec ./docker/manifest.tmpl
+          docker build -f Dockerfile.notls -t containersol/trow:notls ../
+          docker push containersol/trow:notls
   conformance_tests:
     services:
       trow:

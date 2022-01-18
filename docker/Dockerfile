@@ -1,52 +1,42 @@
-#Not a big fan of using nightly, but such is our lot currently
-FROM rust:latest as builder
+# syntax=docker/dockerfile:1
 
-RUN rustup component add rustfmt
-RUN apt-get update && apt-get install -y unzip
-
+#Note we build on amd64 and cross-compile to arch
+FROM --platform=linux/amd64 rust:latest as cross
+ARG TARGETARCH
 WORKDIR /usr/src/trow
+#RUN if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-unknown-linux-gnu" > /.platform ; fi
+COPY docker/platform.sh .
+RUN ./platform.sh # should write /.platform and /.compiler
+RUN rustup component add rustfmt
+RUN rustup target add $(cat /.platform) 
+RUN apt-get update && apt-get install -y unzip $(cat /.compiler)
 
-#First get just the deps for caching.
 COPY Cargo.toml .
 COPY Cargo.lock .
-
-RUN mkdir src/
-RUN echo "fn main() {}" > src/main.rs
-
-# trow-server
-COPY lib/server/Cargo.toml lib/server/
-RUN mkdir -p lib/server/src
-RUN touch lib/server/src/lib.rs
-
-# trow-protobuf
-COPY lib/protobuf/Cargo.toml lib/protobuf/
-RUN echo "fn main() {}" > lib/protobuf/build.rs
-RUN mkdir -p lib/protobuf/src
-RUN touch lib/protobuf/src/lib.rs
-
-RUN cargo build --release # should cache all build deps
+COPY .cargo/config .cargo/config
 
 COPY lib lib
 COPY src src
-# Must build protobuf first for generated code
-RUN cd lib/protobuf && cargo build --release
-RUN cargo build --release
+
+# Build protobuf first for generated code
+RUN cd lib/protobuf && cargo build --release --target $(cat /.platform)
+RUN cargo build --release --target $(cat /.platform)
+RUN cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/ # Get rid of this when build --out is stable
 
 FROM debian:stable-slim
-
 RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 # Note that certs are needed for proxying
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates\
-  && apt-get clean\
+  && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /usr/src/trow/target/release/trow /trow
 
 COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
+# keep this late for concurrency
+COPY --from=cross /usr/src/trow/trow /trow 
 RUN chown -R trow /data /certs /install
 USER trow
 ENTRYPOINT ["/start-trow.sh"]
