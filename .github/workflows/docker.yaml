@@ -27,7 +27,7 @@ jobs:
     - name: Build and push multi-arch image
       run: |
           ./docker/multi-arch.sh
-          docker build -f Dockerfile.notls -t containersol/trow:notls ../
+          docker build -f ./docker/Dockerfile.notls -t containersol/trow:notls ./
           docker push containersol/trow:notls
   conformance_tests:
     services:
