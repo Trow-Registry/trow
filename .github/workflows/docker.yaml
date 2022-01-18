@@ -19,7 +19,7 @@ jobs:
     - name: Install buildx
       run: |
           mkdir -p ~/.docker/cli-plugins
-          curl -fSL -o docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.7.1.linux-amd64
+          curl -fSL -o docker-buildx https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64
           echo "22fcb78c66905bf6ddf198118aaa9838b0349a25347606264be17e4276d6d5fc *docker-buildx" | sha256sum -c -
           mkdir -p ~/.docker/cli-plugins
           mv docker-buildx ~/.docker/cli-plugins/
