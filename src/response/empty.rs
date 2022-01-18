@@ -1,6 +1,7 @@
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct Empty;

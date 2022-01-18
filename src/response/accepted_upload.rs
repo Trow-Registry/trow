@@ -1,5 +1,6 @@
 use crate::response::get_base_url;
 use crate::types::AcceptedUpload;
+use log::debug;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};

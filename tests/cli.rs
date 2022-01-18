@@ -1,5 +1,3 @@
-extern crate assert_cli;
-
 #[cfg(test)]
 mod cli {
 
@@ -144,6 +142,7 @@ mod cli {
     fn log_level_setting() {
         assert_cli::Assert::main_binary()
             .with_args(&["--log-level", "TRACE"])
-            .succeeds();
+            .succeeds()
+            .unwrap();
     }
 }

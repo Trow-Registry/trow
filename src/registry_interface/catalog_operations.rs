@@ -1,5 +1,6 @@
 use super::StorageDriverError;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /*
 There are implementation details in this interface that could/should be abstracted out.

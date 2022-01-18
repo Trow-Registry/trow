@@ -10,7 +10,9 @@ use std::str;
 use std::sync::{Arc, RwLock};
 
 use chrono::prelude::*;
+use failure::format_err;
 use failure::{self, Error, Fail};
+use log::{debug, error, info, warn};
 use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
 use reqwest::{

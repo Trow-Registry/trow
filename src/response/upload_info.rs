@@ -1,5 +1,6 @@
 use crate::response::get_base_url;
 pub use crate::types::{create_upload_info, UploadInfo};
+use log::debug;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{Responder, Response};

@@ -1,4 +1,6 @@
 use failure::Error;
+use failure::Fail;
+use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 
 pub trait FromJson {
@@ -209,7 +211,7 @@ mod test {
           "urls": [
                     "https://mcr.microsoft.com/v2/windows/servercore/blobs/sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
           ]
-         
+
       }
    ]
 }"#;
@@ -322,10 +324,10 @@ mod test {
         let config = "{}\n".as_bytes();
         let config_digest = sha256_tag_digest(BufReader::new(config)).unwrap();
         let data = format!(
-            r#"{{ "config": {{ "digest": "{}", 
-                             "mediaType": "application/vnd.oci.image.config.v1+json", 
+            r#"{{ "config": {{ "digest": "{}",
+                             "mediaType": "application/vnd.oci.image.config.v1+json",
                              "size": {} }},
-                 "mediaType": "application/vnd.oci.image.manifest.v1+json", 
+                 "mediaType": "application/vnd.oci.image.manifest.v1+json",
                  "layers": [], "schemaVersion": 2 }}"#,
             config_digest,
             config.len()
