@@ -47,10 +47,6 @@ docker buildx build \
   --build-arg DATE="$DATE" \
   --build-arg VERSION="$VERSION" \
   $PUSH --pull --platform linux/arm/v7,linux/arm64,linux/amd64 \
-  -f "Dockerfile" -t $IMAGE ../
-
-docker tag $IMAGE containersol/trow:default
-docker tag $IMAGE $GH_REPO:default
-docker tag $IMAGE containersol/trow:latest
-docker tag $IMAGE $GH_REPO:latest
-docker push containersol/trow:default $GH_REPO:default containersol/trow:latest $GH_REPO:latest
+  -t $IMAGE -t containersol/trow:default -t $GH_REPO:default \
+  -t containersol/trow:latest -t $GH_REPO:latest \
+  -f "Dockerfile" ../
