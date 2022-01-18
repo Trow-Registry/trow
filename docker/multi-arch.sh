@@ -36,7 +36,7 @@ DATE="$(date --rfc-3339=seconds)"
 
 if [[ "$CI" = true ]]
 then
-   PUSH = "--push"
+   PUSH="--push"
 fi
 
 docker buildx build \
