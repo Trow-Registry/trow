@@ -29,14 +29,23 @@ There are several ways to produce multiplatform builds with Docker:
     targetting a low-powered platform (e.g. Raspberry Pi), this option may be considerably faster
     than building directly on the hardware or using emulation.
 
-There are two Dockerfiles for approach number 3 `Dockerfile.armv7` and `Dockerfile.arm64`, which you
-can use directly, or as a guide building for other platforms. To use these Dockerfiles, run:
+Our Dockerfile uses 3 (with Docker multiplatform support to assemble the final image). Assuming
+you're running on amd64, you can run the following:
 
 ```
-docker buildx build --pull --load -t trow:armv7 -f Dockerfile.armv7 --platform linux/arm/v7 ../
+docker buildx build --pull --load -t trow:armv7 -f Dockerfile --platform linux/arm/v7 ../
 ```
 
-This assumes you have a recent version of Docker with buildkit installed.
+You can build a multi-platform image (or rather manifest pointing to multiple images) with:
+
+```
+docker buildx build --pull --load -t trow:armv7 -f Dockerfile --platform linux/arm/v7,linux/arm64,linux/amd64 ../
+```
+
+But be aware that you can't load the result into a local Docker instance as it doesn't
+currently understand multi-platform manifests. 
+
+All of this assumes you have a recent version of Docker with buildkit installed.
 
 Note that `--pull` avoids an issue whereby Docker can use the wrong base image and `--load` puts the
 image into the host Docker image cache.
