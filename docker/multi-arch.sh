@@ -39,6 +39,7 @@ then
    PUSH="--push"
 fi
 
+echo $PUSH $DH_IMAGE $GH_IMAGE $DH_REPO $GH_REPO
 docker buildx build \
   --build-arg VCS_REF="${SOURCE_COMMIT:-$(git rev-parse HEAD)}" \
   --build-arg VCS_BRANCH="${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}" \
@@ -46,7 +47,14 @@ docker buildx build \
   --build-arg TAG="$TAG" \
   --build-arg DATE="$DATE" \
   --build-arg VERSION="$VERSION" \
-  "$PUSH" --pull --platform linux/arm/v7,linux/arm64,linux/amd64 \
-  -t "$DH_IMAGE" -t "$GH_IMAGE" -t "$DH_REPO":default -t "$GH_REPO":default \
-  -t containersol/trow:latest -t "$GH_REPO":latest \
-  -f "Dockerfile" ../
+  $PUSH --pull --platform linux/arm/v7,linux/arm64,linux/amd64 \
+  -t $DH_IMAGE -t $GH_IMAGE -t $DH_REPO:default -t $GH_REPO:default \
+  -t $DH_REPO:latest -t $GH_REPO:latest \
+  -f Dockerfile ../
+
+# Sign the images 
+# Assumes runner has installed cosing e.g. uses: sigstore/cosign-installer@main
+if [[ "$CI" = true ]]
+then
+    cosign sign $DH_IMAGE $GH_IMAGE $DH_REPO:default $GH_REPO:default $DH_REPO:latest -t $GH_REPO:latest
+fi
