@@ -4,7 +4,6 @@
 FROM --platform=linux/amd64 rust:latest as cross
 ARG TARGETARCH
 WORKDIR /usr/src/trow
-#RUN if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64-unknown-linux-gnu" > /.platform ; fi
 COPY docker/platform.sh .
 RUN ./platform.sh # should write /.platform and /.compiler
 RUN rustup component add rustfmt
