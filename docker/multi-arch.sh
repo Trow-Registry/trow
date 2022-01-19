@@ -11,7 +11,7 @@ DH_REPO=${DOCKER_REPO:-"containersol/trow"}
 
 # Use trow-multi builder if it exists, otherwise create it
 set +e
-if docker buildx ls | grep -s trow-multi ;
+if ! docker buildx ls | grep -s trow-multi ;
 then
     # Register binfmt handlers
     docker run --rm --privileged aptman/qus -s -- -p arm aarch64
