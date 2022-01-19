@@ -7,12 +7,11 @@ src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
 GH_REPO=${DOCKER_REPO:-"ghcr.io/containersolutions/trow/trow"}
-REPO=${DOCKER_REPO:-"containersol/trow"}
+DH_REPO=${DOCKER_REPO:-"containersol/trow"}
 
 # Use trow-multi builder if it exists, otherwise create it
 set +e
-docker buildx ls | grep -s trow-multi
-if [[ $? != 0 ]]
+if docker buildx ls | grep -s trow-multi ;
 then
     # Register binfmt handlers
     docker run --rm --privileged aptman/qus -s -- -p arm aarch64
@@ -31,7 +30,8 @@ else
 fi
 
 TAG=${DOCKER_TAG:-"$VERSION"}
-IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
+DH_IMAGE=${IMAGE_NAME:-"$DH_REPO:$TAG"}
+GH_IMAGE=${IMAGE_NAME:-"$GH_REPO:$TAG"}
 DATE="$(date --rfc-3339=seconds)"
 
 if [[ "$CI" = true ]]
@@ -42,11 +42,11 @@ fi
 docker buildx build \
   --build-arg VCS_REF="${SOURCE_COMMIT:-$(git rev-parse HEAD)}" \
   --build-arg VCS_BRANCH="${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}" \
-  --build-arg REPO="$REPO" \
+  --build-arg REPO="$DH_REPO" \
   --build-arg TAG="$TAG" \
   --build-arg DATE="$DATE" \
   --build-arg VERSION="$VERSION" \
-  $PUSH --pull --platform linux/arm/v7,linux/arm64,linux/amd64 \
-  -t $IMAGE -t containersol/trow:default -t $GH_REPO:default \
-  -t containersol/trow:latest -t $GH_REPO:latest \
+  "$PUSH" --pull --platform linux/arm/v7,linux/arm64,linux/amd64 \
+  -t "$DH_IMAGE" -t "$GH_IMAGE" -t "$DH_REPO":default -t "$GH_REPO":default \
+  -t containersol/trow:latest -t "$GH_REPO":latest \
   -f "Dockerfile" ../
