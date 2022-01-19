@@ -56,5 +56,7 @@ docker buildx build \
 # Assumes runner has installed cosing e.g. uses: sigstore/cosign-installer@main
 if [[ "$CI" = true ]]
 then
-    cosign sign $DH_IMAGE $GH_IMAGE $DH_REPO:default $GH_REPO:default $DH_REPO:latest -t $GH_REPO:latest
+    #sign once for each registry, will sign corresponding hash
+    cosign sign $DH_IMAGE 
+    cosign sign $GH_IMAGE
 fi
