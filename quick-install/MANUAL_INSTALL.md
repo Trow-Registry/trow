@@ -1,18 +1,20 @@
 # Manual Installation
 
-In general it is recommend to use the [standard install with Kustomize](../docs/KUSTOMIZE_INSTALL.md)). In
+In general it is recommend to use the [standard install with Kustomize](../docs/KUSTOMIZE_INSTALL.md). In
 some cases - particularly where domain names and certs are not available - you may want to use the
 quick-install method documented here, which uses the Kubernetes CA to generate certs, copies them to
 the correct locations and sets up routing via /etc/hosts.
 
 This document manually walks through the steps taken by the installer and may be of use if you need
 to customise installation. Most people should be able to just run the `install.sh` script directly.
+Also be warned that this document may not always be up-to-date with the scripts.
 
- - Apply the `trow.yaml` file from the quick-install directory:
+ - We first want to apply the `trow.yaml` file from the quick-install directory. Note that this file
+   includes some templating to take a namespace, which we can replace with `sed` e.g:
 
 ```
 $ cd quick-install
-$ kubectl apply -f trow.yaml
+$ sed "s/{{namespace}}/kube-public/" trow.yaml | kubectl apply -f -
 serviceaccount "trow" created
 role.rbac.authorization.k8s.io "trow" created
 clusterrole.rbac.authorization.k8s.io "trow" created
