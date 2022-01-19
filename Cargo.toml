@@ -47,7 +47,8 @@ rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", branch = "mast
 [dev-dependencies]
 futures = "0.3"
 quickcheck = "1.0"
-assert_cli = "^0.6"
+assert_cmd = "2.0"
+predicates = "2.1"
 environment = "^0.1"
 hyper = "0.14"
 rand = "^0.8"
