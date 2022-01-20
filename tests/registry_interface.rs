@@ -503,7 +503,7 @@ mod interface_tests {
         println!("Running push_manifest_list()");
         let digest_list = push_manifest_list(&client, &digest, "listtest", "listtest1").await;
         println!("Running get_manifest(puttest:puttest1)");
-        get_manifest(&client, "puttest", "puttest1", Some(358)).await;
+        get_manifest(&client, "puttest", "puttest1", Some(354)).await;
         println!("Running delete_manifest(puttest:digest)");
         delete_manifest(&client, "puttest", &digest).await;
         println!("Running delete_manifest(listtest)");
