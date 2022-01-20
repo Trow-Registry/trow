@@ -11,14 +11,18 @@ mod cli {
         get_command()
             .arg("-Z")
             .assert()
-            .stderr(predicate::str::contains("Found argument '-Z' which wasn't expected, or isn't valid in this context"))
+            .stderr(predicate::str::contains(
+                "Found argument '-Z' which wasn't expected, or isn't valid in this context",
+            ))
             .failure();
 
         get_command()
             .arg("-Z")
             .assert()
             .failure()
-            .stderr(predicate::str::contains("error: Found argument '-Z' which wasn't expected"));
+            .stderr(predicate::str::contains(
+                "error: Found argument '-Z' which wasn't expected",
+            ));
     }
 
     #[test]
@@ -74,28 +78,33 @@ mod cli {
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Images with these prefixes are explicitly allowed: [\"myreg.com/\"]"));
-
+            .stdout(predicate::str::contains(
+                "Images with these prefixes are explicitly allowed: [\"myreg.com/\"]",
+            ));
 
         get_command()
             .args(&["--allow-images", "myreg.com/myimage:1.2", "--dry-run"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Images with these names are explicitly allowed: [\"myreg.com/myimage:1.2\"]"));
-
+            .stdout(predicate::str::contains(
+                "Images with these names are explicitly allowed: [\"myreg.com/myimage:1.2\"]",
+            ));
 
         get_command()
             .args(&["--disallow-local-images", "myimage:1.2", "--dry-run"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Local images with these names are explicitly denied: [\"myimage:1.2\"]"));
-
+            .stdout(predicate::str::contains(
+                "Local images with these names are explicitly denied: [\"myimage:1.2\"]",
+            ));
 
         get_command()
             .args(&["--disallow-local-prefixes", "beta/", "--dry-run"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Local images with these prefixes are explicitly denied: [\"beta/\"]"));
+            .stdout(predicate::str::contains(
+                "Local images with these prefixes are explicitly denied: [\"beta/\"]",
+            ));
     }
 
     #[test]
@@ -104,7 +113,9 @@ mod cli {
             .args(&["--enable-cors", "--dry-run"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Cross-Origin Resource Sharing(CORS) requests are allowed"));
+            .stdout(predicate::str::contains(
+                "Cross-Origin Resource Sharing(CORS) requests are allowed",
+            ));
     }
 
     #[test]
@@ -114,7 +125,6 @@ mod cli {
             .assert()
             .success()
             .stdout(predicate::str::contains("manifest size: 3"));
-
 
         get_command()
             .args(&["--max-manifest-size", "-4"])
