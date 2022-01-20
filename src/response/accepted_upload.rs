@@ -17,7 +17,10 @@ impl<'r> Responder<'r, 'static> for AcceptedUpload {
         let location_header = Header::new("Location", location);
         let digest_header = Header::new("Docker-Content-Digest", self.digest().to_string());
         let (left, right) = self.range();
-        let range_header = Header::new("Range", format!("{}-{}", left, right));
+        let range_header = Header::new(
+            "Range",
+            format!("{}-{}", left, right.checked_sub(1).unwrap_or(0)),
+        );
         let length_header = Header::new("Content-Length", "0");
 
         Response::build()

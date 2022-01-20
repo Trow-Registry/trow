@@ -14,11 +14,12 @@ impl<'r> Responder<'r, 'static> for UploadInfo {
         );
         let (left, right) = self.range();
         let upload_uuid = Header::new("Docker-Upload-UUID", self.uuid().0.clone());
-        let range = Header::new("Range", format!("{}-{}", left, right));
+        let range_max = right.checked_sub(1).unwrap_or(0);
+        let range = Header::new("Range", format!("{}-{}", left, range_max));
         let length = Header::new("X-Content-Length", format!("{}", right - left));
         let location = Header::new("Location", location_url);
 
-        debug!("Range: {}-{}, Length: {}", left, right, right - left);
+        debug!("Range: {}-{}, Length: {}", left, range_max, right - left);
 
         Response::build()
             .header(upload_uuid)
