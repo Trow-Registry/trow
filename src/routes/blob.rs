@@ -9,6 +9,7 @@ use crate::types::{
 use crate::TrowConfig;
 use rocket::data::ToByteUnit;
 use rocket::http::uri::Origin;
+use rocket::{delete, get, patch, post, put};
 
 /*
 ---

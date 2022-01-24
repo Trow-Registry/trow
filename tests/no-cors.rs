@@ -1,10 +1,3 @@
-extern crate base64;
-extern crate environment;
-extern crate hyper;
-extern crate rand;
-extern crate reqwest;
-extern crate serde_json;
-
 mod common;
 
 #[cfg(test)]

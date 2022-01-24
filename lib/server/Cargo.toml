@@ -11,13 +11,13 @@ async-stream = "0.3"
 bytes = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-prost = "0.8"
-prost-types = "0.8"
+prost = "0.9"
+prost-types = "0.9"
 rand = "0.8"
 tokio = { version = "1", features = ["macros", "sync", "time", "rt-multi-thread"] }
 tokio-stream = "0.1"
 chrono = "0.4"
-tonic = "0.5"
+tonic = "0.6"
 log = "0.4"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 failure = "^0.1"
@@ -27,15 +27,15 @@ trow-protobuf = { path = "../protobuf" }
 rustc-serialize = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
 
-prometheus = { version = "0.12"}
+prometheus = { version = "0.13"}
 lazy_static = "1.4.0"
 fs3 = "0.5.0"
 # crypto and crypto related crates
-sha2 = "0.9"
+sha2 = "0.10"
 hex = "0.4"
 quoted-string = "0.6.1"
 
 [build-dependencies]
-tonic-build = "0.5"
+tonic-build = "0.6"
 
 [dev-dependencies]

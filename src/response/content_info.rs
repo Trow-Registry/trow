@@ -1,5 +1,6 @@
 use crate::registry_interface::blob_storage::ContentInfo;
 use crate::response::errors::Error;
+use log::warn;
 use rocket::http::Status;
 use rocket::outcome::Outcome;
 use rocket::request::{self, FromRequest, Request};

@@ -1,6 +1,7 @@
 use crate::TrowConfig;
 use crate::UserConfig;
 use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
+use log::warn;
 use rocket::http::ContentType;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};

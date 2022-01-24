@@ -1,31 +1,5 @@
-#[macro_use]
-extern crate failure;
-extern crate base64;
-extern crate futures;
-extern crate hostname;
-#[macro_use]
-extern crate rocket;
-extern crate argon2;
-extern crate chrono;
-extern crate data_encoding;
-extern crate derive_more;
-extern crate env_logger;
-extern crate frank_jwt;
-extern crate rand;
-extern crate serde;
-extern crate trow_server;
-extern crate uuid;
 use futures::Future;
 use log::{LevelFilter, SetLoggerError};
-
-#[macro_use]
-extern crate log;
-
-#[macro_use]
-extern crate serde_derive;
-
-#[cfg(test)]
-extern crate quickcheck;
 
 use failure::Error;
 use rand::rngs::OsRng;
@@ -54,6 +28,9 @@ use fairings::conditional_fairing::AttachConditionalFairing;
 use rand::RngCore;
 use std::io::Write;
 
+use failure::format_err;
+use failure::Fail;
+use log::debug;
 use rocket::http::Method;
 use rocket_cors::AllowedHeaders;
 use rocket_cors::AllowedOrigins;

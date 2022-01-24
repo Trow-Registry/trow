@@ -1,7 +1,10 @@
 use lazy_static::lazy_static;
 
 use failure::Error;
-use prometheus::{Encoder, IntCounter, IntGauge, TextEncoder};
+use prometheus::{
+    labels, opts, register_int_counter, register_int_gauge, Encoder, IntCounter, IntGauge,
+    TextEncoder,
+};
 use std::path::PathBuf;
 
 //  Metrics static values executed at runtime and registered to default

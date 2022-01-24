@@ -1,149 +1,147 @@
-extern crate assert_cli;
-
 #[cfg(test)]
 mod cli {
+    use predicates::prelude::*;
+
+    fn get_command() -> assert_cmd::Command {
+        assert_cmd::Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap()
+    }
 
     #[test]
     fn invalid_argument() {
-        assert_cli::Assert::main_binary()
-            .with_args(&["-Z"])
-            .fails()
-            .and()
-            .stderr()
-            .contains("error: Found argument '-Z' which wasn't expected")
-            .unwrap();
+        get_command()
+            .arg("-Z")
+            .assert()
+            .stderr(predicate::str::contains(
+                "Found argument '-Z' which wasn't expected, or isn't valid in this context",
+            ))
+            .failure();
+
+        get_command()
+            .arg("-Z")
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains(
+                "error: Found argument '-Z' which wasn't expected",
+            ));
     }
 
     #[test]
     fn help_works() {
-        assert_cli::Assert::main_binary()
-            .with_args(&["-h"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("Trow")
-            .unwrap();
+        get_command()
+            .arg("-h")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Trow"));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["--help"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("Trow")
-            .unwrap();
+        get_command()
+            .arg("--help")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Trow"));
     }
 
     #[test]
     fn host_name_parsing() {
-        assert_cli::Assert::main_binary()
-            .with_args(&["-n myhost.com", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("[\"myhost.com\"]")
-            .unwrap();
+        get_command()
+            .args(&["-n", "myhost.com", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("[\"myhost.com\"]"));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["--names", "trow.test", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("[\"trow.test\"]")
-            .unwrap();
+        get_command()
+            .args(&["--names", "trow.test", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("[\"trow.test\"]"));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["-n myhost.com second", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("[\"myhost.com\", \"second\"]")
-            .unwrap();
+        get_command()
+            .args(&["-n myhost.com second", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("[\"myhost.com\", \"second\"]"));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["-n port.io:3833 second", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("[\"port.io:3833\", \"second\"]")
-            .unwrap();
+        get_command()
+            .args(&["-n port.io:3833 second", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("[\"port.io:3833\", \"second\"]"));
     }
 
     #[test]
     fn image_validation() {
-        assert_cli::Assert::main_binary()
-            .with_args(&[
+        get_command()
+            .args(&[
                 "--deny-k8s-images",
                 "--allow-prefixes",
                 "myreg.com/",
                 "--dry-run",
             ])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("Images with these prefixes are explicitly allowed: [\"myreg.com/\"]")
-            .unwrap();
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "Images with these prefixes are explicitly allowed: [\"myreg.com/\"]",
+            ));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["--allow-images", "myreg.com/myimage:1.2", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("Images with these names are explicitly allowed: [\"myreg.com/myimage:1.2\"]")
-            .unwrap();
+        get_command()
+            .args(&["--allow-images", "myreg.com/myimage:1.2", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "Images with these names are explicitly allowed: [\"myreg.com/myimage:1.2\"]",
+            ));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["--disallow-local-images", "myimage:1.2", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("Local images with these names are explicitly denied: [\"myimage:1.2\"]")
-            .unwrap();
+        get_command()
+            .args(&["--disallow-local-images", "myimage:1.2", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "Local images with these names are explicitly denied: [\"myimage:1.2\"]",
+            ));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["--disallow-local-prefixes", "beta/", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("Local images with these prefixes are explicitly denied: [\"beta/\"]")
-            .unwrap();
+        get_command()
+            .args(&["--disallow-local-prefixes", "beta/", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "Local images with these prefixes are explicitly denied: [\"beta/\"]",
+            ));
     }
 
     #[test]
     fn cors() {
-        assert_cli::Assert::main_binary()
-            .with_args(&["--enable-cors", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("Cross-Origin Resource Sharing(CORS) requests are allowed")
-            .unwrap();
+        get_command()
+            .args(&["--enable-cors", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "Cross-Origin Resource Sharing(CORS) requests are allowed",
+            ));
     }
 
     #[test]
     fn file_size_parsing() {
-        assert_cli::Assert::main_binary()
-            .with_args(&["--max-manifest-size", "3", "--dry-run"])
-            .succeeds()
-            .and()
-            .stdout()
-            .contains("manifest size: 3")
-            .unwrap();
+        get_command()
+            .args(&["--max-manifest-size", "3", "--dry-run"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("manifest size: 3"));
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["--max-manifest-size", "-4"])
-            .fails()
-            .unwrap();
+        get_command()
+            .args(&["--max-manifest-size", "-4"])
+            .assert()
+            .failure();
 
-        assert_cli::Assert::main_binary()
-            .with_args(&["--max-manifest-size", "1.1"])
-            .fails()
-            .unwrap();
+        get_command()
+            .args(&["--max-manifest-size", "1.1"])
+            .assert()
+            .failure();
     }
 
     #[test]
     fn log_level_setting() {
-        assert_cli::Assert::main_binary()
-            .with_args(&["--log-level", "TRACE"])
-            .succeeds();
+        get_command()
+            .args(&["--log-level", "TRACE", "--dry-run"])
+            .assert()
+            .success();
     }
 }

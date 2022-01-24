@@ -3,6 +3,7 @@ use crate::registry_interface::validation::{self, Validation};
 
 use crate::types::AdmissionReview;
 use crate::TrowConfig;
+use rocket::post;
 use rocket::serde::json::Json;
 
 //Kubernetes webhooks for admitting images

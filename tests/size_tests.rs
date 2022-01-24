@@ -1,9 +1,3 @@
-extern crate environment;
-extern crate hyper;
-extern crate rand;
-extern crate reqwest;
-extern crate serde_json;
-
 #[cfg(test)]
 mod common;
 

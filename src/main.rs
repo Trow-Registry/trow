@@ -1,6 +1,3 @@
-extern crate clap;
-extern crate trow;
-
 use clap::{Arg, ArgMatches};
 use std::env;
 use std::fs::File;
@@ -19,78 +16,78 @@ const DEFAULT_KEY_PATH: &str = "./certs/domain.key";
 
   Will cause the program to exit if error or on help/version argument.
 */
-fn parse_args<'a>() -> ArgMatches<'a> {
+fn parse_args() -> ArgMatches {
     clap::App::new(PROGRAM_NAME)
         .version("0.1")
         .author("From Container Solutions")
         .about(PROGRAM_DESC)
         .arg(
-            Arg::with_name("host")
+            Arg::new("host")
                 .long("host")
                 .value_name("host")
                 .help("Sets the name of the host or interface to start Trow on. Defaults to 0.0.0.0")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("port")
+            Arg::new("port")
                 .long("port")
                 .value_name("port")
                 .help("The port that trow will listen on. Defaults to 8443 with TLS, 8000 without.")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("no-tls")
+            Arg::new("no-tls")
                 .long("no-tls")
                 .help("Turns off TLS. Normally only used in development and debugging. If used in production, make sure you understand the risks.")
         )
         .arg(
-            Arg::with_name("cert")
-                .short("c")
+            Arg::new("cert")
+                .short('c')
                 .long("cert")
                 .value_name("cert")
-                .help(&format!("Path to TLS certificate. Defaults to {}.", DEFAULT_CERT_PATH))
+                .help(format!("Path to TLS certificate. Defaults to {}.", DEFAULT_CERT_PATH).as_str())
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("key")
-                .short("k")
+            Arg::new("key")
+                .short('k')
                 .long("key")
                 .value_name("key")
-                .help(&format!("Path to TLS private key. Defaults to {}.", DEFAULT_KEY_PATH))
+                .help(format!("Path to TLS private key. Defaults to {}.", DEFAULT_KEY_PATH).as_str())
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("data-dir")
-                .short("d")
+            Arg::new("data-dir")
+                .short('d')
                 .long("data-dir")
                 .value_name("data_dir")
                 .help("Directory to store images and metadata in.")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("names")
-            .short("n")
+            Arg::new("names")
+            .short('n')
             .long("names")
             .value_name("names")
             .help("Host names for registry. Used in validation callbacks. Separate with comma or use quotes and spaces")
             .takes_value(true),
         )
         .arg(
-            Arg::with_name("dry-run")
+            Arg::new("dry-run")
             .long("dry-run")
             .value_name("dry_run")
             .help("Don't acutally run Trow, just validate arguments. For testing purposes.")
             .takes_value(false),
         )
         .arg(
-            Arg::with_name("allow-docker-official")
+            Arg::new("allow-docker-official")
             .long("allow-docker-official")
             .value_name("allow_docker_official")
             .help("Docker official images (e.g. the debian base image) will be allowed in validation callbacks.")
             .takes_value(false)
         )
         .arg(
-            Arg::with_name("deny-k8s-images")
+            Arg::new("deny-k8s-images")
             .long("deny-k8s-images")
             .value_name("deny_k8s_images")
             .help("By default, validation callbacks will allow various Kubernetes system images by default.
@@ -98,61 +95,61 @@ This option will deny those images; be careful as this may disable cluster insta
             .takes_value(false)
         )
         .arg(
-            Arg::with_name("allow-prefixes")
+            Arg::new("allow-prefixes")
             .long("allow-prefixes")
             .value_name("allow_prefixes")
-            .help("Images that begin with any of the listed prefixes will be allowed in validation callbaks. 
-Separate with a comma or use quotes and spaces. 
-For example 'quay.io/coreos,myhost.com/' will match quay.io/coreos/etcd and myhost.com/myimage/myrepo:tag. 
+            .help("Images that begin with any of the listed prefixes will be allowed in validation callbaks.
+Separate with a comma or use quotes and spaces.
+For example 'quay.io/coreos,myhost.com/' will match quay.io/coreos/etcd and myhost.com/myimage/myrepo:tag.
 Use docker.io as the hostname for the Docker Hub.")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("allow-images")
+            Arg::new("allow-images")
             .long("allow-images")
             .value_name("allow_images")
-            .help("Images that match a full name in the list will be allowed in validation callbacks. 
-Separate with a comma or use quotes and spaces. Include the hostname. 
+            .help("Images that match a full name in the list will be allowed in validation callbacks.
+Separate with a comma or use quotes and spaces. Include the hostname.
 For example 'quay.io/coreos/etcd:latest'. Use docker.io as the hostname for the Docker Hub.")
             .takes_value(true)
         )
 
         .arg(
-            Arg::with_name("disallow-local-prefixes")
+            Arg::new("disallow-local-prefixes")
             .long("disallow-local-prefixes")
             .value_name("disallow_local_prefixes")
-            .help("Disallow local images that match the prefix _not_ including any host name.  
+            .help("Disallow local images that match the prefix _not_ including any host name.
 For example 'beta' will match myhost.com/beta/myapp assuming myhost.com is the name of this registry.")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("disallow-local-images")
+            Arg::new("disallow-local-images")
             .long("disallow-local-images")
             .value_name("disallow_local_images")
-            .help("Disallow local images that match the full name _not_ including any host name.  
+            .help("Disallow local images that match the full name _not_ including any host name.
 For example 'beta/myapp:tag' will match myhost.com/beta/myapp:tag assuming myhost.com is the name of this registry.")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("user")
+            Arg::new("user")
             .long("user")
-            .short("u")
+            .short('u')
             .value_name("user")
             .help("Set the username that can be used to access Trow (e.g. via docker login).
 Must be used with --password or --password-file")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("password")
+            Arg::new("password")
             .long("password")
-            .short("p")
+            .short('p')
             .value_name("password")
             .help("Set the password that can be used to access Trow (e.g. via docker login).
 Must be used with --user")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("password-file")
+            Arg::new("password-file")
             .long("password-file")
             .value_name("password-file")
             .help("Location of file with password that can be used to access Trow (e.g. via docker login).
@@ -160,22 +157,22 @@ Must be used with --user")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("version")
+            Arg::new("version")
             .long("version")
-            .short("v")
+            .short('v')
             .value_name("version")
             .help("Get the version number of Trow")
             .takes_value(false)
         )
         .arg(
-            Arg::with_name("proxy-docker-hub")
+            Arg::new("proxy-docker-hub")
             .long("proxy-docker-hub")
             .value_name("proxy-docker-hub")
             .help("Proxies repos at f/docker/<repo_name> to docker.io/<repo_name>. Downloaded images will be cached.")
             .takes_value(false)
         )
         .arg(
-            Arg::with_name("hub-user")
+            Arg::new("hub-user")
             .long("hub-user")
             .value_name("hub-user")
             .help("Set the username for accessing the Docker Hub, used when proxying Docker Hub images.
@@ -183,40 +180,40 @@ Must be used with --hub-token or --hub-token-file")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("hub-token")
+            Arg::new("hub-token")
             .long("hub-token")
             .value_name("hub-token")
             .help("Set the token for accessing the Docker Hub, used when proxying Docker Hub images")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("hub-token-file")
+            Arg::new("hub-token-file")
             .long("hub-token-file")
             .value_name("hub-token-file")
             .help("Location of file with token that can be used for accessing the Docker Hub, used when proxying Docker Hub images")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("enable-cors")
+            Arg::new("enable-cors")
                 .long("enable-cors")
                 .help("Enable Cross-Origin Resource Sharing(CORS) requests. Used to allow access from web apps (e.g. GUIs).")
         )
         .arg(
-            Arg::with_name("max-manifest-size")
+            Arg::new("max-manifest-size")
             .long("max-manifest-size")
             .value_name("max-manifest-size")
             .help("Maximum size in mebibytes of manifest file that can be uploaded. This is JSON metada, so usually relatively small.")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("max-blob-size")
+            Arg::new("max-blob-size")
             .long("max-blob-size")
             .value_name("max-blob-size")
             .help("Maximum size in mebibytes of \"blob\" that can be uploaded (a single layer of an image). This can be very large in some images (GBs).")
             .takes_value(true)
         )
         .arg(
-            Arg::with_name("log-level")
+            Arg::new("log-level")
             .long("log-level")
             .value_name("log-level")
             .help("The log level at which to output to stdout, valid values are OFF, ERROR, WARN, INFO, DEBUG and TRACE")

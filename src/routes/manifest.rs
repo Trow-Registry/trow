@@ -1,4 +1,5 @@
 use rocket::data::ToByteUnit;
+use rocket::{delete, get, put};
 
 use crate::client_interface::ClientInterface;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};

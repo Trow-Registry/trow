@@ -8,8 +8,11 @@ use crate::registry_interface::{
     validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
     Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
 };
+use failure::Fail;
+use log::{debug, info, warn};
 use rocket::data::DataStream;
 use rocket::tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite};
+use tonic::{Code, Request};
 use trow_proto::{
     admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
     BlobRef, CatalogRequest, CompleteRequest, HealthRequest, ListTagsRequest,
@@ -17,13 +20,9 @@ use trow_proto::{
     UploadRequest, VerifyManifestRequest,
 };
 
-use tonic::{Code, Request};
-
+use crate::registry_interface::{BlobStorage, ManifestStorage, StorageDriverError};
 use crate::types::{self, *};
-use crate::{
-    chrono::TimeZone,
-    registry_interface::{BlobStorage, ManifestStorage, StorageDriverError},
-};
+use chrono::TimeZone;
 use failure::Error;
 use serde_json::Value;
 use std::convert::TryInto;
@@ -443,11 +442,11 @@ impl ClientInterface {
         Ok(file)
     }
 
-    async fn upload_manifest<'a>(
+    async fn upload_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
-        manifest: DataStream<'a>,
+        manifest: DataStream<'_>,
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)

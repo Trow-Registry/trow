@@ -1,27 +1,10 @@
 pub mod digest;
 
-#[macro_use(warn, debug, info, error)]
-extern crate log;
-
-#[macro_use]
-extern crate serde_derive;
-extern crate failure_derive;
-extern crate rustc_serialize;
-extern crate serde_json;
-#[macro_use]
-extern crate failure;
-extern crate chrono;
-
-#[macro_use]
-extern crate prometheus;
-// crypto and crypto related crates
-extern crate hex;
-extern crate sha2;
-
 use tonic::transport::Server;
 mod metrics;
 mod server;
 mod validate;
+use log::{debug, warn};
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;

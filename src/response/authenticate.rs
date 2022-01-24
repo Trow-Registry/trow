@@ -3,6 +3,7 @@ use rocket::http::ContentType;
 use rocket::http::{Header, Status};
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
+use serde::Serialize;
 
 /*
  * Generate a WWW-Authenticate header
