@@ -15,6 +15,8 @@ pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 pub const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
 #[allow(dead_code)]
 pub const LOCATION_HEADER: &str = "Location";
+#[allow(dead_code)]
+pub const RANGE_HEADER: &str = "Range";
 
 #[cfg(test)]
 #[allow(dead_code)]

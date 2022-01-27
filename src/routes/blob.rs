@@ -165,6 +165,7 @@ pub async fn put_blob(
             _ => Error::InternalError,
         })?;
 
+    log::debug!("size {} u32 {}", size, (size as u32));
     Ok(create_accepted_upload(
         digest_obj,
         RepoName(repo_name),
