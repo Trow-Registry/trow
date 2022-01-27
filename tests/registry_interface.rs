@@ -183,7 +183,12 @@ mod interface_tests {
             .to_str()
             .unwrap();
 
-        let range = resp.headers().get(common::RANGE_HEADER).unwrap().to_str().unwrap();
+        let range = resp
+            .headers()
+            .get(common::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert_eq!(range, "0-0"); // Haven't uploaded anything yet
 
         //used by oci_manifest_test
@@ -196,8 +201,13 @@ mod interface_tests {
 
         let resp = cl.put(loc).body(config).send().await.unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
-        let range = resp.headers().get(common::RANGE_HEADER).unwrap().to_str().unwrap();
-        assert_eq!(range, format!("0-{}", (config.len() -1 ))); //note first byte is 0, hence len - 1
+        let range = resp
+            .headers()
+            .get(common::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
     async fn upload_with_post(cl: &reqwest::Client, name: &str) {
@@ -213,8 +223,13 @@ mod interface_tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
-        let range = resp.headers().get(common::RANGE_HEADER).unwrap().to_str().unwrap();
-        assert_eq!(range, format!("0-{}", (config.len() -1 ))); //note first byte is 0, hence len - 1
+        let range = resp
+            .headers()
+            .get(common::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
     async fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
