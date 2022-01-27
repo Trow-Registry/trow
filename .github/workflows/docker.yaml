@@ -25,6 +25,8 @@ jobs:
           mv docker-buildx ~/.docker/cli-plugins/
           chmod +x ~/.docker/cli-plugins/docker-buildx
     - uses: sigstore/cosign-installer@main
+      with:
+          cosign-release: 'v1.4.1'
     - name: Build and push multi-arch image
       run: |
           ./docker/multi-arch.sh
