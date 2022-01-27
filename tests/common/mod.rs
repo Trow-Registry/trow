@@ -64,6 +64,8 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         .await
         .expect("Failed to send patch request");
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    let range = resp.headers().get(RANGE_HEADER).unwrap().to_str().unwrap();
+    assert_eq!(range, format!("0-{}", (blob.len() -1 ))); //note first byte is 0, hence len - 1
 
     let digest = digest::sha256_tag_digest(BufReader::new(blob.as_slice())).unwrap();
     let resp = cl

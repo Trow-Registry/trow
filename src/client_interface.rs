@@ -193,7 +193,7 @@ impl BlobStorage for ClientInterface {
         let total = sink.seek(SeekFrom::End(0)).await.unwrap_or(chunk_len);
         if have_range {
             if (info.range.1 + 1) != total {
-                warn!("total {} r + 1 {}", total, info.range.1 + 1 + 1);
+                warn!("total {} r + 1 {}", total, info.range.1 + 1);
                 return Err(StorageDriverError::InvalidContentRange);
             }
             //Check length if chunked upload
