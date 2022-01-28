@@ -46,11 +46,16 @@ else
     "$POD_IP",
     "$SERVICE_IP"
   ],
-  "CN": "trow.$POD_NAMESPACE",
+  "CN": "system:node:trow.$POD_NAMESPACE",
   "key": {
     "algo": "rsa",
     "size": 4096
-  }
+  },
+  "names": [
+        {
+          "O":  "system:nodes"
+        }
+    ]
 }
 EOF
 
@@ -66,7 +71,7 @@ EOF
   kubectl delete csr trow.$POD_NAMESPACE || true
 
   cat <<EOF | kubectl create -f -
-apiVersion: certificates.k8s.io/v1beta1
+apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
 metadata:
   name: trow.$POD_NAMESPACE
@@ -74,6 +79,7 @@ spec:
   groups:
   - system:authenticated
   request: $REQ
+  signerName: kubernetes.io/kubelet-serving
   usages:
   - digital signature
   - key encipherment
