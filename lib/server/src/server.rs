@@ -756,15 +756,6 @@ impl TrowServer {
             Err(e) => Err(e),
         };
 
-        //Not an error, even if it's not great
-        fs::remove_file(&scratch_path).unwrap_or_else(|e| {
-            error!(
-                "Error deleting file {} {:?}",
-                &scratch_path.to_string_lossy(),
-                e
-            )
-        });
-
         res?;
         Ok(())
     }
@@ -1029,9 +1020,6 @@ impl Registry for TrowServer {
                         );
                         Status::internal("Internal error copying manifest")
                     });
-
-                fs::remove_file(&uploaded_manifest)
-                    .unwrap_or_else(|e| error!("Failure deleting uploaded manifest {:?}", e));
 
                 ret
             }
