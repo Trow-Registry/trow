@@ -13,6 +13,7 @@ use async_recursion::async_recursion;
 use chrono::prelude::*;
 use failure::format_err;
 use failure::{self, Error, Fail};
+use futures::future::try_join_all;
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
@@ -457,11 +458,17 @@ impl TrowServer {
         let mani: Manifest = serde_json::from_slice(&bytes)?;
 
         if let Manifest::List(_) = mani {
-            for digest in mani.get_local_asset_digests() {
-                let mut image = remote_image.clone();
-                image.tag = digest.to_string();
-                self.download_manifest_and_layers(cl, token, &image, local_repo_name).await?;
-            }
+            let images_to_dl = mani.get_local_asset_digests()
+                .into_iter()
+                .map(|digest| {
+                    let mut image = remote_image.clone();
+                    image.tag = digest.to_string();
+                    image
+                })
+                .collect::<Vec<_>>();
+            let futures = images_to_dl.iter()
+                .map(|img| self.download_manifest_and_layers(cl, token, &img, local_repo_name));
+            try_join_all(futures).await?;
         } else {
             let mut paths = vec![];
             //TODO: change to perform dloads async
