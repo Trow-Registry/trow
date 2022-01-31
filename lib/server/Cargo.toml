@@ -6,6 +6,7 @@ edition = "2021"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com" ]
 
 [dependencies]
+async-recursion = "1.0"
 futures = "0.3"
 async-stream = "0.3"
 bytes = "1"

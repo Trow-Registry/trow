@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::str;
 use std::sync::{Arc, RwLock};
 
+use async_recursion::async_recursion;
 use chrono::prelude::*;
 use failure::format_err;
 use failure::{self, Error, Fail};
@@ -115,15 +116,16 @@ pub struct Auth {
 }
 
 fn create_accept_header() -> HeaderMap {
+    const ACCEPT: [&str; 3] = [
+        manifest_media_type::OCI_V1,
+        manifest_media_type::DOCKER_V2,
+        manifest_media_type::DOCKER_LIST,
+    ];
+
     let mut headers = HeaderMap::new();
     headers.insert(
         reqwest::header::ACCEPT,
-        HeaderValue::from_str(&format!(
-            "{}, {}",
-            manifest_media_type::OCI_V1,
-            manifest_media_type::DOCKER_V2
-        ))
-        .unwrap(),
+        HeaderValue::from_str(&ACCEPT.join(", ")).unwrap()
     );
     headers
 }
@@ -421,13 +423,15 @@ impl TrowServer {
         None
     }
 
-    async fn download_manifest_and_layers<T: Display>(
+    #[async_recursion]
+    async fn download_manifest_and_layers<T: Display + Sync>(
         &self,
         cl: &reqwest::Client,
         token: &Option<T>,
         remote_image: &Image,
         local_repo_name: &str,
     ) -> Result<(), Error> {
+        debug!("Downloading manifest + layers for {}", remote_image);
         let mut req = cl.get(&remote_image.get_manifest_url());
         if let Some(auth) = token {
             req = req.bearer_auth(auth);
@@ -452,35 +456,43 @@ impl TrowServer {
 
         let mani: Manifest = serde_json::from_slice(&bytes)?;
 
-        let mut paths = vec![];
-        //TODO: change to perform dloads async
-        for digest in mani.get_local_asset_digests() {
-            //skip blob if it already exists in local storage
-            //we need to continue as docker images may share blobs
-            if self.get_catalog_path_for_blob(digest)?.exists() {
-                info!("Already have blob {}", digest);
-                continue;
+        if let Manifest::List(_) = mani {
+            for digest in mani.get_local_asset_digests() {
+                let mut image = remote_image.clone();
+                image.tag = digest.to_string();
+                self.download_manifest_and_layers(cl, token, &image, local_repo_name).await?;
             }
-            let addr = format!(
-                "{}/{}/blobs/{}",
-                remote_image.host, remote_image.repo, digest
-            );
-            info!("Downloading blob {}", addr);
+        } else {
+            let mut paths = vec![];
+            //TODO: change to perform dloads async
+            for digest in mani.get_local_asset_digests() {
+                //skip blob if it already exists in local storage
+                //we need to continue as docker images may share blobs
+                if self.get_catalog_path_for_blob(digest)?.exists() {
+                    info!("Already have blob {}", digest);
+                    continue;
+                }
+                let addr = format!(
+                    "{}/{}/blobs/{}",
+                    remote_image.host, remote_image.repo, digest
+                );
+                info!("Downloading blob {}", addr);
 
-            let resp = if let Some(auth) = token {
-                cl.get(&addr).bearer_auth(auth).send().await?
-            } else {
-                cl.get(&addr).send().await?
-            };
-            let path = self.scratch_path.join(digest);
+                let resp = if let Some(auth) = token {
+                    cl.get(&addr).bearer_auth(auth).send().await?
+                } else {
+                    cl.get(&addr).send().await?
+                };
+                let path = self.scratch_path.join(digest);
 
-            let mut buf = File::create(&path)?;
-            buf.write_all(&resp.bytes().await?)?; //Is this going to be buffered?
-            paths.push((path, digest));
-        }
+                let mut buf = File::create(&path)?;
+                buf.write_all(&resp.bytes().await?)?; //Is this going to be buffered?
+                paths.push((path, digest));
+            }
 
-        for (path, digest) in &paths {
-            self.save_blob(&path, digest)?;
+            for (path, digest) in &paths {
+                self.save_blob(&path, digest)?;
+            }
         }
 
         //Save out manifest
@@ -490,15 +502,6 @@ impl TrowServer {
 
         self.save_blob(&temp_mani_path, &calculated_digest)?;
         self.save_tag(&calculated_digest, local_repo_name, &remote_image.tag)?;
-
-        //Delete all the temp stuff
-        fs::remove_file(&temp_mani_path)
-            .unwrap_or_else(|e| error!("Failure deleting downloaded manifest {:?}", e));
-
-        for (path, _digest) in paths {
-            fs::remove_file(path)
-                .unwrap_or_else(|e| error!("Failure deleting downloaded blob {:?}", e));
-        }
 
         Ok(())
     }
@@ -720,6 +723,7 @@ impl TrowServer {
         })
     }
 
+    /// Moves blob from scratch to blob catalog
     fn save_blob(&self, scratch_path: &PathBuf, digest: &str) -> Result<(), Error> {
         let digest_path = self.get_catalog_path_for_blob(digest)?;
         let repo_path = digest_path
@@ -729,8 +733,7 @@ impl TrowServer {
         if !repo_path.exists() {
             fs::create_dir_all(repo_path)?;
         }
-
-        fs::copy(&scratch_path, &digest_path)?;
+        fs::rename(&scratch_path, &digest_path)?;
         Ok(())
     }
 
