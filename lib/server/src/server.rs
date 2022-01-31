@@ -117,10 +117,11 @@ pub struct Auth {
 }
 
 fn create_accept_header() -> HeaderMap {
-    const ACCEPT: [&str; 3] = [
+    const ACCEPT: [&str; 4] = [
         manifest_media_type::OCI_V1,
         manifest_media_type::DOCKER_V2,
         manifest_media_type::DOCKER_LIST,
+        manifest_media_type::OCI_INDEX,
     ];
 
     let mut headers = HeaderMap::new();
