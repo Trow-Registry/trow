@@ -476,12 +476,27 @@ impl TrowServer {
             let mut paths = vec![];
             //TODO: change to perform dloads async
             for digest in mani.get_local_asset_digests() {
-                //skip blob if it already exists in local storage
-                //we need to continue as docker images may share blobs
                 if self.get_catalog_path_for_blob(digest)?.exists() {
                     info!("Already have blob {}", digest);
                     continue;
                 }
+                let path = self.scratch_path.join(digest);
+                let file = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&path);
+
+                let mut buf = match file {
+                    Ok(f) => f,
+                    Err(e) => match e.kind() {
+                        std::io::ErrorKind::AlreadyExists => {
+                            info!("Skip concurrently fetched blob {}", digest);
+                            continue;
+                        }
+                        _ => return Err(e.into()),
+                    },
+                };
+
                 let addr = format!(
                     "{}/{}/blobs/{}",
                     remote_image.host, remote_image.repo, digest
@@ -493,9 +508,7 @@ impl TrowServer {
                 } else {
                     cl.get(&addr).send().await?
                 };
-                let path = self.scratch_path.join(digest);
 
-                let mut buf = File::create(&path)?;
                 buf.write_all(&resp.bytes().await?)?; //Is this going to be buffered?
                 paths.push((path, digest));
             }

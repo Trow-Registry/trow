@@ -76,7 +76,13 @@ mod interface_tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Could not get {}:{}",
+            name,
+            tag
+        );
         let mani: manifest::ManifestV2 = resp.json().await.unwrap();
         assert_eq!(mani.schema_version, 2);
     }
