@@ -127,7 +127,7 @@ fn create_accept_header() -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(
         reqwest::header::ACCEPT,
-        HeaderValue::from_str(&ACCEPT.join(", ")).unwrap()
+        HeaderValue::from_str(&ACCEPT.join(", ")).unwrap(),
     );
     headers
 }
@@ -459,7 +459,8 @@ impl TrowServer {
         let mani: Manifest = serde_json::from_slice(&bytes)?;
 
         if let Manifest::List(_) = mani {
-            let images_to_dl = mani.get_local_asset_digests()
+            let images_to_dl = mani
+                .get_local_asset_digests()
                 .into_iter()
                 .map(|digest| {
                     let mut image = remote_image.clone();
@@ -467,7 +468,8 @@ impl TrowServer {
                     image
                 })
                 .collect::<Vec<_>>();
-            let futures = images_to_dl.iter()
+            let futures = images_to_dl
+                .iter()
                 .map(|img| self.download_manifest_and_layers(cl, token, &img, local_repo_name));
             try_join_all(futures).await?;
         } else {
