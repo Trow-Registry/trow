@@ -29,9 +29,10 @@ jobs:
           cosign-release: 'v1.4.1'
     - name: Build and push multi-arch image
       run: |
-          ./docker/multi-arch.sh
+          #./docker/multi-arch.sh
           docker build -f ./docker/Dockerfile.notls -t containersol/trow:notls ./
           docker push containersol/trow:notls
+          COSIGN_EXPERIMENTAL=1 cosign sign --verbose containersol/trow:notls
   conformance_tests:
     services:
       trow:
