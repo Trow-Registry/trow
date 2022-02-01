@@ -30,6 +30,7 @@ use crate::digest::sha256_tag_digest;
 use crate::manifest::{manifest_media_type, FromJson, Manifest};
 use crate::metrics;
 use crate::server::trow_server::registry_server::Registry;
+use crate::temporary_file::TemporaryFile;
 
 use self::trow_server::*;
 
@@ -439,20 +440,12 @@ impl TrowServer {
             return Ok(());
         }
         let path = self.scratch_path.join(digest);
-        let file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path);
-
-        let mut buf = match file {
-            Ok(f) => f,
-            Err(e) => match e.kind() {
-                std::io::ErrorKind::AlreadyExists => {
-                    info!("Skip concurrently fetched blob {}", digest);
-                    return Ok(());
-                }
-                _ => return Err(e.into()),
-            },
+        let mut file = match TemporaryFile::open_for_writing(path).await? {
+            Some(f) => f,
+            None => {
+                info!("Skip concurrently fetched blob {}", digest);
+                return Ok(());
+            }
         };
 
         let addr = format!(
@@ -461,23 +454,13 @@ impl TrowServer {
         );
         info!("Downloading blob {}", addr);
 
-        let save_data = async {
-            let resp = if let Some(auth) = token {
-                cl.get(&addr).bearer_auth(auth).send().await?
-            } else {
-                cl.get(&addr).send().await?
-            };
-            buf.write_all(&resp.bytes().await?)?;
-            self.save_blob(&path, digest)?;
-            Ok(())
+        let resp = if let Some(auth) = token {
+            cl.get(&addr).bearer_auth(auth).send().await?
+        } else {
+            cl.get(&addr).send().await?
         };
-        if let e @ Err(_) = save_data.await {
-            // An error happened while downloading the blob.
-            // Remove the temporary file & return.
-            let _ = fs::remove_file(&path);
-            return e;
-        }
-
+        file.write_all(&resp.bytes().await?).await?;
+        self.save_blob(file.path(), digest)?;
         Ok(())
     }
 
@@ -776,7 +759,7 @@ impl TrowServer {
     }
 
     /// Moves blob from scratch to blob catalog
-    fn save_blob(&self, scratch_path: &PathBuf, digest: &str) -> Result<(), Error> {
+    fn save_blob(&self, scratch_path: &Path, digest: &str) -> Result<(), Error> {
         let digest_path = self.get_catalog_path_for_blob(digest)?;
         let repo_path = digest_path
             .parent()

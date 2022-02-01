@@ -3,6 +3,7 @@ pub mod digest;
 use tonic::transport::Server;
 mod metrics;
 mod server;
+mod temporary_file;
 mod validate;
 use log::{debug, warn};
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
