@@ -155,6 +155,15 @@ mod interface_tests {
         //Need to special case single name repos
         get_manifest(&client, "f/docker/alpine", "latest").await;
 
+        //Download an amd64 manifest, then the multi platform version of the same manifest
+        get_manifest(
+            &client,
+            "f/docker/hello-world",
+            "sha256:f54a58bc1aac5ea1a25d796ae155dc228b3f0e11d046ae276b39c4bf2f13d8c4",
+        )
+        .await;
+        get_manifest(&client, "f/docker/hello-world", "linux").await;
+
         //test writing manifest to proxy dir isn't allowed
         upload_to_nonwritable_repo(&client, "f/failthis").await;
     }
