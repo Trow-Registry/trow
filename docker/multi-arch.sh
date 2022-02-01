@@ -57,7 +57,7 @@ docker buildx build \
 if [[ "$CI" = true ]]
 then
     #sign once for each registry, will sign corresponding hash
-    #COSIGN_EXPERIMENTAL=1 cosign sign --verbose $DH_IMAGE 
-    echo "Running: COSIGN_EXPERIMENTAL=1 cosign sign $GH_IMAGE"
-    COSIGN_EXPERIMENTAL=1 cosign sign --verbose $GH_IMAGE
+    #(assumes keyless signing is enabled)
+    cosign sign $DH_IMAGE 
+    cosign sign $GH_IMAGE
 fi
