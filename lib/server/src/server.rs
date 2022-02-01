@@ -426,8 +426,7 @@ impl TrowServer {
         None
     }
 
-    /// Downloads a blob that is part of `remote_image`.
-    /// The returned Future **must not** get cancelled.
+    /// Download a blob that is part of `remote_image`.
     async fn download_blob<T: Display>(
         &self,
         cl: &reqwest::Client,
@@ -517,16 +516,7 @@ impl TrowServer {
                     .get_local_asset_digests()
                     .into_iter()
                     .map(|digest| self.download_blob(cl, token, remote_image, &digest));
-                // Don't use try_join_all because these futures should never be cancelled.
-                let res = join_all(futures).await;
-                let errors = res.into_iter().filter_map(|e| e.err()).collect::<Vec<_>>();
-                if !errors.is_empty() {
-                    return Err(failure::err_msg(format!(
-                        "Failed to download {} blobs: {:?}",
-                        errors.len(),
-                        errors
-                    )));
-                }
+                try_join_all(futures).await?;
             }
         }
 
