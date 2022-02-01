@@ -13,7 +13,7 @@ use async_recursion::async_recursion;
 use chrono::prelude::*;
 use failure::format_err;
 use failure::{self, Error, Fail};
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
@@ -425,6 +425,62 @@ impl TrowServer {
         None
     }
 
+    /// Downloads a blob that is part of `remote_image`.
+    /// The returned Future **must not** get cancelled.
+    async fn download_blob<T: Display>(
+        &self,
+        cl: &reqwest::Client,
+        token: &Option<T>,
+        remote_image: &Image,
+        digest: &str,
+    ) -> Result<(), Error> {
+        if self.get_catalog_path_for_blob(digest)?.exists() {
+            info!("Already have blob {}", digest);
+            return Ok(());
+        }
+        let path = self.scratch_path.join(digest);
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path);
+
+        let mut buf = match file {
+            Ok(f) => f,
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::AlreadyExists => {
+                    info!("Skip concurrently fetched blob {}", digest);
+                    return Ok(());
+                }
+                _ => return Err(e.into()),
+            },
+        };
+
+        let addr = format!(
+            "{}/{}/blobs/{}",
+            remote_image.host, remote_image.repo, digest
+        );
+        info!("Downloading blob {}", addr);
+
+        let save_data = async {
+            let resp = if let Some(auth) = token {
+                cl.get(&addr).bearer_auth(auth).send().await?
+            } else {
+                cl.get(&addr).send().await?
+            };
+            buf.write_all(&resp.bytes().await?)?;
+            self.save_blob(&path, digest)?;
+            Ok(())
+        };
+        if let e @ Err(_) = save_data.await {
+            // An error happened while downloading the blob.
+            // Remove the temporary file & return.
+            let _ = fs::remove_file(&path);
+            return e;
+        }
+
+        Ok(())
+    }
+
     #[async_recursion]
     async fn download_manifest_and_layers<T: Display + Sync>(
         &self,
@@ -457,64 +513,37 @@ impl TrowServer {
         buf.write_all(&bytes)?;
 
         let mani: Manifest = serde_json::from_slice(&bytes)?;
-
-        if let Manifest::List(_) = mani {
-            let images_to_dl = mani
-                .get_local_asset_digests()
-                .into_iter()
-                .map(|digest| {
-                    let mut image = remote_image.clone();
-                    image.tag = digest.to_string();
-                    image
-                })
-                .collect::<Vec<_>>();
-            let futures = images_to_dl
-                .iter()
-                .map(|img| self.download_manifest_and_layers(cl, token, &img, local_repo_name));
-            try_join_all(futures).await?;
-        } else {
-            let mut paths = vec![];
-            //TODO: change to perform dloads async
-            for digest in mani.get_local_asset_digests() {
-                if self.get_catalog_path_for_blob(digest)?.exists() {
-                    info!("Already have blob {}", digest);
-                    continue;
-                }
-                let path = self.scratch_path.join(digest);
-                let file = std::fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&path);
-
-                let mut buf = match file {
-                    Ok(f) => f,
-                    Err(e) => match e.kind() {
-                        std::io::ErrorKind::AlreadyExists => {
-                            info!("Skip concurrently fetched blob {}", digest);
-                            continue;
-                        }
-                        _ => return Err(e.into()),
-                    },
-                };
-
-                let addr = format!(
-                    "{}/{}/blobs/{}",
-                    remote_image.host, remote_image.repo, digest
-                );
-                info!("Downloading blob {}", addr);
-
-                let resp = if let Some(auth) = token {
-                    cl.get(&addr).bearer_auth(auth).send().await?
-                } else {
-                    cl.get(&addr).send().await?
-                };
-
-                buf.write_all(&resp.bytes().await?)?; //Is this going to be buffered?
-                paths.push((path, digest));
+        match mani {
+            Manifest::List(_) => {
+                let images_to_dl = mani
+                    .get_local_asset_digests()
+                    .into_iter()
+                    .map(|digest| {
+                        let mut image = remote_image.clone();
+                        image.tag = digest.to_string();
+                        image
+                    })
+                    .collect::<Vec<_>>();
+                let futures = images_to_dl
+                    .iter()
+                    .map(|img| self.download_manifest_and_layers(cl, token, &img, local_repo_name));
+                try_join_all(futures).await?;
             }
-
-            for (path, digest) in &paths {
-                self.save_blob(&path, digest)?;
+            Manifest::V2(_) => {
+                let futures = mani
+                    .get_local_asset_digests()
+                    .into_iter()
+                    .map(|digest| self.download_blob(cl, token, remote_image, &digest));
+                // Don't use try_join_all because these futures should never be cancelled.
+                let res = join_all(futures).await;
+                let errors = res.into_iter().filter_map(|e| e.err()).collect::<Vec<_>>();
+                if !errors.is_empty() {
+                    return Err(failure::err_msg(format!(
+                        "Failed to download {} blobs: {:?}",
+                        errors.len(),
+                        errors
+                    )));
+                }
             }
         }
 
