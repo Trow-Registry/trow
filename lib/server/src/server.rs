@@ -13,7 +13,7 @@ use async_recursion::async_recursion;
 use chrono::prelude::*;
 use failure::format_err;
 use failure::{self, Error, Fail};
-use futures::future::{join_all, try_join_all};
+use futures::future::try_join_all;
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
 use quoted_string::strip_dquotes;

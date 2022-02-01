@@ -50,7 +50,7 @@ mod test {
     use super::*;
     use futures::future::try_join_all;
     use tempfile::tempdir;
-    use tokio::time::Duration;
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_temporary_file() {
@@ -86,6 +86,8 @@ mod test {
                     None => return Err(()),
                 };
                 file.write_all(b"hello").await.unwrap();
+                sleep(Duration::from_millis(500)).await;
+                drop(file);
                 Ok(())
             }
         });
