@@ -10,6 +10,11 @@ jobs:
   upload_images:
     runs-on: ubuntu-latest
 
+    permissions:
+        contents: read
+        packages: write
+        id-token: write
+
     steps:
     - uses: actions/checkout@v2
     - name: Login to package repos
@@ -32,7 +37,9 @@ jobs:
           #./docker/multi-arch.sh
           docker build -f ./docker/Dockerfile.notls -t containersol/trow:notls ./
           docker push containersol/trow:notls
-          COSIGN_EXPERIMENTAL=1 cosign sign --verbose containersol/trow:notls
+          cosign sign --verbose containersol/trow:notls
+      env:
+          COSIGN_EXPERIMENTAL: 1
   conformance_tests:
     services:
       trow:
