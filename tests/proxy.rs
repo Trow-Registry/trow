@@ -83,8 +83,7 @@ mod interface_tests {
             name,
             tag
         );
-        let mani: manifest::ManifestV2 = resp.json().await.unwrap();
-        assert_eq!(mani.schema_version, 2);
+        let _: manifest::Manifest = resp.json().await.unwrap();
     }
 
     async fn upload_to_nonwritable_repo(cl: &reqwest::Client, name: &str) {
