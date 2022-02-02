@@ -79,16 +79,17 @@ mod test {
         let path = dir.path().join("test.txt");
 
         let futures = (0..2).map(|_| {
-            let path = path.clone();
-            async move {
+            async {
                 let mut file = match TemporaryFile::open_for_writing(path.clone()).await.unwrap() {
                     Some(f) => f,
-                    None => return Err(()),
+                    None => return Err(()) as Result<(), ()>,
                 };
                 file.write_all(b"hello").await.unwrap();
+                // Sleep to ensure that the future stay active long enough to be cancelled
                 sleep(Duration::from_millis(500)).await;
+                // Ensure `file` isn't droped before the sleep
                 drop(file);
-                Ok(())
+                unreachable!();
             }
         });
 
