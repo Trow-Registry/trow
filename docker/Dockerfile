@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-#Note we build on amd64 and cross-compile to arch
-FROM --platform=linux/amd64 rust:latest as cross
+#Note we build on host plaftform and cross-compile to target arch
+FROM --platform=$BUILDPLATFORM rust:latest as cross
 ARG TARGETARCH
 WORKDIR /usr/src/trow
 COPY docker/platform.sh .
