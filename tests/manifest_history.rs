@@ -79,7 +79,7 @@ mod interface_tests {
                 "{}/v2/{}/blobs/uploads/?digest={}",
                 TROW_ADDRESS, "config", digest
             ))
-            .body(config.clone())
+            .body(config)
             .send()
             .await
             .unwrap();
@@ -102,10 +102,10 @@ mod interface_tests {
         }
 
         let manifest = format!(
-            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json", 
-                 "config": {{ "digest": "{}", 
-                             "mediaType": "application/vnd.oci.image.config.v1+json", 
-                             "size": {} }}, 
+            r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                 "config": {{ "digest": "{}",
+                             "mediaType": "application/vnd.oci.image.config.v1+json",
+                             "size": {} }},
                  "layers": [
                     {{
                               "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",

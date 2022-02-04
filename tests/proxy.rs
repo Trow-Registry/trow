@@ -76,9 +76,14 @@ mod interface_tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let mani: manifest::ManifestV2 = resp.json().await.unwrap();
-        assert_eq!(mani.schema_version, 2);
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "Could not get {}:{}",
+            name,
+            tag
+        );
+        let _: manifest::Manifest = resp.json().await.unwrap();
     }
 
     async fn upload_to_nonwritable_repo(cl: &reqwest::Client, name: &str) {
@@ -149,6 +154,15 @@ mod interface_tests {
 
         //Need to special case single name repos
         get_manifest(&client, "f/docker/alpine", "latest").await;
+
+        //Download an amd64 manifest, then the multi platform version of the same manifest
+        get_manifest(
+            &client,
+            "f/docker/hello-world",
+            "sha256:f54a58bc1aac5ea1a25d796ae155dc228b3f0e11d046ae276b39c4bf2f13d8c4",
+        )
+        .await;
+        get_manifest(&client, "f/docker/hello-world", "linux").await;
 
         //test writing manifest to proxy dir isn't allowed
         upload_to_nonwritable_repo(&client, "f/failthis").await;

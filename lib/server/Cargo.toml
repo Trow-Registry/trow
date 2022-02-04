@@ -6,6 +6,7 @@ edition = "2021"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com" ]
 
 [dependencies]
+async-recursion = "1.0"
 futures = "0.3"
 async-stream = "0.3"
 bytes = "1"
@@ -14,7 +15,7 @@ serde_json = "1.0"
 prost = "0.9"
 prost-types = "0.9"
 rand = "0.8"
-tokio = { version = "1", features = ["macros", "sync", "time", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "sync", "time", "rt-multi-thread", "fs"] }
 tokio-stream = "0.1"
 chrono = "0.4"
 tonic = "0.6"
@@ -26,7 +27,6 @@ serde_derive = "^1.0"
 trow-protobuf = { path = "../protobuf" }
 rustc-serialize = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
-
 prometheus = { version = "0.13"}
 lazy_static = "1.4.0"
 fs3 = "0.5.0"
@@ -39,3 +39,4 @@ quoted-string = "0.6.1"
 tonic-build = "0.6"
 
 [dev-dependencies]
+tempfile = "3.3"
