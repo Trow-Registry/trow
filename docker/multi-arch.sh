@@ -58,6 +58,6 @@ if [[ "$CI" = true ]]
 then
     #sign once for each registry, will sign corresponding hash
     #(assumes keyless signing is enabled)
-    cosign sign $DH_IMAGE 
-    cosign sign $GH_IMAGE
+    cosign sign --recursive $DH_IMAGE 
+    cosign sign --recursive $GH_IMAGE
 fi
