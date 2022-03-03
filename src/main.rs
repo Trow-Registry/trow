@@ -17,7 +17,7 @@ const DEFAULT_KEY_PATH: &str = "./certs/domain.key";
   Will cause the program to exit if error or on help/version argument.
 */
 fn parse_args() -> ArgMatches {
-    clap::App::new(PROGRAM_NAME)
+    clap::Command::new(PROGRAM_NAME)
         .version("0.1")
         .author("From Container Solutions")
         .about(PROGRAM_DESC)
