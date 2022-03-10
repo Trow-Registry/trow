@@ -43,21 +43,7 @@ do
   esac
 done
 
-./multi-arch.sh
-
-while true
-do
-  read -r -p "About to push containersol/trow:$VERSION. Continue(y/n)? " choice
-  case "$choice" in
-    n|N) exit;;
-    y|Y) break;;
-    *) echo 'Response not valid';;
-  esac
-done
-
-docker tag containersol/trow:$VERSION ghcr.io/containersolutions/trow/trow:$VERSION
-docker push containersol/trow:$VERSION
-docker push ghcr.io/containersolutions/trow/trow:$VERSION
+RELEASE="true" ./multi-arch.sh
 
 if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]
 then

@@ -32,9 +32,9 @@ fi
 TAG=${DOCKER_TAG:-"$VERSION"}
 DH_IMAGE=${IMAGE_NAME:-"$DH_REPO:$TAG"}
 GH_IMAGE=${IMAGE_NAME:-"$GH_REPO:$TAG"}
-DATE="$(date --rfc-3339=seconds)"
+DATE="$(date '+%Y-%m-%d %T%z')"
 
-if [[ "$CI" = true ]]
+if [[ "$CI" = "true" || "$RELEASE" = "true" ]]
 then
    PUSH="--push"
 fi
