@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
 use std::io;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::str;
 use std::sync::{Arc, RwLock};
@@ -22,6 +22,7 @@ use reqwest::{
 };
 use thiserror::Error;
 use tokio::sync::mpsc;
+use tokio::io::AsyncWriteExt;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -313,7 +314,7 @@ impl TrowServer {
         get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(tag))
     }
 
-    fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<()> {
+    async fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<()> {
         // Tag files should contain list of digests with timestamp
         // First line should always be the current digest
 
@@ -322,18 +323,13 @@ impl TrowServer {
         fs::create_dir_all(&repo_dir)?;
 
         let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
-        let contents = format!("{} {}\n", digest, ts);
+        let contents = format!("{} {}\n", digest, ts).into_bytes();
 
-        if let Ok(mut f) = fs::File::open(&repo_path) {
-            let mut buf = Vec::new();
-            buf.extend(contents.as_bytes().iter());
-            f.read_to_end(&mut buf)?;
-            // TODO: Probably best to write to temporary file and then copy over.
-            // Will be closer to atomic
-            fs::write(&repo_path, buf)?;
-        } else {
-            fs::File::create(&repo_path).and_then(|mut f| f.write_all(contents.as_bytes()))?;
-        }
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&repo_path).await?;
+        file.write_all(&contents).await?;
         Ok(())
     }
 
@@ -485,12 +481,11 @@ impl TrowServer {
             ));
         }
 
-        //First save as bytes
-        let mani_id = Uuid::new_v4().to_string();
-        let temp_mani_path = self.scratch_path.join(mani_id);
-        let mut buf = File::create(&temp_mani_path)?;
+        let mut buf = TemporaryFile::open_for_writing(
+            self.scratch_path.join(Uuid::new_v4().to_string())
+        ).await?.unwrap();
         let bytes = resp.bytes().await?;
-        buf.write_all(&bytes)?;
+        buf.write_all(&bytes).await?;
 
         let mani: Manifest = serde_json::from_slice(&bytes)?;
         match mani {
@@ -519,12 +514,12 @@ impl TrowServer {
         }
 
         //Save out manifest
-        let f = File::open(&temp_mani_path)?;
+        let f = File::open(buf.path())?;
         let reader = BufReader::new(f);
         let calculated_digest = sha256_tag_digest(reader)?;
 
-        self.save_blob(&temp_mani_path, &calculated_digest)?;
-        self.save_tag(&calculated_digest, local_repo_name, &remote_image.tag)?;
+        self.save_blob(buf.path(), &calculated_digest)?;
+        self.save_tag(&calculated_digest, local_repo_name, &remote_image.tag).await?;
 
         Ok(())
     }
@@ -713,7 +708,7 @@ impl TrowServer {
                     if !is_digest(&reference) {
                         let our_digest = self.get_digest_from_manifest(&repo_name, &reference);
                         if our_digest.is_err() || (our_digest.unwrap() != digest) {
-                            let res = self.save_tag(&digest, &repo_name, &reference);
+                            let res = self.save_tag(&digest, &repo_name, &reference).await;
                             if res.is_err() {
                                 error!(
                                     "Internal error updating tag for proxied image {:?}",
@@ -1024,7 +1019,7 @@ impl Registry for TrowServer {
                 let digest = vm.digest.clone();
                 let ret = self
                     .save_blob(&uploaded_manifest, &digest)
-                    .and(self.save_tag(&digest, &mr.repo_name, &mr.reference))
+                    .and(self.save_tag(&digest, &mr.repo_name, &mr.reference).await)
                     .map(|_| Response::new(vm))
                     .map_err(|e| {
                         error!(
