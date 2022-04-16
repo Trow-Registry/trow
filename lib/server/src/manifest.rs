@@ -1,7 +1,7 @@
 use anyhow::Result;
-use thiserror::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
+use thiserror::Error;
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self>
@@ -75,7 +75,6 @@ pub struct Object {
     pub size: Option<u64>,
     pub digest: String, //special type would be nice
 }
-
 
 #[derive(Error, Debug)]
 #[error("Invalid Manifest: {err:?}")]

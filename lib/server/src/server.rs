@@ -9,10 +9,9 @@ use std::path::{Path, PathBuf};
 use std::str;
 use std::sync::{Arc, RwLock};
 
+use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
-use anyhow::{Result, anyhow};
-use thiserror::Error;
 use futures::future::try_join_all;
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
@@ -21,6 +20,7 @@ use reqwest::{
     self,
     header::{HeaderMap, HeaderValue},
 };
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -343,7 +343,8 @@ impl TrowServer {
                 error!("Digest {} not in repository {}", reference, repo_name);
                 return Err(anyhow!(
                     "Digest {} not in repository {}",
-                    reference, repo_name
+                    reference,
+                    repo_name
                 ));
             }
             reference.to_string()
@@ -369,10 +370,7 @@ impl TrowServer {
                 let path = self.get_catalog_path_for_blob(digest)?;
 
                 if !path.exists() {
-                    return Err(anyhow!(
-                        "Failed to find artifact with digest {}",
-                        digest
-                    ));
+                    return Err(anyhow!("Failed to find artifact with digest {}", digest));
                 }
             }
         }

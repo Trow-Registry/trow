@@ -1,5 +1,5 @@
-use lazy_static::lazy_static;
 use anyhow::Result;
+use lazy_static::lazy_static;
 use prometheus::{
     labels, opts, register_int_counter, register_int_gauge, Encoder, IntCounter, IntGauge,
     TextEncoder,
