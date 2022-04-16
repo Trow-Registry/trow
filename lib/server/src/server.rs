@@ -21,8 +21,8 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
 };
 use thiserror::Error;
-use tokio::sync::mpsc;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -328,7 +328,8 @@ impl TrowServer {
         let mut file = tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&repo_path).await?;
+            .open(&repo_path)
+            .await?;
         file.write_all(&contents).await?;
         Ok(())
     }
@@ -481,9 +482,10 @@ impl TrowServer {
             ));
         }
 
-        let mut buf = TemporaryFile::open_for_writing(
-            self.scratch_path.join(Uuid::new_v4().to_string())
-        ).await?.unwrap();
+        let mut buf =
+            TemporaryFile::open_for_writing(self.scratch_path.join(Uuid::new_v4().to_string()))
+                .await?
+                .unwrap();
         let bytes = resp.bytes().await?;
         buf.write_all(&bytes).await?;
 
@@ -519,7 +521,8 @@ impl TrowServer {
         let calculated_digest = sha256_tag_digest(reader)?;
 
         self.save_blob(buf.path(), &calculated_digest)?;
-        self.save_tag(&calculated_digest, local_repo_name, &remote_image.tag).await?;
+        self.save_tag(&calculated_digest, local_repo_name, &remote_image.tag)
+            .await?;
 
         Ok(())
     }
