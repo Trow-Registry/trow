@@ -1,7 +1,6 @@
 use futures::Future;
 use log::{LevelFilter, SetLoggerError};
 
-use failure::Error;
 use rand::rngs::OsRng;
 use rocket::fairing;
 use std::env;
@@ -28,16 +27,16 @@ use fairings::conditional_fairing::AttachConditionalFairing;
 use rand::RngCore;
 use std::io::Write;
 
-use failure::format_err;
-use failure::Fail;
+use anyhow::{anyhow, Result};
 use log::debug;
 use rocket::http::Method;
 use rocket_cors::AllowedHeaders;
 use rocket_cors::AllowedOrigins;
+use thiserror::Error;
 
 //TODO: Make this take a cause or description
-#[derive(Fail, Debug)]
-#[fail(display = "invalid data directory")]
+#[derive(Error, Debug)]
+#[error("invalid data directory")]
 pub struct ConfigError {}
 
 #[derive(Clone, Debug)]
@@ -92,7 +91,7 @@ struct UserConfig {
 
 fn init_trow_server(
     config: TrowConfig,
-) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>, Error> {
+) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>> {
     debug!("Starting Trow server");
 
     //Could pass full config here.
@@ -212,7 +211,7 @@ impl TrowBuilder {
         self
     }
 
-    fn build_rocket_config(&self) -> Result<rocket::config::Config, Error> {
+    fn build_rocket_config(&self) -> Result<rocket::config::Config> {
         // When run in production, Rocket wants a secret key for private cookies.
         // As we don't use private cookies, we just generate it here.
         let mut key = [0u8; 32];
@@ -229,7 +228,7 @@ impl TrowBuilder {
 
         if let Some(ref tls) = self.config.tls {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
-                return  Err(format_err!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
+                return  Err(anyhow!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
             }
 
             let tls_config =
@@ -240,7 +239,7 @@ impl TrowBuilder {
         Ok(cfg)
     }
 
-    pub fn start(&self) -> Result<(), Error> {
+    pub fn start(&self) -> Result<()> {
         init_logger(self.config.log_level.clone())?;
 
         let rocket_config = &self.build_rocket_config()?;
@@ -348,7 +347,7 @@ impl TrowBuilder {
     }
 }
 
-pub fn build_handlers(listen_addr: String) -> Result<ClientInterface, Error> {
+pub fn build_handlers(listen_addr: String) -> Result<ClientInterface> {
     debug!("Address for backend: {}", listen_addr);
 
     //TODO this function is useless currently

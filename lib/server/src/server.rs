@@ -11,8 +11,8 @@ use std::sync::{Arc, RwLock};
 
 use async_recursion::async_recursion;
 use chrono::prelude::*;
-use failure::format_err;
-use failure::{self, Error, Fail};
+use anyhow::{Result, anyhow};
+use thiserror::Error;
 use futures::future::try_join_all;
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
@@ -79,14 +79,14 @@ struct Upload {
     uuid: String,
 }
 
-#[derive(Fail, Debug)]
-#[fail(display = "Error getting proxied repo {}", msg)]
+#[derive(Error, Debug)]
+#[error("Error getting proxied repo {msg:?}")]
 pub struct ProxyError {
     msg: String,
 }
 
-#[derive(Fail, Debug)]
-#[fail(display = "Expected digest {} but got {}", user_digest, actual_digest)]
+#[derive(Error, Debug)]
+#[error("Expected digest {user_digest:?} but got {actual_digest:?}")]
 pub struct DigestValidationError {
     user_digest: String,
     actual_digest: String,
@@ -170,7 +170,7 @@ struct RepoIterator {
 }
 
 impl RepoIterator {
-    fn new(base_dir: &Path) -> Result<RepoIterator, Error> {
+    fn new(base_dir: &Path) -> Result<RepoIterator> {
         let paths = fs::read_dir(base_dir)?.collect();
         Ok(RepoIterator { paths })
     }
@@ -206,7 +206,7 @@ impl Iterator for RepoIterator {
  * TODO: should be able to use range of hashes.
  * TODO: check if using a static for the hasher speeds things up.
  */
-fn validate_digest(file: &PathBuf, digest: &str) -> Result<(), Error> {
+fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
     let f = File::open(file)?;
     let reader = BufReader::new(f);
 
@@ -243,7 +243,7 @@ fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
     Ok(!permissions.readonly())
 }
 
-fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String, Error> {
+fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String> {
     let digest_date = fs::read_to_string(path)?;
     //Should be digest followed by date, but allow for digest only
     Ok(digest_date
@@ -263,7 +263,7 @@ impl TrowServer {
         allow_images: Vec<String>,
         deny_local_prefixes: Vec<String>,
         deny_local_images: Vec<String>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
         let scratch_path = create_path(data_path, UPLOADS_DIR)?;
         let blobs_path = create_path(data_path, BLOBS_DIR)?;
@@ -287,33 +287,33 @@ impl TrowServer {
         self.scratch_path.join(uuid)
     }
 
-    fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf, Error> {
+    fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf> {
         let mut iter = digest.split(':');
         let alg = iter
             .next()
-            .ok_or_else(|| format_err!("Digest {} did not contain alg component", digest))?;
+            .ok_or_else(|| anyhow!("Digest {} did not contain alg component", digest))?;
         if !SUPPORTED_DIGESTS.contains(&alg) {
-            return Err(format_err!("Hash algorithm {} not supported", alg));
+            return Err(anyhow!("Hash algorithm {} not supported", alg));
         }
         let val = iter
             .next()
-            .ok_or_else(|| format_err!("Digest {} did not contain value component", digest))?;
+            .ok_or_else(|| anyhow!("Digest {} did not contain value component", digest))?;
         assert_eq!(None, iter.next());
         Ok(self.blobs_path.join(alg).join(val))
     }
 
     // Given a manifest digest, check if it is referenced by any tag in the repo
-    fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool, Error> {
+    fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool> {
         let mut ri = RepoIterator::new(&self.manifests_path.join(repo_name))?;
         let res = ri.find(|de| does_manifest_match_digest(de, &digest));
         Ok(res.is_some())
     }
 
-    fn get_digest_from_manifest(&self, repo_name: &str, tag: &str) -> Result<String, Error> {
+    fn get_digest_from_manifest(&self, repo_name: &str, tag: &str) -> Result<String> {
         get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(tag))
     }
 
-    fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<(), Error> {
+    fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<()> {
         // Tag files should contain list of digests with timestamp
         // First line should always be the current digest
 
@@ -337,14 +337,14 @@ impl TrowServer {
         Ok(())
     }
 
-    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf, Error> {
+    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf> {
         let digest = if is_digest(reference) {
             if !self.verify_manifest_digest_in_repo(repo_name, reference)? {
                 error!("Digest {} not in repository {}", reference, repo_name);
-                return Err(failure::err_msg(format!(
+                return Err(anyhow!(
                     "Digest {} not in repository {}",
                     reference, repo_name
-                )));
+                ));
             }
             reference.to_string()
         } else {
@@ -359,7 +359,7 @@ impl TrowServer {
         &self,
         manifest_path: &PathBuf,
         verify_assets_exist: bool,
-    ) -> Result<VerifiedManifest, Error> {
+    ) -> Result<VerifiedManifest> {
         let manifest_bytes = std::fs::read(&manifest_path)?;
         let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
         let manifest = Manifest::from_json(&manifest_json)?;
@@ -369,7 +369,7 @@ impl TrowServer {
                 let path = self.get_catalog_path_for_blob(digest)?;
 
                 if !path.exists() {
-                    return Err(format_err!(
+                    return Err(anyhow!(
                         "Failed to find artifact with digest {}",
                         digest
                     ));
@@ -433,7 +433,7 @@ impl TrowServer {
         token: &Option<T>,
         remote_image: &Image,
         digest: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if self.get_catalog_path_for_blob(digest)?.exists() {
             info!("Already have blob {}", digest);
             return Ok(());
@@ -470,7 +470,7 @@ impl TrowServer {
         token: &Option<T>,
         remote_image: &Image,
         local_repo_name: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         debug!("Downloading manifest + layers for {}", remote_image);
         let mut req = cl.get(&remote_image.get_manifest_url());
         if let Some(auth) = token {
@@ -480,11 +480,11 @@ impl TrowServer {
         let resp = req.headers(create_accept_header()).send().await?;
 
         if !resp.status().is_success() {
-            return Err(failure::err_msg(format!(
+            return Err(anyhow!(
                 "GET {} returned unexpected {}",
                 &remote_image.get_manifest_url(),
                 resp.status()
-            )));
+            ));
         }
 
         //First save as bytes
@@ -539,7 +539,7 @@ impl TrowServer {
         cl: &reqwest::Client,
         image: &Image,
         auth: &Option<Auth>,
-    ) -> Result<String, Error> {
+    ) -> Result<String> {
         //First get auth address from remote server
         let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
 
@@ -548,7 +548,7 @@ impl TrowServer {
         let realm = bearer_param_map
             .get("realm")
             .cloned()
-            .ok_or(format_err!("Expected realm key in authenticate header"))?;
+            .ok_or(anyhow!("Expected realm key in authenticate header"))?;
 
         bearer_param_map.remove("realm");
 
@@ -562,7 +562,7 @@ impl TrowServer {
         }
 
         let resp = request.send().await.or_else(|e| {
-            Err(format_err!(
+            Err(anyhow!(
                 "Failed to send authenticate to {} request: {}",
                 realm,
                 e
@@ -570,30 +570,30 @@ impl TrowServer {
         })?;
 
         if !resp.status().is_success() {
-            return Err(format_err!("Failed to authenticate to {}", realm));
+            return Err(anyhow!("Failed to authenticate to {}", realm));
         }
 
         resp.json::<serde_json::Value>()
             .await
-            .map_err(|e| format_err!("Failed to deserialize auth response {}", e))?
+            .map_err(|e| anyhow!("Failed to deserialize auth response {}", e))?
             .get("access_token")
             .map(|s| s.as_str().unwrap_or(""))
             .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
-            .ok_or(format_err!("Failed to find auth token in auth repsonse"))
+            .ok_or(anyhow!("Failed to find auth token in auth repsonse"))
     }
 
     async fn get_www_authenticate_header(
         &self,
         cl: &reqwest::Client,
         image: &Image,
-    ) -> Result<String, Error> {
+    ) -> Result<String> {
         let resp = cl
             .head(&image.get_manifest_url())
             .headers(create_accept_header())
             .send()
             .await
             .map_err(|e| {
-                format_err!(
+                anyhow!(
                     "Attempt to authenticate to {} failed with: {}",
                     &image.get_manifest_url(),
                     e
@@ -601,7 +601,7 @@ impl TrowServer {
             })?;
 
         if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "Expected request '{}' to fail with status unauthorized",
                 &image.get_manifest_url()
             ));
@@ -609,12 +609,12 @@ impl TrowServer {
 
         resp.headers()
             .get("www-authenticate")
-            .ok_or(format_err!(
+            .ok_or(anyhow!(
                 "Expected www-authenticate header to identify authentication server"
             ))
             .and_then(|v| {
                 v.to_str()
-                    .map_err(|e| format_err!("Failed to read auth header {:?}", e))
+                    .map_err(|e| anyhow!("Failed to read auth header {:?}", e))
             })
             .map(|s| s.to_string())
     }
@@ -674,7 +674,7 @@ impl TrowServer {
         repo_name: String,
         reference: String,
         do_verification: bool,
-    ) -> Result<ManifestReadLocation, Error> {
+    ) -> Result<ManifestReadLocation> {
         if let Some((proxy_image, proxy_auth)) =
             self.get_proxy_address_and_auth(&repo_name, &reference)
         {
@@ -749,11 +749,11 @@ impl TrowServer {
     }
 
     /// Moves blob from scratch to blob catalog
-    fn save_blob(&self, scratch_path: &Path, digest: &str) -> Result<(), Error> {
+    fn save_blob(&self, scratch_path: &Path, digest: &str) -> Result<()> {
         let digest_path = self.get_catalog_path_for_blob(digest)?;
         let repo_path = digest_path
             .parent()
-            .ok_or_else(|| failure::err_msg("Error finding repository path"))?;
+            .ok_or_else(|| anyhow!("Error finding repository path"))?;
 
         if !repo_path.exists() {
             fs::create_dir_all(repo_path)?;
@@ -762,7 +762,7 @@ impl TrowServer {
         Ok(())
     }
 
-    fn validate_and_save_blob(&self, user_digest: &str, uuid: &str) -> Result<(), Error> {
+    fn validate_and_save_blob(&self, user_digest: &str, uuid: &str) -> Result<()> {
         debug!("Saving blob {}", user_digest);
 
         let scratch_path = self.get_upload_path_for_blob(uuid);

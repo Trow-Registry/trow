@@ -21,22 +21,22 @@ uuid = { version = "0.8", features = ["v4", "serde"] }
 log = "0.4"
 env_logger = "0.9"
 base64 = "0.13.0"
-failure = "0.1"
+anyhow = "1.0"
 trow-protobuf = { path = "./lib/protobuf" }
 trow-server = { path = "./lib/server" }
 derive_more = "0.99"
 hostname = "0.3"
 clap = "3.0"
-tonic = "0.6"
-prost = "0.9"
-prost-types = "0.9"
+tonic = "0.7"
+prost = "0.10"
+prost-types = "0.10"
 bytes = "1"
 chrono = { version="^0.4", features = ["serde"] }
-rusqlite = "0.26"
+rusqlite = "0.27"
 data-encoding = "2.3"
 openssl = { version = "0.10", features = ["vendored"] }
 lazy_static = "1.4.0"
-regex = "1.3.9"
+regex = "1.5.0"
 sha2 = "0.10"
 hex = "0.4"
 thiserror = "1.0"
@@ -45,7 +45,6 @@ rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", branch = "mast
 [build-dependencies]
 
 [dev-dependencies]
-futures = "0.3"
 quickcheck = "1.0"
 assert_cmd = "2.0"
 predicates = "2.1"

@@ -1,6 +1,5 @@
 use lazy_static::lazy_static;
-
-use failure::Error;
+use anyhow::Result;
 use prometheus::{
     labels, opts, register_int_counter, register_int_gauge, Encoder, IntCounter, IntGauge,
     TextEncoder,
@@ -48,7 +47,7 @@ pub fn query_disk_metrics(path: &PathBuf) {
     TOTAL_SPACE.set(total_space as i64);
 }
 
-pub fn gather_metrics(blobs_path: &PathBuf) -> Result<String, Error> {
+pub fn gather_metrics(blobs_path: &PathBuf) -> Result<String> {
     query_disk_metrics(blobs_path);
 
     let encoder = TextEncoder::new();
