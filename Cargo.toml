@@ -27,9 +27,9 @@ trow-server = { path = "./lib/server" }
 derive_more = "0.99"
 hostname = "0.3"
 clap = "3.0"
-tonic = "0.7"
-prost = "0.10"
-prost-types = "0.10"
+tonic = "0.6"
+prost = "0.9"
+prost-types = "0.9"
 bytes = "1"
 chrono = { version="^0.4", features = ["serde"] }
 rusqlite = "0.27"

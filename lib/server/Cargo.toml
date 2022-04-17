@@ -12,13 +12,13 @@ async-stream = "0.3"
 bytes = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-prost = "0.10"
-prost-types = "0.10"
+prost = "0.9"
+prost-types = "0.9"
 rand = "0.8"
 tokio = { version = "1", features = ["macros", "sync", "time", "rt-multi-thread", "fs"] }
 tokio-stream = "0.1"
 chrono = "0.4"
-tonic = "0.7"
+tonic = "0.6"
 log = "0.4"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 anyhow = "1.0"
@@ -36,7 +36,7 @@ hex = "0.4"
 quoted-string = "0.6.1"
 
 [build-dependencies]
-tonic-build = "0.7"
+tonic-build = "0.6"
 
 [dev-dependencies]
 tempfile = "3.3"
