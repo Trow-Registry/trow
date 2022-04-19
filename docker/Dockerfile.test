@@ -1,3 +1,5 @@
+# syntax = docker/dockerfile:1
+
 #Not a big fan of using nightly, but such is our lot currently
 FROM rust:latest as builder
 
@@ -10,31 +12,15 @@ WORKDIR /usr/src/trow
 COPY Cargo.toml .
 COPY Cargo.lock .
 
-RUN mkdir src/
-RUN echo "fn main() {}" > src/main.rs
-
-# trow-server
-COPY lib/server/Cargo.toml lib/server/
-RUN mkdir -p lib/server/src
-RUN touch lib/server/src/lib.rs
-
-# trow-protobuf
-COPY lib/protobuf/Cargo.toml lib/protobuf/
-RUN echo "fn main() {}" > lib/protobuf/build.rs
-RUN mkdir -p lib/protobuf/src
-RUN touch lib/protobuf/src/lib.rs
-
-RUN cargo build # should cache all build deps
-RUN cargo test --no-run
-
-COPY lib lib
 COPY src src
+COPY trow-server trow-server
+COPY trow-protobuf trow-protobuf
 COPY tests tests
-RUN mkdir certs 
+
+RUN mkdir certs
 COPY quick-install/self-cert/make-certs.sh certs/
 COPY quick-install/self-cert/in.req certs/
 RUN cd certs && ./make-certs.sh
-# Must build protobuf first for generated code
-RUN cd lib/protobuf && cargo build
-RUN cd lib/server && cargo test
-RUN cargo test
+
+RUN --mount=type=cache,target=./target \
+    cargo test --workspace
