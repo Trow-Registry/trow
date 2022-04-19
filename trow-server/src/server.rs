@@ -36,7 +36,7 @@ use crate::temporary_file::TemporaryFile;
 use self::trow_server::*;
 
 pub mod trow_server {
-    include!("../../protobuf/out/trow.rs");
+    include!("../../trow-protobuf/out/trow.rs");
 }
 
 static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];

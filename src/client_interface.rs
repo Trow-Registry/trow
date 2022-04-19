@@ -1,5 +1,5 @@
 pub mod trow_proto {
-    include!("../lib/protobuf/out/trow.rs");
+    include!("../trow-protobuf/out/trow.rs");
 }
 
 use crate::registry_interface::blob_storage::Stored;
