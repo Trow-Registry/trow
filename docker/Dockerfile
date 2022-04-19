@@ -14,7 +14,8 @@ COPY Cargo.toml .
 COPY Cargo.lock .
 COPY .cargo/config .cargo/config
 
-COPY lib lib
+COPY trow-server/ trow-server/
+COPY trow-protobuf/ trow-protobuf/
 COPY src src
 
 RUN cargo build --release --target $(cat /.platform)

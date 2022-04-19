@@ -4,18 +4,18 @@ set -euo pipefail
 MAJOR_VERSION="0"
 MINOR_VERSION="3"
 PATCH_VERSION="5"
-# Only use this for "special" release and prefix with "-" 
+# Only use this for "special" release and prefix with "-"
 # e.g. -SCANNING for scanning preview feature release
-NAME="" 
+NAME=""
 
 VERSION="$MAJOR_VERSION.$MINOR_VERSION.$PATCH_VERSION$NAME"
 
 CARGO_VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
-SERVER_CARGO_VERSION=$(sed '/^version = */!d; s///;q' ../lib/server/Cargo.toml | sed s/\"//g)
+SERVER_CARGO_VERSION=$(sed '/^version = */!d; s///;q' ../trow-server/Cargo.toml | sed s/\"//g)
 BRANCH=$(git branch --show-current)
 
 echo """
-Release script for Trow. This script is dependent on docker and manifest-tool. 
+Release script for Trow. This script is dependent on docker and manifest-tool.
 You will also need to be logged into a Docker Hub account that can write to the containersol
 repo.
 
@@ -28,7 +28,7 @@ Before running this, please check:
 
 Version in this script $VERSION
 Version in Cargo.toml $CARGO_VERSION
-Version in lib/server/Cargo.toml $SERVER_CARGO_VERSION
+Version in trow-server/Cargo.toml $SERVER_CARGO_VERSION
 You are currently on $BRANCH
 
 """
@@ -67,6 +67,6 @@ git push origin v$VERSION
 # Update charts/trow/Chart.yaml with correct values
 # Run `helm package charts/trow/ --destination charts/` - this should build tgz
 # Upload tgz to GH release
-# Run `helm repo index charts/ --merge charts/index.yaml --url https://github.com/ContainerSolutions/trow/releases/download/v0.3.4/` 
+# Run `helm repo index charts/ --merge charts/index.yaml --url https://github.com/ContainerSolutions/trow/releases/download/v0.3.4/`
 # Merge new index.yaml
 # Copy index.yaml to gh-pages branch
