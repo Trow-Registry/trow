@@ -6,10 +6,9 @@ set -euo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-export DOCKER_BUILDKIT=1
 docker build \
     --progress=plain \
-    --build-arg BUILDKIT_SANDBOX_HOSTNAME=trow.test \
+    --add-host trow.test:127.0.0.1 \
     -t trow/test \
     -f Dockerfile.test \
     ..
