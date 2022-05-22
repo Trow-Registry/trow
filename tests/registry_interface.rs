@@ -218,7 +218,7 @@ mod interface_tests {
                 "{}/v2/{}/blobs/uploads/?digest={}",
                 TROW_ADDRESS, name, digest
             ))
-            .body(config.clone())
+            .body(config)
             .send()
             .await
             .unwrap();

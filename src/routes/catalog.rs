@@ -3,6 +3,7 @@ use crate::registry_interface::{CatalogOperations, ManifestHistory};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{RepoCatalog, TagList};
+use anyhow::Result;
 use rocket::get;
 
 #[get("/v2/_catalog?<n>&<last>")]

@@ -1,11 +1,12 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::io::{Error, Read};
+use std::io::Read;
 
 // Crypto and crypto related imports
 use sha2::{Sha256, Sha512};
 
 // We need to rename here!
+use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use sha2::Digest as ShaDigest;
 use std::fmt;
@@ -77,13 +78,13 @@ impl fmt::Display for Digest {
     }
 }
 
-fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> Result<String, Error> {
+fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> Result<String> {
     let mut sh = D::default();
     let mut buffer = [0u8; BUFFER_SIZE];
     loop {
         let n = match reader.read(&mut buffer) {
             Ok(n) => n,
-            Err(err) => return Err(err),
+            Err(err) => return Err(Error::from(err)),
         };
         sh.update(&buffer[..n]);
         if n == 0 || n < BUFFER_SIZE {
@@ -93,26 +94,26 @@ fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> Result<String, Err
     Ok(hex::encode(sh.finalize()))
 }
 
-fn sha256_digest<R: Read>(mut reader: R) -> Result<String, Error> {
+fn sha256_digest<R: Read>(mut reader: R) -> Result<String> {
     digest::<Sha256, _>(&mut reader)
 }
 
-fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
+fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String> {
     let digest = sha256_digest(&mut reader)?;
     Ok(format!("{}:{}", DigestAlgorithm::Sha256, digest))
 }
 
-fn sha512_digest<R: Read>(mut reader: R) -> Result<String, Error> {
+fn sha512_digest<R: Read>(mut reader: R) -> Result<String> {
     digest::<Sha512, _>(&mut reader)
 }
 
-fn sha512_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
+fn sha512_tag_digest<R: Read>(mut reader: R) -> Result<String> {
     let digest = sha512_digest(&mut reader)?;
     Ok(format!("{}:{}", DigestAlgorithm::Sha512, digest))
 }
 
 /// Returns a hash in the form of: algo:hash
-pub fn hash_tag<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String, Error> {
+pub fn hash_tag<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String> {
     match algo {
         DigestAlgorithm::Sha256 => sha256_tag_digest(reader),
         DigestAlgorithm::Sha512 => sha512_tag_digest(reader),
@@ -120,7 +121,7 @@ pub fn hash_tag<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String, Er
 }
 
 /// Returns a hash in the form of: hash
-pub fn hash_reference<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String, Error> {
+pub fn hash_reference<R: Read>(algo: &DigestAlgorithm, reader: R) -> Result<String> {
     match algo {
         DigestAlgorithm::Sha256 => sha256_digest(reader),
         DigestAlgorithm::Sha512 => sha512_digest(reader),

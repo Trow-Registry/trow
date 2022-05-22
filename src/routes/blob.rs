@@ -7,6 +7,7 @@ use crate::types::{
     create_accepted_upload, create_upload_info, AcceptedUpload, BlobDeleted, RepoName, Upload, Uuid,
 };
 use crate::TrowConfig;
+use anyhow::Result;
 use rocket::data::ToByteUnit;
 use rocket::http::uri::Origin;
 use rocket::{delete, get, patch, post, put};

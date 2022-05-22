@@ -3,6 +3,7 @@ use crate::client_interface::ClientInterface;
 use crate::registry_interface::{Metrics, MetricsResponse};
 use crate::response::errors::Error;
 
+use anyhow::Result;
 use rocket::get;
 use rocket::State;
 

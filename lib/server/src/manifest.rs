@@ -1,10 +1,10 @@
-use failure::Error;
-use failure::Fail;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
+use thiserror::Error;
 
 pub trait FromJson {
-    fn from_json(raw: &Value) -> Result<Self, Error>
+    fn from_json(raw: &Value) -> Result<Self>
     where
         Self: std::marker::Sized;
 }
@@ -76,8 +76,8 @@ pub struct Object {
     pub digest: String, //special type would be nice
 }
 
-#[derive(Fail, Debug)]
-#[fail(display = "Invalid Manifest: {}", err)]
+#[derive(Error, Debug)]
+#[error("Invalid Manifest: {err:?}")]
 pub struct InvalidManifest {
     err: String,
 }
@@ -95,7 +95,7 @@ pub mod manifest_media_type {
     pub const DEFAULT: &str = OCI_V1;
 }
 
-fn schema_2(raw: &Value) -> Result<Manifest, Error> {
+fn schema_2(raw: &Value) -> Result<Manifest> {
     // According to the spec, manifests don't have to have a mediaType (?!).
     // Assume V2 if not present.
     let mt = raw["mediaType"]
@@ -119,7 +119,7 @@ fn schema_2(raw: &Value) -> Result<Manifest, Error> {
 }
 
 impl FromJson for Manifest {
-    fn from_json(raw: &Value) -> Result<Self, Error> {
+    fn from_json(raw: &Value) -> Result<Self> {
         let schema_version = raw["schemaVersion"].as_u64().ok_or(InvalidManifest {
             err: "schemaVersion is required".to_owned(),
         })?;

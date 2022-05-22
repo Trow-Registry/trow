@@ -1,4 +1,4 @@
-use failure::{self, Error};
+use anyhow::{Error, Result};
 use std::io::Read;
 
 // Crypto and crypto related imports
@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 // Buffer size for SHA2 hashing
 const BUFFER_SIZE: usize = 1024;
 
-fn digest<D: Digest + Default, R: Read>(reader: &mut R) -> Result<String, Error> {
+fn digest<D: Digest + Default, R: Read>(reader: &mut R) -> Result<String> {
     let mut sh = D::default();
     let mut buffer = [0u8; BUFFER_SIZE];
     loop {
@@ -23,11 +23,11 @@ fn digest<D: Digest + Default, R: Read>(reader: &mut R) -> Result<String, Error>
     Ok(hex::encode(sh.finalize()))
 }
 
-fn sha256_digest<R: Read>(mut reader: R) -> Result<String, Error> {
+fn sha256_digest<R: Read>(mut reader: R) -> Result<String> {
     digest::<Sha256, _>(&mut reader)
 }
 
-pub fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String, Error> {
+pub fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String> {
     let digest = sha256_digest(&mut reader)?;
     Ok(format!("sha256:{}", digest))
 }

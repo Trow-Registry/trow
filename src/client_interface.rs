@@ -8,10 +8,11 @@ use crate::registry_interface::{
     validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
     Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
 };
-use failure::Fail;
+use anyhow::Result;
 use log::{debug, info, warn};
 use rocket::data::DataStream;
 use rocket::tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite};
+use thiserror::Error;
 use tonic::{Code, Request};
 use trow_proto::{
     admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
@@ -23,7 +24,6 @@ use trow_proto::{
 use crate::registry_interface::{BlobStorage, ManifestStorage, StorageDriverError};
 use crate::types::{self, *};
 use chrono::TimeZone;
-use failure::Error;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::io::SeekFrom;
@@ -65,15 +65,15 @@ fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<Stri
 
 // TODO: Each function should have it's own enum of the errors it can return
 // There must be a standard pattern for this somewhere...
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum RegistryError {
-    #[fail(display = "Invalid repository or tag")]
+    #[error("Invalid repository or tag")]
     InvalidName,
-    #[fail(display = "Invalid manifest")]
+    #[error("Invalid manifest")]
     InvalidManifest,
-    #[fail(display = "Invalid Range")]
+    #[error("Invalid Range")]
     ManifestClipped,
-    #[fail(display = "Manifest over data limit")]
+    #[error("Manifest over data limit")]
     Internal,
 }
 
@@ -349,7 +349,7 @@ impl Metrics for ClientInterface {
 }
 
 impl ClientInterface {
-    pub fn new(server: String) -> Result<Self, Error> {
+    pub fn new(server: String) -> Result<Self> {
         Ok(ClientInterface { server })
     }
 
@@ -371,7 +371,7 @@ impl ClientInterface {
         x
     }
 
-    async fn request_upload(&self, repo_name: &str) -> Result<String, Error> {
+    async fn request_upload(&self, repo_name: &str) -> Result<String> {
         info!("Request Upload called for {}", repo_name);
         let req = UploadRequest {
             repo_name: repo_name.to_string(),
@@ -387,12 +387,7 @@ impl ClientInterface {
         Ok(response.uuid)
     }
 
-    async fn complete_upload(
-        &self,
-        repo_name: &str,
-        uuid: &str,
-        digest: &Digest,
-    ) -> Result<(), Error> {
+    async fn complete_upload(&self, repo_name: &str, uuid: &str, digest: &Digest) -> Result<()> {
         info!(
             "Complete Upload called for repository {} with upload id {} digest {}",
             repo_name, uuid, digest
@@ -416,7 +411,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         uuid: &Uuid,
-    ) -> Result<impl AsyncWrite + AsyncSeek, Error> {
+    ) -> Result<impl AsyncWrite + AsyncSeek> {
         info!(
             "Getting write location for blob in repo {} with upload id {}",
             repo_name, uuid
@@ -496,7 +491,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-    ) -> Result<(impl AsyncWrite, String), Error> {
+    ) -> Result<(impl AsyncWrite, String)> {
         info!(
             "Getting write location for manifest in repo {} with ref {}",
             repo_name, reference
@@ -527,7 +522,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-    ) -> Result<ManifestReader, Error> {
+    ) -> Result<ManifestReader> {
         info!(
             "Getting read location for {} with ref {}",
             repo_name, reference
@@ -560,7 +555,7 @@ impl ClientInterface {
         reference: &str,
         limit: u32,
         last_digest: &str,
-    ) -> Result<ManifestHistory, Error> {
+    ) -> Result<ManifestHistory> {
         info!(
             "Getting manifest history for repo {} ref {} limit {} last_digest {}",
             repo_name, reference, limit, last_digest
@@ -596,7 +591,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         digest: &Digest,
-    ) -> Result<BlobReader, Error> {
+    ) -> Result<BlobReader> {
         info!("Getting read location for blob {} in {}", digest, repo_name);
         let br = BlobRef {
             digest: digest.to_string(),
@@ -623,7 +618,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         digest: &Digest,
-    ) -> Result<BlobDeleted, Error> {
+    ) -> Result<BlobDeleted> {
         info!("Attempting to delete blob {} in {}", digest, repo_name);
         let br = BlobRef {
             digest: digest.to_string(),
@@ -643,7 +638,7 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
         uuid: &str,
-    ) -> Result<types::VerifiedManifest, Error> {
+    ) -> Result<types::VerifiedManifest> {
         info!(
             "Verifying manifest {} in {} uuid {}",
             reference, repo_name, uuid
@@ -672,7 +667,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         digest: &Digest,
-    ) -> Result<ManifestDeleted, Error> {
+    ) -> Result<ManifestDeleted> {
         info!("Attempting to delete manifest {} in {}", digest, repo_name);
         let mr = ManifestRef {
             reference: digest.to_string(),
@@ -687,7 +682,7 @@ impl ClientInterface {
         Ok(ManifestDeleted {})
     }
 
-    async fn get_catalog_part(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog, Error> {
+    async fn get_catalog_part(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog> {
         info!(
             "Getting image catalog limit {} last_repo {}",
             limit, last_repo
@@ -712,12 +707,7 @@ impl ClientInterface {
         Ok(catalog)
     }
 
-    async fn list_tags(
-        &self,
-        repo_name: &str,
-        limit: u32,
-        last_tag: &str,
-    ) -> Result<TagList, Error> {
+    async fn list_tags(&self, repo_name: &str, limit: u32, last_tag: &str) -> Result<TagList> {
         info!(
             "Getting tag list for {} limit {} last_tag {}",
             repo_name, limit, last_tag
@@ -750,7 +740,7 @@ impl ClientInterface {
         &self,
         req: &validation::AdmissionRequest,
         host_names: &[String],
-    ) -> Result<validation::AdmissionResponse, Error> {
+    ) -> Result<validation::AdmissionResponse> {
         info!(
             "Validating admission request {} host_names {:?}",
             req.uid, host_names
@@ -869,7 +859,7 @@ impl ClientInterface {
 
      Returns disk and total request metrics(blobs, manifests).
     */
-    async fn get_metrics(&self) -> Result<MetricsResponse, Error> {
+    async fn get_metrics(&self) -> Result<MetricsResponse> {
         debug!("Getting metrics");
         let req = Request::new(MetricsRequest {});
         let resp = self
