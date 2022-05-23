@@ -7,18 +7,17 @@ WORKDIR /usr/src/trow
 COPY docker/platform.sh .
 RUN ./platform.sh # should write /.platform and /.compiler
 RUN rustup component add rustfmt
-RUN rustup target add $(cat /.platform) 
+RUN rustup target add $(cat /.platform)
 RUN apt-get update && apt-get install -y unzip $(cat /.compiler)
 
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY .cargo/config .cargo/config
 
-COPY lib lib
+COPY trow-server/ trow-server/
+COPY trow-protobuf/ trow-protobuf/
 COPY src src
 
-# Build protobuf first for generated code
-RUN cd lib/protobuf && cargo build --release --target $(cat /.platform)
 RUN cargo build --release --target $(cat /.platform)
 RUN cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/ # Get rid of this when build --out is stable
 
@@ -35,7 +34,7 @@ COPY quick-install/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
 # keep this late for concurrency
-COPY --from=cross /usr/src/trow/trow /trow 
+COPY --from=cross /usr/src/trow/trow /trow
 RUN chown -R trow /data /certs /install
 USER trow
 ENTRYPOINT ["/start-trow.sh"]

@@ -27,7 +27,7 @@ pub async fn validate_image(
         Some(req) => match ci.validate_admission(&req, &tc.host_names).await {
             Ok(res) => {
                 resp_data.response = Some(res);
-                Json(resp_data)
+                resp_data
             }
             Err(e) => {
                 resp_data.response = Some(validation::AdmissionResponse {
@@ -39,7 +39,7 @@ pub async fn validate_image(
                         code: None,
                     }),
                 });
-                Json(resp_data)
+                resp_data
             }
         },
 
@@ -54,7 +54,7 @@ pub async fn validate_image(
                 }),
             });
 
-            Json(resp_data)
+            resp_data
         }
     }
 }

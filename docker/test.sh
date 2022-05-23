@@ -5,4 +5,10 @@ set -euo pipefail
 #https://stackoverflow.com/questions/59895/can-a-bash-script-tell-which-directory-it-is-stored-in
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
-docker build --add-host trow.test:127.0.0.1 -t test -f Dockerfile.test ..
+
+docker build \
+    --progress=plain \
+    --add-host trow.test:127.0.0.1 \
+    -t trow/test \
+    -f Dockerfile.test \
+    ..

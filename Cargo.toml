@@ -4,6 +4,13 @@ version = "0.3.5"
 authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
 edition = "2021"
 
+[workspace]
+members = [
+    "trow-server",
+    "trow-protobuf"
+]
+
+
 [features]
 sqlite = []
 
@@ -22,8 +29,8 @@ log = "0.4"
 env_logger = "0.9"
 base64 = "0.13.0"
 anyhow = "1.0"
-trow-protobuf = { path = "./lib/protobuf" }
-trow-server = { path = "./lib/server" }
+trow-protobuf = { path = "./trow-protobuf" }
+trow-server = { path = "./trow-server" }
 derive_more = "0.99"
 hostname = "0.3"
 clap = "3.0"
@@ -41,8 +48,6 @@ sha2 = "0.10"
 hex = "0.4"
 thiserror = "1.0"
 rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", branch = "master" }
-
-[build-dependencies]
 
 [dev-dependencies]
 quickcheck = "1.0"

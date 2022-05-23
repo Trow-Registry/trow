@@ -341,7 +341,7 @@ impl TrowBuilder {
         // Start GRPC Backend thread.
         rt.spawn(init_trow_server(self.config.clone())?);
         //And now rocket
-        rt.block_on(f)?;
+        _ = rt.block_on(f)?;
 
         Ok(())
     }

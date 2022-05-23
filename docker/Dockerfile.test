@@ -14,27 +14,27 @@ RUN mkdir src/
 RUN echo "fn main() {}" > src/main.rs
 
 # trow-server
-COPY lib/server/Cargo.toml lib/server/
-RUN mkdir -p lib/server/src
-RUN touch lib/server/src/lib.rs
+COPY trow-server/Cargo.toml trow-server/
+RUN mkdir -p trow-server/src
+RUN touch trow-server/src/lib.rs
 
 # trow-protobuf
-COPY lib/protobuf/Cargo.toml lib/protobuf/
-RUN echo "fn main() {}" > lib/protobuf/build.rs
-RUN mkdir -p lib/protobuf/src
-RUN touch lib/protobuf/src/lib.rs
+COPY trow-protobuf/Cargo.toml trow-protobuf/
+RUN echo "fn main() {}" > trow-protobuf/build.rs
+RUN mkdir -p trow-protobuf/src
+RUN touch trow-protobuf/src/lib.rs
 
-RUN cargo build # should cache all build deps
-RUN cargo test --no-run
+RUN cargo test --workspace --no-run
 
-COPY lib lib
+
 COPY src src
+COPY trow-server trow-server
+COPY trow-protobuf trow-protobuf
 COPY tests tests
-RUN mkdir certs 
+
+RUN mkdir certs
 COPY quick-install/self-cert/make-certs.sh certs/
 COPY quick-install/self-cert/in.req certs/
 RUN cd certs && ./make-certs.sh
-# Must build protobuf first for generated code
-RUN cd lib/protobuf && cargo build
-RUN cd lib/server && cargo test
-RUN cargo test
+
+RUN cargo test --workspace

@@ -24,7 +24,7 @@ uuid = { version = "0.8", features = ["v4", "serde"] }
 anyhow = "1.0"
 thiserror = "1.0"
 serde_derive = "^1.0"
-trow-protobuf = { path = "../protobuf" }
+trow-protobuf = { path = "../trow-protobuf" }
 rustc-serialize = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
 prometheus = { version = "0.13"}
