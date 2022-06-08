@@ -156,16 +156,16 @@ mod interface_tests {
             .build()
             .unwrap();
 
-        //Using docker proxy should be able to download image even though it's not in registry
+        //Using registry proxy should be able to download image even though it's not in registry
         //These tests are repeated to exercise caching logic
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
 
-        //NOTE: if tag is updated also update nginx tag
-        get_manifest(&client, "f/docker/library/alpine", "3.13").await;
-        get_manifest(&client, "f/docker/library/alpine", "3.13").await;
+        get_manifest(&client, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
+        get_manifest(&client, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
 
         //This should use same alpine image as base (so partially cached)
+        get_manifest(&client, "f/docker/library/alpine", "3.13").await;
         get_manifest(&client, "f/docker/library/nginx", "1.21.0-alpine").await;
 
         //Need to special case single name repos

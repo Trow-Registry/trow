@@ -170,7 +170,6 @@ Must be used with --user")
             .value_name("FILE")
             .help("Load a JSON file containing the config to proxy repos at f/<registry_alias>/<repo_name> to <registry>/<repo_name>.")
             .takes_value(true)
-            .allow_invalid_utf8(true)
         )
         .arg(
             Arg::new("enable-cors")

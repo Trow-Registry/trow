@@ -13,9 +13,11 @@ use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
 use futures::future::try_join_all;
+use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
 use quoted_string::strip_dquotes;
+use regex::Regex;
 use reqwest::{
     self,
     header::{HeaderMap, HeaderValue},
@@ -46,8 +48,6 @@ static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
 
 static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
-                               // static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
-                               // static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
@@ -383,15 +383,24 @@ impl TrowServer {
     ) -> Option<(Image, RegistryProxyConfig)> {
         //All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
-            let proxy_name = repo_name.strip_prefix(PROXY_DIR).unwrap();
+            let segments = repo_name.splitn(3, '/').collect::<Vec<_>>();
+            debug_assert_eq!(segments[0], "f");
+            let proxy_alias = segments[1].to_string();
+            let mut repo = segments[2].to_string();
 
             for proxy in self.proxy_registry_config.iter() {
-                if proxy.alias == proxy_name {
-                    let image = Image {
-                        host: proxy.host.clone(),
-                        repo: repo_name.to_string(),
-                        tag: reference.to_string(),
-                    };
+                if proxy.alias == proxy_alias {
+                    if proxy.host.contains("docker.io") && !repo.contains('/') {
+                        repo = format!("library/{}", repo)
+                    }
+
+                    let mut host = proxy.host.clone();
+                    if !host.starts_with("http://") && !host.starts_with("https://") {
+                        host = format!("https://{}", host);
+                    }
+                    host = format!("{}/v2", host);
+                    let tag = reference.to_string();
+                    let image = Image { host, repo, tag };
                     return Some((image, proxy.clone()));
                 }
             }
@@ -542,11 +551,15 @@ impl TrowServer {
             return Err(anyhow!("Failed to authenticate to {}", realm));
         }
 
-        resp.json::<serde_json::Value>()
+        let resp_json = resp
+            .json::<serde_json::Value>()
             .await
-            .map_err(|e| anyhow!("Failed to deserialize auth response {}", e))?
+            .map_err(|e| anyhow!("Failed to deserialize auth response {}", e))?;
+
+        resp_json
             .get("access_token")
-            .map(|s| s.as_str().unwrap_or(""))
+            .or_else(|| resp_json.get("token"))
+            .and_then(|v| v.as_str())
             .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
             .ok_or_else(|| anyhow!("Failed to find auth token in auth repsonse"))
     }
@@ -589,15 +602,18 @@ impl TrowServer {
     }
 
     fn get_bearer_param_map(www_authenticate_header: String) -> HashMap<String, String> {
-        let base = www_authenticate_header.strip_prefix("Bearer ");
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",?"#).unwrap();
+        }
+        let base = www_authenticate_header
+            .strip_prefix("Bearer ")
+            .unwrap_or("");
 
-        base.unwrap_or("")
-            .split(',')
-            .map(|kv| kv.split('=').collect::<Vec<&str>>())
-            .map(|vec| {
+        RE.captures_iter(base)
+            .map(|m| {
                 (
-                    vec[0].to_string(),
-                    strip_dquotes(vec[1]).unwrap_or(vec[1]).to_string(),
+                    m.name("key").unwrap().as_str().to_string(),
+                    m.name("value").unwrap().as_str().to_string(),
                 )
             })
             .collect()
@@ -971,7 +987,7 @@ impl Registry for TrowServer {
         {
             Ok(vm) => Ok(Response::new(vm)),
             Err(e) => {
-                warn!("Internal error with manifest {:?}", e);
+                warn!("Internal error with manifest: {:?}", e);
                 Err(Status::internal("Internal error finding manifest"))
             }
         }
