@@ -20,9 +20,7 @@ pub fn test_client() -> Client {
         grpc: GrpcConfig {
             listen: "trow:51000".to_owned(),
         },
-        proxy_hub: true,
-        hub_user: None,
-        hub_pass: None,
+        proxy_registry_config: vec![],
         host_names: vec![],
         allow_prefixes: vec![],
         allow_images: vec![],

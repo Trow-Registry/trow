@@ -10,11 +10,12 @@ mod interface_tests {
 
     use reqwest::StatusCode;
     use std::fs::{self, File};
-    use std::io::Read;
+    use std::io::{Read, Write};
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
+
     use trow_server::manifest;
 
     const TROW_ADDRESS: &str = "https://trow.test:8443";
@@ -26,12 +27,27 @@ mod interface_tests {
     /// Seriously considering moving to docker run.
 
     async fn start_trow() -> TrowInstance {
+        let config_file_path = "/tmp/trow-proxy-cfg.json";
+        File::create("/tmp/trow-proxy-cfg.json")
+            .unwrap()
+            .write_all(
+                r#"
+            [
+                {"alias": "docker", "host": "https://docker.io"},
+                {"alias": "nvcr","host": "https://nvcr.io"}
+            ]
+        "#
+                .as_bytes(),
+            )
+            .unwrap();
+
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
             .arg("--")
-            .arg("--proxy-docker-hub")
+            .arg("--proxy-registry-config-file")
+            .arg(config_file_path)
             .spawn()
             .expect("failed to start");
 

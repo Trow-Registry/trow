@@ -1,14 +1,3 @@
-use futures::Future;
-use log::{LevelFilter, SetLoggerError};
-
-use rand::rngs::OsRng;
-use rocket::fairing;
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::str::FromStr;
-use uuid::Uuid;
-
 mod client_interface;
 mod fairings;
 
@@ -21,18 +10,30 @@ mod registry_interface;
 #[cfg(feature = "sqlite")]
 mod users;
 
-use chrono::Utc;
-use client_interface::ClientInterface;
-use fairings::conditional_fairing::AttachConditionalFairing;
-use rand::RngCore;
+use futures::Future;
+use log::{LevelFilter, SetLoggerError};
 use std::io::Write;
 
 use anyhow::{anyhow, Result};
+use chrono::Utc;
 use log::debug;
+use rand::rngs::OsRng;
+use rand::RngCore;
+use rocket::fairing;
 use rocket::http::Method;
 use rocket_cors::AllowedHeaders;
 use rocket_cors::AllowedOrigins;
+use std::env;
+use std::fs;
+use std::path::Path;
+use std::str::FromStr;
 use thiserror::Error;
+use uuid::Uuid;
+
+use client_interface::ClientInterface;
+use fairings::conditional_fairing::AttachConditionalFairing;
+
+use trow_server::RegistryProxyConfig;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -56,9 +57,7 @@ pub struct TrowConfig {
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
     host_names: Vec<String>,
-    proxy_hub: bool,
-    hub_user: Option<String>,
-    hub_pass: Option<String>,
+    proxy_registry_config: Vec<RegistryProxyConfig>,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -101,9 +100,7 @@ fn init_trow_server(
     let ts = trow_server::build_server(
         &config.data_dir,
         config.grpc.listen.parse::<std::net::SocketAddr>()?,
-        config.proxy_hub,
-        config.hub_user,
-        config.hub_pass,
+        config.proxy_registry_config,
         config.allow_prefixes,
         config.allow_images,
         config.deny_prefixes,
@@ -151,7 +148,6 @@ impl TrowBuilder {
         addr: NetAddr,
         listen: String,
         host_names: Vec<String>,
-        proxy_hub: bool,
         allow_prefixes: Vec<String>,
         allow_images: Vec<String>,
         deny_prefixes: Vec<String>,
@@ -168,9 +164,7 @@ impl TrowBuilder {
             tls: None,
             grpc: GrpcConfig { listen },
             host_names,
-            proxy_hub,
-            hub_user: None,
-            hub_pass: None,
+            proxy_registry_config: Vec::new(),
             allow_prefixes,
             allow_images,
             deny_prefixes,
@@ -184,6 +178,15 @@ impl TrowBuilder {
             log_level,
         };
         TrowBuilder { config }
+    }
+
+    pub fn with_proxy_registries(&mut self, config_file: impl AsRef<str>) -> &mut Self {
+        let config_file = config_file.as_ref();
+        let config_str = fs::read_to_string(config_file)
+            .unwrap_or_else(|e| panic!("Could not read file `{}`: {}", config_file, e));
+        let config = serde_json::from_str::<Vec<RegistryProxyConfig>>(&config_str).unwrap();
+        self.config.proxy_registry_config = config;
+        self
     }
 
     pub fn with_tls(&mut self, cert_file: String, key_file: String) -> &mut TrowBuilder {
@@ -202,12 +205,6 @@ impl TrowBuilder {
                 .expect("Error hashing password");
         let usercfg = UserConfig { user, hash_encoded };
         self.config.user = Some(usercfg);
-        self
-    }
-
-    pub fn with_hub_auth(&mut self, hub_user: String, token: String) -> &mut TrowBuilder {
-        self.config.hub_pass = Some(token);
-        self.config.hub_user = Some(hub_user);
         self
     }
 
@@ -283,8 +280,11 @@ impl TrowBuilder {
             self.config.deny_images
         );
 
-        if self.config.proxy_hub {
-            println!("  Docker Hub repostories are being proxy-cached under f/docker/\n");
+        if !self.config.proxy_registry_config.is_empty() {
+            println!("  Proxy registries configured:");
+            for config in &self.config.proxy_registry_config {
+                println!("    {}: {}", config.alias, config.host);
+            }
         }
 
         if self.config.cors {

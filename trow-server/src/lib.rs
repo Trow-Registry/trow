@@ -1,25 +1,32 @@
 pub mod digest;
-
-use tonic::transport::Server;
+pub mod manifest;
 mod metrics;
 mod server;
 mod temporary_file;
 mod validate;
+
 use log::{debug, warn};
+use serde::{Deserialize, Serialize};
+use std::future::Future;
+use tokio::runtime::Runtime;
+use tonic::transport::Server;
+
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
-use std::future::Future;
-use tokio::runtime::Runtime;
 
-pub mod manifest;
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RegistryProxyConfig {
+    pub alias: String,
+    pub host: String,
+    username: Option<String>,
+    password: Option<String>,
+}
 
 pub struct TrowServerBuilder {
     data_path: String,
     listen_addr: std::net::SocketAddr,
-    proxy_hub: bool,
-    hub_user: Option<String>,
-    hub_pass: Option<String>,
+    proxy_registry_config: Vec<RegistryProxyConfig>,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -32,9 +39,7 @@ pub struct TrowServerBuilder {
 pub fn build_server(
     data_path: &str,
     listen_addr: std::net::SocketAddr,
-    proxy_hub: bool,
-    hub_user: Option<String>,
-    hub_pass: Option<String>,
+    proxy_registry_config: Vec<RegistryProxyConfig>,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_prefixes: Vec<String>,
@@ -43,9 +48,7 @@ pub fn build_server(
     TrowServerBuilder {
         data_path: data_path.to_string(),
         listen_addr,
-        proxy_hub,
-        hub_user,
-        hub_pass,
+        proxy_registry_config,
         allow_prefixes,
         allow_images,
         deny_prefixes,
@@ -88,9 +91,7 @@ impl TrowServerBuilder {
     pub fn get_server_future(self) -> impl Future<Output = Result<(), tonic::transport::Error>> {
         let ts = TrowServer::new(
             &self.data_path,
-            self.proxy_hub,
-            self.hub_user,
-            self.hub_pass,
+            self.proxy_registry_config,
             self.allow_prefixes,
             self.allow_images,
             self.deny_prefixes,

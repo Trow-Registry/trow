@@ -32,6 +32,7 @@ use crate::manifest::{manifest_media_type, FromJson, Manifest};
 use crate::metrics;
 use crate::server::trow_server::registry_server::Registry;
 use crate::temporary_file::TemporaryFile;
+use crate::RegistryProxyConfig;
 
 use self::trow_server::*;
 
@@ -45,8 +46,8 @@ static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
 
 static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
-static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
-static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
+                               // static HUB_PROXY_DIR: &str = "docker/"; //Repositories starting with this are considered proxies
+                               // static HUB_ADDRESS: &str = "https://registry-1.docker.io/v2";
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
@@ -65,9 +66,7 @@ pub struct TrowServer {
     manifests_path: PathBuf,
     blobs_path: PathBuf,
     scratch_path: PathBuf,
-    proxy_hub: bool,
-    hub_user: Option<String>,
-    hub_pass: Option<String>,
+    proxy_registry_config: Vec<RegistryProxyConfig>,
     allow_prefixes: Vec<String>,
     allow_images: Vec<String>,
     deny_local_prefixes: Vec<String>,
@@ -110,12 +109,6 @@ impl Image {
     fn get_manifest_url(&self) -> String {
         format!("{}/{}/manifests/{}", self.host, self.repo, self.tag)
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Auth {
-    pub user: Option<String>, //DockerHub has anon auth
-    pub pass: Option<String>,
 }
 
 fn create_accept_header() -> HeaderMap {
@@ -218,10 +211,10 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
             "Upload did not match given digest. Was given {} but got {}",
             digest, calculated_digest
         );
-        Err(DigestValidationError {
+        return Err(anyhow!(DigestValidationError {
             user_digest: digest.to_string(),
             actual_digest: calculated_digest,
-        })?;
+        }));
     }
 
     Ok(())
@@ -257,9 +250,7 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String> {
 impl TrowServer {
     pub fn new(
         data_path: &str,
-        proxy_hub: bool,
-        hub_user: Option<String>,
-        hub_pass: Option<String>,
+        proxy_registry_config: Vec<RegistryProxyConfig>,
         allow_prefixes: Vec<String>,
         allow_images: Vec<String>,
         deny_local_prefixes: Vec<String>,
@@ -273,9 +264,7 @@ impl TrowServer {
             manifests_path,
             blobs_path,
             scratch_path,
-            proxy_hub,
-            hub_user,
-            hub_pass,
+            proxy_registry_config,
             allow_prefixes,
             allow_images,
             deny_local_prefixes,
@@ -306,7 +295,7 @@ impl TrowServer {
     // Given a manifest digest, check if it is referenced by any tag in the repo
     fn verify_manifest_digest_in_repo(&self, repo_name: &str, digest: &str) -> Result<bool> {
         let mut ri = RepoIterator::new(&self.manifests_path.join(repo_name))?;
-        let res = ri.find(|de| does_manifest_match_digest(de, &digest));
+        let res = ri.find(|de| does_manifest_match_digest(de, digest));
         Ok(res.is_some())
     }
 
@@ -387,37 +376,26 @@ impl TrowServer {
     If repo is proxied to another registry, this will return the details of the remote image.
     If the repo isn't proxied None is returned
     **/
-    fn get_proxy_address_and_auth(
+    fn get_proxy_image_and_auth(
         &self,
         repo_name: &str,
         reference: &str,
-    ) -> Option<(Image, Option<Auth>)> {
+    ) -> Option<(Image, RegistryProxyConfig)> {
         //All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
             let proxy_name = repo_name.strip_prefix(PROXY_DIR).unwrap();
 
-            if self.proxy_hub && proxy_name.starts_with(HUB_PROXY_DIR) {
-                let mut repo = proxy_name.strip_prefix(HUB_PROXY_DIR).unwrap().to_string();
-
-                //Official images have to use the library/ repository
-                if !repo.contains('/') {
-                    repo = format!("library/{}", repo).to_string();
-                }
-
-                return Some((
-                    Image {
-                        host: HUB_ADDRESS.to_string(),
-                        repo,
+            for proxy in self.proxy_registry_config.iter() {
+                if proxy.alias == proxy_name {
+                    let image = Image {
+                        host: proxy.host.clone(),
+                        repo: repo_name.to_string(),
                         tag: reference.to_string(),
-                    },
-                    Some(Auth {
-                        user: self.hub_user.clone(),
-                        pass: self.hub_pass.clone(),
-                    }),
-                ));
+                    };
+                    return Some((image, proxy.clone()));
+                }
             }
         }
-
         None
     }
 
@@ -503,14 +481,14 @@ impl TrowServer {
                     .collect::<Vec<_>>();
                 let futures = images_to_dl
                     .iter()
-                    .map(|img| self.download_manifest_and_layers(cl, token, &img, local_repo_name));
+                    .map(|img| self.download_manifest_and_layers(cl, token, img, local_repo_name));
                 try_join_all(futures).await?;
             }
             Manifest::V2(_) => {
                 let futures = mani
                     .get_local_asset_digests()
                     .into_iter()
-                    .map(|digest| self.download_blob(cl, token, remote_image, &digest));
+                    .map(|digest| self.download_blob(cl, token, remote_image, digest));
                 try_join_all(futures).await?;
             }
         }
@@ -534,7 +512,7 @@ impl TrowServer {
         &self,
         cl: &reqwest::Client,
         image: &Image,
-        auth: &Option<Auth>,
+        auth: &RegistryProxyConfig,
     ) -> Result<String> {
         //First get auth address from remote server
         let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
@@ -544,26 +522,21 @@ impl TrowServer {
         let realm = bearer_param_map
             .get("realm")
             .cloned()
-            .ok_or(anyhow!("Expected realm key in authenticate header"))?;
+            .ok_or_else(|| anyhow!("Expected realm key in authenticate header"))?;
 
         bearer_param_map.remove("realm");
 
         let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
 
-        if let Some(a) = auth {
-            if let Some(u) = &a.user {
-                info!("Attempting proxy authentication with user {}", u);
-                request = request.basic_auth(u, a.pass.as_ref())
-            }
+        if let Some(u) = &auth.username {
+            info!("Attempting proxy authentication with user {}", u);
+            request = request.basic_auth(u, auth.password.as_ref())
         }
 
-        let resp = request.send().await.or_else(|e| {
-            Err(anyhow!(
-                "Failed to send authenticate to {} request: {}",
-                realm,
-                e
-            ))
-        })?;
+        let resp = request
+            .send()
+            .await
+            .map_err(|e| anyhow!("Failed to send authenticate to {} request: {}", realm, e))?;
 
         if !resp.status().is_success() {
             return Err(anyhow!("Failed to authenticate to {}", realm));
@@ -575,7 +548,7 @@ impl TrowServer {
             .get("access_token")
             .map(|s| s.as_str().unwrap_or(""))
             .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
-            .ok_or(anyhow!("Failed to find auth token in auth repsonse"))
+            .ok_or_else(|| anyhow!("Failed to find auth token in auth repsonse"))
     }
 
     async fn get_www_authenticate_header(
@@ -605,9 +578,9 @@ impl TrowServer {
 
         resp.headers()
             .get("www-authenticate")
-            .ok_or(anyhow!(
-                "Expected www-authenticate header to identify authentication server"
-            ))
+            .ok_or_else(|| {
+                anyhow!("Expected www-authenticate header to identify authentication server")
+            })
             .and_then(|v| {
                 v.to_str()
                     .map_err(|e| anyhow!("Failed to read auth header {:?}", e))
@@ -672,7 +645,7 @@ impl TrowServer {
         do_verification: bool,
     ) -> Result<ManifestReadLocation> {
         if let Some((proxy_image, proxy_auth)) =
-            self.get_proxy_address_and_auth(&repo_name, &reference)
+            self.get_proxy_image_and_auth(&repo_name, &reference)
         {
             //TODO: May want to consider download tracking in case of simultaneous requests
             //In short term this isn't a big problem as should just copy over itself in worst case
