@@ -21,6 +21,12 @@ jobs:
         override: true
         default: true
         components: rustfmt
+    - name: install ping
+      # necessary when using `act`
+      run: |
+        apt-get -y update
+        apt-get -y install iputils-ping
+
     - name: Install certs
       run: |
         cd quick-install/self-cert && ./make-certs.sh && cd ../..
