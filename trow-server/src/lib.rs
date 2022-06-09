@@ -1,6 +1,7 @@
 pub mod digest;
 pub mod manifest;
 mod metrics;
+mod proxy_auth;
 mod server;
 mod temporary_file;
 mod validate;

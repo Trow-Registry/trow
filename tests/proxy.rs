@@ -181,6 +181,9 @@ mod interface_tests {
         .await;
         get_manifest(&client, "f/docker/hello-world", "linux").await;
 
+        // test a registry that doesn't require auth
+        get_manifest(&client, "f/quay/openshifttest/scratch", "latest").await;
+
         //test writing manifest to proxy dir isn't allowed
         upload_to_nonwritable_repo(&client, "f/failthis").await;
     }

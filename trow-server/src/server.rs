@@ -1,5 +1,3 @@
-use core::fmt::Display;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, DirEntry, File};
@@ -13,11 +11,9 @@ use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
 use futures::future::try_join_all;
-use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
-use quoted_string::strip_dquotes;
-use regex::Regex;
+use reqwest::Method;
 use reqwest::{
     self,
     header::{HeaderMap, HeaderValue},
@@ -32,6 +28,7 @@ use uuid::Uuid;
 use crate::digest::sha256_tag_digest;
 use crate::manifest::{manifest_media_type, FromJson, Manifest};
 use crate::metrics;
+use crate::proxy_auth::ProxyClient;
 use crate::server::trow_server::registry_server::Registry;
 use crate::temporary_file::TemporaryFile;
 use crate::RegistryProxyConfig;
@@ -106,12 +103,12 @@ impl fmt::Display for Image {
 }
 
 impl Image {
-    fn get_manifest_url(&self) -> String {
+    pub fn get_manifest_url(&self) -> String {
         format!("{}/{}/manifests/{}", self.host, self.repo, self.tag)
     }
 }
 
-fn create_accept_header() -> HeaderMap {
+pub fn create_accept_header() -> HeaderMap {
     const ACCEPT: [&str; 4] = [
         manifest_media_type::OCI_V1,
         manifest_media_type::DOCKER_V2,
@@ -397,7 +394,6 @@ impl TrowServer {
                         repo = format!("library/{}", repo)
                     }
 
-                    let mut host = proxy.host.clone();
                     if !host.starts_with("http://") && !host.starts_with("https://") {
                         host = format!("https://{}", host);
                     }
@@ -412,10 +408,9 @@ impl TrowServer {
     }
 
     /// Download a blob that is part of `remote_image`.
-    async fn download_blob<T: Display>(
+    async fn download_blob(
         &self,
-        cl: &reqwest::Client,
-        token: &Option<T>,
+        cl: &ProxyClient,
         remote_image: &Image,
         digest: &str,
     ) -> Result<()> {
@@ -437,32 +432,26 @@ impl TrowServer {
             remote_image.host, remote_image.repo, digest
         );
         info!("Downloading blob {}", addr);
+        let resp = cl.authenticated_request(Method::GET, &addr).send().await?;
 
-        let resp = if let Some(auth) = token {
-            cl.get(&addr).bearer_auth(auth).send().await?
-        } else {
-            cl.get(&addr).send().await?
-        };
-        file.write_stream(resp.bytes_stream()).await?;
+        file.write_all(&resp.bytes().await?).await?;
         self.save_blob(file.path(), digest)?;
         Ok(())
     }
 
     #[async_recursion]
-    async fn download_manifest_and_layers<T: Display + Sync>(
+    async fn download_manifest_and_layers(
         &self,
-        cl: &reqwest::Client,
-        token: &Option<T>,
+        cl: &ProxyClient,
         remote_image: &Image,
         local_repo_name: &str,
     ) -> Result<()> {
         debug!("Downloading manifest + layers for {}", remote_image);
-        let mut req = cl.get(&remote_image.get_manifest_url());
-        if let Some(auth) = token {
-            req = req.bearer_auth(auth);
-        }
-
-        let resp = req.headers(create_accept_header()).send().await?;
+        let resp = cl
+            .authenticated_request(Method::GET, &remote_image.get_manifest_url())
+            .headers(create_accept_header())
+            .send()
+            .await?;
 
         if !resp.status().is_success() {
             return Err(anyhow!(
@@ -493,14 +482,14 @@ impl TrowServer {
                     .collect::<Vec<_>>();
                 let futures = images_to_dl
                     .iter()
-                    .map(|img| self.download_manifest_and_layers(cl, token, img, local_repo_name));
+                    .map(|img| self.download_manifest_and_layers(cl, img, local_repo_name));
                 try_join_all(futures).await?;
             }
             Manifest::V2(_) => {
                 let futures = mani
                     .get_local_asset_digests()
                     .into_iter()
-                    .map(|digest| self.download_blob(cl, token, remote_image, digest));
+                    .map(|digest| self.download_blob(cl, remote_image, digest));
                 try_join_all(futures).await?;
             }
         }
@@ -517,143 +506,25 @@ impl TrowServer {
         Ok(())
     }
 
-    /**
-    Authenticates to proxy server and returns auth token.
-    **/
-    async fn get_auth_token(
-        &self,
-        cl: &reqwest::Client,
-        image: &Image,
-        auth: &RegistryProxyConfig,
-    ) -> Result<String> {
-        //First get auth address from remote server
-        let www_authenticate_header = self.get_www_authenticate_header(cl, image).await?;
-
-        let mut bearer_param_map = TrowServer::get_bearer_param_map(www_authenticate_header);
-
-        let realm = bearer_param_map
-            .get("realm")
-            .cloned()
-            .ok_or_else(|| anyhow!("Expected realm key in authenticate header"))?;
-
-        bearer_param_map.remove("realm");
-
-        let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
-
-        if let Some(u) = &auth.username {
-            info!("Attempting proxy authentication with user {}", u);
-            request = request.basic_auth(u, auth.password.as_ref())
-        }
-
-        let resp = request
-            .send()
-            .await
-            .map_err(|e| anyhow!("Failed to send authenticate to {} request: {}", realm, e))?;
-
-        if !resp.status().is_success() {
-            return Err(anyhow!("Failed to authenticate to {}", realm));
-        }
-
-        let resp_json = resp
-            .json::<serde_json::Value>()
-            .await
-            .map_err(|e| anyhow!("Failed to deserialize auth response {}", e))?;
-
-        resp_json
-            .get("access_token")
-            .or_else(|| resp_json.get("token"))
-            .and_then(|v| v.as_str())
-            .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
-            .ok_or_else(|| anyhow!("Failed to find auth token in auth repsonse"))
-    }
-
-    async fn get_www_authenticate_header(
-        &self,
-        cl: &reqwest::Client,
-        image: &Image,
-    ) -> Result<String> {
+    async fn get_digest_from_header(&self, cl: &ProxyClient, image: &Image) -> Option<String> {
         let resp = cl
-            .head(&image.get_manifest_url())
+            .authenticated_request(Method::HEAD, &image.get_manifest_url())
             .headers(create_accept_header())
             .send()
-            .await
-            .map_err(|e| {
-                anyhow!(
-                    "Attempt to authenticate to {} failed with: {}",
-                    &image.get_manifest_url(),
-                    e
-                )
-            })?;
+            .await;
 
-        if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
-            return Err(anyhow!(
-                "Expected request '{}' to fail with status unauthorized",
-                &image.get_manifest_url()
-            ));
-        }
-
-        resp.headers()
-            .get("www-authenticate")
-            .ok_or_else(|| {
-                anyhow!("Expected www-authenticate header to identify authentication server")
-            })
-            .and_then(|v| {
-                v.to_str()
-                    .map_err(|e| anyhow!("Failed to read auth header {:?}", e))
-            })
-            .map(|s| s.to_string())
-    }
-
-    fn get_bearer_param_map(www_authenticate_header: String) -> HashMap<String, String> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",?"#).unwrap();
-        }
-        let base = www_authenticate_header
-            .strip_prefix("Bearer ")
-            .unwrap_or("");
-
-        RE.captures_iter(base)
-            .map(|m| {
-                (
-                    m.name("key").unwrap().as_str().to_string(),
-                    m.name("value").unwrap().as_str().to_string(),
-                )
-            })
-            .collect()
-    }
-
-    async fn get_digest_from_header(
-        &self,
-        cl: &reqwest::Client,
-        image: &Image,
-        auth_token: &Option<String>,
-    ) -> Option<String> {
-        let resp = if let Some(auth) = auth_token {
-            cl.head(&image.get_manifest_url())
-                .bearer_auth(&auth)
-                .headers(create_accept_header())
-                .send()
-                .await
-        } else {
-            cl.head(&image.get_manifest_url())
-                .headers(create_accept_header())
-                .send()
-                .await
-        };
-
-        let resp = match resp {
-            Ok(r) => r,
+        match resp {
             Err(e) => {
-                error!("Remote registry didn't respond to HEAD request {}", e);
-                return None;
+                error!(
+                    "Remote registry didn't respond correctly to HEAD request {}",
+                    e
+                );
+                None
             }
-        };
-
-        if let Some(digest) = resp.headers().get(DIGEST_HEADER) {
-            let digest = format!("{:?}", digest);
-            Some(digest.trim_matches('"').to_string())
-        } else {
-            None
+            Ok(resp) => resp.headers().get(DIGEST_HEADER).map(|digest| {
+                let digest = format!("{:?}", digest);
+                digest.trim_matches('"').to_string()
+            }),
         }
     }
 
@@ -663,7 +534,7 @@ impl TrowServer {
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation> {
-        if let Some((proxy_image, proxy_auth)) =
+        if let Some((proxy_image, proxy_cfg)) =
             self.get_proxy_image_and_auth(&repo_name, &reference)
         {
             //TODO: May want to consider download tracking in case of simultaneous requests
@@ -673,23 +544,19 @@ impl TrowServer {
                 repo_name, reference, proxy_image
             );
 
-            let cl = reqwest::Client::new();
+            let cl = ProxyClient::try_new(&proxy_cfg, &proxy_image)
+                .await
+                .map_err(|e| {
+                    anyhow!(
+                        "Could not configure client for registry {}: {}",
+                        proxy_cfg.host,
+                        e
+                    )
+                })?;
 
             let mut have_manifest = false;
 
-            //Get auth token for remote server.
-            //TODO: Consider caching
-            let auth_token = match self.get_auth_token(&cl, &proxy_image, &proxy_auth).await {
-                Ok(a) => Some(a),
-                Err(e) => {
-                    error!("Failed to get auth token for {}. Error: {}", proxy_image, e);
-                    None
-                }
-            };
-
-            let digest = self
-                .get_digest_from_header(&cl, &proxy_image, &auth_token)
-                .await;
+            let digest = self.get_digest_from_header(&cl, &proxy_image).await;
 
             if let Some(digest) = digest {
                 if self.get_catalog_path_for_blob(&digest)?.exists() {
@@ -717,7 +584,7 @@ impl TrowServer {
 
             if !have_manifest {
                 if let Err(e) = self
-                    .download_manifest_and_layers(&cl, &auth_token, &proxy_image, &repo_name)
+                    .download_manifest_and_layers(&cl, &proxy_image, &repo_name)
                     .await
                 {
                     //Note that we may still have an out-of-date version that will be returned
