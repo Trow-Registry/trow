@@ -1,3 +1,7 @@
+use anyhow::Result;
+use bytes::Bytes;
+use futures::stream::Stream;
+use futures::StreamExt;
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, File};
 use tokio::io::{self, AsyncWriteExt};
@@ -30,9 +34,22 @@ impl TemporaryFile {
         };
         Ok(Some(TemporaryFile { file, path }))
     }
+
     pub async fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         self.file.write_all(buf).await
     }
+
+    pub async fn write_stream(
+        &mut self,
+        mut stream: impl Stream<Item = reqwest::Result<Bytes>> + Unpin,
+    ) -> Result<()> {
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            self.write_all(&chunk).await?;
+        }
+        Ok(())
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }

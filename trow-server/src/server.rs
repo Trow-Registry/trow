@@ -453,7 +453,7 @@ impl TrowServer {
         } else {
             cl.get(&addr).send().await?
         };
-        file.write_all(&resp.bytes().await?).await?;
+        file.write_stream(resp.bytes_stream()).await?;
         self.save_blob(file.path(), digest)?;
         Ok(())
     }
