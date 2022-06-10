@@ -18,61 +18,61 @@ pub enum HttpAuth {
     None,
 }
 
+/// Wrapper around `reqwest::Client` that automagically handles authentication
+/// to other container registries
 pub struct ProxyClient {
     pub cl: reqwest::Client,
     pub auth: HttpAuth,
 }
 
-/// Wrapper around `reqwest::Client` that automagically handles authentication
 impl ProxyClient {
     pub async fn try_new(proxy_cfg: &RegistryProxyConfig, proxy_image: &Image) -> Result<Self> {
         let base_client = reqwest::Client::new();
 
         let www_authenticate_header =
             Self::get_www_authenticate_header(&base_client, proxy_image).await?;
-        let cl = if www_authenticate_header.starts_with("Basic") {
-            if proxy_cfg.username.is_none() {
-                return Err(anyhow!(
-                    "Registry `{}` requires Basic auth but no username was provided",
-                    proxy_cfg.host
-                ));
+        let cl = match www_authenticate_header.as_str() {
+            h if h.starts_with("Basic") => {
+                if proxy_cfg.username.is_none() {
+                    return Err(anyhow!(
+                        "Registry `{}` requires Basic auth but no username was provided",
+                        proxy_cfg.host
+                    ));
+                }
+                ProxyClient {
+                    cl: base_client,
+                    auth: HttpAuth::Basic(
+                        proxy_cfg.username.clone().unwrap(),
+                        proxy_cfg.password.clone(),
+                    ),
+                }
             }
-            ProxyClient {
-                cl: base_client,
-                auth: HttpAuth::Basic(
-                    proxy_cfg.username.clone().unwrap(),
-                    proxy_cfg.password.clone(),
-                ),
-            }
-        } else if www_authenticate_header.starts_with("Bearer") {
-            let tok =
-                match Self::get_bearer_auth_token(&base_client, www_authenticate_header, proxy_cfg)
+            h if h.starts_with("Bearer") => {
+                let tok = Self::get_bearer_auth_token(&base_client, h, proxy_cfg)
                     .await
-                {
-                    Ok(a) => a,
-                    Err(e) => {
-                        return Err(anyhow!(
+                    .map_err(|e| {
+                        anyhow!(
                             "Failed to get bearer auth token for {}. Error: {}",
                             proxy_image,
                             e
-                        ))
-                    }
-                };
+                        )
+                    })?;
 
-            ProxyClient {
-                cl: base_client,
-                auth: HttpAuth::Bearer(tok),
+                ProxyClient {
+                    cl: base_client,
+                    auth: HttpAuth::Bearer(tok),
+                }
             }
-        } else if www_authenticate_header.is_empty() {
-            ProxyClient {
+            "" => ProxyClient {
                 cl: base_client,
                 auth: HttpAuth::None,
+            },
+            _ => {
+                return Err(anyhow!(
+                    "Registry `{}` requires authentication but no supported scheme was provided in WWW-Authenticate",
+                    proxy_cfg.host
+                ));
             }
-        } else {
-            return Err(anyhow!(
-                "Registry `{}` requires authentication but no supported scheme was provided in WWW-Authenticate",
-                proxy_cfg.host
-            ));
         };
 
         Ok(cl)
@@ -91,7 +91,7 @@ impl ProxyClient {
 
     async fn get_bearer_auth_token(
         cl: &reqwest::Client,
-        www_authenticate_header: String,
+        www_authenticate_header: &str,
         auth: &RegistryProxyConfig,
     ) -> Result<String> {
         let mut bearer_param_map = Self::get_bearer_param_map(www_authenticate_header);
@@ -163,7 +163,7 @@ impl ProxyClient {
         }
     }
 
-    fn get_bearer_param_map(www_authenticate_header: String) -> HashMap<String, String> {
+    fn get_bearer_param_map(www_authenticate_header: &str) -> HashMap<String, String> {
         lazy_static! {
             static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",?"#).unwrap();
         }

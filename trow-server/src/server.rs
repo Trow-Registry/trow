@@ -373,7 +373,7 @@ impl TrowServer {
     If repo is proxied to another registry, this will return the details of the remote image.
     If the repo isn't proxied None is returned
     **/
-    fn get_proxy_image_and_auth(
+    fn get_proxy_image_and_cfg(
         &self,
         repo_name: &str,
         reference: &str,
@@ -434,7 +434,7 @@ impl TrowServer {
         info!("Downloading blob {}", addr);
         let resp = cl.authenticated_request(Method::GET, &addr).send().await?;
 
-        file.write_all(&resp.bytes().await?).await?;
+        file.write_stream(resp.bytes_stream()).await?;
         self.save_blob(file.path(), digest)?;
         Ok(())
     }
@@ -534,8 +534,7 @@ impl TrowServer {
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation> {
-        if let Some((proxy_image, proxy_cfg)) =
-            self.get_proxy_image_and_auth(&repo_name, &reference)
+        if let Some((proxy_image, proxy_cfg)) = self.get_proxy_image_and_cfg(&repo_name, &reference)
         {
             //TODO: May want to consider download tracking in case of simultaneous requests
             //In short term this isn't a big problem as should just copy over itself in worst case
