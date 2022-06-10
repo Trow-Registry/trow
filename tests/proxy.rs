@@ -33,8 +33,9 @@ mod interface_tests {
             .write_all(
                 r#"
             [
-                {"alias": "docker", "host": "https://docker.io"},
-                {"alias": "nvcr","host": "https://nvcr.io"}
+                {"alias": "docker", "host": "registry-1.docker.io"},
+                {"alias": "nvcr","host": "nvcr.io"},
+                {"alias": "quay","host": "quay.io"}
             ]
         "#
                 .as_bytes(),

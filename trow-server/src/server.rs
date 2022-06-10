@@ -390,7 +390,10 @@ impl TrowServer {
 
             for proxy in self.proxy_registry_config.iter() {
                 if proxy.alias == proxy_alias {
+                    let mut host = proxy.host.clone();
+
                     if proxy.host.contains("docker.io") && !repo.contains('/') {
+                        // handle images like "nginx:latest"
                         repo = format!("library/{}", repo)
                     }
 
