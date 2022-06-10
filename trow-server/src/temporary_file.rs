@@ -29,24 +29,26 @@ impl TemporaryFile {
                 std::io::ErrorKind::AlreadyExists => {
                     return Ok(None);
                 }
-                _ => return Err(e.into()),
+                _ => return Err(e),
             },
         };
         Ok(Some(TemporaryFile { file, path }))
     }
 
     pub async fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.file.write_all(buf).await
+        self.file.write_all(buf).await?;
+        self.file.flush().await
     }
 
-    pub async fn write_stream(
-        &mut self,
-        mut stream: impl Stream<Item = reqwest::Result<Bytes>> + Unpin,
-    ) -> Result<()> {
+    pub async fn write_stream<S>(&mut self, mut stream: S) -> Result<()>
+    where
+        S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
+    {
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
-            self.write_all(&chunk).await?;
+            self.file.write_all(&chunk).await?;
         }
+        self.file.flush().await?;
         Ok(())
     }
 
@@ -116,5 +118,29 @@ mod test {
             "The same file cannot be opened for writing twice !"
         );
         assert!(!path.exists(), "File should have been deleted");
+    }
+
+    #[tokio::test]
+    async fn test_write() {
+        const DUMMY_DATA: &[u8] = b"0123456789ABCDEF";
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.txt");
+
+        let mut file = TemporaryFile::open_for_writing(file_path.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        file.write_all(DUMMY_DATA).await.unwrap();
+        assert_eq!(fs::read(file.path()).await.unwrap(), DUMMY_DATA);
+        drop(file);
+
+        let mut file = TemporaryFile::open_for_writing(file_path.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        let dummy_stream = futures::stream::iter(DUMMY_DATA.chunks(4).map(|b| Ok(Bytes::from(b))));
+        file.write_stream(dummy_stream).await.unwrap();
+        assert_eq!(fs::read(file.path()).await.unwrap(), DUMMY_DATA);
+        drop(file);
     }
 }
