@@ -12,6 +12,8 @@ use crate::server::create_accept_header;
 use crate::server::Image;
 use crate::RegistryProxyConfig;
 
+const AUTHN_HEADER: &str = "www-authenticate";
+
 pub enum HttpAuth {
     Basic(String, Option<String>),
     Bearer(String),
@@ -149,7 +151,7 @@ impl ProxyClient {
         match resp.status() {
             StatusCode::UNAUTHORIZED => resp
                 .headers()
-                .get("www-authenticate")
+                .get(AUTHN_HEADER)
                 .ok_or_else(|| {
                     anyhow!("Expected www-authenticate header to identify authentication server")
                 })
@@ -165,7 +167,7 @@ impl ProxyClient {
 
     fn get_bearer_param_map(www_authenticate_header: &str) -> HashMap<String, String> {
         lazy_static! {
-            static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",?"#).unwrap();
+            static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",? *"#).unwrap();
         }
         let base = www_authenticate_header
             .strip_prefix("Bearer ")
@@ -179,5 +181,147 @@ impl ProxyClient {
                 )
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    const AUTHZ_HEADER: &str = "Authorization";
+
+    fn get_basic_setup() -> (MockServer, RegistryProxyConfig, Image) {
+        let server = MockServer::start();
+
+        let proxy_cfg = RegistryProxyConfig {
+            host: format!("http://{}", server.address()),
+            alias: "toto".to_string(),
+            username: None,
+            password: None,
+        };
+
+        let proxy_image = Image {
+            host: format!("{}/v2", &proxy_cfg.host),
+            repo: "hello_world".to_string(),
+            tag: "latest".to_string(),
+        };
+
+        (server, proxy_cfg, proxy_image)
+    }
+
+    #[tokio::test]
+    async fn test_no_auth() {
+        let (server, proxy_cfg, proxy_image) = get_basic_setup();
+
+        let mock_server = server.mock(|when, then| {
+            when.method("HEAD")
+                .path("/v2/hello_world/manifests/latest")
+                .header_exists("Accept");
+            then.status(200);
+        });
+
+        ProxyClient::try_new(&proxy_cfg, &proxy_image)
+            .await
+            .unwrap();
+        mock_server.assert();
+    }
+
+    #[tokio::test]
+    async fn test_basic_auth() {
+        let (server, mut cfg, image) = get_basic_setup();
+
+        let mock_server = server.mock(|when, then| {
+            when.method("HEAD")
+                .path("/v2/hello_world/manifests/latest")
+                .header_exists("Accept");
+            then.status(401)
+                .header(AUTHN_HEADER, "Basic realm=\"hell\", charset=\"UTF-8\"");
+        });
+        let username = "lucifer";
+        cfg.username = Some(username.to_string());
+
+        let clt = ProxyClient::try_new(&cfg, &image).await.unwrap();
+
+        mock_server.assert();
+        assert!(matches!(clt.auth, HttpAuth::Basic(u, None) if u == username));
+    }
+
+    #[tokio::test]
+    async fn test_bearer_auth() {
+        let (server, cfg, image) = get_basic_setup();
+
+        let mock_head_req = server.mock(|when, then| {
+            when.method("HEAD")
+                .path("/v2/hello_world/manifests/latest")
+                .header_exists("Accept");
+            then.status(401).header(
+                AUTHN_HEADER,
+                format!(
+                    "Bearer realm=\"{}/hell\", charset=\"UTF-8\",service=\"trow_registry\",scope=\"push/pull\"",
+                    server.base_url()
+                ),
+            );
+        });
+        let token = "no-token-haha";
+        let mock_auth_tok = server.mock(|when, then| {
+            when.method("GET")
+                .path("/hell")
+                .query_param("charset", "UTF-8")
+                .query_param("service", "trow_registry")
+                .query_param("scope", "push/pull");
+            then.status(200).json_body(json!({
+                "access_token": token,
+            }));
+        });
+
+        let cl = ProxyClient::try_new(&cfg, &image).await.unwrap();
+
+        mock_head_req.assert();
+        mock_auth_tok.assert();
+        assert!(matches!(cl.auth, HttpAuth::Bearer(tok) if tok == token));
+    }
+
+    #[tokio::test]
+    async fn test_bearer_auth_with_username_password() {
+        let (server, mut cfg, image) = get_basic_setup();
+
+        cfg.username = Some("like-this".to_string());
+        cfg.password = Some("reign-of-the-septims".to_string());
+
+        let mock_head_req = server.mock(|when, then| {
+            when.method("HEAD")
+                .path("/v2/hello_world/manifests/latest")
+                .header_exists("Accept");
+            then.status(401).header(
+                AUTHN_HEADER,
+                format!(
+                    "Bearer realm=\"{}/hive/impish\",oscillating=\"YES\", born=\"too-slow\",scope=\"repository:nvidia/cuda:pull,push\"",
+                    server.base_url()
+                ),
+            );
+        });
+        let token = "alleycat-token";
+        let mock_auth_tok = server.mock(|when, then| {
+            when.method("GET")
+                .path("/hive/impish")
+                .query_param("oscillating", "YES")
+                .query_param("born", "too-slow")
+                .query_param("scope", "repository:nvidia/cuda:pull,push")
+                .header(
+                    AUTHZ_HEADER,
+                    format!("Basic {}", base64::encode("like-this:reign-of-the-septims")),
+                );
+            then.status(200).json_body(json!({
+                "token": token,
+            }));
+        });
+
+        let cl = ProxyClient::try_new(&cfg, &image).await.unwrap();
+
+        mock_head_req.assert();
+        mock_auth_tok.assert();
+        assert!(matches!(cl.auth, HttpAuth::Bearer(tok) if tok == token));
     }
 }

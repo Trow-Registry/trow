@@ -41,3 +41,5 @@ tonic-build = "0.6"
 
 [dev-dependencies]
 tempfile = "3.3"
+httpmock = "0.6"
+base64 = "0.13.0"
