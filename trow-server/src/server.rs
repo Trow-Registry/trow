@@ -543,7 +543,7 @@ impl TrowServer {
                 repo_name, reference, proxy_image
             );
 
-            let cl = ProxyClient::try_new(&proxy_cfg, &proxy_image)
+            let cl = ProxyClient::try_new(proxy_cfg.clone(), &proxy_image)
                 .await
                 .map_err(|e| {
                     anyhow!(

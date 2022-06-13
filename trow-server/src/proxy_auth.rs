@@ -1,12 +1,15 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
 use log::info;
 use quoted_string::strip_dquotes;
 use regex::Regex;
 use reqwest::StatusCode;
 use reqwest::{self, Method};
+use rusoto_core::Region;
+use rusoto_ecr::{Ecr, EcrClient};
 
 use crate::server::create_accept_header;
 use crate::server::Image;
@@ -14,6 +17,7 @@ use crate::RegistryProxyConfig;
 
 const AUTHN_HEADER: &str = "www-authenticate";
 
+#[derive(Debug)]
 pub enum HttpAuth {
     Basic(String, Option<String>),
     Bearer(String),
@@ -28,22 +32,38 @@ pub struct ProxyClient {
 }
 
 impl ProxyClient {
-    pub async fn try_new(proxy_cfg: &RegistryProxyConfig, proxy_image: &Image) -> Result<Self> {
+    pub async fn try_new(mut proxy_cfg: RegistryProxyConfig, proxy_image: &Image) -> Result<Self> {
         let base_client = reqwest::Client::new();
 
-        let www_authenticate_header =
-            get_www_authenticate_header(&base_client, proxy_image).await?;
-        let cl = match www_authenticate_header.as_str() {
-            h if h.starts_with("Basic") => Self::try_new_with_basic_auth(proxy_cfg, base_client).await,
-            h if h.starts_with("Bearer") => Self::try_new_with_bearer_auth(proxy_cfg, base_client, &www_authenticate_header).await,
-            "" => Ok(ProxyClient {
+        let authn_header = get_www_authenticate_header(&base_client, proxy_image).await?;
+
+        if proxy_image.host.contains(".dkr.ecr.")
+            && proxy_image.host.contains(".amazonaws.com")
+            && matches!(&proxy_cfg.username, Some(u) if u == "AWS")
+            && proxy_cfg.password.is_none()
+        {
+            let passwd = get_aws_ecr_password_from_env(&proxy_image.host)
+                .await
+                .context("Could not fetch password to ECR registry")?;
+            proxy_cfg.password = Some(passwd);
+        }
+
+        let cl = match authn_header {
+            Some(h) if h.starts_with("Basic") => {
+                Self::try_new_with_basic_auth(&proxy_cfg, base_client).await
+            }
+            Some(h) if h.starts_with("Bearer") => {
+                Self::try_new_with_bearer_auth(&proxy_cfg, base_client, &h).await
+            }
+            None => Ok(ProxyClient {
                 cl: base_client,
                 auth: HttpAuth::None,
             }),
-            _ => Err(anyhow!(
-                    "Registry `{}` requires authentication but no supported scheme was provided in WWW-Authenticate",
-                    proxy_cfg.host
-                ))
+            Some(invalid_header) => Err(anyhow!(
+                "Could not parse {AUTHN_HEADER} of registry `{}`: `{}`",
+                proxy_cfg.host,
+                invalid_header
+            )),
         };
 
         cl
@@ -101,8 +121,42 @@ impl ProxyClient {
     }
 }
 
+/// Fetches AWS ECR credentials.
+/// We use the [rusoto ChainProvider](https://docs.rs/rusoto_credential/0.48.0/rusoto_credential/struct.ChainProvider.html)
+/// to fetch AWS credentials.
+async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
+    let region = ecr_host
+        .split('.')
+        .nth(3)
+        .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?;
+
+    let ecr_clt = EcrClient::new(Region::from_str(region)?);
+
+    let token_resp = ecr_clt
+        .get_authorization_token(rusoto_ecr::GetAuthorizationTokenRequest::default())
+        .await;
+    let token = token_resp?
+        .authorization_data
+        .ok_or_else(|| anyhow!("AWS ECR get token response lacks authorization_data"))?
+        .first()
+        .unwrap()
+        .authorization_token
+        .clone()
+        .unwrap();
+    // The token is base64(username:password). Here, username is "AWS".
+    // To get the password, we trim "AWS:" from the decoded token.
+    let mut auth_str = base64::decode(token)?;
+    auth_str.drain(0..4);
+
+    String::from_utf8(auth_str).context("Could not convert ECR token to valid password")
+}
+
 /// Get the WWW-Authenticate header from a registry.
-async fn get_www_authenticate_header(cl: &reqwest::Client, image: &Image) -> Result<String> {
+/// Ok(None) is returned if the registry does not require authentication.
+async fn get_www_authenticate_header(
+    cl: &reqwest::Client,
+    image: &Image,
+) -> Result<Option<String>> {
     let resp = cl
         .head(&image.get_manifest_url())
         .headers(create_accept_header())
@@ -123,12 +177,9 @@ async fn get_www_authenticate_header(cl: &reqwest::Client, image: &Image) -> Res
             .ok_or_else(|| {
                 anyhow!("Expected www-authenticate header to identify authentication server")
             })
-            .and_then(|v| {
-                v.to_str()
-                    .map_err(|e| anyhow!("Failed to read auth header: {:?}", e))
-            })
-            .map(|s| s.to_string()),
-        StatusCode::OK => Ok(String::new()),
+            .and_then(|v| v.to_str().context("Failed to read auth header"))
+            .map(|s| Some(s.to_string())),
+        StatusCode::OK => Ok(None),
         _ => Err(anyhow!("Unexpected status code {}", resp.status())),
     }
 }
@@ -175,7 +226,7 @@ async fn get_bearer_auth_token(
     let resp = request
         .send()
         .await
-        .map_err(|e| anyhow!("Failed to send authenticate to {} request: {}", realm, e))?;
+        .with_context(|| format!("Failed to send authenticate to {} request", realm))?;
     info!("resp: {:?}", resp);
     if !resp.status().is_success() {
         return Err(anyhow!("Failed to authenticate to {}", realm));
@@ -184,7 +235,7 @@ async fn get_bearer_auth_token(
     let resp_json = resp
         .json::<serde_json::Value>()
         .await
-        .map_err(|e| anyhow!("Failed to deserialize auth response {}", e))?;
+        .context("Failed to deserialize auth response")?;
 
     resp_json
         .get("access_token")
@@ -232,9 +283,7 @@ mod tests {
             then.status(200);
         });
 
-        ProxyClient::try_new(&proxy_cfg, &proxy_image)
-            .await
-            .unwrap();
+        ProxyClient::try_new(proxy_cfg, &proxy_image).await.unwrap();
         mock_server.assert();
     }
 
@@ -252,7 +301,7 @@ mod tests {
         let username = "lucifer";
         cfg.username = Some(username.to_string());
 
-        let clt = ProxyClient::try_new(&cfg, &image).await.unwrap();
+        let clt = ProxyClient::try_new(cfg, &image).await.unwrap();
 
         mock_server.assert();
         assert!(matches!(clt.auth, HttpAuth::Basic(u, None) if u == username));
@@ -286,7 +335,7 @@ mod tests {
             }));
         });
 
-        let cl = ProxyClient::try_new(&cfg, &image).await.unwrap();
+        let cl = ProxyClient::try_new(cfg, &image).await.unwrap();
 
         mock_head_req.assert();
         mock_auth_tok.assert();
@@ -328,7 +377,7 @@ mod tests {
             }));
         });
 
-        let cl = ProxyClient::try_new(&cfg, &image).await.unwrap();
+        let cl = ProxyClient::try_new(cfg, &image).await.unwrap();
 
         mock_head_req.assert();
         mock_auth_tok.assert();
