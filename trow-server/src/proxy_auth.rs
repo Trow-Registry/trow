@@ -32,52 +32,61 @@ impl ProxyClient {
         let base_client = reqwest::Client::new();
 
         let www_authenticate_header =
-            Self::get_www_authenticate_header(&base_client, proxy_image).await?;
+            get_www_authenticate_header(&base_client, proxy_image).await?;
         let cl = match www_authenticate_header.as_str() {
-            h if h.starts_with("Basic") => {
-                if proxy_cfg.username.is_none() {
-                    return Err(anyhow!(
-                        "Registry `{}` requires Basic auth but no username was provided",
-                        proxy_cfg.host
-                    ));
-                }
-                ProxyClient {
-                    cl: base_client,
-                    auth: HttpAuth::Basic(
-                        proxy_cfg.username.clone().unwrap(),
-                        proxy_cfg.password.clone(),
-                    ),
-                }
-            }
-            h if h.starts_with("Bearer") => {
-                let tok = Self::get_bearer_auth_token(&base_client, h, proxy_cfg)
-                    .await
-                    .map_err(|e| {
-                        anyhow!(
-                            "Failed to get bearer auth token for {}. Error: {}",
-                            proxy_image,
-                            e
-                        )
-                    })?;
-
-                ProxyClient {
-                    cl: base_client,
-                    auth: HttpAuth::Bearer(tok),
-                }
-            }
-            "" => ProxyClient {
+            h if h.starts_with("Basic") => Self::try_new_with_basic_auth(proxy_cfg, base_client).await,
+            h if h.starts_with("Bearer") => Self::try_new_with_bearer_auth(proxy_cfg, base_client, &www_authenticate_header).await,
+            "" => Ok(ProxyClient {
                 cl: base_client,
                 auth: HttpAuth::None,
-            },
-            _ => {
-                return Err(anyhow!(
+            }),
+            _ => Err(anyhow!(
                     "Registry `{}` requires authentication but no supported scheme was provided in WWW-Authenticate",
                     proxy_cfg.host
-                ));
-            }
+                ))
         };
 
-        Ok(cl)
+        cl
+    }
+
+    async fn try_new_with_basic_auth(
+        proxy_cfg: &RegistryProxyConfig,
+        cl: reqwest::Client,
+    ) -> Result<Self> {
+        if proxy_cfg.username.is_none() {
+            return Err(anyhow!(
+                "Registry `{}` requires Basic auth but no username was provided",
+                proxy_cfg.host
+            ));
+        }
+        Ok(ProxyClient {
+            cl,
+            auth: HttpAuth::Basic(
+                proxy_cfg.username.clone().unwrap(),
+                proxy_cfg.password.clone(),
+            ),
+        })
+    }
+
+    async fn try_new_with_bearer_auth(
+        proxy_cfg: &RegistryProxyConfig,
+        cl: reqwest::Client,
+        authn_header: &str,
+    ) -> Result<Self> {
+        let tok = get_bearer_auth_token(&cl, authn_header, proxy_cfg)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to get bearer auth token for {}: {}",
+                    proxy_cfg.host,
+                    e
+                )
+            })?;
+
+        Ok(ProxyClient {
+            cl,
+            auth: HttpAuth::Bearer(tok),
+        })
     }
 
     /// Build a request with added authentication.
@@ -90,98 +99,99 @@ impl ProxyClient {
             HttpAuth::None => req,
         }
     }
+}
 
-    async fn get_bearer_auth_token(
-        cl: &reqwest::Client,
-        www_authenticate_header: &str,
-        auth: &RegistryProxyConfig,
-    ) -> Result<String> {
-        let mut bearer_param_map = Self::get_bearer_param_map(www_authenticate_header);
-        info!("bearer param map: {:?}", bearer_param_map);
-        let realm = bearer_param_map
-            .get("realm")
-            .cloned()
-            .ok_or_else(|| anyhow!("Expected realm key in authenticate header"))?;
+/// Get the WWW-Authenticate header from a registry.
+async fn get_www_authenticate_header(cl: &reqwest::Client, image: &Image) -> Result<String> {
+    let resp = cl
+        .head(&image.get_manifest_url())
+        .headers(create_accept_header())
+        .send()
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "Could not fetch {AUTHN_HEADER} header from {} (failed with: {})",
+                &image.get_manifest_url(),
+                e
+            )
+        })?;
 
-        bearer_param_map.remove("realm");
-        info!("Realm is {}", realm);
-        let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
-
-        if let Some(u) = &auth.username {
-            info!("Attempting proxy authentication with user {}", u);
-            request = request.basic_auth(u, auth.password.as_ref());
-        }
-
-        let resp = request
-            .send()
-            .await
-            .map_err(|e| anyhow!("Failed to send authenticate to {} request: {}", realm, e))?;
-        info!("resp: {:?}", resp);
-        if !resp.status().is_success() {
-            return Err(anyhow!("Failed to authenticate to {}", realm));
-        }
-
-        let resp_json = resp
-            .json::<serde_json::Value>()
-            .await
-            .map_err(|e| anyhow!("Failed to deserialize auth response {}", e))?;
-
-        resp_json
-            .get("access_token")
-            .or_else(|| resp_json.get("token"))
-            .and_then(|s| s.as_str())
-            .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
-            .ok_or_else(|| anyhow!("Failed to find auth token in auth repsonse"))
-    }
-
-    async fn get_www_authenticate_header(cl: &reqwest::Client, image: &Image) -> Result<String> {
-        let resp = cl
-            .head(&image.get_manifest_url())
-            .headers(create_accept_header())
-            .send()
-            .await
-            .map_err(|e| {
-                anyhow!(
-                    "Attempt to authenticate to {} failed with: {}",
-                    &image.get_manifest_url(),
-                    e
-                )
-            })?;
-
-        match resp.status() {
-            StatusCode::UNAUTHORIZED => resp
-                .headers()
-                .get(AUTHN_HEADER)
-                .ok_or_else(|| {
-                    anyhow!("Expected www-authenticate header to identify authentication server")
-                })
-                .and_then(|v| {
-                    v.to_str()
-                        .map_err(|e| anyhow!("Failed to read auth header: {:?}", e))
-                })
-                .map(|s| s.to_string()),
-            StatusCode::OK => Ok(String::new()),
-            _ => Err(anyhow!("Unexpected status code {}", resp.status())),
-        }
-    }
-
-    fn get_bearer_param_map(www_authenticate_header: &str) -> HashMap<String, String> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",? *"#).unwrap();
-        }
-        let base = www_authenticate_header
-            .strip_prefix("Bearer ")
-            .unwrap_or("");
-
-        RE.captures_iter(base)
-            .map(|m| {
-                (
-                    m.name("key").unwrap().as_str().to_string(),
-                    m.name("value").unwrap().as_str().to_string(),
-                )
+    match resp.status() {
+        StatusCode::UNAUTHORIZED => resp
+            .headers()
+            .get(AUTHN_HEADER)
+            .ok_or_else(|| {
+                anyhow!("Expected www-authenticate header to identify authentication server")
             })
-            .collect()
+            .and_then(|v| {
+                v.to_str()
+                    .map_err(|e| anyhow!("Failed to read auth header: {:?}", e))
+            })
+            .map(|s| s.to_string()),
+        StatusCode::OK => Ok(String::new()),
+        _ => Err(anyhow!("Unexpected status code {}", resp.status())),
     }
+}
+
+fn get_bearer_param_map(www_authenticate_header: &str) -> HashMap<String, String> {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r#"(?P<key>[^=]+)="(?P<value>.*?)",? *"#).unwrap();
+    }
+    let base = www_authenticate_header
+        .strip_prefix("Bearer ")
+        .unwrap_or("");
+
+    RE.captures_iter(base)
+        .map(|m| {
+            (
+                m.name("key").unwrap().as_str().to_string(),
+                m.name("value").unwrap().as_str().to_string(),
+            )
+        })
+        .collect()
+}
+
+async fn get_bearer_auth_token(
+    cl: &reqwest::Client,
+    www_authenticate_header: &str,
+    auth: &RegistryProxyConfig,
+) -> Result<String> {
+    let mut bearer_param_map = get_bearer_param_map(www_authenticate_header);
+    info!("bearer param map: {:?}", bearer_param_map);
+    let realm = bearer_param_map
+        .get("realm")
+        .cloned()
+        .ok_or_else(|| anyhow!("Expected realm key in authenticate header"))?;
+
+    bearer_param_map.remove("realm");
+    info!("Realm is {}", realm);
+    let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
+
+    if let Some(u) = &auth.username {
+        info!("Attempting proxy authentication with user {}", u);
+        request = request.basic_auth(u, auth.password.as_ref());
+    }
+
+    let resp = request
+        .send()
+        .await
+        .map_err(|e| anyhow!("Failed to send authenticate to {} request: {}", realm, e))?;
+    info!("resp: {:?}", resp);
+    if !resp.status().is_success() {
+        return Err(anyhow!("Failed to authenticate to {}", realm));
+    }
+
+    let resp_json = resp
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| anyhow!("Failed to deserialize auth response {}", e))?;
+
+    resp_json
+        .get("access_token")
+        .or_else(|| resp_json.get("token"))
+        .and_then(|s| s.as_str())
+        .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
+        .ok_or_else(|| anyhow!("Failed to find auth token in auth repsonse"))
 }
 
 #[cfg(test)]
