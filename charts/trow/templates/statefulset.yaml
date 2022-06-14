@@ -25,19 +25,19 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
-          - "--no-tls" 
-          - "-n" 
+          - "--no-tls"
+          - "-n"
           - {{ .Values.trow.domain | quote }}
           {{- if and (.Values.trow.user) (.Values.trow.password) }}
-          - "-u" 
-          - {{ .Values.trow.user | quote }} 
-          - "--password-file" 
+          - "-u"
+          - {{ .Values.trow.user | quote }}
+          - "--password-file"
           - "/etc/trow/pass"
           {{- end }}
-        {{- with .Values.trow.validation }} 
-          {{- if .proxyDockerHub }}
-          - "--proxy-docker-hub"
+          {{- if (not (empty .Values.trow.proxyRegistries)) }}
+          - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
           {{- end }}
+        {{- with .Values.trow.validation }}
           {{- if .allowDocker }}
           - "--allow-docker-official"
           {{- end }}
@@ -67,20 +67,29 @@ spec:
         volumeMounts:
         - name: data-vol
           mountPath: /data
-    {{- if and (.Values.trow.user) (.Values.trow.password) }}
+      {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
           mountPath: /etc/trow
           readOnly: true
-    {{- end}}
-    {{- if and (.Values.trow.user) (.Values.trow.password) }}
+      {{- end}}
+      - name: trow-pass
+          mountPath: /etc/trow
+          readOnly: true
+
       volumes:
+      {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
           secret:
             secretName: {{ include "trow.fullname" . }}-password
             items:
               - key: pass
                 path: pass
-    {{- end}}
+      {{- end}}
+      {{- if (not (empty .Values.trow.proxyRegistries)) }}
+        - name: trow-proxy-cfg
+          secret:
+            secretName: {{ include "trow.fullname" . }}-proxy-cfg
+      {{- end }}
       securityContext:
         runAsUser: 333333
         runAsGroup: 333333
