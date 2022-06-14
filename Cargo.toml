@@ -48,6 +48,8 @@ sha2 = "0.10"
 hex = "0.4"
 thiserror = "1.0"
 rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", branch = "master" }
+kube = {version="0.73", features=["admission"]}
+k8s-openapi = {version="0.15.0", features=["v1_23"]}
 
 [dev-dependencies]
 quickcheck = "1.0"

@@ -1,4 +1,4 @@
-use crate::registry_interface::{validation, Digest};
+use crate::registry_interface::Digest;
 
 use derive_more::Display;
 use rocket::Responder;
@@ -190,16 +190,6 @@ impl TagList {
     pub fn raw(self) -> Vec<String> {
         self.list
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct AdmissionReview {
-    //TODO: Get rid of stringly typing
-    pub api_version: String,
-    pub kind: String,
-    pub request: Option<validation::AdmissionRequest>,
-    pub response: Option<validation::AdmissionResponse>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

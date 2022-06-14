@@ -192,15 +192,12 @@ service Registry {
  * In future, we could directly use k8s types, but I'd rather leave that to a higher level.
  */
 message AdmissionRequest {
-
   repeated string images = 1;
   string namespace = 2;
-  //TODO: should be enum
-  string operation = 3;
   //Host names that the Trow should consider "local" for figuring out if we host the given
   //images. As there might be upstream proxies etc it seemed wise to allow this to be
   //configured, but be aware that there are security implications.
-  repeated string host_names = 4;
+  repeated string host_names = 3;
 }
 
 //Mutate will require patch or equivalent

@@ -10,13 +10,13 @@ use rocket::State;
 use rocket::{catch, catchers, get, routes};
 use std::str;
 
+mod admission;
 mod blob;
 mod catalog;
 mod health;
 mod manifest;
 mod metrics;
 mod readiness;
-mod validation;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
@@ -75,7 +75,7 @@ pub fn routes() -> Vec<rocket::Route> {
         catalog::get_manifest_history_3level,
         catalog::get_manifest_history_4level,
         catalog::get_manifest_history_5level,
-        validation::validate_image,
+        admission::validate_image,
         health::healthz,
         readiness::readiness,
         metrics::metrics
