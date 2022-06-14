@@ -184,7 +184,7 @@ impl TrowBuilder {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
             .unwrap_or_else(|e| panic!("Could not read file `{}`: {}", config_file, e));
-        let config = serde_json::from_str::<Vec<RegistryProxyConfig>>(&config_str).unwrap();
+        let config = serde_yaml::from_str::<Vec<RegistryProxyConfig>>(&config_str).unwrap();
         self.config.proxy_registry_config = config;
         self
     }
