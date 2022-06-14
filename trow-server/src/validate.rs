@@ -1,3 +1,6 @@
+use anyhow::{anyhow, Result};
+use const_format::formatcp;
+use lazy_static::lazy_static;
 use log::info;
 use tonic::{Request, Response, Status};
 
@@ -6,6 +9,25 @@ use crate::server::trow_server::{AdmissionRequest, AdmissionResponse};
 use crate::server::{Image, TrowServer};
 
 const DOCKER_HUB_HOSTNAME: &str = "docker.io";
+
+/// The regex validates an image reference.
+/// It returns `name`, `tag` and `digest`.
+///
+/// From:
+/// https://github.com/distribution/distribution/blob/91f33cb5c01ac8eecf4bc721994bcdbb9fb63ae7/reference/regexp.go
+/// https://github.com/distribution/distribution/blob/b5e2f3f33dbc80d2c40b5d550541467477d5d36e/reference/reference.go
+const fn get_image_ref_regex() -> &'static str {
+    const SEPARATOR: &str = "(?:[._]|__|[-]*)";
+    const ALPHANUMERIC: &str = "[a-z0-9]+";
+    const DOMAIN_COMPONENT: &str = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
+    const NAME_COMPONENT: &str = formatcp!("{ALPHANUMERIC}(?:{SEPARATOR}{ALPHANUMERIC})*");
+    const DOMAIN: &str = formatcp!("{DOMAIN_COMPONENT}(?:[.]{DOMAIN_COMPONENT})*(?::[0-9]+)?");
+    const DIGEST: &str = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
+    const TAG: &str = r#"[\w][\w.-]{0,127}"#;
+    const NAME: &str = formatcp!("(?:{DOMAIN}/)?{NAME_COMPONENT}(/{NAME_COMPONENT})*");
+
+    formatcp!("^(?P<name>{NAME})(?::(?P<tag>{TAG}))?(?:@(?P<digest>{DIGEST}))?$")
+}
 
 /*
  * Current function is based on old Docker code to parse image names. There is a newer
@@ -21,45 +43,55 @@ const DOCKER_HUB_HOSTNAME: &str = "docker.io";
  *
  * The tests should clarify a bit.
  */
-fn parse_image(image_str: &str) -> Image {
+fn parse_image(image_str: &str) -> Result<Image> {
+    lazy_static! {
+        static ref RE: regex::Regex = regex::RegexBuilder::new(get_image_ref_regex())
+            .size_limit(1024*1024) // 1MB limit (complex regex can explode in size)
+            .unicode(false) // unicode is not allowed in image references
+            .build().unwrap();
+    };
+
+    let captures = RE
+        .captures(image_str)
+        .ok_or_else(|| anyhow!("Invalid image ref: `{}`", image_str))?;
+
+    let name = captures.name("name").unwrap().as_str();
+
     let host;
-    let after_host;
-    let repo;
-    let tag;
-
-    match image_str.find('/') {
-        Some(i) => {
-            let left = image_str.get(..i).unwrap();
-            if !(left.starts_with("localhost") || left.contains(':') || left.contains('.')) {
-                host = DOCKER_HUB_HOSTNAME;
-                after_host = image_str;
-            } else {
-                host = left;
-                after_host = image_str.get((i + 1)..).unwrap();
-            }
-        }
-        None => {
-            host = DOCKER_HUB_HOSTNAME;
-            after_host = image_str;
-        }
+    let mut repo;
+    // https://github.com/distribution/distribution/blob/6affafd1f030087d88f88841bf66a8abe2bf4d24/reference/normalize.go#L90
+    let i = name.find('/').unwrap_or(0);
+    if i == 0
+        || (!name[..i].contains(['.', ':'])
+            && &name[..i] != "localhost"
+            && name[..i].to_lowercase() == name[..i])
+    {
+        host = DOCKER_HUB_HOSTNAME;
+        repo = name.to_string();
+    } else {
+        host = &name[..i];
+        repo = name[i + 1..].to_string();
     }
 
-    match after_host.find(':') {
-        None => {
-            repo = after_host;
-            tag = "latest";
-        }
-        Some(i) => {
-            repo = after_host.get(..i).unwrap();
-            tag = after_host.get((i + 1)..).unwrap();
-        }
+    let tag = match captures.name("digest") {
+        Some(match_) => match_.as_str(),
+        None => match captures.name("tag") {
+            Some(match_) => match_.as_str(),
+            None => "latest",
+        },
+    };
+
+    // Handle images like ubuntu:latest, which is actually library/ubuntu:latest
+    // Also handle registry-1.docker.io as well as docker.io
+    if host.ends_with(DOCKER_HUB_HOSTNAME) && !repo.contains('/') {
+        repo = format!("library/{}", repo);
     }
 
-    Image {
+    Ok(Image {
         host: host.to_string(),
-        repo: repo.to_string(),
+        repo,
         tag: tag.to_string(),
-    }
+    })
 }
 
 #[allow(clippy::needless_return)]
@@ -70,7 +102,7 @@ fn check_image(
     deny: &dyn Fn(&Image) -> bool,
     allow: &dyn Fn(&Image) -> bool,
 ) -> (bool, String) {
-    let image = parse_image(&image_raw);
+    let image = parse_image(image_raw).unwrap();
     if local_hosts.contains(&image.host) {
         //local image
         if image_exists(&image) {
@@ -149,16 +181,16 @@ mod test {
 
     #[test]
     fn test_parse() {
-        let mut ret = parse_image("debian");
+        let mut ret = parse_image("debian").unwrap();
         assert_eq!(
             ret,
             Image {
                 host: "docker.io".to_string(),
-                repo: "debian".to_string(),
+                repo: "library/debian".to_string(),
                 tag: "latest".to_string(),
             }
         );
-        ret = parse_image("amouat/network-utils");
+        ret = parse_image("amouat/network-utils").unwrap();
         assert_eq!(
             ret,
             Image {
@@ -167,7 +199,7 @@ mod test {
                 tag: "latest".to_string(),
             }
         );
-        ret = parse_image("amouat/network-utils:beta");
+        ret = parse_image("amouat/network-utils:beta").unwrap();
         assert_eq!(
             ret,
             Image {
@@ -176,8 +208,16 @@ mod test {
                 tag: "beta".to_string(),
             }
         );
-
-        ret = parse_image("localhost:8080/myimage:test");
+        ret = parse_image("registry-1.docker.io/mandy").unwrap();
+        assert_eq!(
+            ret,
+            Image {
+                host: "registry-1.docker.io".to_string(),
+                repo: "library/mandy".to_string(),
+                tag: "latest".to_string(),
+            }
+        );
+        ret = parse_image("localhost:8080/myimage:test").unwrap();
         assert_eq!(
             ret,
             Image {
@@ -186,7 +226,7 @@ mod test {
                 tag: "test".to_string(),
             }
         );
-        ret = parse_image("localhost:8080/mydir/myimage:test");
+        ret = parse_image("localhost:8080/mydir/myimage:test").unwrap();
         assert_eq!(
             ret,
             Image {
@@ -196,13 +236,24 @@ mod test {
             }
         );
 
-        ret = parse_image("quay.io/mydir/another/myimage:test");
+        ret = parse_image("quay.io/mydir/another/myimage:test").unwrap();
         assert_eq!(
             ret,
             Image {
                 host: "quay.io".to_string(),
                 repo: "mydir/another/myimage".to_string(),
                 tag: "test".to_string(),
+            }
+        );
+
+        ret = parse_image("quay.io:99/myimage:heh@sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5").unwrap();
+        assert_eq!(
+            ret,
+            Image {
+                host: "quay.io:99".to_string(),
+                repo: "myimage".to_string(),
+                tag: "sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5"
+                    .to_string(),
             }
         );
     }
@@ -217,7 +268,7 @@ mod test {
             &|_| false,
             &|_| false,
         );
-        assert_eq!(true, v); //Easier to read than assert!(!v)
+        assert_eq!(true, v);
 
         //Image refers to this registry but not present in registry (so deny)
         let (v, _) = check_image(

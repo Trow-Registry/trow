@@ -37,6 +37,7 @@ regex = "1.5.0"
 rusoto_core = "0.48"
 rusoto_ecr = "0.48"
 base64 = "0.13.0"
+const_format = "0.2.24"
 
 [build-dependencies]
 tonic-build = "0.6"
