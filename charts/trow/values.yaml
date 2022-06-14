@@ -21,6 +21,10 @@ trow:
     allowImages: []
     disallowLocalPrefixes: []
     disallowLocalImages: []
+    patch:
+      image:
+        image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1
+        imagePullPolicy: IfNotPresent
   # proxyRegistries: |
   #   - alias: docker
   #     host: registry-1.docker.io

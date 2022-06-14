@@ -20,8 +20,27 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+    {{- if .Values.trow.validation.enabled }}
+      initContainers:
+      # TODO: remove this thing :'c
+      - name: trow-webhook-cert-translate
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - sh
+          - -c
+          - |
+            cp /etc/trow/webhook-cert-ecc/cert /etc/trow/webhook-cert && \
+            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/key -out /etc/trow/webhook-cert/key
+        volumeMounts:
+        - name: webhook-cert-translated
+          mountPath: /etc/trow/webhook-cert
+        - name: webhook-cert-ecc
+          mountPath: /etc/trow/webhook-cert-ecc
+          readOnly: true
+    {{- end }}
       containers:
-      - name: trow-pod
+      - name: trow
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
@@ -33,6 +52,41 @@ spec:
           - {{ .Values.trow.user | quote }}
           - "--password-file"
           - "/etc/trow/pass"
+          {{- end }}
+          {{- if (not (empty .Values.trow.proxyRegistries)) }}
+          - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
+          {{- end }}
+        ports:
+        - name: http
+          containerPort: 8000
+        volumeMounts:
+        - name: data-vol
+          mountPath: /data
+      {{- if and (.Values.trow.user) (.Values.trow.password) }}
+        - name: trow-pass
+          mountPath: /etc/trow/pass
+          subPath: pass
+          readOnly: true
+      {{- end}}
+      {{- if (not (empty .Values.trow.proxyRegistries)) }}
+        - name: trow-proxy-cfg
+          mountPath: /etc/trow/proxy-registries.yaml
+          subPath: proxy-registries.yaml
+          readOnly: true
+      {{- end}}
+    {{- if .Values.trow.validation.enabled }}
+      - name: trow-webhook
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+          - "--cert=/etc/trow/webhook-cert/cert"
+          - "--key=/etc/trow/webhook-cert/key"
+          - "-n"
+          - {{ .Values.trow.domain | quote }}
+          {{- if and (.Values.trow.user) (.Values.trow.password) }}
+          - "-u"
+          - {{ .Values.trow.user | quote }}
+          - "--password-file=/etc/trow/pass"
           {{- end }}
           {{- if (not (empty .Values.trow.proxyRegistries)) }}
           - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
@@ -62,28 +116,37 @@ spec:
           {{- end }}
         {{- end }}
         ports:
-        - name: http
-          containerPort: 8000
+        - name: webhook
+          containerPort: 8443
         volumeMounts:
         - name: data-vol
           mountPath: /data
+        - name: webhook-cert-translated
+          mountPath: /etc/trow/webhook-cert
+          readOnly: true
       {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
-          mountPath: /etc/trow
+          mountPath: /etc/trow/pass
+          subPath: pass
           readOnly: true
       {{- end}}
-      - name: trow-pass
-          mountPath: /etc/trow
+      {{- if (not (empty .Values.trow.proxyRegistries)) }}
+        - name: trow-proxy-cfg
+          mountPath: /etc/trow/proxy-registries.yaml
+          subPath: proxy-registries.yaml
           readOnly: true
-
+      {{- end}}
+    {{- end }}
       volumes:
+        - name: webhook-cert-ecc
+          secret:
+            secretName: {{ include "trow.fullname" . }}-admission
+        - name: webhook-cert-translated
+          emptyDir: {}
       {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
           secret:
             secretName: {{ include "trow.fullname" . }}-password
-            items:
-              - key: pass
-                path: pass
       {{- end}}
       {{- if (not (empty .Values.trow.proxyRegistries)) }}
         - name: trow-proxy-cfg

@@ -4,8 +4,12 @@ metadata:
   name: {{ include "trow.fullname" . }}
   labels:
     {{- include "trow.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: {{ .Values.service.type }}
+  {{- if and (eq .Values.service.type "ClusterIP") (not (empty .Values.service.clusterIP)) }}
+  clusterIP: {{ .Values.service.clusterIP }}
+  {{- end }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: http
@@ -13,5 +17,6 @@ spec:
       {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePort)) }}
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
+
   selector:
     {{- include "trow.selectorLabels" . | nindent 4 }}
