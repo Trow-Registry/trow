@@ -301,7 +301,9 @@ impl AdmissionValidation for ClientInterface {
     ) -> AdmissionResponse {
         self.validate_admission_internal(admission_req, host_names)
             .await
-            .unwrap_or_else(|_| AdmissionResponse::from(admission_req).deny("Internal error"))
+            .unwrap_or_else(|e| {
+                AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
+            })
     }
 }
 

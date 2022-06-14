@@ -33,7 +33,7 @@ use uuid::Uuid;
 use client_interface::ClientInterface;
 use fairings::conditional_fairing::AttachConditionalFairing;
 
-use trow_server::RegistryProxyConfig;
+use trow_server::{ImageValidationConfig, RegistryProxyConfig};
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -58,10 +58,7 @@ pub struct TrowConfig {
     grpc: GrpcConfig,
     host_names: Vec<String>,
     proxy_registry_config: Vec<RegistryProxyConfig>,
-    allow_prefixes: Vec<String>,
-    allow_images: Vec<String>,
-    deny_prefixes: Vec<String>,
-    deny_images: Vec<String>,
+    image_validation_config: Option<ImageValidationConfig>,
     dry_run: bool,
     max_manifest_size: u32,
     max_blob_size: u32,
@@ -101,10 +98,7 @@ fn init_trow_server(
         &config.data_dir,
         config.grpc.listen.parse::<std::net::SocketAddr>()?,
         config.proxy_registry_config,
-        config.allow_prefixes,
-        config.allow_images,
-        config.deny_prefixes,
-        config.deny_images,
+        config.image_validation_config,
     );
     //TODO: probably shouldn't be reusing this cert
     let ts = if let Some(tls) = config.tls {
@@ -148,10 +142,6 @@ impl TrowBuilder {
         addr: NetAddr,
         listen: String,
         host_names: Vec<String>,
-        allow_prefixes: Vec<String>,
-        allow_images: Vec<String>,
-        deny_prefixes: Vec<String>,
-        deny_images: Vec<String>,
         dry_run: bool,
         cors: bool,
         max_manifest_size: u32,
@@ -165,10 +155,7 @@ impl TrowBuilder {
             grpc: GrpcConfig { listen },
             host_names,
             proxy_registry_config: Vec::new(),
-            allow_prefixes,
-            allow_images,
-            deny_prefixes,
-            deny_images,
+            image_validation_config: None,
             dry_run,
             max_manifest_size,
             max_blob_size,
@@ -186,6 +173,15 @@ impl TrowBuilder {
             .unwrap_or_else(|e| panic!("Could not read file `{}`: {}", config_file, e));
         let config = serde_yaml::from_str::<Vec<RegistryProxyConfig>>(&config_str).unwrap();
         self.config.proxy_registry_config = config;
+        self
+    }
+
+    pub fn with_image_validation(&mut self, config_file: impl AsRef<str>) -> &mut Self {
+        let config_file = config_file.as_ref();
+        let config_str = fs::read_to_string(config_file)
+            .unwrap_or_else(|e| panic!("Could not read file `{}`: {}", config_file, e));
+        let config = serde_yaml::from_str::<ImageValidationConfig>(&config_str).unwrap();
+        self.config.image_validation_config = Some(config);
         self
     }
 
@@ -263,22 +259,19 @@ impl TrowBuilder {
             "  These host names will be considered local (refer to this registry): {:?}",
             self.config.host_names
         );
-        println!(
-            "  Images with these prefixes are explicitly allowed: {:?}",
-            self.config.allow_prefixes
-        );
-        println!(
-            "  Images with these names are explicitly allowed: {:?}",
-            self.config.allow_images
-        );
-        println!(
-            "  Local images with these prefixes are explicitly denied: {:?}",
-            self.config.deny_prefixes
-        );
-        println!(
-            "  Local images with these names are explicitly denied: {:?}\n",
-            self.config.deny_images
-        );
+
+        let valid_cfg = self.config.image_validation_config.as_ref();
+
+        let allowed = valid_cfg
+            .map(|cfg| cfg.allow.clone())
+            .unwrap_or_else(|| vec![]);
+        let denied = valid_cfg
+            .map(|cfg| cfg.deny.clone())
+            .unwrap_or_else(|| vec![]);
+
+        println!("  These repositories are explicitly allowed: {:?}", allowed);
+
+        println!("  These repositories are explicitly denied: {:?}", denied);
 
         if !self.config.proxy_registry_config.is_empty() {
             println!("  Proxy registries configured:");

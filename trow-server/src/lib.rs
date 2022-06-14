@@ -1,13 +1,12 @@
 pub mod digest;
+mod image;
 pub mod manifest;
 mod metrics;
 mod proxy_auth;
 mod server;
 mod temporary_file;
-mod validate;
 
 use log::{debug, warn};
-use serde::{Deserialize, Serialize};
 use std::future::Future;
 use tokio::runtime::Runtime;
 use tonic::transport::Server;
@@ -16,22 +15,14 @@ use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RegistryProxyConfig {
-    pub alias: String,
-    pub host: String,
-    username: Option<String>,
-    password: Option<String>,
-}
+pub use image::ImageValidationConfig;
+pub use proxy_auth::RegistryProxyConfig;
 
 pub struct TrowServerBuilder {
     data_path: String,
     listen_addr: std::net::SocketAddr,
     proxy_registry_config: Vec<RegistryProxyConfig>,
-    allow_prefixes: Vec<String>,
-    allow_images: Vec<String>,
-    deny_prefixes: Vec<String>,
-    deny_images: Vec<String>,
+    image_validation_config: Option<ImageValidationConfig>,
     tls_cert: Option<Vec<u8>>,
     tls_key: Option<Vec<u8>>,
     root_key: Option<Vec<u8>>,
@@ -41,19 +32,13 @@ pub fn build_server(
     data_path: &str,
     listen_addr: std::net::SocketAddr,
     proxy_registry_config: Vec<RegistryProxyConfig>,
-    allow_prefixes: Vec<String>,
-    allow_images: Vec<String>,
-    deny_prefixes: Vec<String>,
-    deny_images: Vec<String>,
+    image_validation_config: Option<ImageValidationConfig>,
 ) -> TrowServerBuilder {
     TrowServerBuilder {
         data_path: data_path.to_string(),
         listen_addr,
         proxy_registry_config,
-        allow_prefixes,
-        allow_images,
-        deny_prefixes,
-        deny_images,
+        image_validation_config,
         tls_cert: None,
         tls_key: None,
         root_key: None,
@@ -93,10 +78,7 @@ impl TrowServerBuilder {
         let ts = TrowServer::new(
             &self.data_path,
             self.proxy_registry_config,
-            self.allow_prefixes,
-            self.allow_images,
-            self.deny_prefixes,
-            self.deny_images,
+            self.image_validation_config,
         )
         .expect("Failure configuring Trow Server");
 

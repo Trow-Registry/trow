@@ -3,11 +3,9 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
-
-    use environment::Environment;
-
     use crate::common;
 
+    use environment::Environment;
     use reqwest::StatusCode;
     use std::fs::{self, File};
     use std::io::{Read, Write};
@@ -32,13 +30,13 @@ mod interface_tests {
             .unwrap()
             .write_all(
                 r#"
-            [
-                {"alias": "docker", "host": "registry-1.docker.io"},
-                {"alias": "nvcr","host": "nvcr.io"},
-                {"alias": "quay","host": "quay.io"}
-            ]
-        "#
-                .as_bytes(),
+            - alias: docker
+              host: registry-1.docker.io
+            - alias: nvcr
+              host: nvcr.io
+            - alias: quay
+              host: quay.io"#
+                    .as_bytes(),
             )
             .unwrap();
 

@@ -8,7 +8,7 @@ mod validation_tests {
     use environment::Environment;
     use reqwest::StatusCode;
     use std::fs::{self, File};
-    use std::io::Read;
+    use std::io::{Read, Write};
     use std::process::Child;
     use std::process::Command;
     use std::thread;
@@ -19,10 +19,30 @@ mod validation_tests {
     struct TrowInstance {
         pid: Child,
     }
+
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
-
     async fn start_trow() -> TrowInstance {
+        let config_file_path = "/tmp/trow-proxy-cfg.json";
+        File::create("/tmp/trow-proxy-cfg.json")
+            .unwrap()
+            .write_all(
+                r#"
+              default: Deny
+              allow:
+                - registry-1.docker.io
+                - nvcr.io
+                - quay.io
+                - localhost:8000
+                - trow.test
+                - k8s.gcr.io
+              deny:
+                - localhost:8000/secret/shine-box
+              "#
+                .as_bytes(),
+            )
+            .unwrap();
+
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
@@ -30,14 +50,8 @@ mod validation_tests {
             .arg("--")
             .arg("--names")
             .arg("trow.test")
-            .arg("--allow-prefixes")
-            .arg("docker.io/amouat/")
-            .arg("--allow-images")
-            .arg("docker.io/debian:latest,quay.io/coreos/etcd:3.4")
-            .arg("--disallow-local-prefixes")
-            .arg("bla/, testy")
-            .arg("--disallow-local-images")
-            .arg("not:me, or/this:one")
+            .arg("--image-validation-config-file")
+            .arg(config_file_path)
             .spawn()
             .expect("failed to start");
 
@@ -297,39 +311,24 @@ mod validation_tests {
         //It might be possible to improve things with a thread_local
         let _trow = start_trow().await;
         validate_example(&client).await;
-        test_image(&client, "trow.test/am/test:tag", false).await;
-        //push image and test again
-        common::upload_layer(&client, "am/test", "tag").await;
+
+        // explicitely allowed
         test_image(&client, "trow.test/am/test:tag", true).await;
-
-        //k8s images should be allowed by default
         test_image(&client, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true).await;
-
-        //allow prefix example
         test_image(&client, "docker.io/amouat/myimage:test", true).await;
-        test_image(&client, "amouat/myimage:test", true).await;
-        test_image(&client, "docker.io/someone/myimage:test", false).await;
+        test_image(&client, "http://localhost:8000/hello/world", true).await;
 
-        //allow image example
-        test_image(&client, "docker.io/debian:latest", true).await;
-        test_image(&client, "debian", true).await;
-        test_image(&client, "quay.io/coreos/etcd:3.4", true).await;
-        test_image(&client, "quay.io/coreos/etcd:3.4.2", false).await;
+        // explicitely denied
+        test_image(&client, "localhost:8000/secret/shine-box", true).await;
+        test_image(&client, "http://localhost:8000/secret/shine-box", true).await;
+        test_image(&client, "https://localhost:8000/secret/shine-box", true).await;
 
-        //deny prefix example
-        common::upload_layer(&client, "bla/test", "tag").await;
-        common::upload_layer(&client, "blatest", "tag").await;
-        test_image(&client, "trow.test/bla/test:tag", false).await;
-        test_image(&client, "trow.test/blatest:tag", true).await;
-        common::upload_layer(&client, "testy/test", "tag").await;
-        common::upload_layer(&client, "testytest", "tag").await;
-        test_image(&client, "trow.test/testy/test:tag", false).await;
-        test_image(&client, "trow.test/testytest:tag", false).await;
+        // default denied
+        test_image(&client, "virus.land.cc/not/suspect", false).await;
 
-        //deny image example
-        common::upload_layer(&client, "not", "me").await;
-        common::upload_layer(&client, "or/this", "one").await;
-        test_image(&client, "trow.test/not:me", false).await;
-        test_image(&client, "trow.test/or/this:one", false).await;
+        // invalid image ref
+        test_image(&client, "http://nope", false).await;
+        test_image(&client, "example.com", false).await;
+        test_image(&client, "docker.io", false).await;
     }
 }

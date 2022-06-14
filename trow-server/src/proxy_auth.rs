@@ -10,10 +10,10 @@ use reqwest::StatusCode;
 use reqwest::{self, Method};
 use rusoto_core::Region;
 use rusoto_ecr::{Ecr, EcrClient};
+use serde::{Deserialize, Serialize};
 
+use crate::image::Image;
 use crate::server::create_accept_header;
-use crate::server::Image;
-use crate::RegistryProxyConfig;
 
 const AUTHN_HEADER: &str = "www-authenticate";
 
@@ -22,6 +22,14 @@ pub enum HttpAuth {
     Basic(String, Option<String>),
     Bearer(String),
     None,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RegistryProxyConfig {
+    pub alias: String,
+    pub host: String,
+    username: Option<String>,
+    password: Option<String>,
 }
 
 /// Wrapper around `reqwest::Client` that automagically handles authentication
@@ -37,12 +45,12 @@ impl ProxyClient {
 
         let authn_header = get_www_authenticate_header(&base_client, proxy_image).await?;
 
-        if proxy_image.host.contains(".dkr.ecr.")
-            && proxy_image.host.contains(".amazonaws.com")
+        if proxy_cfg.host.contains(".dkr.ecr.")
+            && proxy_cfg.host.contains(".amazonaws.com")
             && matches!(&proxy_cfg.username, Some(u) if u == "AWS")
             && proxy_cfg.password.is_none()
         {
-            let passwd = get_aws_ecr_password_from_env(&proxy_image.host)
+            let passwd = get_aws_ecr_password_from_env(&proxy_cfg.host)
                 .await
                 .context("Could not fetch password to ECR registry")?;
             proxy_cfg.password = Some(passwd);
@@ -263,11 +271,7 @@ mod tests {
             password: None,
         };
 
-        let proxy_image = Image {
-            host: format!("{}/v2", &proxy_cfg.host),
-            repo: "hello_world".to_string(),
-            tag: "latest".to_string(),
-        };
+        let proxy_image = Image::new(&proxy_cfg.host, "hello_world".into(), "latest".into());
 
         (server, proxy_cfg, proxy_image)
     }

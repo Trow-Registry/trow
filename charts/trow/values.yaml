@@ -15,12 +15,16 @@ trow:
   # password: password
   validation:
     enabled: false
-    allowDocker: false
-    allowKubernetes: true
-    allowPrefixes: []
-    allowImages: []
-    disallowLocalPrefixes: []
-    disallowLocalImages: []
+    ## The validation webhook need to be configured.
+    ## Note: it runs AFTER mutation webhooks.
+    ## Example:
+    # config: |
+    #   default: Deny # Deny or Allow
+    #   allow:
+    #     - registry-1.docker.io
+    #   deny:
+    #     - localhost
+    #     - registry-1.docker.io/library/nginx
     patch:
       image:
         image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1

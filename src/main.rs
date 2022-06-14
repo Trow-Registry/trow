@@ -80,57 +80,6 @@ fn parse_args() -> ArgMatches {
             .takes_value(false),
         )
         .arg(
-            Arg::new("allow-docker-official")
-            .long("allow-docker-official")
-            .value_name("allow_docker_official")
-            .help("Docker official images (e.g. the debian base image) will be allowed in validation callbacks.")
-            .takes_value(false)
-        )
-        .arg(
-            Arg::new("deny-k8s-images")
-            .long("deny-k8s-images")
-            .value_name("deny_k8s_images")
-            .help("By default, validation callbacks will allow various Kubernetes system images by default.
-This option will deny those images; be careful as this may disable cluster installation and updates.")
-            .takes_value(false)
-        )
-        .arg(
-            Arg::new("allow-prefixes")
-            .long("allow-prefixes")
-            .value_name("allow_prefixes")
-            .help("Images that begin with any of the listed prefixes will be allowed in validation callbaks.
-Separate with a comma or use quotes and spaces.
-For example 'quay.io/coreos,myhost.com/' will match quay.io/coreos/etcd and myhost.com/myimage/myrepo:tag.
-Use docker.io as the hostname for the Docker Hub.")
-            .takes_value(true)
-        )
-        .arg(
-            Arg::new("allow-images")
-            .long("allow-images")
-            .value_name("allow_images")
-            .help("Images that match a full name in the list will be allowed in validation callbacks.
-Separate with a comma or use quotes and spaces. Include the hostname.
-For example 'quay.io/coreos/etcd:latest'. Use docker.io as the hostname for the Docker Hub.")
-            .takes_value(true)
-        )
-
-        .arg(
-            Arg::new("disallow-local-prefixes")
-            .long("disallow-local-prefixes")
-            .value_name("disallow_local_prefixes")
-            .help("Disallow local images that match the prefix _not_ including any host name.
-For example 'beta' will match myhost.com/beta/myapp assuming myhost.com is the name of this registry.")
-            .takes_value(true)
-        )
-        .arg(
-            Arg::new("disallow-local-images")
-            .long("disallow-local-images")
-            .value_name("disallow_local_images")
-            .help("Disallow local images that match the full name _not_ including any host name.
-For example 'beta/myapp:tag' will match myhost.com/beta/myapp:tag assuming myhost.com is the name of this registry.")
-            .takes_value(true)
-        )
-        .arg(
             Arg::new("user")
             .long("user")
             .short('u')
@@ -165,10 +114,17 @@ Must be used with --user")
             .takes_value(false)
         )
         .arg(
+            Arg::new("image-validation-config-file")
+            .long("image-validation-config-file")
+            .value_name("FILE")
+            .help("Load a YAML file containing the config to validate container images through an admission webhook.")
+            .takes_value(true)
+        )
+        .arg(
             Arg::new("proxy-registry-config-file")
             .long("proxy-registry-config-file")
             .value_name("FILE")
-            .help("Load a JSON file containing the config to proxy repos at f/<registry_alias>/<repo_name> to <registry>/<repo_name>.")
+            .help("Load a YAML file containing the config to proxy repos at f/<registry_alias>/<repo_name> to <registry>/<repo_name>.")
             .takes_value(true)
         )
         .arg(
@@ -243,18 +199,6 @@ fn main() {
             x.parse().expect("Failed to parse max blob size")
         });
 
-    let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
-    if matches.is_present("allow-docker-official") {
-        allow_prefixes.push("docker.io/".to_owned());
-    }
-    if !matches.is_present("deny-k8s-images") {
-        allow_prefixes.push("k8s.gcr.io/".to_owned());
-        allow_prefixes.push("docker.io/containersol/trow".to_owned());
-    }
-    let allow_images = parse_list(matches.value_of("allow-images").unwrap_or(""));
-    let deny_prefixes = parse_list(matches.value_of("disallow-local-prefixes").unwrap_or(""));
-    let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
-
     let cors = matches.is_present("enable-cors");
 
     let addr = NetAddr {
@@ -266,10 +210,6 @@ fn main() {
         addr,
         "127.0.0.1:51000".to_string(),
         host_names,
-        allow_prefixes,
-        allow_images,
-        deny_prefixes,
-        deny_images,
         dry_run,
         cors,
         max_manifest_size,
@@ -313,6 +253,9 @@ fn main() {
     }
     if let Some(config_file) = matches.value_of("proxy-registry-config-file") {
         builder.with_proxy_registries(config_file);
+    }
+    if let Some(config_file) = matches.value_of("image-validation-config-file") {
+        builder.with_image_validation(config_file);
     }
 
     builder.start().unwrap_or_else(|e| {

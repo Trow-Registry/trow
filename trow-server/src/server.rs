@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fmt;
 use std::fs::{self, DirEntry, File};
 use std::io;
 use std::io::{BufRead, BufReader};
@@ -7,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::str;
 use std::sync::{Arc, RwLock};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
 use futures::future::try_join_all;
@@ -25,15 +24,15 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
+use self::trow_server::*;
 use crate::digest::sha256_tag_digest;
+use crate::image::Image;
 use crate::manifest::{manifest_media_type, FromJson, Manifest};
-use crate::metrics;
 use crate::proxy_auth::ProxyClient;
 use crate::server::trow_server::registry_server::Registry;
 use crate::temporary_file::TemporaryFile;
 use crate::RegistryProxyConfig;
-
-use self::trow_server::*;
+use crate::{metrics, ImageValidationConfig};
 
 pub mod trow_server {
     include!("../../trow-protobuf/out/trow.rs");
@@ -64,10 +63,7 @@ pub struct TrowServer {
     blobs_path: PathBuf,
     scratch_path: PathBuf,
     proxy_registry_config: Vec<RegistryProxyConfig>,
-    allow_prefixes: Vec<String>,
-    allow_images: Vec<String>,
-    deny_local_prefixes: Vec<String>,
-    deny_local_images: Vec<String>,
+    pub image_validation_config: Option<ImageValidationConfig>,
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
@@ -87,25 +83,6 @@ pub struct ProxyError {
 pub struct DigestValidationError {
     user_digest: String,
     actual_digest: String,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Image {
-    pub host: String, //Including port, docker.io by default
-    pub repo: String, //Between host and : including any /s
-    pub tag: String,  //Bit after the :, latest by default
-}
-
-impl fmt::Display for Image {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}/{}:{}", self.host, self.repo, self.tag)
-    }
-}
-
-impl Image {
-    pub fn get_manifest_url(&self) -> String {
-        format!("{}/{}/manifests/{}", self.host, self.repo, self.tag)
-    }
 }
 
 pub fn create_accept_header() -> HeaderMap {
@@ -248,24 +225,25 @@ impl TrowServer {
     pub fn new(
         data_path: &str,
         proxy_registry_config: Vec<RegistryProxyConfig>,
-        allow_prefixes: Vec<String>,
-        allow_images: Vec<String>,
-        deny_local_prefixes: Vec<String>,
-        deny_local_images: Vec<String>,
+        image_validation_config: Option<ImageValidationConfig>,
     ) -> Result<Self> {
         let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
         let scratch_path = create_path(data_path, UPLOADS_DIR)?;
         let blobs_path = create_path(data_path, BLOBS_DIR)?;
+
+        let mut internal_validation_cfg = None;
+        if let Some(cfg) = image_validation_config {
+            internal_validation_cfg =
+                Some(cfg.try_into().context("Invalid image validation config")?);
+        }
+
         let svc = TrowServer {
             active_uploads: Arc::new(RwLock::new(HashSet::new())),
             manifests_path,
             blobs_path,
             scratch_path,
             proxy_registry_config,
-            allow_prefixes,
-            allow_images,
-            deny_local_prefixes,
-            deny_local_images,
+            image_validation_config: internal_validation_cfg,
         };
         Ok(svc)
     }
@@ -383,23 +361,11 @@ impl TrowServer {
             let segments = repo_name.splitn(3, '/').collect::<Vec<_>>();
             debug_assert_eq!(segments[0], "f");
             let proxy_alias = segments[1].to_string();
-            let mut repo = segments[2].to_string();
+            let repo = segments[2].to_string();
 
             for proxy in self.proxy_registry_config.iter() {
                 if proxy.alias == proxy_alias {
-                    let mut host = proxy.host.clone();
-
-                    if proxy.host.contains("docker.io") && !repo.contains('/') {
-                        // handle images like "nginx:latest"
-                        repo = format!("library/{}", repo)
-                    }
-
-                    if !host.starts_with("http://") && !host.starts_with("https://") {
-                        host = format!("https://{}", host);
-                    }
-                    host = format!("{}/v2", host);
-                    let tag = reference.to_string();
-                    let image = Image { host, repo, tag };
+                    let image = Image::new(&proxy.host, repo, reference.into());
                     return Some((image, proxy.clone()));
                 }
             }
@@ -427,10 +393,7 @@ impl TrowServer {
             }
         };
 
-        let addr = format!(
-            "{}/{}/blobs/{}",
-            remote_image.host, remote_image.repo, digest
-        );
+        let addr = format!("{}/blobs/{}", remote_image.get_base_uri(), digest);
         info!("Downloading blob {}", addr);
         let resp = cl.authenticated_request(Method::GET, &addr).send().await?;
 
@@ -629,58 +592,6 @@ impl TrowServer {
         Ok(())
     }
 
-    //Support functions for validate, would like to move these
-    pub fn image_exists(&self, image: &Image) -> bool {
-        match self.get_path_for_manifest(&image.repo, &image.tag) {
-            Ok(f) => f.exists(),
-            Err(_) => false,
-        }
-    }
-
-    pub fn is_local_denied(&self, image: &Image) -> bool {
-        //Try matching both with and without host name
-        //Deny images are expected without host as always local
-        let full_name = format!("{}", image);
-        let name_without_host = format!("{}:{}", image.repo, image.tag);
-
-        for prefix in &self.deny_local_prefixes {
-            if full_name.starts_with(prefix) || name_without_host.starts_with(prefix) {
-                info!("Image {} matches prefix {} on deny list", image, prefix);
-                return true;
-            }
-        }
-
-        for name in &self.deny_local_images {
-            if &full_name == name || &name_without_host == name {
-                info!("Image {} matches image {} on deny list", image, name);
-                return true;
-            }
-        }
-
-        false
-    }
-
-    pub fn is_allowed(&self, image: &Image) -> bool {
-        //Have full names with host here
-        let name = format!("{}", image);
-
-        for prefix in &self.allow_prefixes {
-            if name.starts_with(prefix) {
-                info!("Image {} matches prefix {} on allow list", name, prefix);
-                return true;
-            }
-        }
-
-        for a_name in &self.allow_images {
-            if &name == a_name {
-                info!("Image {} matches image {} on allow list", name, a_name);
-                return true;
-            }
-        }
-
-        false
-    }
-
     fn is_writable_repo(&self, repo_name: &str) -> bool {
         if repo_name.starts_with(PROXY_DIR) {
             return false;
@@ -849,7 +760,6 @@ impl Registry for TrowServer {
 
         let mr = req.into_inner();
         metrics::TOTAL_MANIFEST_REQUESTS.inc();
-        // TODO refactor to return directly
         match self
             .create_manifest_read_location(mr.repo_name, mr.reference, true)
             .await
