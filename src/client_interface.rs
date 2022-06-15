@@ -740,7 +740,6 @@ impl ClientInterface {
                 .namespace
                 .clone()
                 .ok_or_else(|| anyhow!("Object has no namespace"))?,
-            host_names: host_names.to_vec(),
         };
 
         let internal_resp = self

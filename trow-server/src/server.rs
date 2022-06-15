@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::str;
 use std::sync::{Arc, RwLock};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
 use futures::future::try_join_all;
@@ -231,19 +231,13 @@ impl TrowServer {
         let scratch_path = create_path(data_path, UPLOADS_DIR)?;
         let blobs_path = create_path(data_path, BLOBS_DIR)?;
 
-        let mut internal_validation_cfg = None;
-        if let Some(cfg) = image_validation_config {
-            internal_validation_cfg =
-                Some(cfg.try_into().context("Invalid image validation config")?);
-        }
-
         let svc = TrowServer {
             active_uploads: Arc::new(RwLock::new(HashSet::new())),
             manifests_path,
             blobs_path,
             scratch_path,
             proxy_registry_config,
-            image_validation_config: internal_validation_cfg,
+            image_validation_config,
         };
         Ok(svc)
     }

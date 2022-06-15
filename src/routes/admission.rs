@@ -23,7 +23,7 @@ pub async fn validate_image(
             AdmissionResponse::invalid(format!("Invalid admission request: {}", e)).into_review()
         }
         Ok(req) => ci
-            .validate_admission(&req, &tc.host_names)
+            .validate_admission(&req, &tc.service_name)
             .await
             .into_review(),
     })

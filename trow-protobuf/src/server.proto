@@ -194,23 +194,16 @@ service Registry {
 message AdmissionRequest {
   repeated string images = 1;
   string namespace = 2;
-  //Host names that the Trow should consider "local" for figuring out if we host the given
-  //images. As there might be upstream proxies etc it seemed wise to allow this to be
-  //configured, but be aware that there are security implications.
-  repeated string host_names = 3;
 }
 
-//Mutate will require patch or equivalent
 message AdmissionResponse {
   bool is_allowed = 1;
-  //Reason blank if valid
   string reason = 2;
+  // only used for mutation
+  optional bytes patch = 3;
 }
 
 service AdmissionController{
-
   rpc ValidateAdmission (AdmissionRequest) returns (AdmissionResponse) {}
-  //TODO mutating admission controller to pin digests
-  //rpc MutateAdmission (AdmissionRequest) returns (AdmissionResponse) {}
-
+  rpc MutateAdmission (AdmissionRequest) returns (AdmissionResponse) {}
 }

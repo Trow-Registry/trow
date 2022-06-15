@@ -1,3 +1,4 @@
+mod admission;
 pub mod digest;
 mod image;
 pub mod manifest;
@@ -15,7 +16,7 @@ use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
 
-pub use image::ImageValidationConfig;
+pub use admission::ImageValidationConfig;
 pub use proxy_auth::RegistryProxyConfig;
 
 pub struct TrowServerBuilder {
@@ -82,10 +83,9 @@ impl TrowServerBuilder {
         )
         .expect("Failure configuring Trow Server");
 
-        let future = Server::builder()
+        Server::builder()
             .add_service(RegistryServer::new(ts.clone()))
             .add_service(AdmissionControllerServer::new(ts))
-            .serve(self.listen_addr);
-        future
+            .serve(self.listen_addr)
     }
 }

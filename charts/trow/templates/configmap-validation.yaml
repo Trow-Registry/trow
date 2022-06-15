@@ -1,0 +1,11 @@
+{{- if (not (empty .Values.trow.validation.config)) }}
+apiVersion: v1
+kind: configMap
+metadata:
+  name: {{ include "trow.fullname" . }}-validation-cfg
+  labels:
+    {{- include "trow.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
+data:
+  validation.yaml: {{ .Values.trow.validation.config }}
+{{- end }}

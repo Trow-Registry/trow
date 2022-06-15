@@ -4,13 +4,6 @@ use anyhow::{anyhow, Result};
 use const_format::formatcp;
 use http::uri::Scheme;
 use lazy_static::lazy_static;
-use log::warn;
-use serde::{Deserialize, Serialize};
-use tonic::{Request, Response, Status};
-
-use crate::server::trow_server::admission_controller_server::AdmissionController;
-use crate::server::trow_server::{AdmissionRequest, AdmissionResponse};
-use crate::server::TrowServer;
 
 /// The regex validates an image reference.
 /// It returns `name`, `tag` and `digest`.
@@ -31,13 +24,6 @@ const fn get_image_ref_regex() -> &'static str {
     const NAME: &str = formatcp!("(?:{DOMAIN}/)?{NAME_COMPONENT}(/{NAME_COMPONENT})*");
 
     formatcp!("^(?P<name>{NAME})(?::(?P<tag>{TAG}))?(?:@(?P<digest>{DIGEST}))?$")
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ImageValidationConfig {
-    pub default: String,
-    pub allow: Vec<String>,
-    pub deny: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -87,6 +73,10 @@ impl Image {
         }
     }
 
+    pub fn get_host(&self) -> &str {
+        &self.host
+    }
+
     /// Example return value: `https://registry-1.docker.io/v2/library/nginx`
     pub fn get_base_uri(&self) -> String {
         format!("{}://{}/v2/{}", self.scheme, self.host, self.repo)
@@ -100,9 +90,14 @@ impl Image {
     }
 
     /// Example return value: `registry-1.docker.io/library/nginx@sha256:12345`
-    pub fn get_full_reference(&self) -> String {
+    pub fn get_name_with_host(&self) -> String {
+        format!("{}/{}", self.host, self.get_name())
+    }
+
+    /// Returns image name without the registry `host`
+    pub fn get_name(&self) -> String {
         let tag_sep = if self.tag.contains(':') { ":" } else { "@" };
-        format!("{}/{}{tag_sep}{}", self.host, self.repo, self.tag)
+        format!("{}{tag_sep}{}", self.repo, self.tag)
     }
 
     pub fn try_from_str(image_ref: &str) -> Result<Self> {
@@ -148,80 +143,6 @@ impl Image {
         };
         let host = format!("{scheme}{host}");
         Ok(Self::new(&host, repo, tag.to_string()))
-    }
-}
-
-fn check_image_is_allowed(
-    raw_image_ref: &str,
-    config: &ImageValidationConfig,
-) -> (bool, &'static str) {
-    let image = match Image::try_from_str(raw_image_ref) {
-        Ok(image) => image,
-        Err(_) => return (false, "Invalid image reference"),
-    };
-    let image_ref = image.get_full_reference();
-    let mut is_allowed = match config.default.as_str() {
-        "Allow" => true,
-        "Deny" => false,
-        _ => {
-            warn!("Invalid default image validation config: `{}`. Should be `Allow` or `Deny`. Default to `Deny`.", config.default);
-            false
-        }
-    };
-    let mut match_len = 0;
-    let mut match_reson = "Image did not match, using default config";
-
-    for m in config.deny.iter() {
-        if m.len() > match_len && image_ref.starts_with(m) {
-            is_allowed = false;
-            match_len = m.len();
-            match_reson = "Image explicitely denied";
-        }
-    }
-
-    for m in config.allow.iter() {
-        if m.len() > match_len && image_ref.starts_with(m) {
-            is_allowed = true;
-            match_len = m.len();
-            match_reson = "Image explicitely allowed";
-        }
-    }
-
-    (is_allowed, match_reson)
-}
-
-#[tonic::async_trait]
-impl AdmissionController for TrowServer {
-    async fn validate_admission(
-        &self,
-        ar: Request<AdmissionRequest>,
-    ) -> Result<Response<AdmissionResponse>, Status> {
-        if self.image_validation_config.is_none() {
-            return Ok(Response::new(AdmissionResponse {
-                is_allowed: false,
-                reason: "Missing image validation config !".to_string(),
-            }));
-        }
-        let ar = ar.into_inner();
-        let mut valid = true;
-        let mut reason = String::new();
-
-        for image_raw in ar.images {
-            let (v, r) =
-                check_image_is_allowed(&image_raw, self.image_validation_config.as_ref().unwrap());
-            if !v {
-                valid = false;
-                reason = format!("{reason}; {image_raw}: {r}");
-                break;
-            }
-        }
-        reason.drain(0..2);
-
-        let ar = AdmissionResponse {
-            is_allowed: valid,
-            reason,
-        };
-        Ok(Response::new(ar))
     }
 }
 
@@ -314,41 +235,5 @@ mod test {
                     .to_string(),
             }
         );
-    }
-
-    #[test]
-    fn test_check() {
-        let cfg = ImageValidationConfig {
-            default: "Deny".to_string(),
-            allow: vec!["localhost:8080".into(), "quay.io".into()],
-            deny: vec![],
-        };
-
-        let (v, _) = check_image_is_allowed("localhost:8080/mydir/myimage:test", &cfg);
-        assert!(v);
-
-        let (v, _) = check_image_is_allowed("quay.io:8080/mydir/myimage:test", &cfg);
-        assert!(!v);
-
-        let (v, _) = check_image_is_allowed("quay.io/mydir/myimage:test", &cfg);
-        assert!(v);
-
-        let cfg = ImageValidationConfig {
-            default: "Allow".to_string(),
-            allow: vec![],
-            deny: vec!["registry-1.docker.io".into(), "toto.land".into()],
-        };
-
-        let (v, _) = check_image_is_allowed("ubuntu", &cfg);
-        assert!(!v);
-
-        let (v, _) = check_image_is_allowed("toto.land/myimage:test", &cfg);
-        assert!(!v);
-
-        let (v, _) = check_image_is_allowed("quay.io/myimage:test", &cfg);
-        assert!(v);
-
-        let (v, _) = check_image_is_allowed("quay.io/myimage@invalid", &cfg);
-        assert!(!v);
     }
 }

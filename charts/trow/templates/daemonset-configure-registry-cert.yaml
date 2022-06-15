@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    {{- include "trow.labels" . | nindent 4 }}
+    app.kubernetes.io/component: container-runtime-configurator
+  name: {{ include "trow.fullname" . }}-tls-helper
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "trow.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: container-runtime-configurator
+  template:
+    metadata:
+      labels:
+        {{- include "trow.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: container-runtime-configurator
+    spec:
+      containers:
+        - name: container-runtime-configurator
+          {{- with .Values.tlsDaemonset.image }}
+          image: "{{ .repository }}:{{ .tag }}"
+          imagePullPolicy: {{ .pullPolicy }}
+          {{- end }}
+          securityContext:
+            privileged: true
+          env:
+            - name: SERVICE_NAME
+              value: {{ .Release.Name }}
+          volumeMounts:
+            - name: containerd-cfg
+              mountPath: /etc/containerd
+            - name: containers-cfg
+              mountPath: /etc/containers
+      volumes:
+        - name: containerd-cfg
+          hostPath:
+            path: /etc/containerd
+            type: Directory
+        - name: containers-cfg
+          hostPath:
+            path: /etc/containers
+            type: Directory
+      priorityClassName: system-node-critical

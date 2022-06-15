@@ -39,6 +39,8 @@ rusoto_ecr = "0.48"
 base64 = "0.13.0"
 const_format = "0.2.24"
 http = "0.2.8"
+json-patch = "0.2.6"
+dns-lookup = "1.0.8"
 
 [build-dependencies]
 tonic-build = "0.6"

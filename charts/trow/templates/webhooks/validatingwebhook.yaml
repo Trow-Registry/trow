@@ -19,7 +19,7 @@ webhooks:
     failurePolicy: Ignore
     clientConfig:
       service:
-        name: {{ include "trow.fullname" . }}-admission
+        name: {{ include "trow.fullname" . }}
         path: "/validate-image"
         namespace: {{ .Release.Namespace }}
 {{ end }}

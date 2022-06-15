@@ -56,7 +56,7 @@ pub struct TrowConfig {
     addr: NetAddr,
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
-    host_names: Vec<String>,
+    service_name: String,
     proxy_registry_config: Vec<RegistryProxyConfig>,
     image_validation_config: Option<ImageValidationConfig>,
     dry_run: bool,
@@ -141,7 +141,7 @@ impl TrowBuilder {
         data_dir: String,
         addr: NetAddr,
         listen: String,
-        host_names: Vec<String>,
+        service_name: String,
         dry_run: bool,
         cors: bool,
         max_manifest_size: u32,
@@ -153,7 +153,7 @@ impl TrowBuilder {
             addr,
             tls: None,
             grpc: GrpcConfig { listen },
-            host_names,
+            service_name,
             proxy_registry_config: Vec::new(),
             image_validation_config: None,
             dry_run,
@@ -257,7 +257,7 @@ impl TrowBuilder {
 
         println!(
             "  These host names will be considered local (refer to this registry): {:?}",
-            self.config.host_names
+            self.config.service_name
         );
 
         let valid_cfg = self.config.image_validation_config.as_ref();

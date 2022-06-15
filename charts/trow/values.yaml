@@ -9,8 +9,15 @@ image:
   tag:
   pullPolicy: Always
 
+tlsDaemonset:
+  ## We use a daemonset to configure the container registry on every node
+  ## to accept the Trow TLS certificate
+  image:
+    repository: containersol/trow
+    tag: tls-helper-0.3.5-amd64
+    pullPolicy: Always
+
 trow:
-  domain: myregistry.mydomain.io
   # user: user
   # password: password
   validation:
@@ -42,10 +49,8 @@ fullnameOverride: ""
 
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 8000
-  ## Specify the nodePort value for the LoadBalancer and NodePort service types.
-  nodePort:
 
 ingress:
   enabled: false

@@ -65,11 +65,11 @@ fn parse_args() -> ArgMatches {
                 .takes_value(true),
         )
         .arg(
-            Arg::new("names")
+            Arg::new("service-name")
             .short('n')
-            .long("names")
-            .value_name("names")
-            .help("Host names for registry. Used in validation callbacks. Separate with comma or use quotes and spaces")
+            .long("service-name")
+            .value_name("service-name")
+            .help("Internal Trow service name. Used by mutating webhook.")
             .takes_value(true),
         )
         .arg(

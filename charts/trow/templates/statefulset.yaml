@@ -20,7 +20,6 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
     {{- end }}
-    {{- if .Values.trow.validation.enabled }}
       initContainers:
       # TODO: remove this thing :'c
       - name: trow-webhook-cert-translate
@@ -30,23 +29,22 @@ spec:
           - sh
           - -c
           - |
-            cp /etc/trow/webhook-cert-ecc/cert /etc/trow/webhook-cert && \
-            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/key -out /etc/trow/webhook-cert/key
+            cp /etc/trow/tls-cert-ecc/cert /etc/trow/webhook-cert && \
+            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/tls-cert-ecc/key -out /etc/trow/webhook-cert/key
         volumeMounts:
-        - name: webhook-cert-translated
+        - name: tls-cert-pkcs8
           mountPath: /etc/trow/webhook-cert
-        - name: webhook-cert-ecc
-          mountPath: /etc/trow/webhook-cert-ecc
+        - name: tls-cert-ecc
+          mountPath: /etc/trow/tls-cert-ecc
           readOnly: true
-    {{- end }}
       containers:
       - name: trow
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
-          - "--no-tls"
-          - "-n"
-          - {{ .Values.trow.domain | quote }}
+          - "--cert=/etc/trow/webhook-cert/cert"
+          - "--key=/etc/trow/webhook-cert/key"
+          - "--service-name={{ .Release.Name }}"
           {{- if and (.Values.trow.user) (.Values.trow.password) }}
           - "-u"
           - {{ .Values.trow.user | quote }}
@@ -56,72 +54,16 @@ spec:
           {{- if (not (empty .Values.trow.proxyRegistries)) }}
           - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
           {{- end }}
+          {{- if (not (empty .Values.trow.validation.config)) }}
+          - "--image-validation-config-file=/etc/trow/validation.yaml"
+          {{- end }}
         ports:
-        - name: http
-          containerPort: 8000
-        volumeMounts:
-        - name: data-vol
-          mountPath: /data
-      {{- if and (.Values.trow.user) (.Values.trow.password) }}
-        - name: trow-pass
-          mountPath: /etc/trow/pass
-          subPath: pass
-          readOnly: true
-      {{- end}}
-      {{- if (not (empty .Values.trow.proxyRegistries)) }}
-        - name: trow-proxy-cfg
-          mountPath: /etc/trow/proxy-registries.yaml
-          subPath: proxy-registries.yaml
-          readOnly: true
-      {{- end}}
-    {{- if .Values.trow.validation.enabled }}
-      - name: trow-webhook
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        args:
-          - "--cert=/etc/trow/webhook-cert/cert"
-          - "--key=/etc/trow/webhook-cert/key"
-          - "-n"
-          - {{ .Values.trow.domain | quote }}
-          {{- if and (.Values.trow.user) (.Values.trow.password) }}
-          - "-u"
-          - {{ .Values.trow.user | quote }}
-          - "--password-file=/etc/trow/pass"
-          {{- end }}
-          {{- if (not (empty .Values.trow.proxyRegistries)) }}
-          - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
-          {{- end }}
-        {{- with .Values.trow.validation }}
-          {{- if .allowDocker }}
-          - "--allow-docker-official"
-          {{- end }}
-          {{- if not .allowKubernetes }}
-          - "--deny-k8s-images"
-          {{- end }}
-          {{- if .allowPrefixes }}
-          - "--allow-prefixes"
-          - {{ .allowPrefixes | join "," | quote }}
-          {{- end }}
-          {{- if .allowImages }}
-          - "--allow-images"
-          - {{ .allowImages | join "," | quote }}
-          {{- end }}
-          {{- if .disallowLocalPrefixes }}
-          - "--disallow-local-prefixes"
-          - {{ .disallowLocalPrefixes | join "," | quote }}
-          {{- end }}
-          {{- if .disallowLocalImages }}
-          - "--disallow-local-images"
-          - {{ .disallowLocalImages | join "," | quote }}
-          {{- end }}
-        {{- end }}
-        ports:
-        - name: webhook
+        - name: https
           containerPort: 8443
         volumeMounts:
         - name: data-vol
           mountPath: /data
-        - name: webhook-cert-translated
+        - name: tls-cert-pkcs8
           mountPath: /etc/trow/webhook-cert
           readOnly: true
       {{- if and (.Values.trow.user) (.Values.trow.password) }}
@@ -136,12 +78,17 @@ spec:
           subPath: proxy-registries.yaml
           readOnly: true
       {{- end}}
-    {{- end }}
+      {{- if (not (empty .Values.trow.validation.config)) }}
+        - name: trow-validation-cfg
+          mountPath: /etc/trow/validation.yaml
+          subPath: validation.yaml
+          readOnly: true
+      {{- end}}
       volumes:
-        - name: webhook-cert-ecc
+        - name: tls-cert-ecc
           secret:
-            secretName: {{ include "trow.fullname" . }}-admission
-        - name: webhook-cert-translated
+            secretName: {{ include "trow.fullname" . }}-tls
+        - name: tls-cert-pkcs8
           emptyDir: {}
       {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
@@ -153,6 +100,11 @@ spec:
           secret:
             secretName: {{ include "trow.fullname" . }}-proxy-cfg
       {{- end }}
+      {{- if (not (empty .Values.trow.validation.config)) }}
+        - name: trow-validation-cfg
+          configmap:
+            name: {{ include "trow.fullname" . }}-validation-cfg
+      {{- end}}
       securityContext:
         runAsUser: 333333
         runAsGroup: 333333

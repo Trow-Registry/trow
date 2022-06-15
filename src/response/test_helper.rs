@@ -22,7 +22,7 @@ pub fn test_client() -> Client {
         },
         proxy_registry_config: vec![],
         image_validation_config: None,
-        host_names: vec![],
+        service_name: vec![],
         dry_run: false,
         max_manifest_size: 1,
         max_blob_size: 100,

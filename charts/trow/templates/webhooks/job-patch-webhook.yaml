@@ -30,7 +30,7 @@ spec:
             - --webhook-name={{ include "trow.fullname" . }}-validation
             - --namespace=$(POD_NAMESPACE)
             - --patch-mutating=false
-            - --secret-name={{ include "trow.fullname" . }}-admission
+            - --secret-name={{ include "trow.fullname" . }}-tls
             - --patch-failure-policy=Fail
           env:
             - name: POD_NAMESPACE
@@ -40,7 +40,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
       restartPolicy: OnFailure
-      serviceAccountName: {{ include "trow.fullname" . }}-admission
+      serviceAccountName: {{ include "trow.fullname" . }}-tls-patch
       securityContext:
         runAsNonRoot: true
         runAsUser: 2000

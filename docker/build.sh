@@ -20,6 +20,17 @@ TAG=${DOCKER_TAG:-"$VERSION-amd64"}
 IMAGE=${IMAGE_NAME:-"$REPO:$TAG"}
 DATE="$(date --rfc-3339=seconds)"
 
+# docker build \
+#   --build-arg VCS_REF="${SOURCE_COMMIT:-$(git rev-parse HEAD)}" \
+#   --build-arg VCS_BRANCH="${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}" \
+#   --build-arg REPO="$REPO" \
+#   --build-arg TAG="$TAG" \
+#   --build-arg DATE="$DATE" \
+#   --build-arg VERSION="$VERSION" \
+#   -f Dockerfile -t $IMAGE ../
+
+# docker tag $IMAGE $REPO:default
+
 docker build \
   --build-arg VCS_REF="${SOURCE_COMMIT:-$(git rev-parse HEAD)}" \
   --build-arg VCS_BRANCH="${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}" \
@@ -27,9 +38,7 @@ docker build \
   --build-arg TAG="$TAG" \
   --build-arg DATE="$DATE" \
   --build-arg VERSION="$VERSION" \
-  -f Dockerfile -t $IMAGE ../
-
-docker tag $IMAGE $REPO:default
+  -f Dockerfile.tls-daemonset -t "$REPO:tls-helper-$TAG" ../
 
 if [[ "$CI" = true ]]
 then
@@ -44,10 +53,10 @@ then
 
     docker tag $IMAGE containersol/trow:latest
     docker push containersol/trow:latest
-    docker tag $IMAGE $GH_REPO:default 
-    docker push $GH_REPO:default 
-    docker tag $IMAGE $GH_REPO:latest 
-    docker push $GH_REPO:latest 
+    docker tag $IMAGE $GH_REPO:default
+    docker push $GH_REPO:default
+    docker tag $IMAGE $GH_REPO:latest
+    docker push $GH_REPO:latest
 
     # Add new image name to manifest template
     sed -i "s|{{TROW_AMD64_IMAGE}}|${IMAGE}|" ./manifest.tmpl
