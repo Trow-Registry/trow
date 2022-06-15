@@ -76,6 +76,7 @@ pub fn routes() -> Vec<rocket::Route> {
         catalog::get_manifest_history_4level,
         catalog::get_manifest_history_5level,
         admission::validate_image,
+        admission::mutate_image,
         health::healthz,
         readiness::readiness,
         metrics::metrics

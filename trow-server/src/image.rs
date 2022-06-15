@@ -90,14 +90,13 @@ impl Image {
     }
 
     /// Example return value: `registry-1.docker.io/library/nginx@sha256:12345`
-    pub fn get_name_with_host(&self) -> String {
-        format!("{}/{}", self.host, self.get_name())
+    pub fn get_ref(&self) -> String {
+        let tag_sep = if self.tag.contains(':') { "@" } else { ":" };
+        format!("{}/{}{tag_sep}{}", self.host, self.repo, self.tag)
     }
 
-    /// Returns image name without the registry `host`
-    pub fn get_name(&self) -> String {
-        let tag_sep = if self.tag.contains(':') { ":" } else { "@" };
-        format!("{}{tag_sep}{}", self.repo, self.tag)
+    pub fn get_repo(&self) -> &str {
+        &self.repo
     }
 
     pub fn try_from_str(image_ref: &str) -> Result<Self> {

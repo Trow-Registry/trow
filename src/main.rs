@@ -65,11 +65,11 @@ fn parse_args() -> ArgMatches {
                 .takes_value(true),
         )
         .arg(
-            Arg::new("service-name")
+            Arg::new("name")
             .short('n')
-            .long("service-name")
-            .value_name("service-name")
-            .help("Internal Trow service name. Used by mutating webhook.")
+            .long("name")
+            .value_name("name")
+            .help("Host name for registry. Used in AdmissionMutation webhook.")
             .takes_value(true),
         )
         .arg(
@@ -156,12 +156,6 @@ Must be used with --user")
         .get_matches()
 }
 
-fn parse_list(names: &str) -> Vec<String> {
-    //split on , or whitespace
-    let ret_str = names.replace(',', " ");
-    ret_str.split_whitespace().map(|x| x.to_owned()).collect()
-}
-
 fn main() {
     let matches = parse_args();
 
@@ -182,8 +176,8 @@ fn main() {
     let cert_path = matches.value_of("cert").unwrap_or("./certs/domain.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
-    let host_names_str = matches.value_of("names").unwrap_or(host);
-    let host_names = parse_list(host_names_str);
+
+    let host_name = matches.value_of("name").unwrap_or(host);
     let dry_run = matches.is_present("dry-run");
 
     let default_manifest_size: u32 = 4; //mebibytes
@@ -209,7 +203,7 @@ fn main() {
         data_path.to_string(),
         addr,
         "127.0.0.1:51000".to_string(),
-        host_names,
+        host_name.to_owned(),
         dry_run,
         cors,
         max_manifest_size,

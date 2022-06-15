@@ -261,16 +261,13 @@ impl TrowBuilder {
         );
 
         let valid_cfg = self.config.image_validation_config.as_ref();
-
         let allowed = valid_cfg
             .map(|cfg| cfg.allow.clone())
-            .unwrap_or_else(|| vec![]);
+            .unwrap_or_else(Vec::new);
         let denied = valid_cfg
             .map(|cfg| cfg.deny.clone())
-            .unwrap_or_else(|| vec![]);
-
+            .unwrap_or_else(Vec::new);
         println!("  These repositories are explicitly allowed: {:?}", allowed);
-
         println!("  These repositories are explicitly denied: {:?}", denied);
 
         if !self.config.proxy_registry_config.is_empty() {

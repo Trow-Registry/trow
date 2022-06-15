@@ -1,11 +1,13 @@
-{{- if (not (empty .Values.trow.validation.config)) }}
+{{- if (not (empty .Values.trow.validation.config)) -}}
 apiVersion: v1
-kind: configMap
+kind: ConfigMap
 metadata:
   name: {{ include "trow.fullname" . }}-validation-cfg
   labels:
     {{- include "trow.labels" . | nindent 4 }}
   namespace: {{ .Release.Namespace }}
 data:
-  validation.yaml: {{ .Values.trow.validation.config }}
+  validation.yaml: |
+{{ .Values.trow.validation.config | toYaml | indent 4 }}
+
 {{- end }}

@@ -62,7 +62,7 @@ pub struct TrowServer {
     manifests_path: PathBuf,
     blobs_path: PathBuf,
     scratch_path: PathBuf,
-    proxy_registry_config: Vec<RegistryProxyConfig>,
+    pub proxy_registry_config: Vec<RegistryProxyConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
 }
 

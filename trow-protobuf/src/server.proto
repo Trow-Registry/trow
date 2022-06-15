@@ -194,6 +194,9 @@ service Registry {
 message AdmissionRequest {
   repeated string images = 1;
   string namespace = 2;
+  // Used by mutation webhook
+  repeated string image_paths = 3;
+  string host_name = 4;
 }
 
 message AdmissionResponse {

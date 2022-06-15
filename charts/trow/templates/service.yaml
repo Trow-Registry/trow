@@ -11,11 +11,12 @@ spec:
   clusterIP: {{ .Values.service.clusterIP }}
   {{- end }}
   ports:
-    - port: 443
-      targetPort: https
-      name: https
-    {{- if semverCompare ">=1.20" .Capabilities.KubeVersion.Version }}
-      appProtocol: https
-    {{- end }}
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      name: http
+      {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePort)) }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
+
   selector:
     {{- include "trow.selectorLabels" . | nindent 4 }}

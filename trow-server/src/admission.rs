@@ -1,11 +1,10 @@
 use anyhow::Result;
-use log::warn;
+use json_patch::{Patch, PatchOperation, ReplaceOperation};
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
-use json_patch::{Patch, AddOperation, PatchOperation};
 
 use crate::image::Image;
-use crate::RegistryProxyConfig;
 use crate::server::trow_server::admission_controller_server::AdmissionController;
 use crate::server::trow_server::{AdmissionRequest, AdmissionResponse};
 use crate::server::TrowServer;
@@ -25,7 +24,7 @@ fn check_image_is_allowed(
         Ok(image) => image,
         Err(_) => return (false, "Invalid image reference"),
     };
-    let image_ref = image.get_name_with_host();
+    let image_ref = image.get_ref();
     let mut is_allowed = match config.default.as_str() {
         "Allow" => true,
         "Deny" => false,
@@ -54,22 +53,6 @@ fn check_image_is_allowed(
     }
 
     (is_allowed, match_reson)
-}
-
-fn get_proxy_image(image_ref: &str, proxy_cfg: &[RegistryProxyConfig]) -> Result<Image> {
-    let image = Image::try_from_str(image_ref)?;
-
-    for cfg in proxy_cfg.iter() {
-        if image.get_host() == cfg.host {
-            return Ok(Image::new(
-                "trow.io",
-                format!("/f/{}/{}", cfg.alias, image.get_name()),
-                image.tag,
-            ));
-        }
-    }
-
-    unimplemented!()
 }
 
 #[tonic::async_trait]
@@ -114,78 +97,47 @@ impl AdmissionController for TrowServer {
     ) -> Result<Response<AdmissionResponse>, Status> {
         let ar = ar.into_inner();
 
-        // let repo_ip =
+        let mut patch_operations = Vec::<PatchOperation>::new();
 
-        for raw_image in ar.images {
+        for (raw_image, image_path) in ar.images.iter().zip(ar.image_paths.iter()) {
+            println!("Processing image `{}` @ `{}`", raw_image, image_path);
             let image = match Image::try_from_str(raw_image) {
                 Ok(image) => image,
                 Err(_) => continue,
             };
 
-            for cfg in proxy_cfg.iter() {
+            for cfg in self.proxy_registry_config.iter() {
+                println!("{} == {} ?", image.get_host(), cfg.host);
+
                 if image.get_host() == cfg.host {
-                    return Ok(Image::new(
-                        "trow.io",
-                        format!("/f/{}/{}", cfg.alias, image.get_name()),
-                        image.tag,
-                    ));
+                    info!("mutate_admission: proxying image {}", raw_image);
+                    println!("It's a match ! {}", cfg.alias);
+                    let im = Image::new(
+                        &ar.host_name,
+                        format!("f/{}/{}", cfg.alias, image.get_repo()),
+                        image.tag.clone(),
+                    );
+                    patch_operations.push(PatchOperation::Replace(ReplaceOperation {
+                        path: image_path.clone(),
+                        value: serde_json::Value::String(im.get_ref()),
+                    }));
+                    break;
                 }
             }
+        }
+        let patch = Patch(patch_operations);
+        let patch_vec = Some(
+            serde_json::to_vec(&patch)
+                .map_err(|e| Status::internal(format!("Could not serialize patch: {}", e)))?,
+        );
 
-            let patch = Patch::new(vec![
-                PatchOperation::new(
-                    "replace",
-                    "/spec/containers/0/image",
-                    image.get_name_with_host(),
-                ),
-            ]);
-
-
-        let image = match Image::try_from_str(&ar.images[0]) {
-            Ok(image) => image,
-            Err(_) => return Ok(Response::new(AdmissionResponse {
-                patch: None,
-                is_allowed: false,
-                reason: "Invalid image reference".to_string(),
-            })),
-        };
-
-        let mut patch_operations = Vec::<PatchOperation>::new();
-
-
-
-        unimplemented!()
-        // let mut response = AdmissionResponse::from(ar.into_inner());
-        // .with_patch(Patch(vec![PatchOperation::Add(AddOperation {
-        //     path: "/metadata/labels/my-label".to_owned(),
-        //     value: serde_json::Value::String("my-value".to_owned()),
-        // })]));
-
-        // for image_raw in ar.images {
-
-
-
-        //     let (v, r) =
-        //         check_image_is_allowed(&image_raw, self.image_validation_config.as_ref().unwrap());
-        //     if !v {
-        //         valid = false;
-        //         reason = format!("{reason}; {image_raw}: {r}");
-        //         break;
-        //     }
-        // }
-        // reason.drain(0..2);
-
-        // let ar = AdmissionResponse {
-        //     patch: None,
-        //     is_allowed: valid,
-        //     reason,
-        // };
-        // Ok(Response::new(ar))
-
-
+        return Ok(Response::new(AdmissionResponse {
+            patch: patch_vec,
+            is_allowed: true,
+            reason: "".to_string(),
+        }));
     }
 }
-
 #[cfg(test)]
 mod test {
     use super::*;

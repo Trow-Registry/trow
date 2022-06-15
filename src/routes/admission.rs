@@ -28,3 +28,23 @@ pub async fn validate_image(
             .into_review(),
     })
 }
+
+// Kubernetes webhooks for automatically proxying images
+#[post("/mutate-image", data = "<image_data>")]
+pub async fn mutate_image(
+    ci: &rocket::State<ClientInterface>,
+    tc: &rocket::State<TrowConfig>,
+    image_data: Json<AdmissionReview<Pod>>,
+) -> Json<AdmissionReview<DynamicObject>> {
+    let req: Result<AdmissionRequest<_>, _> = image_data.into_inner().try_into();
+
+    Json::from(match req {
+        Err(e) => {
+            AdmissionResponse::invalid(format!("Invalid admission request: {}", e)).into_review()
+        }
+        Ok(req) => ci
+            .mutate_admission(&req, &tc.service_name)
+            .await
+            .into_review(),
+    })
+}

@@ -1,9 +1,8 @@
 {{- if or .Values.trow.validation.enableWebhook .Values.trow.proxyConfig.enableWebhook -}}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name:  {{ include "trow.fullname" . }}-admission
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "trow.fullname" . }}-admission
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
@@ -12,10 +11,11 @@ metadata:
     app.kubernetes.io/component: admission-webhook
 rules:
   - apiGroups:
-      - ""
+      - admissionregistration.k8s.io
     resources:
-      - secrets
+      - validatingwebhookconfigurations
+      - mutatingwebhookconfigurations
     verbs:
       - get
-      - create
+      - update
 {{- end }}

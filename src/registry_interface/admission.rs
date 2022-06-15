@@ -8,6 +8,12 @@ pub trait AdmissionValidation {
     async fn validate_admission(
         &self,
         admission_req: &AdmissionRequest<Pod>,
-        host_names: &[String],
+        host_name: &str,
+    ) -> AdmissionResponse;
+
+    async fn mutate_admission(
+        &self,
+        admission_req: &AdmissionRequest<Pod>,
+        host_name: &str,
     ) -> AdmissionResponse;
 }
