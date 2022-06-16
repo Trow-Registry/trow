@@ -30,8 +30,8 @@ pub struct RegistryProxyConfig {
     /// This field is unvalidated and may contain a scheme or not.
     /// eg: `http://example.com` and `example.com`
     pub host: String,
-    username: Option<String>,
-    password: Option<String>,
+    pub username: Option<String>,
+    pub password: Option<String>,
 }
 
 /// Wrapper around `reqwest::Client` that automagically handles authentication

@@ -246,10 +246,16 @@ fn main() {
         }
     }
     if let Some(config_file) = matches.value_of("proxy-registry-config-file") {
-        builder.with_proxy_registries(config_file);
+        if let Err(e) = builder.with_proxy_registries(config_file) {
+            eprintln!("Failed to load proxy registry config file: {:#}", e);
+            std::process::exit(1);
+        }
     }
     if let Some(config_file) = matches.value_of("image-validation-config-file") {
-        builder.with_image_validation(config_file);
+        if let Err(e) = builder.with_image_validation(config_file) {
+            eprintln!("Failed to load image validation config file: {:#}", e);
+            std::process::exit(1);
+        }
     }
 
     builder.start().unwrap_or_else(|e| {

@@ -3,18 +3,23 @@ mod common;
 
 #[cfg(test)]
 mod validation_tests {
-
-    use crate::common;
-    use environment::Environment;
-    use reqwest::StatusCode;
-    use std::fs::{self, File};
-    use std::io::{Read, Write};
+    use std::collections::HashMap;
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
 
-    const LYCAON_ADDRESS: &str = "https://trow.test:8443";
+    use environment::Environment;
+    use k8s_openapi::api::core::v1::Pod;
+    use kube::core::admission::AdmissionReview;
+    use reqwest::StatusCode;
+
+    use crate::common;
+    use trow_server::ImageValidationConfig;
+
+    const PORT: &str = "39366";
+    const HOST: &str = "127.0.0.1:39366";
+    const ORIGIN: &str = "http://127.0.0.1:39366";
 
     struct TrowInstance {
         pid: Child,
@@ -23,62 +28,47 @@ mod validation_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
     async fn start_trow() -> TrowInstance {
-        let config_file_path = "/tmp/trow-proxy-cfg.json";
-        File::create("/tmp/trow-proxy-cfg.json")
-            .unwrap()
-            .write_all(
-                r#"
-              default: Deny
-              allow:
-                - registry-1.docker.io
-                - nvcr.io
-                - quay.io
-                - localhost:8000
-                - trow.test
-                - k8s.gcr.io
-              deny:
-                - localhost:8000/secret/shine-box
-              "#
-                .as_bytes(),
-            )
-            .unwrap();
+        let config_file = common::get_file(ImageValidationConfig {
+            default: "Deny".to_string(),
+            allow: vec![
+                "registry-1.docker.io".to_string(),
+                "nvcr.io".to_string(),
+                "quay.io".to_string(),
+                "localhost:8000".to_string(),
+                "trow.test".to_string(),
+                "k8s.gcr.io".to_string(),
+            ],
+            deny: vec!["localhost:8000/secret/".to_string()],
+        });
 
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
             .arg("--")
-            .arg("--names")
-            .arg("trow.test")
+            .arg("--no-tls")
+            .arg("--name")
+            .arg(HOST)
+            .arg("--port")
+            .arg(PORT)
             .arg("--image-validation-config-file")
-            .arg(config_file_path)
+            .arg(config_file.path())
             .spawn()
             .expect("failed to start");
 
         let mut timeout = 100;
 
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::new();
 
-        let mut response = client.get(LYCAON_ADDRESS).send().await;
+        let mut response = client.get(ORIGIN).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(LYCAON_ADDRESS).send().await;
+            response = client.get(ORIGIN).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
             child.kill().unwrap();
-            panic!("Failed to start Trow");
+            panic!("Failed to start Trow",);
         }
         TrowInstance { pid: child }
     }
@@ -154,7 +144,7 @@ mod validation_tests {
         "containers": [
           {
             "name": "test3",
-            "image": "nginx",
+            "image": "unknown_registry.io/nginx",
             "resources": {
               "requests": {
                 "cpu": "100m"
@@ -204,108 +194,102 @@ mod validation_tests {
 }"#;
 
         let resp = cl
-            .post(&format!("{}/validate-image", LYCAON_ADDRESS))
+            .post(&format!("{}/validate-image", ORIGIN))
             .body(review)
             .send()
             .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
-        //should deny by default
-        let txt = resp.text().await.unwrap();
-        assert!(txt.contains("\"allowed\":false"));
-        assert!(txt.contains(
-            "Remote image nginx disallowed as not contained in this registry and not in allow list"
-        ));
+
+        let mut val = resp.json::<serde_json::Value>().await.unwrap();
+        // Fixes "missing field" (which is bollocks)
+        val["response"]["auditAnnotations"] =
+            serde_json::to_value(HashMap::<String, String>::new()).unwrap();
+        let review: AdmissionReview<Pod> = serde_json::from_value(val).unwrap();
+        let response = review.response.unwrap();
+
+        assert!(!response.allowed);
+
+        assert_eq!(response.result.message.unwrap(), "unknown_registry.io/nginx: Image is neither explicitely allowed nor denied (using default behavior)");
     }
 
     async fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
-        let start = r#"{
-  "kind": "AdmissionReview",
-  "apiVersion": "admission.k8s.io/v1beta1",
-  "request": {
-    "uid": "0b4ab323-b607-11e8-a555-42010a8002b4",
-    "kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Pod"
-    },
-    "resource": {
-      "group": "",
-      "version": "v1",
-      "resource": "pods"
-    },
-    "namespace": "default",
-    "operation": "CREATE",
-    "userInfo": {
-      "username": "system:serviceaccount:kube-system:replicaset-controller",
-      "uid": "fc3f24b4-b5e2-11e8-a555-42010a8002b4",
-      "groups": [
-        "system:serviceaccounts",
-        "system:serviceaccounts:kube-system",
-        "system:authenticated"
-      ]
-    },
-    "object": {
-      "metadata": {
-        "name": "test3-88c6d6597-rll2c",
-        "generateName": "test3-88c6d6597-",
-        "namespace": "default",
-        "uid": "0b4aae46-b607-11e8-a555-42010a8002b4",
-        "creationTimestamp": "2018-09-11T21:10:00Z",
-        "labels": {
-          "pod-template-hash": "447282153",
-          "run": "test3"
-        }
-      },
-      "spec": {
-        "containers": [
-          {
-            "name": "test3",
-            "image": ""#;
-        let end = r#""
-          }
-        ]
-      }
-    }
-  }
-}"#;
-        let review = format!("{}{}{}", start, image_string, end);
+        let review = serde_json::json!({
+            "kind": "AdmissionReview",
+            "apiVersion": "admission.k8s.io/v1beta1",
+            "request": {
+                "uid": "0b4ab323-b607-11e8-a555-42010a8002b4",
+                "kind": {
+                    "group": "",
+                    "version": "v1",
+                    "kind": "Pod"
+                },
+                "resource": {
+                    "group": "",
+                    "version": "v1",
+                    "resource": "pods"
+                },
+                "namespace": "default",
+                "operation": "CREATE",
+                "userInfo": {
+                    "username": "system:serviceaccount:kube-system:replicaset-controller",
+                    "uid": "fc3f24b4-b5e2-11e8-a555-42010a8002b4",
+                    "groups": [
+                        "system:serviceaccounts",
+                        "system:serviceaccounts:kube-system",
+                        "system:authenticated"
+                    ]
+                },
+                "object": {
+                    "metadata": {
+                        "name": "test3-88c6d6597-rll2c",
+                        "generateName": "test3-88c6d6597-",
+                        "namespace": "default",
+                        "uid": "0b4aae46-b607-11e8-a555-42010a8002b4",
+                        "creationTimestamp": "2018-09-11T21:10:00Z",
+                        "labels": {
+                        "pod-template-hash": "447282153",
+                        "run": "test3"
+                        }
+                    },
+                    "spec": {
+                        "containers": [{
+                            "name": "test3",
+                            "image": image_string,
+                        }]
+                    }
+                }
+            }
+        })
+        .to_string();
 
         let resp = cl
-            .post(&format!("{}/validate-image", LYCAON_ADDRESS))
+            .post(&format!("{}/validate-image", ORIGIN))
             .body(review)
             .send()
             .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
-        //should deny by default
-        let txt = resp.text().await.unwrap();
-        if is_allowed {
-            assert!(txt.contains("\"allowed\":true"));
-        } else {
-            assert!(txt.contains("\"allowed\":false"));
-        }
+
+        let mut val = resp.json::<serde_json::Value>().await.unwrap();
+        // Fixes "missing field" (which is bollocks)
+        val["response"]["auditAnnotations"] =
+            serde_json::to_value(HashMap::<String, String>::new()).unwrap();
+        let review: AdmissionReview<Pod> = serde_json::from_value(val).unwrap();
+        let response = review.response.unwrap();
+
+        assert_eq!(
+            response.allowed, is_allowed,
+            "Wrong response for `{}` ({:?})",
+            image_string, response.result.message
+        );
     }
 
     #[tokio::test]
     async fn test_runner() {
-        //Need to start with empty repo
-        fs::remove_dir_all("./data").unwrap_or(());
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::new();
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
@@ -319,14 +303,14 @@ mod validation_tests {
         test_image(&client, "localhost:8000/hello/world", true).await;
 
         // explicitely denied
-        test_image(&client, "localhost:8000/secret/shine-box", true).await;
+        test_image(&client, "localhost:8000/secret/shine-box", false).await;
 
         // default denied
         test_image(&client, "virus.land.cc/not/suspect", false).await;
 
         // invalid image ref
-        test_image(&client, "nope", false).await;
-        test_image(&client, "example.com", false).await;
+        // Some very weird refs are actually technically valid, like `example.com` !
+        test_image(&client, "hello human", false).await;
         test_image(&client, "docker.io/voyager@jasper-byrne", false).await;
     }
 }

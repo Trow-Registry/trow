@@ -851,16 +851,6 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
-dependencies = [
- "log",
- "regex",
-]
-
-[[package]]
-name = "env_logger"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
@@ -1963,15 +1953,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
-name = "openssl-src"
-version = "111.20.0+1.1.1o"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92892c4f87d56e376e469ace79f1128fdaded07646ddf73aa0be4706ff712dec"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "openssl-sys"
 version = "0.9.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1980,7 +1961,6 @@ dependencies = [
  "autocfg",
  "cc",
  "libc",
- "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -2292,17 +2272,6 @@ name = "protobuf"
 version = "2.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf7e6d18738ecd0902d30d1ad232c9125985a3422929b16c65517b38adc14f96"
-
-[[package]]
-name = "quickcheck"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "588f6378e4dd99458b60ec275b4477add41ce4fa9f64dcba6f15adccb19b50d6"
-dependencies = [
- "env_logger 0.8.4",
- "log",
- "rand",
-]
 
 [[package]]
 name = "quote"
@@ -3512,7 +3481,7 @@ dependencies = [
  "clap",
  "data-encoding",
  "derive_more",
- "env_logger 0.9.0",
+ "env_logger",
  "environment",
  "frank_jwt",
  "futures",
@@ -3526,11 +3495,9 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "openssl",
  "predicates",
  "prost",
  "prost-types",
- "quickcheck",
  "rand",
  "regex",
  "reqwest",
@@ -3543,6 +3510,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2 0.10.2",
+ "tempfile",
  "thiserror",
  "tokio",
  "tonic",
@@ -3582,7 +3550,6 @@ dependencies = [
  "fs3",
  "futures",
  "hex",
- "http",
  "httpmock",
  "json-patch",
  "lazy_static",
@@ -3591,7 +3558,6 @@ dependencies = [
  "prost",
  "prost-types",
  "quoted-string",
- "rand",
  "regex",
  "reqwest",
  "rusoto_core",

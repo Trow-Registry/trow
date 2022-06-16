@@ -1,7 +1,11 @@
+use std::io::BufReader;
+use std::io::Write;
+use std::process::Child;
+
 use rand::Rng;
 use reqwest::StatusCode;
-use std::io::BufReader;
-use std::process::Child;
+use serde::Serialize;
+
 use trow_server::digest;
 use trow_server::manifest;
 
@@ -118,4 +122,16 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
     assert_eq!(resp.status(), StatusCode::CREATED);
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();
     assert_eq!(&location, &manifest_addr);
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+/// Returns a temporary file filled with `contents`
+pub fn get_file<T: Serialize>(contents: T) -> tempfile::NamedTempFile {
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(serde_yaml::to_string(&contents).unwrap().as_bytes())
+        .unwrap();
+    file.flush().unwrap();
+
+    file
 }

@@ -20,7 +20,7 @@ pub async fn validate_image(
 
     Json::from(match req {
         Err(e) => {
-            AdmissionResponse::invalid(format!("Invalid admission request: {}", e)).into_review()
+            AdmissionResponse::invalid(format!("Invalid admission request: {:#}", e)).into_review()
         }
         Ok(req) => ci
             .validate_admission(&req, &tc.service_name)
@@ -40,7 +40,7 @@ pub async fn mutate_image(
 
     Json::from(match req {
         Err(e) => {
-            AdmissionResponse::invalid(format!("Invalid admission request: {}", e)).into_review()
+            AdmissionResponse::invalid(format!("Invalid admission request: {:#}", e)).into_review()
         }
         Ok(req) => ci
             .mutate_admission(&req, &tc.service_name)

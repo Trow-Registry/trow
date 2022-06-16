@@ -10,6 +10,7 @@ mod registry_interface;
 #[cfg(feature = "sqlite")]
 mod users;
 
+use anyhow::Context;
 use futures::Future;
 use log::{LevelFilter, SetLoggerError};
 use std::io::Write;
@@ -167,22 +168,24 @@ impl TrowBuilder {
         TrowBuilder { config }
     }
 
-    pub fn with_proxy_registries(&mut self, config_file: impl AsRef<str>) -> &mut Self {
+    pub fn with_proxy_registries(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
-            .unwrap_or_else(|e| panic!("Could not read file `{}`: {}", config_file, e));
-        let config = serde_yaml::from_str::<Vec<RegistryProxyConfig>>(&config_str).unwrap();
+            .with_context(|| format!("Could not read file `{}`", config_file))?;
+        let config = serde_yaml::from_str::<Vec<RegistryProxyConfig>>(&config_str)
+            .with_context(|| format!("Could not parse file `{}`", config_file))?;
         self.config.proxy_registry_config = config;
-        self
+        Ok(self)
     }
 
-    pub fn with_image_validation(&mut self, config_file: impl AsRef<str>) -> &mut Self {
+    pub fn with_image_validation(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
-            .unwrap_or_else(|e| panic!("Could not read file `{}`: {}", config_file, e));
-        let config = serde_yaml::from_str::<ImageValidationConfig>(&config_str).unwrap();
+            .with_context(|| format!("Could not read file `{}`", config_file))?;
+        let config = serde_yaml::from_str::<ImageValidationConfig>(&config_str)
+            .with_context(|| format!("Could not parse file `{}`", config_file))?;
         self.config.image_validation_config = Some(config);
-        self
+        Ok(self)
     }
 
     pub fn with_tls(&mut self, cert_file: String, key_file: String) -> &mut TrowBuilder {
@@ -260,21 +263,23 @@ impl TrowBuilder {
             self.config.service_name
         );
 
-        let valid_cfg = self.config.image_validation_config.as_ref();
-        let allowed = valid_cfg
-            .map(|cfg| cfg.allow.clone())
-            .unwrap_or_else(Vec::new);
-        let denied = valid_cfg
-            .map(|cfg| cfg.deny.clone())
-            .unwrap_or_else(Vec::new);
-        println!("  These repositories are explicitly allowed: {:?}", allowed);
-        println!("  These repositories are explicitly denied: {:?}", denied);
+        match self.config.image_validation_config {
+            Some(ref config) => {
+                println!("  Image validation webhook configured:");
+                println!("    Default action: {}", config.default);
+                println!("    Allowed prefixes: {:?}", config.allow);
+                println!("    Denied prefixes: {:?}", config.deny);
+            }
+            None => println!("  Image validation is not configured"),
+        }
 
         if !self.config.proxy_registry_config.is_empty() {
             println!("  Proxy registries configured:");
             for config in &self.config.proxy_registry_config {
                 println!("    {}: {}", config.alias, config.host);
             }
+        } else {
+            println!("  No proxy registries configured");
         }
 
         if self.config.cors {

@@ -34,7 +34,8 @@ fn check_image_is_allowed(
         }
     };
     let mut match_len = 0;
-    let mut match_reson = "Image did not match, using default config";
+    let mut match_reson =
+        "Image is neither explicitely allowed nor denied (using default behavior)";
 
     for m in config.deny.iter() {
         if m.len() > match_len && image_ref.starts_with(m) {
@@ -70,23 +71,22 @@ impl AdmissionController for TrowServer {
         }
         let ar = ar.into_inner();
         let mut valid = true;
-        let mut reason = String::new();
+        let mut reasons = Vec::new();
 
         for image_raw in ar.images {
             let (v, r) =
                 check_image_is_allowed(&image_raw, self.image_validation_config.as_ref().unwrap());
             if !v {
                 valid = false;
-                reason = format!("{reason}; {image_raw}: {r}");
+                reasons.push(format!("{image_raw}: {r}"));
                 break;
             }
         }
-        reason.drain(0..2);
 
         let ar = AdmissionResponse {
             patch: None,
             is_allowed: valid,
-            reason,
+            reason: reasons.join("; "),
         };
         Ok(Response::new(ar))
     }
@@ -96,22 +96,20 @@ impl AdmissionController for TrowServer {
         ar: Request<AdmissionRequest>,
     ) -> Result<Response<AdmissionResponse>, Status> {
         let ar = ar.into_inner();
-
         let mut patch_operations = Vec::<PatchOperation>::new();
 
         for (raw_image, image_path) in ar.images.iter().zip(ar.image_paths.iter()) {
-            println!("Processing image `{}` @ `{}`", raw_image, image_path);
             let image = match Image::try_from_str(raw_image) {
                 Ok(image) => image,
                 Err(_) => continue,
             };
 
             for cfg in self.proxy_registry_config.iter() {
-                println!("{} == {} ?", image.get_host(), cfg.host);
-
                 if image.get_host() == cfg.host {
-                    info!("mutate_admission: proxying image {}", raw_image);
-                    println!("It's a match ! {}", cfg.alias);
+                    info!(
+                        "mutate_admission: proxying image {} to {}",
+                        raw_image, cfg.alias
+                    );
                     let im = Image::new(
                         &ar.host_name,
                         format!("f/{}/{}", cfg.alias, image.get_repo()),
@@ -123,6 +121,7 @@ impl AdmissionController for TrowServer {
                     }));
                     break;
                 }
+                info!("mutate_admission: could not proxy image {}", raw_image);
             }
         }
         let patch = Patch(patch_operations);
@@ -146,7 +145,7 @@ mod test {
     fn test_check() {
         let cfg = ImageValidationConfig {
             default: "Deny".to_string(),
-            allow: vec!["localhost:8080".into(), "quay.io".into()],
+            allow: vec!["localhost:8080/".into(), "quay.io/".into()],
             deny: vec![],
         };
 
