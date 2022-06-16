@@ -316,19 +316,17 @@ mod validation_tests {
         test_image(&client, "trow.test/am/test:tag", true).await;
         test_image(&client, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true).await;
         test_image(&client, "docker.io/amouat/myimage:test", true).await;
-        test_image(&client, "http://localhost:8000/hello/world", true).await;
+        test_image(&client, "localhost:8000/hello/world", true).await;
 
         // explicitely denied
         test_image(&client, "localhost:8000/secret/shine-box", true).await;
-        test_image(&client, "http://localhost:8000/secret/shine-box", true).await;
-        test_image(&client, "https://localhost:8000/secret/shine-box", true).await;
 
         // default denied
         test_image(&client, "virus.land.cc/not/suspect", false).await;
 
         // invalid image ref
-        test_image(&client, "http://nope", false).await;
+        test_image(&client, "nope", false).await;
         test_image(&client, "example.com", false).await;
-        test_image(&client, "docker.io", false).await;
+        test_image(&client, "docker.io/voyager@jasper-byrne", false).await;
     }
 }

@@ -27,6 +27,8 @@ pub enum HttpAuth {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxyConfig {
     pub alias: String,
+    /// This field is unvalidated and may contain a scheme or not.
+    /// eg: `http://example.com` and `example.com`
     pub host: String,
     username: Option<String>,
     password: Option<String>,
@@ -172,7 +174,7 @@ async fn get_www_authenticate_header(
         .await
         .map_err(|e| {
             anyhow!(
-                "Could not fetch {AUTHN_HEADER} header from {} (failed with: {})",
+                "Could not fetch www-authenticate header from {} (failed with: {})",
                 &image.get_manifest_url(),
                 e
             )
@@ -272,7 +274,6 @@ mod tests {
         };
 
         let proxy_image = Image::new(&proxy_cfg.host, "hello_world".into(), "latest".into());
-
         (server, proxy_cfg, proxy_image)
     }
 
