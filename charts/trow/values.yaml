@@ -11,6 +11,7 @@ image:
 
 trow:
   ## if using NodePort, this can be set to 127.0.0.1:XXXX
+  ## Where "XXXX" is the value of service.nodePort
   domain: myregistry.mydomain.io
   # user: user
   # password: password
@@ -33,12 +34,12 @@ trow:
     config:
       - alias: docker
         host: registry-1.docker.io
+        username: ~
+        password: ~
       - alias: nvcr
         host: https://nvcr.io
       - alias: quay
         host: quay.io
-      # - alias: toto
-      #  host: http://toto.land
 
 webhookPatch:
   image:
