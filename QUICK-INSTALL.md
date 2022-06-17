@@ -1,11 +1,13 @@
 Quick Install for Dev/Test Instructions
 =======================================
 
+# NOT RECOMMENDED: PLEASE USE THE HELM CHART
+
 ## Install with TLS
 
 These instructions are intended for installing Trow on short-lived clusters, typically when
 developing or testing with Kubernetes. For longer-lived clusters, please see the [standard
-installation instructions](docs/KUSTOMIZE_INSTALL.md). 
+installation instructions](docs/KUSTOMIZE_INSTALL.md).
 
 The install script will configure the Trow registry on an existing Kubernetes
 cluster, with a certificate signed by the Kubernetes CA. It will copy the certificate to the nodes
@@ -35,7 +37,7 @@ clusterrolebinding.rbac.authorization.k8s.io "cluster-admin-binding" created
 
 ### Automatic installation
 
- - Just run `./install.sh` from the `quick-install` directory and follow the prompts. 
+ - Just run `./install.sh` from the `quick-install` directory and follow the prompts.
  - You can also specify installation namespace by running `./install.sh <namespace>`
  - If you are using a Mac, restart Docker once the install script has completed.
 
@@ -58,10 +60,10 @@ $ docker tag nginx:alpine trow.kube-public:31000/test/nginx:alpine
 ```
 $ docker push trow.kube-public:31000/test/nginx:alpine
 The push refers to repository [trow.kube-public:31000/test/nginx]
-979531bcfa2b: Pushed 
-8d36c62f099e: Pushed 
-4b735058ece4: Pushed 
-503e53e365f3: Pushed 
+979531bcfa2b: Pushed
+8d36c62f099e: Pushed
+4b735058ece4: Pushed
+503e53e365f3: Pushed
 alpine: digest: sha256:bfddb36c23addfd10db511d95b7508fa7b6b2aca09b313ff3ef73c3752d11a55 size: 11903
 ```
 
@@ -134,12 +136,12 @@ At this time the only authentication available is a simple username & password c
 
 ```
      ...
-     containers:                                                               
-      - name: trow-pod                                                          
-        image: containersol/trow:default                                        
-        args: ["-u", "myuser", "-p", "mypass", "-n", "trow:31000 trow.kube-public:31000"]                       
+     containers:
+      - name: trow-pod
+        image: containersol/trow:default
+        args: ["-u", "myuser", "-p", "mypass", "-n", "trow:31000 trow.kube-public:31000"]
         imagePullPolicy: Always
-     ...   
+     ...
 
 ```
 
@@ -153,7 +155,7 @@ Error response from daemon: Get https://trow.test:8443/v2/myimage/manifests/late
 ```
 $ docker login trow.test:8443
 Username: myuser
-Password: 
+Password:
 Login Succeeded
 $ docker pull ...
 ```

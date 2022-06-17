@@ -254,36 +254,30 @@ impl TrowBuilder {
             self.config.max_manifest_size
         );
 
-        println!("\n**Validation callback configuration\n");
-
-        println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
-
         println!(
-            "  These host names will be considered local (refer to this registry): {:?}",
+            "Hostname of this registry (for the MutatingWebhook): {:?}",
             self.config.service_name
         );
-
         match self.config.image_validation_config {
             Some(ref config) => {
-                println!("  Image validation webhook configured:");
-                println!("    Default action: {}", config.default);
-                println!("    Allowed prefixes: {:?}", config.allow);
-                println!("    Denied prefixes: {:?}", config.deny);
+                println!("Image validation webhook configured:");
+                println!("  Default action: {}", config.default);
+                println!("  Allowed prefixes: {:?}", config.allow);
+                println!("  Denied prefixes: {:?}", config.deny);
             }
-            None => println!("  Image validation is not configured"),
+            None => println!("Image validation webhook not configured"),
         }
-
         if !self.config.proxy_registry_config.is_empty() {
-            println!("  Proxy registries configured:");
+            println!("Proxy registries configured:");
             for config in &self.config.proxy_registry_config {
-                println!("    {}: {}", config.alias, config.host);
+                println!("  - {}: {}", config.alias, config.host);
             }
         } else {
-            println!("  No proxy registries configured");
+            println!("Proxy registries not configured");
         }
 
         if self.config.cors {
-            println!("  Cross-Origin Resource Sharing(CORS) requests are allowed\n");
+            println!("Cross-Origin Resource Sharing(CORS) requests are allowed\n");
         }
 
         if self.config.dry_run {

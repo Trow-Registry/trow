@@ -76,7 +76,7 @@ mod cli {
         get_command()
             .assert()
             .success()
-            .stdout(predicate::str::contains("  No proxy registries configured"));
+            .stdout(predicate::str::contains("Proxy registries not configured"));
 
         let file = get_file(ImageValidationConfig {
             allow: vec!["trow.test/".to_string()],
@@ -93,10 +93,10 @@ mod cli {
             .success()
             .stdout(predicate::str::contains(
                 [
-                    "  Image validation webhook configured:",
-                    "    Default action: Allow",
-                    "    Allowed prefixes: [\"trow.test/\"]",
-                    "    Denied prefixes: [\"toto\"]",
+                    "Image validation webhook configured:",
+                    "  Default action: Allow",
+                    "  Allowed prefixes: [\"trow.test/\"]",
+                    "  Denied prefixes: [\"toto\"]",
                 ]
                 .join("\n"),
             ));
@@ -108,7 +108,7 @@ mod cli {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "  Image validation is not configured",
+                "Image validation webhook not configured",
             ));
 
         let file = get_file::<Vec<RegistryProxyConfig>>(vec![
@@ -135,9 +135,9 @@ mod cli {
             .success()
             .stdout(predicate::str::contains(
                 [
-                    "  Proxy registries configured:",
-                    "    lovni: jul.example.com",
-                    "    trow: 127.0.0.1",
+                    "Proxy registries configured:",
+                    "  - lovni: jul.example.com",
+                    "  - trow: 127.0.0.1",
                 ]
                 .join("\n"),
             ));
