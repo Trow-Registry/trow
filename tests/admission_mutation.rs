@@ -59,7 +59,7 @@ mod admission_mutation_tests {
             .spawn()
             .expect("failed to start");
 
-        let mut timeout = 100;
+        let mut timeout = 600;
 
         let client = reqwest::Client::new();
 
