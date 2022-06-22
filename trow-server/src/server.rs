@@ -487,18 +487,18 @@ impl TrowServer {
 
     async fn create_manifest_read_location(
         &self,
-        repo_name: String,
+        mut repo_name: String,
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation> {
         if let Some((proxy_image, proxy_cfg)) = self.get_proxy_image_and_cfg(&repo_name, &reference)
         {
-            //TODO: May want to consider download tracking in case of simultaneous requests
-            //In short term this isn't a big problem as should just copy over itself in worst case
             info!(
                 "Request for proxied repo {}:{} maps to {}",
                 repo_name, reference, proxy_image
             );
+            // Replace eg f/docker/alpine by f/docker/library/alpine
+            repo_name = format!("f/{}/{}", proxy_cfg.alias, proxy_image.get_repo());
 
             let cl = ProxyClient::try_new(proxy_cfg.clone(), &proxy_image)
                 .await
