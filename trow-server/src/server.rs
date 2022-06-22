@@ -212,13 +212,18 @@ fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
 }
 
 fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String> {
-    let digest_date = fs::read_to_string(path)?;
-    //Should be digest followed by date, but allow for digest only
-    Ok(digest_date
+    let manifest = fs::read_to_string(path)?;
+    let latest_digest_line = manifest
+        .lines()
+        .last()
+        .ok_or_else(|| anyhow!("Empty manifest"))?;
+    // Each line is `{digest} {date}`
+    let latest_digest = latest_digest_line
         .split(' ')
         .next()
-        .unwrap_or(&digest_date)
-        .to_string())
+        .ok_or_else(|| anyhow!("Invalid manifest line: `{}`", latest_digest_line))?;
+
+    Ok(latest_digest.to_string())
 }
 
 impl TrowServer {
@@ -274,7 +279,7 @@ impl TrowServer {
 
     async fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<()> {
         // Tag files should contain list of digests with timestamp
-        // First line should always be the current digest
+        // Last line should always be the current digest
 
         let repo_dir = self.manifests_path.join(repo_name);
         let repo_path = repo_dir.join(tag);
