@@ -1,9 +1,10 @@
-[![](https://github.com/containersolutions/trow/workflows/Tests/badge.svg)](https://github.com/containersolutions/trow/actions)
+[![](https://github.com/extrality/trow/workflows/Tests/badge.svg)](https://github.com/extrality/trow/actions)
 
-[![](https://github.com/containersolutions/trow/workflows/OCI%20Conformance/badge.svg)](https://github.com/containersolutions/trow/actions)
+[![](https://github.com/extrality/trow/workflows/OCI%20Conformance/badge.svg)](https://github.com/extrality/trow/actions)
 
 # Trow
-Image Management for Kubernetes
+Image Management for Kubernetes.
+Forked from https://github.com/ContainerSolutions/trow
 
 We're building an image management solution for Kubernetes (and possibly other orchestrators).
 At its heart is the Trow Registry, which runs inside the cluster, is simple to set-up and fully
@@ -17,7 +18,7 @@ it is a old style of cargo boat that transported goods on rivers. Finally, it is
 an archaic word meaning "to think, believe, or trust". The reader is free to
 choose which interpretation they like most, but it should be pronounced to rhyme
 with "brow".
- 
+
 ## Use Cases
 
 The primary goal for Trow is to create a registry that runs within Kubernetes
@@ -56,7 +57,7 @@ Note that Trow is currently alpha and you can expect to find rough edges.
 ## Architecture and Design
 
 If you're interested in the design of Trow please take a look at the [Architecture
-Guide](docs/ARCHITECTURE.md). 
+Guide](docs/ARCHITECTURE.md).
 
 ## Tests
 
@@ -71,7 +72,7 @@ how to persist images and how to list repositories and tags via curl.
 
 Please take a look at [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to help out and
 [DEVELOPING.md](DEVELOPING.md) for how to get started compiling and running Trow. See also the
-[Architecture Guide](docs/ARCHITECTURE.md). 
+[Architecture Guide](docs/ARCHITECTURE.md).
 
 ## Code of Conduct
 

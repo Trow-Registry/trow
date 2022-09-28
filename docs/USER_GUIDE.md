@@ -159,7 +159,7 @@ reasons and ambiguities in specification.
 
 ## Multiplatform Builds
 
-Trow has builds for amd64, armv7 and arm64. Images with a release version but no explicit platform e.g. `trow:0.3` or `trow:0.3.2` should be _multiplatform_ images that will automatically pull the correct version of the image for the current platform. Images tagged `latest` or `default` are currently amd64 only. Images should be pushed to both [GHCR](https://github.com/orgs/ContainerSolutions/packages/container/package/trow%2Ftrow) and the [Docker Hub](https://hub.docker.com/r/containersol/trow).
+Trow has builds for amd64, armv7 and arm64. Images with a release version but no explicit platform e.g. `trow:0.3` or `trow:0.3.2` should be _multiplatform_ images that will automatically pull the correct version of the image for the current platform. Images tagged `latest` or `default` are currently amd64 only. Images should be pushed to both [GHCR](https://github.com/orgs/extrality/packages/container/package/trow%2Ftrow) and the [Docker Hub](https://hub.docker.com/r/containersol/trow).
 
 If there's another build you would like to see, please get in contact.
 

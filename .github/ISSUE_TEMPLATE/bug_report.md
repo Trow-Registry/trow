@@ -22,7 +22,7 @@ Logs for Trow are normally obtained from Kubernetes e.g. `kubectl -n kube-public
 
 **Trow Info**
  - Install method (quick-install, Helm, Kustomize)
- - Version/Image Name (e.g. `containersol/trow:0.3`, can be obtained from `kubectl describe`) 
+ - Version/Image Name (e.g. `extrality/trow:0.3`, can be obtained from `kubectl describe`)
 
 **Kubernetes**
  - Kubernetes distro/host (EKS, GKE, Kind, Minikube etc)
