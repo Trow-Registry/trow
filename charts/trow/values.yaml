@@ -10,6 +10,7 @@ image:
 
 trow:
   domain: myregistry.mydomain.io
+  # host: "::" # Enables IPv6 Support, by listening also on IPv6 interfaces
   # user: user
   # password: password
   validation:
