@@ -576,7 +576,10 @@ impl ClientInterface {
 
         while let Some(entry) = stream.message().await? {
             let ts = if let Some(date) = entry.date {
-                chrono::Utc.timestamp_opt(date.seconds, date.nanos.try_into().unwrap()).earliest().unwrap()
+                chrono::Utc
+                    .timestamp_opt(date.seconds, date.nanos.try_into().unwrap())
+                    .earliest()
+                    .unwrap()
             } else {
                 warn!("Manifest digest stored without timestamp. Using Epoch.");
                 chrono::Utc.timestamp_opt(0, 0).earliest().unwrap()
