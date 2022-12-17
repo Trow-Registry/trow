@@ -92,7 +92,8 @@ mod test {
         assert!(!path.exists(), "File should have been deleted");
     }
 
-    //#[tokio::test]
+    /*
+    #[tokio::test]
     async fn test_temporary_file_async_cancellation() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.txt");
@@ -119,6 +120,7 @@ mod test {
         );
         assert!(!path.exists(), "File should have been deleted");
     }
+    */
 
     #[tokio::test]
     async fn test_write() {
