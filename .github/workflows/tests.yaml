@@ -15,9 +15,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
+      uses: actions-rs/toolchain@v2
       with:
-        toolchain: nightly
+        toolchain: stable
         override: true
         default: true
         components: rustfmt
