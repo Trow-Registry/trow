@@ -24,7 +24,7 @@ changed.
 
 Running the tests is a little more complicated as you need to set the domain `trow.test` to point to
 your local machine and set-up TLS certificates. Instead of doing this you might find it easier to
-use the slower Docker mehod instead, by simply running the `docker/test.sh` script. 
+use the slower Docker method instead, by simply running the `docker/test.sh` script. 
 
 If you still want to run the tests locally, you will first need to configure routing. On my Linux
 laptop I do this by adding the line `127.0.0.1 trow.test` to `/etc/hosts`. I believe this will also
