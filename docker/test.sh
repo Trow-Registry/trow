@@ -7,6 +7,7 @@ src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
 docker build \
+    --platform linux/amd64 \
     --progress=plain \
     --add-host trow.test:127.0.0.1 \
     -t trow/test \

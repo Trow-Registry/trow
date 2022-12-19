@@ -8,7 +8,7 @@ COPY docker/platform.sh .
 RUN ./platform.sh # should write /.platform and /.compiler
 RUN rustup component add rustfmt
 RUN rustup target add $(cat /.platform)
-RUN apt-get update && apt-get install -y unzip $(cat /.compiler)
+RUN apt update && apt-get install -y unzip $(cat /.compiler)
 
 COPY Cargo.toml .
 COPY Cargo.lock .
