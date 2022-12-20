@@ -29,6 +29,10 @@ spec:
           - "--no-tls" 
           - "-n" 
           - {{ .Values.trow.domain | quote }}
+          {{- if .Values.trow.host }}
+          - "--host"
+          - {{ .Values.trow.host | quote }}
+          {{- end}}
           {{- if and (.Values.trow.user) (.Values.trow.password) }}
           - "-u" 
           - {{ .Values.trow.user | quote }} 
