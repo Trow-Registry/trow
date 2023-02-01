@@ -43,7 +43,7 @@ pub struct ManifestListEntry {
     pub media_type: String, //TODO: make enum
     pub size: u32,
     pub digest: String,
-    pub platform: Platform,
+    pub platform: Option<Platform>,
 }
 
 #[derive(Serialize, Deserialize)]

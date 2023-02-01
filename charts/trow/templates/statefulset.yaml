@@ -16,6 +16,7 @@ spec:
       labels:
         {{- include "trow.selectorLabels" . | nindent 8 }}
     spec:
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -47,6 +48,10 @@ spec:
           - "--no-tls"
           - "-n"
           - {{ .Values.trow.domain | quote }}
+          {{- if .Values.trow.host }}
+          - "--host"
+          - {{ .Values.trow.host | quote }}
+          {{- end}}
           {{- if and (.Values.trow.user) (.Values.trow.password) }}
           - "-u"
           - {{ .Values.trow.user | quote }}
@@ -83,6 +88,10 @@ spec:
           subPath: validation.yaml
           readOnly: true
       {{- end}}
+      {{- with .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
     {{- if or .Values.trow.validation.enableWebhook .Values.trow.proxyConfig.enableWebhook }}
       - name: trow-webhook
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -130,6 +139,10 @@ spec:
           subPath: validation.yaml
           readOnly: true
       {{- end}}
+      {{- with .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
 
     {{- end }}
       volumes:
@@ -155,10 +168,10 @@ spec:
           configMap:
             name: {{ include "trow.fullname" . }}-validation-cfg
       {{- end }}
+      {{- with .Values.podSecurityContext }}
       securityContext:
-        runAsUser: 333333
-        runAsGroup: 333333
-        fsGroup: 333333
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
