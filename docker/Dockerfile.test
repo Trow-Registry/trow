@@ -33,8 +33,8 @@ COPY trow-protobuf trow-protobuf
 COPY tests tests
 
 RUN mkdir certs
-COPY quick-install/self-cert/make-certs.sh certs/
-COPY quick-install/self-cert/in.req certs/
+COPY utils/self-cert/make-certs.sh certs/
+COPY utils/self-cert/in.req certs/
 RUN cd certs && ./make-certs.sh
 
 RUN cargo test --workspace

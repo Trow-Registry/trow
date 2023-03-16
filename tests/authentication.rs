@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod common;
 
 #[cfg(test)]

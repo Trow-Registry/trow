@@ -6,31 +6,55 @@ replicaCount: 1
 
 image:
   repository: containersol/trow
+  tag:
   pullPolicy: Always
 
 trow:
+  ## if using NodePort, this can be set to 127.0.0.1:XXXX
+  ## Where "XXXX" is the value of service.nodePort
   domain: myregistry.mydomain.io
   # host: "::" # Enables IPv6 Support, by listening also on IPv6 interfaces
   # user: user
   # password: password
   validation:
-    enabled: false
-    allowDocker: false
-    allowKubernetes: true
-    allowPrefixes: []
-    allowImages: []
-    disallowLocalPrefixes: []
-    disallowLocalImages: []
-    proxyDockerHub: false
+    enableWebhook: false
+    ## Ignore or Fail
+    onWebhookFailure: Ignore
+    ## The validation webhook need to be configured.
+    ## Note: it runs AFTER mutation webhooks.
+    ## Example:
+    config:
+      default: Deny # Deny or Allow
+      allow:
+        - 127.0.0.1
+      deny: []
+  proxyConfig:
+    enableWebhook: false
+    ## Ignore or Fail
+    onWebhookFailure: Ignore
+    config:
+      - alias: docker
+        host: registry-1.docker.io
+        username: ~
+        password: ~
+      - alias: nvcr
+        host: https://nvcr.io
+      - alias: quay
+        host: quay.io
 
+webhookPatch:
+  image:
+    image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1
+    pullPolicy: IfNotPresent
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-
 service:
   type: NodePort
   port: 8000
+  ## Specify the nodePort value for the LoadBalancer and NodePort service types.
+  nodePort:
 
 ingress:
   enabled: false
@@ -45,7 +69,7 @@ ingress:
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
-  
+
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little

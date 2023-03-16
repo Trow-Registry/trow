@@ -368,7 +368,7 @@ mod test {
                   }
                   "#;
 
-        let v: Value = serde_json::from_str(&data).unwrap();
+        let v: Value = serde_json::from_str(data).unwrap();
         assert!(Manifest::from_json(&v).is_ok());
     }
 }

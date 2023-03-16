@@ -1,14 +1,3 @@
-use futures::Future;
-use log::{LevelFilter, SetLoggerError};
-
-use rand::rngs::OsRng;
-use rocket::fairing;
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::str::FromStr;
-use uuid::Uuid;
-
 mod client_interface;
 mod fairings;
 
@@ -21,18 +10,31 @@ mod registry_interface;
 #[cfg(feature = "sqlite")]
 mod users;
 
-use chrono::Utc;
-use client_interface::ClientInterface;
-use fairings::conditional_fairing::AttachConditionalFairing;
-use rand::RngCore;
+use anyhow::Context;
+use futures::Future;
+use log::{LevelFilter, SetLoggerError};
 use std::io::Write;
 
 use anyhow::{anyhow, Result};
+use chrono::Utc;
 use log::debug;
+use rand::rngs::OsRng;
+use rand::RngCore;
+use rocket::fairing;
 use rocket::http::Method;
 use rocket_cors::AllowedHeaders;
 use rocket_cors::AllowedOrigins;
+use std::env;
+use std::fs;
+use std::path::Path;
+use std::str::FromStr;
 use thiserror::Error;
+use uuid::Uuid;
+
+use client_interface::ClientInterface;
+use fairings::conditional_fairing::AttachConditionalFairing;
+
+use trow_server::{ImageValidationConfig, RegistryProxyConfig};
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -55,14 +57,9 @@ pub struct TrowConfig {
     addr: NetAddr,
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
-    host_names: Vec<String>,
-    proxy_hub: bool,
-    hub_user: Option<String>,
-    hub_pass: Option<String>,
-    allow_prefixes: Vec<String>,
-    allow_images: Vec<String>,
-    deny_prefixes: Vec<String>,
-    deny_images: Vec<String>,
+    service_name: String,
+    proxy_registry_config: Vec<RegistryProxyConfig>,
+    image_validation_config: Option<ImageValidationConfig>,
     dry_run: bool,
     max_manifest_size: u32,
     max_blob_size: u32,
@@ -101,13 +98,8 @@ fn init_trow_server(
     let ts = trow_server::build_server(
         &config.data_dir,
         config.grpc.listen.parse::<std::net::SocketAddr>()?,
-        config.proxy_hub,
-        config.hub_user,
-        config.hub_pass,
-        config.allow_prefixes,
-        config.allow_images,
-        config.deny_prefixes,
-        config.deny_images,
+        config.proxy_registry_config,
+        config.image_validation_config,
     );
     //TODO: probably shouldn't be reusing this cert
     let ts = if let Some(tls) = config.tls {
@@ -150,12 +142,7 @@ impl TrowBuilder {
         data_dir: String,
         addr: NetAddr,
         listen: String,
-        host_names: Vec<String>,
-        proxy_hub: bool,
-        allow_prefixes: Vec<String>,
-        allow_images: Vec<String>,
-        deny_prefixes: Vec<String>,
-        deny_images: Vec<String>,
+        service_name: String,
         dry_run: bool,
         cors: bool,
         max_manifest_size: u32,
@@ -167,14 +154,9 @@ impl TrowBuilder {
             addr,
             tls: None,
             grpc: GrpcConfig { listen },
-            host_names,
-            proxy_hub,
-            hub_user: None,
-            hub_pass: None,
-            allow_prefixes,
-            allow_images,
-            deny_prefixes,
-            deny_images,
+            service_name,
+            proxy_registry_config: Vec::new(),
+            image_validation_config: None,
             dry_run,
             max_manifest_size,
             max_blob_size,
@@ -184,6 +166,26 @@ impl TrowBuilder {
             log_level,
         };
         TrowBuilder { config }
+    }
+
+    pub fn with_proxy_registries(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
+        let config_file = config_file.as_ref();
+        let config_str = fs::read_to_string(config_file)
+            .with_context(|| format!("Could not read file `{}`", config_file))?;
+        let config = serde_yaml::from_str::<Vec<RegistryProxyConfig>>(&config_str)
+            .with_context(|| format!("Could not parse file `{}`", config_file))?;
+        self.config.proxy_registry_config = config;
+        Ok(self)
+    }
+
+    pub fn with_image_validation(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
+        let config_file = config_file.as_ref();
+        let config_str = fs::read_to_string(config_file)
+            .with_context(|| format!("Could not read file `{}`", config_file))?;
+        let config = serde_yaml::from_str::<ImageValidationConfig>(&config_str)
+            .with_context(|| format!("Could not parse file `{}`", config_file))?;
+        self.config.image_validation_config = Some(config);
+        Ok(self)
     }
 
     pub fn with_tls(&mut self, cert_file: String, key_file: String) -> &mut TrowBuilder {
@@ -202,12 +204,6 @@ impl TrowBuilder {
                 .expect("Error hashing password");
         let usercfg = UserConfig { user, hash_encoded };
         self.config.user = Some(usercfg);
-        self
-    }
-
-    pub fn with_hub_auth(&mut self, hub_user: String, token: String) -> &mut TrowBuilder {
-        self.config.hub_pass = Some(token);
-        self.config.hub_user = Some(hub_user);
         self
     }
 
@@ -258,37 +254,30 @@ impl TrowBuilder {
             self.config.max_manifest_size
         );
 
-        println!("\n**Validation callback configuration\n");
-
-        println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
-
         println!(
-            "  These host names will be considered local (refer to this registry): {:?}",
-            self.config.host_names
+            "Hostname of this registry (for the MutatingWebhook): {:?}",
+            self.config.service_name
         );
-        println!(
-            "  Images with these prefixes are explicitly allowed: {:?}",
-            self.config.allow_prefixes
-        );
-        println!(
-            "  Images with these names are explicitly allowed: {:?}",
-            self.config.allow_images
-        );
-        println!(
-            "  Local images with these prefixes are explicitly denied: {:?}",
-            self.config.deny_prefixes
-        );
-        println!(
-            "  Local images with these names are explicitly denied: {:?}\n",
-            self.config.deny_images
-        );
-
-        if self.config.proxy_hub {
-            println!("  Docker Hub repostories are being proxy-cached under f/docker/\n");
+        match self.config.image_validation_config {
+            Some(ref config) => {
+                println!("Image validation webhook configured:");
+                println!("  Default action: {}", config.default);
+                println!("  Allowed prefixes: {:?}", config.allow);
+                println!("  Denied prefixes: {:?}", config.deny);
+            }
+            None => println!("Image validation webhook not configured"),
+        }
+        if !self.config.proxy_registry_config.is_empty() {
+            println!("Proxy registries configured:");
+            for config in &self.config.proxy_registry_config {
+                println!("  - {}: {}", config.alias, config.host);
+            }
+        } else {
+            println!("Proxy registries not configured");
         }
 
         if self.config.cors {
-            println!("  Cross-Origin Resource Sharing(CORS) requests are allowed\n");
+            println!("Cross-Origin Resource Sharing(CORS) requests are allowed\n");
         }
 
         if self.config.dry_run {

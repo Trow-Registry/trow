@@ -21,7 +21,6 @@ If applicable, please include CLI output or logs (if large please attach or put 
 Logs for Trow are normally obtained from Kubernetes e.g. `kubectl -n kube-public trow-deploy...`
 
 **Trow Info**
- - Install method (quick-install, Helm, Kustomize)
  - Version/Image Name (e.g. `extrality/trow:0.3`, can be obtained from `kubectl describe`)
 
 **Kubernetes**

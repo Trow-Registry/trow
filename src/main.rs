@@ -65,11 +65,11 @@ fn parse_args() -> ArgMatches {
                 .takes_value(true),
         )
         .arg(
-            Arg::new("names")
+            Arg::new("name")
             .short('n')
-            .long("names")
-            .value_name("names")
-            .help("Host names for registry. Used in validation callbacks. Separate with comma or use quotes and spaces")
+            .long("name")
+            .value_name("name")
+            .help("Host name for registry. Used in AdmissionMutation webhook.")
             .takes_value(true),
         )
         .arg(
@@ -78,57 +78,6 @@ fn parse_args() -> ArgMatches {
             .value_name("dry_run")
             .help("Don't acutally run Trow, just validate arguments. For testing purposes.")
             .takes_value(false),
-        )
-        .arg(
-            Arg::new("allow-docker-official")
-            .long("allow-docker-official")
-            .value_name("allow_docker_official")
-            .help("Docker official images (e.g. the debian base image) will be allowed in validation callbacks.")
-            .takes_value(false)
-        )
-        .arg(
-            Arg::new("deny-k8s-images")
-            .long("deny-k8s-images")
-            .value_name("deny_k8s_images")
-            .help("By default, validation callbacks will allow various Kubernetes system images by default.
-This option will deny those images; be careful as this may disable cluster installation and updates.")
-            .takes_value(false)
-        )
-        .arg(
-            Arg::new("allow-prefixes")
-            .long("allow-prefixes")
-            .value_name("allow_prefixes")
-            .help("Images that begin with any of the listed prefixes will be allowed in validation callbaks.
-Separate with a comma or use quotes and spaces.
-For example 'quay.io/coreos,myhost.com/' will match quay.io/coreos/etcd and myhost.com/myimage/myrepo:tag.
-Use docker.io as the hostname for the Docker Hub.")
-            .takes_value(true)
-        )
-        .arg(
-            Arg::new("allow-images")
-            .long("allow-images")
-            .value_name("allow_images")
-            .help("Images that match a full name in the list will be allowed in validation callbacks.
-Separate with a comma or use quotes and spaces. Include the hostname.
-For example 'quay.io/coreos/etcd:latest'. Use docker.io as the hostname for the Docker Hub.")
-            .takes_value(true)
-        )
-
-        .arg(
-            Arg::new("disallow-local-prefixes")
-            .long("disallow-local-prefixes")
-            .value_name("disallow_local_prefixes")
-            .help("Disallow local images that match the prefix _not_ including any host name.
-For example 'beta' will match myhost.com/beta/myapp assuming myhost.com is the name of this registry.")
-            .takes_value(true)
-        )
-        .arg(
-            Arg::new("disallow-local-images")
-            .long("disallow-local-images")
-            .value_name("disallow_local_images")
-            .help("Disallow local images that match the full name _not_ including any host name.
-For example 'beta/myapp:tag' will match myhost.com/beta/myapp:tag assuming myhost.com is the name of this registry.")
-            .takes_value(true)
         )
         .arg(
             Arg::new("user")
@@ -165,32 +114,17 @@ Must be used with --user")
             .takes_value(false)
         )
         .arg(
-            Arg::new("proxy-docker-hub")
-            .long("proxy-docker-hub")
-            .value_name("proxy-docker-hub")
-            .help("Proxies repos at f/docker/<repo_name> to docker.io/<repo_name>. Downloaded images will be cached.")
-            .takes_value(false)
-        )
-        .arg(
-            Arg::new("hub-user")
-            .long("hub-user")
-            .value_name("hub-user")
-            .help("Set the username for accessing the Docker Hub, used when proxying Docker Hub images.
-Must be used with --hub-token or --hub-token-file")
+            Arg::new("image-validation-config-file")
+            .long("image-validation-config-file")
+            .value_name("FILE")
+            .help("Load a YAML file containing the config to validate container images through an admission webhook.")
             .takes_value(true)
         )
         .arg(
-            Arg::new("hub-token")
-            .long("hub-token")
-            .value_name("hub-token")
-            .help("Set the token for accessing the Docker Hub, used when proxying Docker Hub images")
-            .takes_value(true)
-        )
-        .arg(
-            Arg::new("hub-token-file")
-            .long("hub-token-file")
-            .value_name("hub-token-file")
-            .help("Location of file with token that can be used for accessing the Docker Hub, used when proxying Docker Hub images")
+            Arg::new("proxy-registry-config-file")
+            .long("proxy-registry-config-file")
+            .value_name("FILE")
+            .help("Load a YAML file containing the config to proxy repos at f/<registry_alias>/<repo_name> to <registry>/<repo_name>.")
             .takes_value(true)
         )
         .arg(
@@ -222,12 +156,6 @@ Must be used with --hub-token or --hub-token-file")
         .get_matches()
 }
 
-fn parse_list(names: &str) -> Vec<String> {
-    //split on , or whitespace
-    let ret_str = names.replace(",", " ");
-    ret_str.split_whitespace().map(|x| x.to_owned()).collect()
-}
-
 fn main() {
     let matches = parse_args();
 
@@ -248,10 +176,9 @@ fn main() {
     let cert_path = matches.value_of("cert").unwrap_or("./certs/domain.crt");
     let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
     let data_path = matches.value_of("data-dir").unwrap_or("./data");
-    let host_names_str = matches.value_of("names").unwrap_or(host);
-    let host_names = parse_list(host_names_str);
+
+    let host_name = matches.value_of("name").unwrap_or(host);
     let dry_run = matches.is_present("dry-run");
-    let proxy_hub = matches.is_present("proxy-docker-hub");
 
     let default_manifest_size: u32 = 4; //mebibytes
     let default_blob_size: u32 = 8192; //mebibytes
@@ -266,18 +193,6 @@ fn main() {
             x.parse().expect("Failed to parse max blob size")
         });
 
-    let mut allow_prefixes = parse_list(matches.value_of("allow-prefixes").unwrap_or(""));
-    if matches.is_present("allow-docker-official") {
-        allow_prefixes.push("docker.io/".to_owned());
-    }
-    if !matches.is_present("deny-k8s-images") {
-        allow_prefixes.push("k8s.gcr.io/".to_owned());
-        allow_prefixes.push("docker.io/containersol/trow".to_owned());
-    }
-    let allow_images = parse_list(matches.value_of("allow-images").unwrap_or(""));
-    let deny_prefixes = parse_list(matches.value_of("disallow-local-prefixes").unwrap_or(""));
-    let deny_images = parse_list(matches.value_of("disallow-local-images").unwrap_or(""));
-
     let cors = matches.is_present("enable-cors");
 
     let addr = NetAddr {
@@ -288,12 +203,7 @@ fn main() {
         data_path.to_string(),
         addr,
         "127.0.0.1:51000".to_string(),
-        host_names,
-        proxy_hub,
-        allow_prefixes,
-        allow_images,
-        deny_prefixes,
-        deny_images,
+        host_name.to_owned(),
         dry_run,
         cors,
         max_manifest_size,
@@ -335,40 +245,19 @@ fn main() {
             std::process::exit(1);
         }
     }
-    if matches.is_present("proxy-docker-hub") && matches.is_present("hub-user") {
-        let hub_user = matches
-            .value_of("hub-user")
-            .expect("Failed to read Docker Hub user name");
-
-        if matches.is_present("hub-token") {
-            let hub_token = matches
-                .value_of("hub-token")
-                .expect("Failed to read Docker Hub token");
-            builder.with_hub_auth(hub_user.to_string(), hub_token.to_string());
-        } else if matches.is_present("hub-token-file") {
-            let file_name = matches
-                .value_of("hub-token-file")
-                .expect("Failed to read Docker Hub token file");
-            let mut file = File::open(file_name)
-                .unwrap_or_else(|_| panic!("Failed to read Docker Hub token file {}", file_name));
-            let mut token = String::new();
-            file.read_to_string(&mut token)
-                .unwrap_or_else(|_| panic!("Failed to read Docker Hub token file {}", file_name));
-
-            //Remove final newline if present
-            if token.ends_with('\n') {
-                token.pop();
-                if token.ends_with('\r') {
-                    token.pop();
-                }
-            }
-
-            builder.with_hub_auth(hub_user.to_string(), token);
-        } else {
-            eprintln!("Either --password or --password-file must be set if --user is set");
+    if let Some(config_file) = matches.value_of("proxy-registry-config-file") {
+        if let Err(e) = builder.with_proxy_registries(config_file) {
+            eprintln!("Failed to load proxy registry config file: {:#}", e);
             std::process::exit(1);
         }
     }
+    if let Some(config_file) = matches.value_of("image-validation-config-file") {
+        if let Err(e) = builder.with_image_validation(config_file) {
+            eprintln!("Failed to load image validation config file: {:#}", e);
+            std::process::exit(1);
+        }
+    }
+
     builder.start().unwrap_or_else(|e| {
         eprintln!("Error launching Trow:\n\n{}", e);
         std::process::exit(1);

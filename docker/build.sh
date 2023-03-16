@@ -44,10 +44,10 @@ then
 
     docker tag $IMAGE containersol/trow:latest
     docker push containersol/trow:latest
-    docker tag $IMAGE $GH_REPO:default 
-    docker push $GH_REPO:default 
-    docker tag $IMAGE $GH_REPO:latest 
-    docker push $GH_REPO:latest 
+    docker tag $IMAGE $GH_REPO:default
+    docker push $GH_REPO:default
+    docker tag $IMAGE $GH_REPO:latest
+    docker push $GH_REPO:latest
 
     # Add new image name to manifest template
     sed -i "s|{{TROW_AMD64_IMAGE}}|${IMAGE}|" ./manifest.tmpl

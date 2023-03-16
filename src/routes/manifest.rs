@@ -95,7 +95,7 @@ pub async fn get_manifest_4level(
 }
 
 /*
- * Process 4 level manifest path
+ * Process 5 level manifest path
  */
 #[get("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_5level(
@@ -111,7 +111,7 @@ pub async fn get_manifest_5level(
     get_manifest(
         auth_user,
         ci,
-        format!("{}/{}/{}/{}/{} ", fifth, fourth, org, user, repo),
+        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
         reference,
     )
     .await

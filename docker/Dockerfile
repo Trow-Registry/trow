@@ -30,7 +30,7 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-COPY quick-install/self-cert /install/self-cert
+COPY utils/self-cert /install/self-cert
 COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
 # keep this late for concurrency

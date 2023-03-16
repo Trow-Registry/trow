@@ -135,7 +135,7 @@ pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, fr
 
     // build token from structure and return token string
     let token_claim = TokenClaim {
-        iss: tc.host_names[0].clone(),
+        iss: tc.service_name.clone(),
         sub: vbt.user.clone(),
         aud: "Trow Registry".to_owned(),
         exp: current_time.add(Duration::new(TOKEN_DURATION, 0)).as_secs(),

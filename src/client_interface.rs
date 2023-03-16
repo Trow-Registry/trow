@@ -5,10 +5,13 @@ pub mod trow_proto {
 use crate::registry_interface::blob_storage::Stored;
 use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
 use crate::registry_interface::{
-    validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
-    Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
+    AdmissionValidation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory,
+    ManifestReader, Metrics, MetricsError, MetricsResponse,
 };
+use anyhow::anyhow;
 use anyhow::Result;
+use k8s_openapi::api::core::v1::Pod;
+use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use log::{debug, info, warn};
 use rocket::data::DataStream;
 use rocket::tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite};
@@ -24,7 +27,6 @@ use trow_proto::{
 use crate::registry_interface::{BlobStorage, ManifestStorage, StorageDriverError};
 use crate::types::{self, *};
 use chrono::TimeZone;
-use serde_json::Value;
 use std::convert::TryInto;
 use std::io::SeekFrom;
 
@@ -35,32 +37,26 @@ pub struct ClientInterface {
     server: String,
 }
 
-/**
- * This is really bad way to do things on several levels, but it works for the moment.
- *
- * The major problem is Rust doesn't have TCO so we could be DOS'd by a malicious request.
- */
-fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<String> {
-    match blob {
-        Value::Array(vals) => {
-            for v in vals {
-                extract_images(v, images);
-            }
+fn extract_images(pod: &Pod) -> (Vec<String>, Vec<String>) {
+    let mut images = vec![];
+    let mut paths = vec![];
+
+    let spec = pod.spec.clone().unwrap_or_default();
+    for (i, container) in spec.containers.iter().enumerate() {
+        if let Some(image) = &container.image {
+            images.push(image.clone());
+            paths.push(format!("/spec/containers/{i}/image"));
         }
-        Value::Object(m) => {
-            for (k, v) in m {
-                if k == "image" {
-                    if let Value::String(image) = v {
-                        images.push(image.to_owned())
-                    }
-                } else {
-                    extract_images(v, images);
-                }
-            }
-        }
-        _ => (),
     }
-    images
+
+    for (i, container) in spec.init_containers.unwrap_or_default().iter().enumerate() {
+        if let Some(image) = &container.image {
+            images.push(image.clone());
+            paths.push(format!("/spec/initContainers/{i}/image"));
+        }
+    }
+
+    (images, paths)
 }
 
 // TODO: Each function should have it's own enum of the errors it can return
@@ -71,7 +67,7 @@ pub enum RegistryError {
     InvalidName,
     #[error("Invalid manifest")]
     InvalidManifest,
-    #[error("Invalid Range")]
+    #[error("Invalid Ranextract_imagesge")]
     ManifestClipped,
     #[error("Manifest over data limit")]
     Internal,
@@ -319,15 +315,29 @@ impl CatalogOperations for ClientInterface {
 }
 
 #[rocket::async_trait]
-impl Validation for ClientInterface {
+impl AdmissionValidation for ClientInterface {
     async fn validate_admission(
         &self,
-        admission_req: &validation::AdmissionRequest,
-        host_names: &[String],
-    ) -> Result<validation::AdmissionResponse, ValidationError> {
-        self.validate_admission_internal(admission_req, host_names)
+        admission_req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> AdmissionResponse {
+        self.validate_admission_internal(admission_req, host_name)
             .await
-            .map_err(|_| ValidationError::Internal)
+            .unwrap_or_else(|e| {
+                AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
+            })
+    }
+
+    async fn mutate_admission(
+        &self,
+        admission_req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> AdmissionResponse {
+        self.mutate_admission_internal(admission_req, host_name)
+            .await
+            .unwrap_or_else(|e| {
+                AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
+            })
     }
 }
 
@@ -741,51 +751,87 @@ impl ClientInterface {
      */
     async fn validate_admission_internal(
         &self,
-        req: &validation::AdmissionRequest,
-        host_names: &[String],
-    ) -> Result<validation::AdmissionResponse> {
+        req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> Result<AdmissionResponse> {
         info!(
-            "Validating admission request {} host_names {:?}",
-            req.uid, host_names
+            "Validating admission request {} host_name {:?}",
+            req.uid, host_name
         );
-        //TODO: write something to convert automatically (into()) between AdmissionRequest types
         // TODO: we should really be sending the full object to the backend.
-        let mut images = Vec::new();
-        extract_images(&req.object, &mut images);
+        let obj = req
+            .object
+            .as_ref()
+            .ok_or_else(|| anyhow!("No pod in pod admission request"))?;
+        let (images, _) = extract_images(obj);
         let ar = trow_proto::AdmissionRequest {
+            host_name: host_name.to_string(),
+            image_paths: vec![], // unused in validation
             images,
-            namespace: req.namespace.clone(),
-            operation: req.operation.clone(),
-            host_names: host_names.to_vec(),
+            namespace: req
+                .namespace
+                .clone()
+                .ok_or_else(|| anyhow!("Object has no namespace"))?,
         };
 
-        let resp = self
+        let internal_resp = self
             .connect_admission_controller()
             .await?
             .validate_admission(Request::new(ar))
             .await?
             .into_inner();
 
-        //TODO: again, this should be an automatic conversion
-        let st = if resp.is_allowed {
-            validation::Status {
-                status: "Success".to_owned(),
-                message: None,
-                code: None,
-            }
-        } else {
-            //Not sure "Failure" is correct
-            validation::Status {
-                status: "Failure".to_owned(),
-                message: Some(resp.reason.to_string()),
-                code: None,
-            }
+        let mut resp = AdmissionResponse::from(req);
+        if !internal_resp.is_allowed {
+            resp = resp.deny(internal_resp.reason);
+        }
+
+        Ok(resp)
+    }
+
+    async fn mutate_admission_internal(
+        &self,
+        req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> Result<AdmissionResponse> {
+        info!(
+            "Mutating admission request {} host_name {:?}",
+            req.uid, host_name
+        );
+        // TODO: we should really be sending the full object to the backend.
+        let obj = req
+            .object
+            .as_ref()
+            .ok_or_else(|| anyhow!("No pod in pod admission request"))?;
+        let (images, image_paths) = extract_images(obj);
+        let ar = trow_proto::AdmissionRequest {
+            host_name: host_name.to_string(),
+            image_paths,
+            images,
+            namespace: req
+                .namespace
+                .clone()
+                .ok_or_else(|| anyhow!("Object has no namespace"))?,
         };
-        Ok(validation::AdmissionResponse {
-            uid: req.uid.clone(),
-            allowed: resp.is_allowed,
-            status: Some(st),
-        })
+
+        let internal_resp = self
+            .connect_admission_controller()
+            .await?
+            .mutate_admission(Request::new(ar))
+            .await?
+            .into_inner();
+
+        let mut resp = AdmissionResponse::from(req);
+        if let Some(raw_patch) = internal_resp.patch {
+            let patch: json_patch::Patch = serde_json::from_slice(raw_patch.as_slice())?;
+            resp = resp.with_patch(patch)?;
+        }
+
+        if !internal_resp.is_allowed {
+            resp = resp.deny("Failure");
+        }
+
+        Ok(resp)
     }
 
     /**

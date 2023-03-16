@@ -4,7 +4,7 @@ use prometheus::{
     labels, opts, register_int_counter, register_int_gauge, Encoder, IntCounter, IntGauge,
     TextEncoder,
 };
-use std::path::PathBuf;
+use std::path::Path;
 
 //  Metrics static values executed at runtime and registered to default
 //  prometheus registry
@@ -37,7 +37,7 @@ lazy_static! {
 }
 
 // Query disk metrics
-pub fn query_disk_metrics(path: &PathBuf) {
+pub fn query_disk_metrics(path: &Path) {
     let data_path = path.parent().unwrap();
     let available_space = fs3::available_space(data_path).unwrap_or(0);
     AVAILABLE_SPACE.set(available_space as i64);
@@ -47,7 +47,7 @@ pub fn query_disk_metrics(path: &PathBuf) {
     TOTAL_SPACE.set(total_space as i64);
 }
 
-pub fn gather_metrics(blobs_path: &PathBuf) -> Result<String> {
+pub fn gather_metrics(blobs_path: &Path) -> Result<String> {
     query_disk_metrics(blobs_path);
 
     let encoder = TextEncoder::new();
