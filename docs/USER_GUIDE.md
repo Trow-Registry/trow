@@ -1,12 +1,19 @@
 # Trow User Guide
 
- * [Persisting Data/Images](#persisting-dataimages)
- * [Proxying other registries](#proxying-other-registries-and-MutatingWebhook))
- * [Validation Webhook](#validating-webhook)
- * [Listing Repositories and Tags](#listing-repositories-and-tags)
- * [Using Curl Securely](#using-curl-securely)
- * [Multiplatform Builds](#multiplatform-builds)
- * [Troubleshooting](#troubleshooting)
+- [Trow User Guide](#trow-user-guide)
+  - [Persisting Data/Images](#persisting-dataimages)
+  - [Proxying other registries (and MutatingWebhook)](#proxying-other-registries-and-mutatingwebhook)
+  - [Validating Webhook](#validating-webhook)
+    - [Configuration](#configuration)
+    - [Troubleshooting](#troubleshooting)
+  - [Listing Repositories and Tags](#listing-repositories-and-tags)
+  - [Multiplatform Builds](#multiplatform-builds)
+  - [Troubleshooting](#troubleshooting-1)
+    - [Where are the logs?](#where-are-the-logs)
+    - [I can't push images into Trow](#i-cant-push-images-into-trow)
+    - [My pod can't pull images from Trow](#my-pod-cant-pull-images-from-trow)
+    - [Permission Denied Errors in Logs](#permission-denied-errors-in-logs)
+    - [Errors When Pushing or Pulling Large Images](#errors-when-pushing-or-pulling-large-images)
 
 More information is available in the [README](../README.md) and [Installation
 instructions](../docs/KUSTOMIZE_INSTALL.md).
@@ -193,8 +200,7 @@ If there's another build you would like to see, please get in contact.
 
 The first place to look for debugging information is in the output from the
 `kubectl describe` command. It's worth looking at the output for the deployment,
-replicaset and pod. Assuming the namespace for the Trow is "trow" (if you used the quick-install it
-will be kube-public):
+replicaset and pod. Assuming the namespace for the Trow is "trow":
 
 ```
 $ kubectl describe deploy -n trow trow-deploy
@@ -226,12 +232,6 @@ Look at the logs for the init container:
 $ kubectl logs -n trow trow-deploy-596bf849c8-m7b7l -c trow-init
 ```
 
-If you used the quick-install, the `copy-certs` job may also log errors:
-
-```
-$ kubectl logs -n kube-public copy-certs-925a5126-48bd-43d4-b9ea-3f792519b051-fznp8
-```
-
 ### I can't push images into Trow
 
 If you get an error like:
@@ -249,13 +249,6 @@ Your client isn't reaching the Trow service. Please check the following:
  - Check that a service exists for Trow (e.g. `kubectl describe svc -n trow trow`).
  - Check that your network or cloud provider isn't blocking access.
 
-_The rest of the advice in this question is applicable only to the quick-install_
-
- - Ensure port 31000 is accessible. This will likely mean editing network rules if using a public
-   cloud.
- - Make sure that your client is pointing to the correct address. The IP address given in the error
-   message should match the public IP of one of the cluster nodes. If it doesn't, try running the
-   `install/configure-host.sh` script.
 
 If you get an error like:
 
@@ -309,11 +302,6 @@ Error creating: Internal error occurred: failed calling admission webhook "valid
 ```
 
 Trow probably isn't running and the webhook is configured to `Fail` on error. You will need to disable the admission webhook (or, for helm chart: `onWebhookFailure: Ignore`) and restart Trow.
-
-If the error is not to do with validation and you used the quick-install, it may be that the node is
-unable to pull from the Trow registry. By default nodes are configured by the `copy-certs` job. You
-can check that the job completed successfully with `kubectl get jobs -n kube-public`. If the node is
-new, try running the script `install/copy-certs.sh`.
 
 
 ```
