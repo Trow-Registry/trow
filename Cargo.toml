@@ -1,7 +1,7 @@
 [package]
 name = "trow"
 version = "0.4.0"
-authors = ["Adrian Mouat <adrian.mouat@container-solutions.com>", "Hamish Hutchings <hamish.hutchings@container-solutions.com>"]
+authors = []
 edition = "2021"
 
 [workspace]

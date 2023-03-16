@@ -9,7 +9,7 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.4/trow-0.3.4.tgz
+    - https://github.com/extrality/trow/releases/download/v0.3.4/trow-0.3.4.tgz
     version: 0.3.4
   - apiVersion: v2
     appVersion: 0.3.3
@@ -19,7 +19,7 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.3/trow-0.3.3.tgz
+    - https://github.com/extrality/trow/releases/download/v0.3.3/trow-0.3.3.tgz
     version: 0.3.3
   - apiVersion: v2
     appVersion: 0.3.2
@@ -29,7 +29,7 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.2/trow-0.3.2.tgz
+    - https://github.com/extrality/trow/releases/download/v0.3.2/trow-0.3.2.tgz
     version: 0.3.2
   - apiVersion: v2
     appVersion: 0.3.0
@@ -39,7 +39,7 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.3.0/trow-0.3.0.tgz
+    - https://github.com/extrality/trow/releases/download/v0.3.0/trow-0.3.0.tgz
     version: 0.3.0
   - apiVersion: v2
     appVersion: 0.2.0
@@ -49,7 +49,7 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.1.tgz
+    - https://github.com/extrality/trow/releases/download/v0.2.0/trow-0.1.1.tgz
     version: 0.1.1
   - apiVersion: v2
     appVersion: 0.2.0
@@ -59,6 +59,6 @@ entries:
     name: trow
     type: application
     urls:
-    - https://github.com/ContainerSolutions/trow/releases/download/v0.2.0/trow-0.1.0.tgz
+    - https://github.com/extrality/trow/releases/download/v0.2.0/trow-0.1.0.tgz
     version: 0.1.0
 generated: "2022-01-10T16:32:45.920461911Z"

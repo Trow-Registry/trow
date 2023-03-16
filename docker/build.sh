@@ -6,7 +6,7 @@ set -eo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-GH_REPO=${DOCKER_REPO:-"ghcr.io/containersolutions/trow/trow"}
+GH_REPO=${DOCKER_REPO:-"ghcr.io/extrality/trow/trow"}
 REPO=${DOCKER_REPO:-"containersol/trow"}
 
 if [[ "$CI" = true ]]

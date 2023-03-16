@@ -67,6 +67,6 @@ git push origin v$VERSION
 # Update charts/trow/Chart.yaml with correct values
 # Run `helm package charts/trow/ --destination charts/` - this should build tgz
 # Upload tgz to GH release
-# Run `helm repo index charts/ --merge charts/index.yaml --url https://github.com/ContainerSolutions/trow/releases/download/v0.3.4/`
+# Run `helm repo index charts/ --merge charts/index.yaml --url https://github.com/extrality/trow/releases/download/v0.3.4/`
 # Merge new index.yaml
 # Copy index.yaml to gh-pages branch

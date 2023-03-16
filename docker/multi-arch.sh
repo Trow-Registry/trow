@@ -6,7 +6,7 @@ set -eo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-GH_REPO=${DOCKER_REPO:-"ghcr.io/containersolutions/trow/trow"}
+GH_REPO=${DOCKER_REPO:-"ghcr.io/extrality/trow/trow"}
 DH_REPO=${DOCKER_REPO:-"containersol/trow"}
 
 # Use trow-multi builder if it exists, otherwise create it
@@ -52,12 +52,12 @@ docker buildx build \
   -t $DH_REPO:latest -t $GH_REPO:latest \
   -f Dockerfile ../
 
-# Sign the images 
+# Sign the images
 # Assumes runner has installed cosing e.g. uses: sigstore/cosign-installer@main
 if [[ "$CI" = true ]]
 then
     #sign once for each registry, will sign corresponding hash
     #(assumes keyless signing is enabled)
-    cosign sign --recursive $DH_IMAGE 
+    cosign sign --recursive $DH_IMAGE
     cosign sign --recursive $GH_IMAGE
 fi

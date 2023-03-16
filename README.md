@@ -1,9 +1,10 @@
-[![](https://github.com/containersolutions/trow/workflows/Tests/badge.svg)](https://github.com/containersolutions/trow/actions)
+[![](https://github.com/extrality/trow/workflows/Tests/badge.svg)](https://github.com/extrality/trow/actions)
 
-[![](https://github.com/containersolutions/trow/workflows/OCI%20Conformance/badge.svg)](https://github.com/containersolutions/trow/actions)
+[![](https://github.com/extrality/trow/workflows/OCI%20Conformance/badge.svg)](https://github.com/extrality/trow/actions)
 
 # Trow
-Image Management for Kubernetes
+Image Management for Kubernetes.
+Forked from https://github.com/ContainerSolutions/trow
 
 We're building an image management solution for Kubernetes (and possibly other orchestrators).
 At its heart is the Trow Registry, which runs inside the cluster, is simple to set-up and fully
