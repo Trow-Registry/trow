@@ -47,7 +47,7 @@ docker buildx build \
   --build-arg TAG="$TAG" \
   --build-arg DATE="$DATE" \
   --build-arg VERSION="$VERSION" \
-  $PUSH --pull --platform linux/arm/v7,linux/arm64,linux/amd64 \
+  $PUSH --pull --platform linux/arm64,linux/amd64 \
   -t $DH_IMAGE -t $GH_IMAGE -t $DH_REPO:default -t $GH_REPO:default \
   -t $DH_REPO:latest -t $GH_REPO:latest \
   -f Dockerfile ../

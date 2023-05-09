@@ -282,7 +282,6 @@ impl TrowServer {
         // Last line should always be the current digest
 
         let repo_dir = self.manifests_path.join(repo_name);
-        let repo_path = repo_dir.join(tag);
         fs::create_dir_all(&repo_dir)?;
 
         let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
@@ -291,9 +290,22 @@ impl TrowServer {
         let mut file = tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&repo_path)
+            .open(&repo_dir.join(tag))
             .await?;
         file.write_all(&contents).await?;
+
+        // write digest manifest too
+        if tag != digest {
+            let digest_file = tokio::fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&repo_dir.join(digest))
+                .await;
+            if let Ok(mut file) = digest_file {
+                file.write_all(&contents).await?;
+            }
+        }
+
         Ok(())
     }
 
@@ -505,7 +517,7 @@ impl TrowServer {
             // Replace eg f/docker/alpine by f/docker/library/alpine
             repo_name = format!("f/{}/{}", proxy_cfg.alias, proxy_image.get_repo());
 
-            let cl = ProxyClient::try_new(proxy_cfg.clone(), &proxy_image)
+            let try_cl = ProxyClient::try_new(proxy_cfg.clone(), &proxy_image)
                 .await
                 .map_err(|e| {
                     anyhow!(
@@ -513,42 +525,41 @@ impl TrowServer {
                         proxy_cfg.host,
                         e
                     )
-                })?;
-
+                });
+            if try_cl.is_err() {
+                warn!("Could not create proxy client, cannot pull image");
+            }
             let mut have_manifest = false;
 
-            let digest = self.get_digest_from_header(&cl, &proxy_image).await;
-
-            if let Some(digest) = digest {
+            let local_digest = self.get_digest_from_manifest(&repo_name, &reference).ok();
+            let latest_digest = match &try_cl {
+                Ok(cl) => self.get_digest_from_header(cl, &proxy_image).await,
+                _ => local_digest.clone(),
+            };
+            if let Some(digest) = latest_digest {
                 if self.get_catalog_path_for_blob(&digest)?.exists() {
-                    info!(
-                        "Have up to date manifest for {} digest {}",
-                        repo_name, digest
-                    );
+                    info!("Have manifest for {} digest {}", repo_name, digest);
                     have_manifest = true;
-
-                    //Make sure our tag exists and is up-to-date
-                    if !is_digest(&reference) {
-                        let our_digest = self.get_digest_from_manifest(&repo_name, &reference);
-                        if our_digest.is_err() || (our_digest.unwrap() != digest) {
-                            let res = self.save_tag(&digest, &repo_name, &reference).await;
-                            if res.is_err() {
-                                error!(
-                                    "Internal error updating tag for proxied image {:?}",
-                                    res.unwrap()
-                                );
-                            }
+                    // Make sure our tag is up-to-date
+                    if !is_digest(&reference) && local_digest.as_ref() != Some(&digest) {
+                        let res = self.save_tag(&digest, &repo_name, &reference).await;
+                        if res.is_err() {
+                            error!(
+                                "Internal error updating tag for proxied image {:?}",
+                                res.unwrap()
+                            );
                         }
                     }
                 }
             }
 
             if !have_manifest {
+                let cl = try_cl?;
                 if let Err(e) = self
                     .download_manifest_and_layers(&cl, &proxy_image, &repo_name)
                     .await
                 {
-                    //Note that we may still have an out-of-date version that will be returned
+                    // Note that we may still have an out-of-date version that will be returned
                     error!("Failed to download proxied image {}", e);
                 }
             }

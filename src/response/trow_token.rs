@@ -146,7 +146,7 @@ pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, fr
     };
 
     let header = json!({});
-    let payload = serde_json::to_value(&token_claim)?;
+    let payload = serde_json::to_value(token_claim)?;
 
     //Use generated config here
     let token = encode(header, &tc.token_secret, &payload, Algorithm::HS256)?;

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
@@ -43,7 +44,9 @@ pub struct ProxyClient {
 
 impl ProxyClient {
     pub async fn try_new(mut proxy_cfg: RegistryProxyConfig, proxy_image: &Image) -> Result<Self> {
-        let base_client = reqwest::Client::new();
+        let base_client = reqwest::ClientBuilder::new()
+            .connect_timeout(Duration::from_millis(500))
+            .build()?;
 
         let authn_header = get_www_authenticate_header(&base_client, proxy_image).await?;
 
