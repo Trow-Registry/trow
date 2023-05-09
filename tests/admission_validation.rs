@@ -211,7 +211,7 @@ mod validation_tests {
 
         assert!(!response.allowed);
 
-        assert_eq!(response.result.message.unwrap(), "unknown_registry.io/nginx: Image is neither explicitely allowed nor denied (using default behavior)");
+        assert_eq!(response.result.message, "unknown_registry.io/nginx: Image is neither explicitely allowed nor denied (using default behavior)");
     }
 
     async fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {

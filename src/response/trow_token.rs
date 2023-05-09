@@ -1,5 +1,6 @@
 use crate::TrowConfig;
 use crate::UserConfig;
+use base64::{engine::general_purpose as base64_engine, Engine as _};
 use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
 use log::warn;
 use rocket::http::ContentType;
@@ -57,7 +58,7 @@ impl<'r> FromRequest<'r> for ValidBasicToken {
             return Outcome::Failure((Status::Unauthorized, ()));
         }
 
-        match base64::decode(&auth_strings[1]) {
+        match base64_engine::STANDARD_NO_PAD.decode(&auth_strings[1]) {
             Ok(user_pass) => {
                 if verify_user(user_pass, user_cfg) {
                     Outcome::Success(ValidBasicToken {

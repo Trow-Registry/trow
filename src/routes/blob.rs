@@ -170,7 +170,7 @@ pub async fn put_blob(
         digest_obj,
         RepoName(repo_name),
         Uuid(uuid),
-        (0, (size as u32).checked_sub(1).unwrap_or(0)), // Note first byte is 0
+        (0, (size as u32).saturating_sub(1)), // Note first byte is 0
     ))
 }
 
@@ -336,7 +336,7 @@ pub async fn patch_blob(
                 Ok(create_upload_info(
                     uuid,
                     repo_name,
-                    (0, (stored.total_stored as u32).checked_sub(1).unwrap_or(0)), // First byte is 0
+                    (0, (stored.total_stored as u32).saturating_sub(1)), // First byte is 0
                 ))
             }
         }

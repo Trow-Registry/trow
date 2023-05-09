@@ -67,9 +67,7 @@ impl Drop for TemporaryFile {
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::future::try_join_all;
     use tempfile::tempdir;
-    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_temporary_file() {

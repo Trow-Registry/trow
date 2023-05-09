@@ -53,19 +53,19 @@ mod cli {
     #[test]
     fn host_name_parsing() {
         get_command()
-            .args(&["-n", "myhost.com"])
+            .args(["-n", "myhost.com"])
             .assert()
             .success()
             .stdout(predicate::str::contains(": \"myhost.com\""));
 
         get_command()
-            .args(&["--name", "trow.test"])
+            .args(["--name", "trow.test"])
             .assert()
             .success()
             .stdout(predicate::str::contains(": \"trow.test\""));
 
         get_command()
-            .args(&["-n=port.io:3833"])
+            .args(["-n=port.io:3833"])
             .assert()
             .success()
             .stdout(predicate::str::contains(": \"port.io:3833\""));
@@ -85,7 +85,7 @@ mod cli {
         });
 
         get_command()
-            .args(&[
+            .args([
                 "--image-validation-config-file",
                 file.path().to_str().unwrap(),
             ])
@@ -127,7 +127,7 @@ mod cli {
         ]);
 
         get_command()
-            .args(&[
+            .args([
                 "--proxy-registry-config-file",
                 file.path().to_str().unwrap(),
             ])
@@ -146,7 +146,7 @@ mod cli {
     #[test]
     fn cors() {
         get_command()
-            .args(&["--enable-cors"])
+            .args(["--enable-cors"])
             .assert()
             .success()
             .stdout(predicate::str::contains(
@@ -157,18 +157,18 @@ mod cli {
     #[test]
     fn file_size_parsing() {
         get_command()
-            .args(&["--max-manifest-size", "3"])
+            .args(["--max-manifest-size", "3"])
             .assert()
             .success()
             .stdout(predicate::str::contains("manifest size: 3"));
 
         get_command()
-            .args(&["--max-manifest-size", "-4"])
+            .args(["--max-manifest-size", "-4"])
             .assert()
             .failure();
 
         get_command()
-            .args(&["--max-manifest-size", "1.1"])
+            .args(["--max-manifest-size", "1.1"])
             .assert()
             .failure();
     }
@@ -176,7 +176,7 @@ mod cli {
     #[test]
     fn log_level_setting() {
         get_command()
-            .args(&["--log-level", "TRACE"])
+            .args(["--log-level", "TRACE"])
             .assert()
             .success();
     }

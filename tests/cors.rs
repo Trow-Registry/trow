@@ -7,7 +7,7 @@ mod cors_tests {
     use crate::common;
     use environment::Environment;
 
-    use base64::encode;
+    use base64::{engine::general_purpose as base64_engine, Engine as _};
     use reqwest::header::HeaderMap;
     use reqwest::header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
@@ -134,7 +134,7 @@ mod cors_tests {
     }
 
     async fn test_cors_headers_authorization(cl: &reqwest::Client) {
-        let bytes = encode(b"authtest:authpass");
+        let bytes = base64_engine::STANDARD.encode(b"authtest:authpass");
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned() + "/login"))
             .header(ORIGIN, "https://example.com")

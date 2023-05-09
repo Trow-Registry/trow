@@ -18,7 +18,7 @@ const DEFAULT_KEY_PATH: &str = "./certs/domain.key";
 */
 fn parse_args() -> ArgMatches {
     clap::Command::new(PROGRAM_NAME)
-        .version("0.1")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("From Container Solutions")
         .about(PROGRAM_DESC)
         .arg(
@@ -26,35 +26,37 @@ fn parse_args() -> ArgMatches {
                 .long("host")
                 .value_name("host")
                 .help("Sets the name of the host or interface to start Trow on. Defaults to 0.0.0.0")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("port")
                 .long("port")
                 .value_name("port")
                 .help("The port that trow will listen on. Defaults to 8443 with TLS, 8000 without.")
-                .takes_value(true),
+                .num_args(1)
+                .value_parser(clap::value_parser!(u16)),
         )
         .arg(
             Arg::new("no-tls")
                 .long("no-tls")
                 .help("Turns off TLS. Normally only used in development and debugging. If used in production, make sure you understand the risks.")
+                .num_args(0)
         )
         .arg(
             Arg::new("cert")
                 .short('c')
                 .long("cert")
                 .value_name("cert")
-                .help(format!("Path to TLS certificate. Defaults to {}.", DEFAULT_CERT_PATH).as_str())
-                .takes_value(true),
+                .help(format!("Path to TLS certificate. Defaults to {}.", DEFAULT_CERT_PATH))
+                .num_args(1),
         )
         .arg(
             Arg::new("key")
                 .short('k')
                 .long("key")
                 .value_name("key")
-                .help(format!("Path to TLS private key. Defaults to {}.", DEFAULT_KEY_PATH).as_str())
-                .takes_value(true),
+                .help(format!("Path to TLS private key. Defaults to {}.", DEFAULT_KEY_PATH))
+                .num_args(1),
         )
         .arg(
             Arg::new("data-dir")
@@ -62,7 +64,7 @@ fn parse_args() -> ArgMatches {
                 .long("data-dir")
                 .value_name("data_dir")
                 .help("Directory to store images and metadata in.")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("name")
@@ -70,14 +72,14 @@ fn parse_args() -> ArgMatches {
             .long("name")
             .value_name("name")
             .help("Host name for registry. Used in AdmissionMutation webhook.")
-            .takes_value(true),
+            .num_args(1),
         )
         .arg(
             Arg::new("dry-run")
             .long("dry-run")
             .value_name("dry_run")
             .help("Don't acutally run Trow, just validate arguments. For testing purposes.")
-            .takes_value(false),
+            .num_args(0),
         )
         .arg(
             Arg::new("user")
@@ -86,7 +88,7 @@ fn parse_args() -> ArgMatches {
             .value_name("user")
             .help("Set the username that can be used to access Trow (e.g. via docker login).
 Must be used with --password or --password-file")
-            .takes_value(true)
+            .num_args(1)
         )
         .arg(
             Arg::new("password")
@@ -95,7 +97,7 @@ Must be used with --password or --password-file")
             .value_name("password")
             .help("Set the password that can be used to access Trow (e.g. via docker login).
 Must be used with --user")
-            .takes_value(true)
+            .num_args(1)
         )
         .arg(
             Arg::new("password-file")
@@ -103,55 +105,50 @@ Must be used with --user")
             .value_name("password-file")
             .help("Location of file with password that can be used to access Trow (e.g. via docker login).
 Must be used with --user")
-            .takes_value(true)
-        )
-        .arg(
-            Arg::new("version")
-            .long("version")
-            .short('v')
-            .value_name("version")
-            .help("Get the version number of Trow")
-            .takes_value(false)
+            .num_args(1)
         )
         .arg(
             Arg::new("image-validation-config-file")
             .long("image-validation-config-file")
             .value_name("FILE")
             .help("Load a YAML file containing the config to validate container images through an admission webhook.")
-            .takes_value(true)
+            .num_args(1)
         )
         .arg(
             Arg::new("proxy-registry-config-file")
             .long("proxy-registry-config-file")
             .value_name("FILE")
             .help("Load a YAML file containing the config to proxy repos at f/<registry_alias>/<repo_name> to <registry>/<repo_name>.")
-            .takes_value(true)
+            .num_args(1)
         )
         .arg(
             Arg::new("enable-cors")
                 .long("enable-cors")
                 .help("Enable Cross-Origin Resource Sharing(CORS) requests. Used to allow access from web apps (e.g. GUIs).")
+                .num_args(0)
         )
         .arg(
             Arg::new("max-manifest-size")
             .long("max-manifest-size")
             .value_name("max-manifest-size")
             .help("Maximum size in mebibytes of manifest file that can be uploaded. This is JSON metada, so usually relatively small.")
-            .takes_value(true)
+            .num_args(1)
+            .value_parser(clap::value_parser!(u32))
         )
         .arg(
             Arg::new("max-blob-size")
             .long("max-blob-size")
             .value_name("max-blob-size")
             .help("Maximum size in mebibytes of \"blob\" that can be uploaded (a single layer of an image). This can be very large in some images (GBs).")
-            .takes_value(true)
+            .num_args(1)
+            .value_parser(clap::value_parser!(u32))
         )
         .arg(
             Arg::new("log-level")
             .long("log-level")
             .value_name("log-level")
             .help("The log level at which to output to stdout, valid values are OFF, ERROR, WARN, INFO, DEBUG and TRACE")
-            .takes_value(true)
+            .num_args(1)
         )
         .get_matches()
 }
@@ -159,41 +156,46 @@ Must be used with --user")
 fn main() {
     let matches = parse_args();
 
-    if matches.is_present("version") {
-        let vcs_ref = env::var("VCS_REF").unwrap_or_default();
-        println!("Trow version {} {}", env!("CARGO_PKG_VERSION"), vcs_ref);
-        std::process::exit(0);
-    }
-
     let fallback_log_level = env::var("RUST_LOG").unwrap_or_else(|_| "error".to_string());
-    let log_level = matches.value_of("log-level").unwrap_or(&fallback_log_level);
-    let no_tls = matches.is_present("no-tls");
-    let host = matches.value_of("host").unwrap_or("0.0.0.0");
+    let log_level = matches
+        .get_one::<String>("log-level")
+        .unwrap_or(&fallback_log_level);
+    let no_tls = matches.get_flag("no-tls");
+    let host = matches
+        .get_one::<String>("host")
+        .map(String::as_str)
+        .unwrap_or("0.0.0.0");
     let default_port = if no_tls { 8000 } else { 8443 };
-    let port: u16 = matches.value_of("port").map_or(default_port, |x| {
-        x.parse().expect("Failed to parse port number")
-    });
-    let cert_path = matches.value_of("cert").unwrap_or("./certs/domain.crt");
-    let key_path = matches.value_of("key").unwrap_or("./certs/domain.key");
-    let data_path = matches.value_of("data-dir").unwrap_or("./data");
+    let port: u16 = *matches.get_one::<u16>("port").unwrap_or(&default_port);
+    let cert_path = matches
+        .get_one::<String>("cert")
+        .map(String::as_str)
+        .unwrap_or("./certs/domain.crt");
+    let key_path = matches
+        .get_one::<String>("key")
+        .map(String::as_str)
+        .unwrap_or("./certs/domain.key");
+    let data_path = matches
+        .get_one::<String>("data-dir")
+        .map(String::as_str)
+        .unwrap_or("./data");
 
-    let host_name = matches.value_of("name").unwrap_or(host);
-    let dry_run = matches.is_present("dry-run");
+    let host_name = matches
+        .get_one::<String>("name")
+        .map(String::as_str)
+        .unwrap_or(host);
+    let dry_run = matches.get_flag("dry-run");
 
     let default_manifest_size: u32 = 4; //mebibytes
     let default_blob_size: u32 = 8192; //mebibytes
-    let max_manifest_size = matches
-        .value_of("max-manifest-size")
-        .map_or(default_manifest_size, |x| {
-            x.parse().expect("Failed to parse max manifest size")
-        });
-    let max_blob_size = matches
-        .value_of("max-blob-size")
-        .map_or(default_blob_size, |x| {
-            x.parse().expect("Failed to parse max blob size")
-        });
+    let max_manifest_size = *matches
+        .get_one::<u32>("max-manifest-size")
+        .unwrap_or(&default_manifest_size);
+    let max_blob_size = *matches
+        .get_one::<u32>("max-blob-size")
+        .unwrap_or(&default_blob_size);
 
-    let cors = matches.is_present("enable-cors");
+    let cors = matches.get_flag("enable-cors");
 
     let addr = NetAddr {
         host: host.to_string(),
@@ -213,23 +215,15 @@ fn main() {
     if !no_tls {
         builder.with_tls(cert_path.to_string(), key_path.to_string());
     }
-    if matches.is_present("user") {
-        let user = matches.value_of("user").expect("Failed to read user name");
-
-        if matches.is_present("password") {
-            let pass = matches
-                .value_of("password")
-                .expect("Failed to read user password");
+    if let Some(user) = matches.get_one::<String>("user") {
+        if let Some(pass) = matches.get_one::<String>("password") {
             builder.with_user(user.to_string(), pass.to_string());
-        } else if matches.is_present("password-file") {
-            let file_name = matches
-                .value_of("password-file")
-                .expect("Failed to read user password file");
-            let mut file = File::open(file_name)
-                .unwrap_or_else(|_| panic!("Failed to read password file {}", file_name));
+        } else if let Some(pass_file) = matches.get_one::<String>("password-file") {
+            let mut file = File::open(pass_file)
+                .unwrap_or_else(|_| panic!("Failed to read password file {}", pass_file));
             let mut pass = String::new();
             file.read_to_string(&mut pass)
-                .unwrap_or_else(|_| panic!("Failed to read password file {}", file_name));
+                .unwrap_or_else(|_| panic!("Failed to read password file {}", pass_file));
 
             //Remove final newline if present
             if pass.ends_with('\n') {
@@ -245,13 +239,13 @@ fn main() {
             std::process::exit(1);
         }
     }
-    if let Some(config_file) = matches.value_of("proxy-registry-config-file") {
+    if let Some(config_file) = matches.get_one::<String>("proxy-registry-config-file") {
         if let Err(e) = builder.with_proxy_registries(config_file) {
             eprintln!("Failed to load proxy registry config file: {:#}", e);
             std::process::exit(1);
         }
     }
-    if let Some(config_file) = matches.value_of("image-validation-config-file") {
+    if let Some(config_file) = matches.get_one::<String>("image-validation-config-file") {
         if let Err(e) = builder.with_image_validation(config_file) {
             eprintln!("Failed to load image validation config file: {:#}", e);
             std::process::exit(1);

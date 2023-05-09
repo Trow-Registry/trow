@@ -58,7 +58,7 @@ impl ProxyClient {
             proxy_cfg.password = Some(passwd);
         }
 
-        let cl = match authn_header {
+        match authn_header {
             Some(h) if h.starts_with("Basic") => {
                 Self::try_new_with_basic_auth(&proxy_cfg, base_client).await
             }
@@ -74,9 +74,7 @@ impl ProxyClient {
                 proxy_cfg.host,
                 invalid_header
             )),
-        };
-
-        cl
+        }
     }
 
     async fn try_new_with_basic_auth(

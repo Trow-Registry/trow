@@ -84,7 +84,7 @@ mod interface_tests {
         let _trow = start_trow().await;
 
         let mut status = Command::new("docker")
-            .args(&["pull", "alpine:latest"])
+            .args(["pull", "alpine:latest"])
             .status()
             .expect("Failed to call docker pull - prereq for smoke test");
 
@@ -92,28 +92,28 @@ mod interface_tests {
 
         let image_name = format!("{}/alpine:trow", TROW_NAME);
         status = Command::new("docker")
-            .args(&["tag", "alpine:latest", &image_name])
+            .args(["tag", "alpine:latest", &image_name])
             .status()
             .expect("Failed to call docker");
 
         assert!(status.success());
 
         status = Command::new("docker")
-            .args(&["push", &image_name])
+            .args(["push", &image_name])
             .status()
             .expect("Failed to call docker");
 
         assert!(status.success());
 
         status = Command::new("docker")
-            .args(&["rmi", &image_name])
+            .args(["rmi", &image_name])
             .status()
             .expect("Failed to call docker");
 
         assert!(status.success());
 
         status = Command::new("docker")
-            .args(&["pull", &image_name])
+            .args(["pull", &image_name])
             .status()
             .expect("Failed to call docker");
 

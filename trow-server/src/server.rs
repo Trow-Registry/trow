@@ -321,7 +321,7 @@ impl TrowServer {
         manifest_path: &PathBuf,
         verify_assets_exist: bool,
     ) -> Result<VerifiedManifest> {
-        let manifest_bytes = std::fs::read(&manifest_path)?;
+        let manifest_bytes = std::fs::read(manifest_path)?;
         let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
         let manifest = Manifest::from_json(&manifest_json)?;
 
@@ -574,7 +574,7 @@ impl TrowServer {
         if !repo_path.exists() {
             fs::create_dir_all(repo_path)?;
         }
-        fs::rename(&scratch_path, &digest_path)?;
+        fs::rename(scratch_path, &digest_path)?;
         Ok(())
     }
 
@@ -787,8 +787,7 @@ impl Registry for TrowServer {
             Ok(vm) => {
                 // copy manifest to blobs and add tag
                 let digest = vm.digest.clone();
-                let ret = self
-                    .save_blob(&uploaded_manifest, &digest)
+                self.save_blob(&uploaded_manifest, &digest)
                     .and(self.save_tag(&digest, &mr.repo_name, &mr.reference).await)
                     .map(|_| Response::new(vm))
                     .map_err(|e| {
@@ -797,9 +796,7 @@ impl Registry for TrowServer {
                             &mr.repo_name, &mr.reference, e
                         );
                         Status::internal("Internal error copying manifest")
-                    });
-
-                ret
+                    })
             }
             Err(e) => {
                 error!("Error verifying manifest {:?}", e);
@@ -958,54 +955,52 @@ impl Registry for TrowServer {
 
         let (tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
-            let mut searching_for_digest = mr.last_digest != ""; //Looking for a digest iff it's not empty
+            let mut searching_for_digest = !mr.last_digest.is_empty(); //Looking for a digest iff it's not empty
 
             let mut sent = 0;
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let (digest, date) = match line.find(' ') {
-                        Some(ind) => {
-                            let (digest_str, date_str) = line.split_at(ind);
+            for line in reader.lines().flatten() {
+                let (digest, date) = match line.find(' ') {
+                    Some(ind) => {
+                        let (digest_str, date_str) = line.split_at(ind);
 
-                            if searching_for_digest {
-                                if digest_str == mr.last_digest {
-                                    searching_for_digest = false;
-                                }
-                                //Remember we want digest following matched digest
-                                continue;
+                        if searching_for_digest {
+                            if digest_str == mr.last_digest {
+                                searching_for_digest = false;
                             }
-
-                            let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
-
-                            let ts = if let Ok(dt) = dt_r {
-                                Some(Timestamp {
-                                    seconds: dt.timestamp(),
-                                    nanos: dt.timestamp_subsec_nanos() as i32,
-                                })
-                            } else {
-                                warn!("Failed to parse timestamp {}", date_str);
-                                None
-                            };
-                            (digest_str, ts)
+                            //Remember we want digest following matched digest
+                            continue;
                         }
-                        None => {
-                            warn!("No timestamp found in manifest");
-                            (line.as_ref(), None)
-                        }
-                    };
 
-                    let entry = ManifestHistoryEntry {
-                        digest: digest.to_string(),
-                        date,
-                    };
-                    tx.send(Ok(entry))
-                        .await
-                        .expect("Error streaming manifest history");
+                        let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
 
-                    sent += 1;
-                    if sent >= mr.limit {
-                        break;
+                        let ts = if let Ok(dt) = dt_r {
+                            Some(Timestamp {
+                                seconds: dt.timestamp(),
+                                nanos: dt.timestamp_subsec_nanos() as i32,
+                            })
+                        } else {
+                            warn!("Failed to parse timestamp {}", date_str);
+                            None
+                        };
+                        (digest_str, ts)
                     }
+                    None => {
+                        warn!("No timestamp found in manifest");
+                        (line.as_ref(), None)
+                    }
+                };
+
+                let entry = ManifestHistoryEntry {
+                    digest: digest.to_string(),
+                    date,
+                };
+                tx.send(Ok(entry))
+                    .await
+                    .expect("Error streaming manifest history");
+
+                sent += 1;
+                if sent >= mr.limit {
+                    break;
                 }
             }
         });

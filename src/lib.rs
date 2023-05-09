@@ -16,6 +16,7 @@ use log::{LevelFilter, SetLoggerError};
 use std::io::Write;
 
 use anyhow::{anyhow, Result};
+use base64::{engine::general_purpose as base64_engine, Engine as _};
 use chrono::Utc;
 use log::debug;
 use rand::rngs::OsRng;
@@ -212,7 +213,7 @@ impl TrowBuilder {
         // As we don't use private cookies, we just generate it here.
         let mut key = [0u8; 32];
         OsRng.fill_bytes(&mut key);
-        let secret_key = base64::encode(&key);
+        let secret_key = base64_engine::STANDARD_NO_PAD.encode(key);
 
         //TODO: with Rocket 0.5 should be able to pass our config file and let Rocket pick out the parts it wants
         //This will be simpler and allow more flexibility.

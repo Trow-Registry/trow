@@ -31,8 +31,9 @@ pub enum DigestError {
 pub const SUPPORTED_DIGEST_ALGORITHMS: [DigestAlgorithm; 2] =
     [DigestAlgorithm::Sha256, DigestAlgorithm::Sha512];
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy, Default)]
 pub enum DigestAlgorithm {
+    #[default]
     Sha256,
     Sha512,
 }
@@ -60,11 +61,6 @@ impl std::fmt::Display for DigestAlgorithm {
     }
 }
 
-impl Default for DigestAlgorithm {
-    fn default() -> Self {
-        DigestAlgorithm::Sha256
-    }
-}
 // This contains the algorithm and the hashed value
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Digest {

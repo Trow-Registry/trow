@@ -7,7 +7,7 @@ mod authentication_tests {
     use crate::common;
     use environment::Environment;
 
-    use base64::encode;
+    use base64::{engine::general_purpose as base64_engine, Engine as _};
     use reqwest::StatusCode;
     use std::fs::{self, File};
     use std::io::Read;
@@ -90,7 +90,7 @@ mod authentication_tests {
     }
 
     async fn test_login(cl: &reqwest::Client) {
-        let bytes = encode(b"authtest:authpass");
+        let bytes = base64_engine::STANDARD.encode(b"authtest:authpass");
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned() + "/login"))
             .header(AUTHZ_HEADER, format!("Basic {}", bytes))
