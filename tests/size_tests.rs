@@ -9,14 +9,14 @@ mod interface_tests {
     use crate::common;
 
     use reqwest::StatusCode;
-    use std::fs::File;
-    use std::io::Read;
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
 
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    const PORT: &str = "39365";
+    const HOST: &str = "127.0.0.1:39365";
+    const ORIGIN: &str = "http://127.0.0.1:39365";
 
     struct TrowInstance {
         pid: Child,
@@ -30,6 +30,11 @@ mod interface_tests {
             .env_clear()
             .envs(Environment::inherit().compile())
             .arg("--")
+            .arg("--no-tls")
+            .arg("--name")
+            .arg(HOST)
+            .arg("--port")
+            .arg(PORT)
             .arg("--max-manifest-size")
             .arg("1")
             .arg("--max-blob-size")
@@ -38,24 +43,12 @@ mod interface_tests {
             .expect("failed to start");
 
         let mut timeout = 100;
+        let client = reqwest::Client::new();
 
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
-
-        let mut response = client.get(TROW_ADDRESS).send().await;
+        let mut response = client.get(ORIGIN).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send().await;
+            response = client.get(ORIGIN).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -74,7 +67,7 @@ mod interface_tests {
     #[cfg(test)]
     pub async fn put_sized_blob(cl: &reqwest::Client, size: usize) -> StatusCode {
         let resp = cl
-            .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, "sized"))
+            .post(&format!("{}/v2/{}/blobs/uploads/", ORIGIN, "sized"))
             .send()
             .await
             .expect("Error uploading layer");
@@ -100,19 +93,7 @@ mod interface_tests {
     #[tokio::test]
     async fn test_runner() {
         let _trow = start_trow().await;
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::new();
 
         //put_sized_blob(&client, 100).await;
 

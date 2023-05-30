@@ -1,40 +1,49 @@
----
+{{- if or .Values.trow.validation.enableWebhook .Values.trow.proxyConfig.enableWebhook }}
 apiVersion: apps/v1
-kind: StatefulSet
+kind: DaemonSet
 metadata:
-  name: {{ include "trow.fullname" . }}
   labels:
-    {{- include "registry.labels" . | nindent 4 }}
+    {{- include "webhook.labels" . | nindent 4 }}
+  name: {{ include "trow.fullname" . }}-webhook
   namespace: {{ .Release.Namespace }}
 spec:
-  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "registry.selectorLabels" . | nindent 6 }}
-  serviceName: trow
+      {{- include "webhook.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "registry.selectorLabels" . | nindent 8 }}
+        {{- include "webhook.selectorLabels" . | nindent 8 }}
     spec:
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+      initContainers:
+      - name: trow-webhook-cert-translate
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - sh
+          - -c
+          - |
+            cp /etc/trow/webhook-cert-ecc/cert /etc/trow/webhook-cert && \
+            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/key -out /etc/trow/webhook-cert/key
+        volumeMounts:
+        - name: webhook-cert-translated
+          mountPath: /etc/trow/webhook-cert
+        - name: webhook-cert-ecc
+          mountPath: /etc/trow/webhook-cert-ecc
+          readOnly: true
       containers:
-      - name: trow
+      - name: trow-webhook
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
-          - "--no-tls"
+          - "--cert=/etc/trow/webhook-cert/cert"
+          - "--key=/etc/trow/webhook-cert/key"
           - "-n"
           - {{ .Values.trow.domain | quote }}
-          {{- if and (.Values.trow.user) (.Values.trow.password) }}
-          - "--user"
-          - {{ .Values.trow.user | quote }}
-          - "--password"
-          - "file:///etc/trow/pass"
-          {{- end }}
           {{- if (not (empty .Values.trow.proxyConfig.config)) }}
           - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
           {{- end }}
@@ -42,17 +51,12 @@ spec:
           - "--image-validation-config-file=/etc/trow/validation.yaml"
           {{- end }}
         ports:
-        - name: http
-          containerPort: 8000
+        - name: webhook
+          containerPort: 8443
         volumeMounts:
-        - name: data-vol
-          mountPath: /data
-      {{- if and (.Values.trow.user) (.Values.trow.password) }}
-        - name: trow-pass
-          mountPath: /etc/trow/pass
-          subPath: pass
+        - name: webhook-cert-translated
+          mountPath: /etc/trow/webhook-cert
           readOnly: true
-      {{- end}}
       {{- if (not (empty .Values.trow.proxyConfig.config)) }}
         - name: trow-proxy-cfg
           mountPath: /etc/trow/proxy-registries.yaml
@@ -66,16 +70,11 @@ spec:
           readOnly: true
       {{- end}}
       volumes:
-      {{- if and (.Values.trow.user) (.Values.trow.password) }}
-        - name: trow-pass
+        - name: webhook-cert-ecc
           secret:
-            secretName: {{ include "trow.fullname" . }}-password
-      {{- end}}
-      securityContext:
-        runAsUser: 333333
-        runAsGroup: 333333
-        fsGroup: 333333
-      volumes:
+            secretName: {{ include "trow.fullname" . }}-admission
+        - name: webhook-cert-translated
+          emptyDir: {}
       {{- if (not (empty .Values.trow.proxyConfig.config)) }}
         - name: trow-proxy-cfg
           secret:
@@ -86,6 +85,10 @@ spec:
           configMap:
             name: {{ include "trow.fullname" . }}-validation-cfg
       {{- end }}
+      securityContext:
+        runAsUser: 333333
+        runAsGroup: 333333
+        fsGroup: 333333
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -98,10 +101,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-  {{- with .Values.volumeClaim }}
-  volumeClaimTemplates:
-    - metadata:
-        name: data-vol
-      spec:
-        {{- toYaml . | nindent 8 }}
-  {{- end }}
+{{- end }}

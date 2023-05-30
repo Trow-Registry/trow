@@ -1,15 +1,10 @@
 trow:
-  domain: trow.test
+  domain: "127.0.0.1"
 ingress:
   enabled: true
   annotations:
     kubernetes.io/ingress.class: nginx
-    kubernetes.io/tls-acme: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
   hosts:
     - paths: ['/']
       host:
-  tls:
-  - secretName: trow-test 
-    hosts:
-    - trow.test

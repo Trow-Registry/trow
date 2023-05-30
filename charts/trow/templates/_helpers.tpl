@@ -44,10 +44,39 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
-Selector labels
+Common selector labels
 */}}
 {{- define "trow.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "trow.name" . }}
+app.kubernetes.io/part-of: {{ include "trow.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
+{{/*
+Registry labels
+*/}}
+{{- define "registry.labels" -}}
+{{ include "trow.labels" . }}
+{{ include "registry.selectorLabels" . }}
+{{- end -}}
+
+{{/*
+Registry selector labels
+*/}}
+{{- define "registry.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "trow.name" . }}-registry
+{{- end -}}
+
+{{/*
+Webhook labels
+*/}}
+{{- define "webhook.labels" -}}
+{{ include "trow.labels" . }}
+{{ include "webhook.selectorLabels" . }}
+{{- end -}}
+
+{{/*
+Webhook selector labels
+*/}}
+{{- define "webhook.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "trow.name" . }}-webhook
+{{- end -}}

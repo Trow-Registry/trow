@@ -16,32 +16,28 @@ jobs:
         id-token: write
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Login to package repos
       run: |
-          echo "${{secrets.CR_PAT}}" | docker login ghcr.io -u ${{secrets.CR_USER}} --password-stdin
-          echo "${{secrets.DOCKERHUB_PASS}}" | docker login -u ${{secrets.DOCKERHUB_USER}} --password-stdin
-    - name: Install buildx
-      run: |
-          mkdir -p ~/.docker/cli-plugins
-          curl -fSL -o docker-buildx https://github.com/docker/buildx/releases/download/v0.9.1/buildx-v0.9.1.linux-amd64
-          echo "a7fb95177792ca8ffc7243fad7bf2f33738b8b999a184b6201f002a63c43d136 *docker-buildx" | sha256sum -c -
-          mkdir -p ~/.docker/cli-plugins
-          mv docker-buildx ~/.docker/cli-plugins/
-          chmod +x ~/.docker/cli-plugins/docker-buildx
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        platforms: linux/amd64,linux/arm64
     - uses: sigstore/cosign-installer@main
     - name: Build and push multi-arch image
       run: |
           ./docker/multi-arch.sh
-          docker build -f ./docker/Dockerfile.notls -t extrality/trow:notls ./
-          docker push extrality/trow:notls
-          cosign sign extrality/trow:notls
+          docker build -f ./docker/Dockerfile.notls -t ghcr.io/extrality/trow:notls ./
+          docker push ghcr.io/extrality/trow:notls
+          cosign sign ghcr.io/extrality/trow:notls
       env:
           COSIGN_EXPERIMENTAL: 1
+
   conformance_tests:
     services:
       trow:
-        image: extrality/trow:notls
+        image: ghcr.io/extrality/trow:no-tls
     needs: upload_images
     runs-on: ubuntu-latest
     steps:

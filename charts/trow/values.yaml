@@ -5,15 +5,14 @@
 replicaCount: 1
 
 image:
-  repository: containersol/trow
+  repository: ghcr.io/extrality/trow
   tag:
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 trow:
   ## if using NodePort, this can be set to 127.0.0.1:XXXX
   ## Where "XXXX" is the value of service.nodePort
   domain: myregistry.mydomain.io
-  # host: "::" # Enables IPv6 Support, by listening also on IPv6 interfaces
   # user: user
   # password: password
   validation:
@@ -35,12 +34,12 @@ trow:
     config:
       - alias: docker
         host: registry-1.docker.io
-        username: ~
-        password: ~
       - alias: nvcr
         host: https://nvcr.io
       - alias: quay
         host: quay.io
+      # - alias: toto
+      #  host: http://toto.land
 
 webhookPatch:
   image:
@@ -93,10 +92,3 @@ volumeClaim:
   resources:
     requests:
       storage: 20Gi
-
-automountServiceAccountToken: false
-podSecurityContext:
-  runAsUser: 333333
-  runAsGroup: 333333
-  fsGroup: 333333
-containerSecurityContext: {}

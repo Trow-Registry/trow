@@ -16,8 +16,9 @@ mod interface_tests {
     use std::thread;
     use std::time::Duration;
 
-    const TROW_NAME: &str = "trow.test:8443";
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    const PORT: &str = "39376";
+    const HOST: &str = "127.0.0.1:39376";
+    const TROW_ADDRESS: &str = "http://127.0.0.1:39376";
 
     struct TrowInstance {
         pid: Child,
@@ -27,26 +28,19 @@ mod interface_tests {
     async fn start_trow() -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
+            .arg("--")
+            .arg("--no-tls")
+            .arg("--name")
+            .arg(HOST)
+            .arg("--port")
+            .arg(PORT)
             .env_clear()
             .envs(Environment::inherit().compile())
             .spawn()
             .expect("failed to start");
 
         let mut timeout = 100;
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
-
+        let client = reqwest::Client::new();
         let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
@@ -90,7 +84,7 @@ mod interface_tests {
 
         assert!(status.success());
 
-        let image_name = format!("{}/alpine:trow", TROW_NAME);
+        let image_name = format!("{}/alpine:trow", HOST);
         status = Command::new("docker")
             .args(["tag", "alpine:latest", &image_name])
             .status()

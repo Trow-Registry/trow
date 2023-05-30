@@ -3,25 +3,23 @@ mod common;
 
 #[cfg(test)]
 mod cors_tests {
-
-    use crate::common;
-    use environment::Environment;
-
-    use base64::{engine::general_purpose as base64_engine, Engine as _};
-    use reqwest::header::HeaderMap;
-    use reqwest::header::{
-        ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
-        ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_REQUEST_METHOD, AUTHORIZATION, ORIGIN,
-    };
-    use reqwest::StatusCode;
-    use std::fs::{self, File};
-    use std::io::Read;
+    use std::fs;
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
 
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    use base64::{engine::general_purpose as base64_engine, Engine as _};
+    use environment::Environment;
+    use reqwest::header;
+    use reqwest::header::HeaderMap;
+    use reqwest::StatusCode;
+
+    use crate::common;
+
+    const PORT: &str = "39368";
+    const HOST: &str = "127.0.0.1:39368";
+    const ORIGIN: &str = "http://127.0.0.1:39368";
 
     struct TrowInstance {
         pid: Child,
@@ -35,34 +33,27 @@ mod cors_tests {
             .env_clear()
             .envs(Environment::inherit().compile())
             .arg("--")
-            .arg("-u")
+            .arg("--user")
             .arg("authtest")
-            .arg("-p")
+            .arg("--password")
             .arg("authpass")
+            .arg("--no-tls")
+            .arg("--name")
+            .arg(HOST)
+            .arg("--port")
+            .arg(PORT)
             .arg("--enable-cors")
             .spawn()
             .expect("failed to start");
 
         let mut timeout = 100;
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
         // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
-
-        let mut response = client.get(TROW_ADDRESS).send().await;
+        let client = reqwest::Client::new();
+        let mut response = client.get(ORIGIN).send().await;
 
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send().await;
+            response = client.get(ORIGIN).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -81,29 +72,34 @@ mod cors_tests {
     async fn test_cors_preflight(cl: &reqwest::Client) {
         let mut headers = HeaderMap::new();
 
-        headers.insert(ORIGIN, "https://example.com".parse().unwrap());
-        headers.insert(ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS".parse().unwrap());
+        headers.insert(header::ORIGIN, "https://example.com".parse().unwrap());
+        headers.insert(
+            header::ACCESS_CONTROL_REQUEST_METHOD,
+            "OPTIONS".parse().unwrap(),
+        );
 
         let resp = cl
-            .request(hyper::Method::OPTIONS, &(TROW_ADDRESS.to_owned()))
+            .request(hyper::Method::OPTIONS, &(ORIGIN.to_owned()))
             .headers(headers)
             .send()
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         assert_eq!(
-            resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            resp.headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .unwrap(),
             "https://example.com"
         );
         assert_eq!(
             resp.headers()
-                .get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+                .get(header::ACCESS_CONTROL_ALLOW_CREDENTIALS)
                 .unwrap(),
             "true"
         );
         let res_cors_methods = resp
             .headers()
-            .get(ACCESS_CONTROL_ALLOW_METHODS)
+            .get(header::ACCESS_CONTROL_ALLOW_METHODS)
             .unwrap()
             .to_str()
             .unwrap();
@@ -114,20 +110,22 @@ mod cors_tests {
 
     async fn test_cors_method_get(cl: &reqwest::Client) {
         let resp = cl
-            .get(&(TROW_ADDRESS.to_owned()))
-            .header(ORIGIN, "https://example.com")
-            .header(ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            .get(&(ORIGIN.to_owned()))
+            .header(header::ORIGIN, "https://example.com")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
             .send()
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
-            resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            resp.headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .unwrap(),
             "https://example.com"
         );
         assert_eq!(
             resp.headers()
-                .get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+                .get(header::ACCESS_CONTROL_ALLOW_CREDENTIALS)
                 .unwrap(),
             "true"
         );
@@ -136,9 +134,9 @@ mod cors_tests {
     async fn test_cors_headers_authorization(cl: &reqwest::Client) {
         let bytes = base64_engine::STANDARD.encode(b"authtest:authpass");
         let resp = cl
-            .get(&(TROW_ADDRESS.to_owned() + "/login"))
-            .header(ORIGIN, "https://example.com")
-            .header(AUTHORIZATION, format!("Basic {}", bytes))
+            .get(&(ORIGIN.to_owned() + "/login"))
+            .header(header::ORIGIN, "https://example.com")
+            .header(header::AUTHORIZATION, format!("Basic {}", bytes))
             .send()
             .await
             .unwrap();
@@ -146,12 +144,14 @@ mod cors_tests {
 
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
-            resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            resp.headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .unwrap(),
             "https://example.com"
         );
         assert_eq!(
             resp.headers()
-                .get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+                .get(header::ACCESS_CONTROL_ALLOW_CREDENTIALS)
                 .unwrap(),
             "true"
         );
@@ -166,18 +166,8 @@ mod cors_tests {
         //It might be possible to improve things with a thread_local
         let _trow = start_trow().await;
 
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
         // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::new();
 
         println!("Running test_cors_preflight()");
         test_cors_preflight(&client).await;

@@ -12,9 +12,6 @@ the Dockerfile).
 
 To run tests, use the `build.sh` script or `Dockerfile.test` image (tests will run as part of the build).
 
-Once issues related to TLS libraries have been resolved, a minimal build based on a scratch image
-will be added.
-
 ## Mulitplatform Builds
 
 There are several ways to produce multiplatform builds with Docker:
@@ -43,7 +40,7 @@ docker buildx build --pull --load -t trow:armv7 -f Dockerfile --platform linux/a
 ```
 
 But be aware that you can't load the result into a local Docker instance as it doesn't
-currently understand multi-platform manifests. 
+currently understand multi-platform manifests.
 
 All of this assumes you have a recent version of Docker with buildkit installed.
 

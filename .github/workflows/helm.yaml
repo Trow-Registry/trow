@@ -31,22 +31,9 @@ jobs:
       run: |
           ./ci-config/install-kind-ingress.sh
           kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
-    - name: Generate Certs
-      run: |
-        openssl req -new -config ci-config/cert.config -keyout trow.test.key -x509 -days 1 -out trow.test.crt
-    - name: Create TLS Secret
-      run: |
-        kubectl create secret tls trow-test --key trow.test.key --cert trow.test.crt
     - name: Helm Install Trow
       run: |
         helm install trow-test -f ci-config/values.yaml charts/trow/
-    - name: Set Routing
-      run: |
-        echo "127.0.0.1 trow.test" | sudo tee -a /etc/hosts
-    - name: Setup Docker To Validate Certs
-      run: |
-        sudo mkdir -p /etc/docker/certs.d/trow.test/
-        sudo cp trow.test.crt /etc/docker/certs.d/trow.test/ca.crt
     - name: Pull and Tag Docker Image
       run: |
         docker pull nginx:alpine
@@ -54,6 +41,4 @@ jobs:
     - name: Push to Trow
       run: |
         kubectl wait pod/trow-test-0 --for condition=ready --timeout=300s
-        docker push  trow.test/test/nginx:alpine
-        
-    
+        docker push  127.0.0.1/test/nginx:alpine

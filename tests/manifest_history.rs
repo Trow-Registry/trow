@@ -10,15 +10,17 @@ mod interface_tests {
     use rand::Rng;
 
     use reqwest::StatusCode;
-    use std::fs::{self, File};
-    use std::io::{BufReader, Read};
+    use std::fs;
+    use std::io::BufReader;
     use std::process::Child;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
     use trow_server::digest;
 
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    const PORT: &str = "39368";
+    const HOST: &str = "127.0.0.1:39368";
+    const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
 
     struct TrowInstance {
         pid: Child,
@@ -31,27 +33,17 @@ mod interface_tests {
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
-            // .arg("--")
-            // .arg("--host")
-            // .arg("127.0.0.1")
+            .arg("--")
+            .arg("--no-tls")
+            .arg("--name")
+            .arg(HOST)
+            .arg("--port")
+            .arg(PORT)
             .spawn()
             .expect("failed to start");
 
         let mut timeout = 100;
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
-
+        let client = reqwest::Client::new();
         let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
@@ -178,21 +170,8 @@ mod interface_tests {
     async fn manifest_test() {
         //Need to start with empty repo
         fs::remove_dir_all("./data").unwrap_or(());
-
         let _trow = start_trow().await;
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::new();
 
         upload_config(&client).await;
 

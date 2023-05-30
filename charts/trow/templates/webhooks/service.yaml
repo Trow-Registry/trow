@@ -4,7 +4,7 @@ kind: Service
 metadata:
   name: {{ include "trow.fullname" . }}-admission
   labels:
-    {{- include "trow.labels" . | nindent 4 }}
+    {{- include "webhook.labels" . | nindent 4 }}
     app.kubernetes.io/component: admission-webhook
   namespace: {{ .Release.Namespace }}
 spec:
@@ -17,5 +17,5 @@ spec:
       appProtocol: https
     {{- end }}
   selector:
-    {{- include "trow.selectorLabels" . | nindent 4 }}
+    {{- include "webhook.selectorLabels" . | nindent 4 }}
 {{- end }}

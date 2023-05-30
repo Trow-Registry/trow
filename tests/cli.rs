@@ -22,17 +22,9 @@ mod cli {
             .arg("-Z")
             .assert()
             .stderr(predicate::str::contains(
-                "Found argument '-Z' which wasn't expected, or isn't valid in this context",
+                "error: unexpected argument '-Z' found",
             ))
             .failure();
-
-        get_command()
-            .arg("-Z")
-            .assert()
-            .failure()
-            .stderr(predicate::str::contains(
-                "error: Found argument '-Z' which wasn't expected",
-            ));
     }
 
     #[test]

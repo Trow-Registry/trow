@@ -1,28 +1,30 @@
 # syntax=docker/dockerfile:1.5
 
 #Note we build on host plaftform and cross-compile to target arch
-FROM --platform=$BUILDPLATFORM rust:latest as cross
+FROM --platform=$BUILDPLATFORM rust:1.69-bookworm as cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
 
 ENV PKG_CONFIG_SYSROOT_DIR=/
 
-# should write /.platform and /.compiler
+# should write /.platform and
 RUN --mount=type=bind,source=docker/platform.sh,target=/platform.sh \
     /platform.sh
 
 RUN rustup component add rustfmt
 RUN rustup target add $(cat /.platform)
 
+RUN dpkg --add-architecture $TARGETARCH
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && \
-    apt-get install -y unzip openssl libssl-dev $(cat /.compiler)
+    apt-get install -y unzip openssl libssl-dev:$TARGETARCH $(cat /.compiler)
 
 COPY Cargo.toml .
 COPY Cargo.lock .
-COPY .cargo/config .cargo/config
+COPY .cargo/config.toml .cargo/config.toml
 COPY trow-server/ trow-server/
 COPY trow-protobuf/ trow-protobuf/
 COPY src src
@@ -32,15 +34,14 @@ RUN --mount=type=cache,target=./target \
     cargo build --release --target $(cat /.platform) && \
     cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
 
-FROM debian:stable-slim
+FROM debian:bookworm-slim
 RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 # Note that certs are needed for proxying
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
-    apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates && \
-    apt-get clean
+    apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates
 
 COPY utils/self-cert /install/self-cert
 COPY start-trow.sh /

@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 use self::trow_server::*;
 use crate::digest::sha256_tag_digest;
-use crate::image::Image;
+use crate::image::RemoteImage;
 use crate::manifest::{manifest_media_type, FromJson, Manifest};
 use crate::proxy_auth::ProxyClient;
 use crate::server::trow_server::registry_server::Registry;
@@ -194,7 +194,7 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
     Ok(())
 }
 
-fn is_digest(maybe_digest: &str) -> bool {
+pub fn is_digest(maybe_digest: &str) -> bool {
     for alg in &SUPPORTED_DIGESTS {
         if maybe_digest.starts_with(&format!("{}:", alg)) {
             return true;
@@ -273,8 +273,8 @@ impl TrowServer {
         Ok(res.is_some())
     }
 
-    fn get_digest_from_manifest(&self, repo_name: &str, tag: &str) -> Result<String> {
-        get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(tag))
+    fn get_digest_from_manifest(&self, repo_name: &str, reference: &str) -> Result<String> {
+        get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(reference))
     }
 
     async fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<()> {
@@ -293,18 +293,6 @@ impl TrowServer {
             .open(&repo_dir.join(tag))
             .await?;
         file.write_all(&contents).await?;
-
-        // write digest manifest too
-        if tag != digest {
-            let digest_file = tokio::fs::OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(&repo_dir.join(digest))
-                .await;
-            if let Ok(mut file) = digest_file {
-                file.write_all(&contents).await?;
-            }
-        }
 
         Ok(())
     }
@@ -362,11 +350,11 @@ impl TrowServer {
     If repo is proxied to another registry, this will return the details of the remote image.
     If the repo isn't proxied None is returned
     **/
-    fn get_proxy_image_and_cfg(
+    fn get_remote_image_and_cfg(
         &self,
         repo_name: &str,
         reference: &str,
-    ) -> Option<(Image, RegistryProxyConfig)> {
+    ) -> Option<(RemoteImage, RegistryProxyConfig)> {
         //All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
             let segments = repo_name.splitn(3, '/').collect::<Vec<_>>();
@@ -376,7 +364,7 @@ impl TrowServer {
 
             for proxy in self.proxy_registry_config.iter() {
                 if proxy.alias == proxy_alias {
-                    let image = Image::new(&proxy.host, repo, reference.into());
+                    let image = RemoteImage::new(&proxy.host, repo, reference.into());
                     return Some((image, proxy.clone()));
                 }
             }
@@ -388,7 +376,7 @@ impl TrowServer {
     async fn download_blob(
         &self,
         cl: &ProxyClient,
-        remote_image: &Image,
+        remote_image: &RemoteImage,
         digest: &str,
     ) -> Result<()> {
         if self.get_catalog_path_for_blob(digest)?.exists() {
@@ -417,7 +405,7 @@ impl TrowServer {
     async fn download_manifest_and_layers(
         &self,
         cl: &ProxyClient,
-        remote_image: &Image,
+        remote_image: &RemoteImage,
         local_repo_name: &str,
     ) -> Result<()> {
         debug!("Downloading manifest + layers for {}", remote_image);
@@ -480,7 +468,11 @@ impl TrowServer {
         Ok(())
     }
 
-    async fn get_digest_from_header(&self, cl: &ProxyClient, image: &Image) -> Option<String> {
+    async fn get_digest_from_header(
+        &self,
+        cl: &ProxyClient,
+        image: &RemoteImage,
+    ) -> Option<String> {
         let resp = cl
             .authenticated_request(Method::HEAD, &image.get_manifest_url())
             .headers(create_accept_header())
@@ -508,16 +500,17 @@ impl TrowServer {
         reference: String,
         do_verification: bool,
     ) -> Result<ManifestReadLocation> {
-        if let Some((proxy_image, proxy_cfg)) = self.get_proxy_image_and_cfg(&repo_name, &reference)
+        if let Some((remote_image, proxy_cfg)) =
+            self.get_remote_image_and_cfg(&repo_name, &reference)
         {
             info!(
                 "Request for proxied repo {}:{} maps to {}",
-                repo_name, reference, proxy_image
+                repo_name, reference, remote_image
             );
             // Replace eg f/docker/alpine by f/docker/library/alpine
-            repo_name = format!("f/{}/{}", proxy_cfg.alias, proxy_image.get_repo());
+            repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
 
-            let try_cl = ProxyClient::try_new(proxy_cfg.clone(), &proxy_image)
+            let try_cl = ProxyClient::try_new(proxy_cfg.clone(), &remote_image)
                 .await
                 .map_err(|e| {
                     anyhow!(
@@ -526,37 +519,40 @@ impl TrowServer {
                         e
                     )
                 });
-            if try_cl.is_err() {
-                warn!("Could not create proxy client, cannot pull image");
+            if let Err(e) = &try_cl {
+                warn!("Could not create proxy client: {e}");
             }
-            let mut have_manifest = false;
+            let reference_is_digest = is_digest(&reference);
 
-            let local_digest = self.get_digest_from_manifest(&repo_name, &reference).ok();
-            let latest_digest = match &try_cl {
-                Ok(cl) => self.get_digest_from_header(cl, &proxy_image).await,
-                _ => local_digest.clone(),
-            };
-            if let Some(digest) = latest_digest {
-                if self.get_catalog_path_for_blob(&digest)?.exists() {
-                    info!("Have manifest for {} digest {}", repo_name, digest);
-                    have_manifest = true;
-                    // Make sure our tag is up-to-date
-                    if !is_digest(&reference) && local_digest.as_ref() != Some(&digest) {
-                        let res = self.save_tag(&digest, &repo_name, &reference).await;
-                        if res.is_err() {
-                            error!(
-                                "Internal error updating tag for proxied image {:?}",
-                                res.unwrap()
-                            );
-                        }
+            let digest = if reference_is_digest {
+                reference.clone()
+            } else {
+                let local_digest = self.get_digest_from_manifest(&repo_name, &reference).ok();
+                let latest_digest = match &try_cl {
+                    Ok(cl) => self.get_digest_from_header(cl, &remote_image).await,
+                    _ => local_digest.clone(),
+                };
+                if local_digest != latest_digest {
+                    let res = self
+                        .save_tag(latest_digest.as_ref().unwrap(), &repo_name, &reference)
+                        .await;
+                    if res.is_err() {
+                        error!(
+                            "Internal error updating tag for proxied image {:?}",
+                            res.unwrap()
+                        );
                     }
                 }
-            }
+                latest_digest.ok_or_else(|| {
+                    anyhow!("Could not find digest for {}:{}", repo_name, reference)
+                })?
+            };
 
+            let have_manifest = self.get_catalog_path_for_blob(&digest)?.exists();
             if !have_manifest {
                 let cl = try_cl?;
                 if let Err(e) = self
-                    .download_manifest_and_layers(&cl, &proxy_image, &repo_name)
+                    .download_manifest_and_layers(&cl, &remote_image, &repo_name)
                     .await
                 {
                     // Note that we may still have an out-of-date version that will be returned

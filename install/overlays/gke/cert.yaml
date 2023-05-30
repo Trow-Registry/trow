@@ -1,7 +1,0 @@
-apiVersion: networking.gke.io/v1beta1
-kind: ManagedCertificate
-metadata:
-  name: trow-certificate
-spec:
-  domains:
-    - myregistry.mydomain.com

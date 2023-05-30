@@ -13,7 +13,7 @@ use rusoto_core::Region;
 use rusoto_ecr::{Ecr, EcrClient};
 use serde::{Deserialize, Serialize};
 
-use crate::image::Image;
+use crate::image::RemoteImage;
 use crate::server::create_accept_header;
 
 const AUTHN_HEADER: &str = "www-authenticate";
@@ -43,9 +43,12 @@ pub struct ProxyClient {
 }
 
 impl ProxyClient {
-    pub async fn try_new(mut proxy_cfg: RegistryProxyConfig, proxy_image: &Image) -> Result<Self> {
+    pub async fn try_new(
+        mut proxy_cfg: RegistryProxyConfig,
+        proxy_image: &RemoteImage,
+    ) -> Result<Self> {
         let base_client = reqwest::ClientBuilder::new()
-            .connect_timeout(Duration::from_millis(500))
+            .connect_timeout(Duration::from_millis(1000))
             .build()?;
 
         let authn_header = get_www_authenticate_header(&base_client, proxy_image).await?;
@@ -166,7 +169,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
 /// Ok(None) is returned if the registry does not require authentication.
 async fn get_www_authenticate_header(
     cl: &reqwest::Client,
-    image: &Image,
+    image: &RemoteImage,
 ) -> Result<Option<String>> {
     let resp = cl
         .head(&image.get_manifest_url())
@@ -264,7 +267,7 @@ mod tests {
 
     const AUTHZ_HEADER: &str = "Authorization";
 
-    fn get_basic_setup() -> (MockServer, RegistryProxyConfig, Image) {
+    fn get_basic_setup() -> (MockServer, RegistryProxyConfig, RemoteImage) {
         let server = MockServer::start();
 
         let proxy_cfg = RegistryProxyConfig {
@@ -274,7 +277,7 @@ mod tests {
             password: None,
         };
 
-        let proxy_image = Image::new(&proxy_cfg.host, "hello_world".into(), "latest".into());
+        let proxy_image = RemoteImage::new(&proxy_cfg.host, "hello_world".into(), "latest".into());
         (server, proxy_cfg, proxy_image)
     }
 

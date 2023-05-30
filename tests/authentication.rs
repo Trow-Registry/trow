@@ -39,9 +39,9 @@ mod authentication_tests {
             .arg(HOST)
             .arg("--port")
             .arg(PORT)
-            .arg("-u")
+            .arg("--user")
             .arg("authtest")
-            .arg("-p")
+            .arg("--password")
             .arg("authpass")
             .spawn()
             .expect("failed to start");

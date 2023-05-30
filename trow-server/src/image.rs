@@ -4,6 +4,8 @@ use anyhow::{anyhow, Result};
 use const_format::formatcp;
 use lazy_static::lazy_static;
 
+use super::server::is_digest;
+
 /// The regex validates an image reference.
 /// It returns `name`, `tag` and `digest`.
 ///
@@ -24,16 +26,16 @@ const fn get_image_ref_regex() -> &'static str {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Image {
+pub struct RemoteImage {
     scheme: &'static str, // `http` or `https`
     host: String,         // Including port, docker.io by default
     repo: String,         // Between host and : including any /s
     pub tag: String,      // Bit after the :, latest by default (can also be a digest)
 }
 
-impl std::default::Default for Image {
+impl std::default::Default for RemoteImage {
     fn default() -> Self {
-        Image {
+        RemoteImage {
             scheme: "https",
             host: "(none)".to_string(),
             repo: "(none)".to_string(),
@@ -42,14 +44,13 @@ impl std::default::Default for Image {
     }
 }
 
-impl fmt::Display for Image {
+impl fmt::Display for RemoteImage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tag_sep = if self.tag.contains(':') { ":" } else { "@" };
-        write!(f, "{}/{}{tag_sep}{}", self.host, self.repo, self.tag)
+        write!(f, "{}", self.get_ref())
     }
 }
 
-impl Image {
+impl RemoteImage {
     pub fn new(mut host: &str, mut repo: String, tag: String) -> Self {
         if host.ends_with("docker.io") {
             // The real docker registry is `registry-1.docker.io`, not `docker.io`.
@@ -69,7 +70,7 @@ impl Image {
             "https"
         };
 
-        Image {
+        RemoteImage {
             host: host.to_string(),
             repo,
             tag,
@@ -92,7 +93,7 @@ impl Image {
 
     /// Example return value: `registry-1.docker.io/library/nginx@sha256:12345`
     pub fn get_ref(&self) -> String {
-        let tag_sep = if self.tag.contains(':') { "@" } else { ":" };
+        let tag_sep = if is_digest(&self.tag) { "@" } else { ":" };
         format!("{}/{}{tag_sep}{}", self.host, self.repo, self.tag)
     }
 
@@ -149,57 +150,57 @@ mod test {
 
     #[test]
     fn test_parse_valid() {
-        let mut ret = Image::try_from_str("debian").unwrap();
+        let mut ret = RemoteImage::try_from_str("debian").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "registry-1.docker.io".to_string(),
                 repo: "library/debian".to_string(),
                 ..Default::default()
             }
         );
-        ret = Image::try_from_str("amouat/network-utils").unwrap();
+        ret = RemoteImage::try_from_str("amouat/network-utils").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "registry-1.docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
                 ..Default::default()
             }
         );
-        ret = Image::try_from_str("amouat/network-utils:beta").unwrap();
+        ret = RemoteImage::try_from_str("amouat/network-utils:beta").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "registry-1.docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
                 tag: "beta".to_string(),
                 ..Default::default()
             }
         );
-        ret = Image::try_from_str("registry-1.docker.io/mandy").unwrap();
+        ret = RemoteImage::try_from_str("registry-1.docker.io/mandy").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "registry-1.docker.io".to_string(),
                 repo: "library/mandy".to_string(),
                 ..Default::default()
             }
         );
-        ret = Image::try_from_str("localhost:8080/myimage:test").unwrap();
+        ret = RemoteImage::try_from_str("localhost:8080/myimage:test").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "localhost:8080".to_string(),
                 repo: "myimage".to_string(),
                 tag: "test".to_string(),
                 ..Default::default()
             }
         );
-        ret = Image::try_from_str("localhost:8080/mydir/myimage:test").unwrap();
+        ret = RemoteImage::try_from_str("localhost:8080/mydir/myimage:test").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "localhost:8080".to_string(),
                 repo: "mydir/myimage".to_string(),
                 tag: "test".to_string(),
@@ -207,10 +208,10 @@ mod test {
             }
         );
 
-        ret = Image::try_from_str("quay.io/mydir/another/myimage:test").unwrap();
+        ret = RemoteImage::try_from_str("quay.io/mydir/another/myimage:test").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "quay.io".to_string(),
                 repo: "mydir/another/myimage".to_string(),
                 tag: "test".to_string(),
@@ -218,10 +219,10 @@ mod test {
             }
         );
 
-        ret = Image::try_from_str("quay.io:99/myimage:heh@sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5").unwrap();
+        ret = RemoteImage::try_from_str("quay.io:99/myimage:heh@sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5").unwrap();
         assert_eq!(
             ret,
-            Image {
+            RemoteImage {
                 host: "quay.io:99".to_string(),
                 repo: "myimage".to_string(),
                 tag: "sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5"
@@ -241,7 +242,7 @@ mod test {
         ];
 
         for i in invalid_images.iter() {
-            let ret = Image::try_from_str("http://docker.io/amouat/myimage:test");
+            let ret = RemoteImage::try_from_str("http://docker.io/amouat/myimage:test");
             if let Ok(img) = ret {
                 panic!("Invalid image ref `{}` parsed as `{}`", i, img);
             }
@@ -250,7 +251,7 @@ mod test {
 
     #[test]
     fn test_get_uri() {
-        let img = Image::new(
+        let img = RemoteImage::new(
             "registry-1.docker.io",
             "debian".to_string(),
             "funky".to_string(),
@@ -264,7 +265,7 @@ mod test {
             "https://registry-1.docker.io/v2/library/debian/manifests/funky"
         );
 
-        let img = Image::new(
+        let img = RemoteImage::new(
             "http://cia.gov",
             "not-watching".to_string(),
             "i-swear".to_string(),
@@ -275,7 +276,7 @@ mod test {
             "http://cia.gov/v2/not-watching/manifests/i-swear"
         );
 
-        let img = Image::try_from_str("spy:v3.1.0-cia-INTERNAL").unwrap();
+        let img = RemoteImage::try_from_str("spy:v3.1.0-cia-INTERNAL").unwrap();
         assert_eq!(
             img.get_base_uri(),
             "https://registry-1.docker.io/v2/library/spy"

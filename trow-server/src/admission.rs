@@ -4,7 +4,7 @@ use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
 
-use crate::image::Image;
+use crate::image::RemoteImage;
 use crate::server::trow_server::admission_controller_server::AdmissionController;
 use crate::server::trow_server::{AdmissionRequest, AdmissionResponse};
 use crate::server::TrowServer;
@@ -20,7 +20,7 @@ fn check_image_is_allowed(
     raw_image_ref: &str,
     config: &ImageValidationConfig,
 ) -> (bool, &'static str) {
-    let image = match Image::try_from_str(raw_image_ref) {
+    let image = match RemoteImage::try_from_str(raw_image_ref) {
         Ok(image) => image,
         Err(_) => return (false, "Invalid image reference"),
     };
@@ -99,7 +99,7 @@ impl AdmissionController for TrowServer {
         let mut patch_operations = Vec::<PatchOperation>::new();
 
         for (raw_image, image_path) in ar.images.iter().zip(ar.image_paths.iter()) {
-            let image = match Image::try_from_str(raw_image) {
+            let image = match RemoteImage::try_from_str(raw_image) {
                 Ok(image) => image,
                 Err(_) => continue,
             };
@@ -110,7 +110,7 @@ impl AdmissionController for TrowServer {
                         "mutate_admission: proxying image {} to {}",
                         raw_image, cfg.alias
                     );
-                    let im = Image::new(
+                    let im = RemoteImage::new(
                         &ar.host_name,
                         format!("f/{}/{}", cfg.alias, image.get_repo()),
                         image.tag.clone(),

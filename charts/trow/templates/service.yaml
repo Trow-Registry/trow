@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ include "trow.fullname" . }}
   labels:
-    {{- include "trow.labels" . | nindent 4 }}
+    {{- include "registry.labels" . | nindent 4 }}
   namespace: {{ .Release.Namespace }}
 spec:
   type: {{ .Values.service.type }}
@@ -19,4 +19,4 @@ spec:
       {{- end }}
 
   selector:
-    {{- include "trow.selectorLabels" . | nindent 4 }}
+    {{- include "registry.selectorLabels" . | nindent 4 }}

@@ -13,49 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        default: true
-        components: rustfmt
-
-    - name: Install certs
-      run: |
-        cd utils/self-cert && ./make-certs.sh && cd ../..
-        mkdir certs
-        cp utils/self-cert/domain.crt ./certs/
-        cp utils/self-cert/domain.key ./certs/
-    - name: Add trow.test to hosts
-      run: |
-        echo "127.0.0.1 trow.test" | sudo tee -a /etc/hosts
-    - name: Check trow.test is accessible
-      # skip step when using act
-      if: ${{ !env.ACT }}
-      run: |
-        ping -c 1 trow.test
+    - uses: actions/checkout@v3
+    - uses: rui314/setup-mold@v1
+    - uses: dtolnay/rust-toolchain@stable
     - name: Run Cargo check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-        args: --verbose --workspace
+      run: cargo check --verbose --workspace
     - name: Check formatting
-      run: |
-        cargo fmt --all -- --check
+      run: cargo fmt --all -- --check
     - name: Run trow-server test suite
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: -p trow-server --verbose
+      run: cargo test -p trow-server --verbose
     - name: Run Trow test suite
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: -p trow --verbose -- --test-threads=1
+      run: cargo test -p trow --verbose
     - name: Smoke test
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --verbose -- --ignored
+      run: cargo test --verbose -- --ignored
