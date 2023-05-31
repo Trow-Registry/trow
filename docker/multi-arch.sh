@@ -5,7 +5,7 @@ set -eo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-GH_REPO=${DOCKER_REPO:-"ghcr.io/extrality/trow"}
+GH_REPO="ghcr.io/extrality/trow"
 
 # Use trow-multi builder if it exists, otherwise create it
 if ! docker buildx ls | grep -s trow-multi ;
@@ -57,5 +57,5 @@ if [[ "$CI" = true ]]
 then
     # sign once for each registry, will sign corresponding hash
     # (assumes keyless signing is enabled)
-    cosign sign --recursive $GH_IMAGE
+    cosign sign --yes --recursive $GH_IMAGE
 fi

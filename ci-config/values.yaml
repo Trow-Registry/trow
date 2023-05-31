@@ -7,4 +7,4 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
   hosts:
     - paths: ['/']
-      host:
+      host: "none"

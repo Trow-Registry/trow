@@ -4,4 +4,4 @@ description: Helm chart for Trow registry
 
 type: application
 version: 0.4.3
-appVersion: 0.4.0
+appVersion: 09-05-2023-0

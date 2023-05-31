@@ -29,7 +29,9 @@ spec:
 {{- end }}
   rules:
   {{- range .Values.ingress.hosts }}
-    - host: {{default $trowDomain .host  }}
+    - {{- if ne .host "none" }}
+      host: {{default $trowDomain .host  }}
+      {{- end}}
       http:
         paths:
         {{- range .paths }}

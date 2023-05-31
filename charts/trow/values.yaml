@@ -63,6 +63,7 @@ ingress:
     # kubernetes.io/tls-acme: "true"
   hosts:
     - paths: ['/']
+      # use "none" to not set a host (otherwise defaults to trow.domain)
       host:
   tls: []
   #  - secretName: chart-example-tls
