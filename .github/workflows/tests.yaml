@@ -3,26 +3,25 @@ name: Tests
 on:
   push:
     branches:
-    - main
+      - main
   pull_request:
     branches:
-    - main
+      - main
 
 jobs:
   run-tests:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - uses: rui314/setup-mold@v1
-    - uses: dtolnay/rust-toolchain@stable
-    - name: Run Cargo check
-      run: cargo check --verbose --workspace
-    - name: Check formatting
-      run: cargo fmt --all -- --check
-    - name: Run trow-server test suite
-      run: cargo test -p trow-server --verbose
-    - name: Run Trow test suite
-      run: cargo test -p trow --verbose
-    - name: Smoke test
-      run: cargo test --verbose -- --ignored
+      - uses: actions/checkout@v3
+      - uses: rui314/setup-mold@v1
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run Cargo check
+        run: cargo check --verbose --workspace
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run trow-server test suite
+        run: cargo test -p trow-server --verbose
+      - name: Run Trow test suite
+        run: cargo test -p trow --verbose
+      - name: Smoke test
+        run: cargo test --verbose -- --ignored
