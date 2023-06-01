@@ -44,13 +44,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates
 
 COPY utils/self-cert /install/self-cert
-COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
 # keep this late for concurrency
 COPY --from=cross /usr/src/trow/trow /trow
 RUN chown -R trow /data /certs /install
 USER trow
-ENTRYPOINT ["/start-trow.sh"]
+ENTRYPOINT ["env", "RUST_LOG=warn", "/trow]
 
 ARG VCS_REF
 ARG VCS_BRANCH

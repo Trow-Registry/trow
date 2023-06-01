@@ -1,3 +1,5 @@
+image:
+  tag: "%TROW_IMAGE_TAG%"
 trow:
   domain: "127.0.0.1"
 ingress:

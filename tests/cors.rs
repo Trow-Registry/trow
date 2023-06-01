@@ -37,7 +37,6 @@ mod cors_tests {
             .arg("authtest")
             .arg("--password")
             .arg("authpass")
-            .arg("--no-tls")
             .arg("--name")
             .arg(HOST)
             .arg("--port")

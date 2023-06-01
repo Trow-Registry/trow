@@ -34,7 +34,6 @@ mod interface_tests {
         let mut child = Command::new("cargo")
             .arg("run")
             .arg("--")
-            .arg("--no-tls")
             .arg("--name")
             .arg(HOST)
             .arg("--port")

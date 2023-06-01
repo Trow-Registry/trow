@@ -225,7 +225,11 @@ impl TrowBuilder {
 
         if let Some(ref tls) = self.config.tls {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
-                return  Err(anyhow!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
+                return Err(anyhow!(
+                    "Could not find TLS certificate and key at {} and {}",
+                    tls.cert_file,
+                    tls.key_file
+                ));
             }
 
             let tls_config =

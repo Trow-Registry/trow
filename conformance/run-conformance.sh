@@ -19,7 +19,7 @@ rm -rf trow-tmp
 docker network create trow-conf-test || true
 docker stop trow || true
 docker rm trow || true
-docker run --net trow-conf-test --name trow -d containersol/trow:default --no-tls
+docker run --net trow-conf-test --name trow -d containersol/trow:default
 
 # check out conformance repo
 rm -rf conf-tmp && git clone https://github.com/opencontainers/${spec_name}.git conf-tmp

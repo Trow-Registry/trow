@@ -26,7 +26,6 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
-          - "--no-tls"
           - "-n"
           - {{ .Values.trow.domain | quote }}
           {{- if and (.Values.trow.user) (.Values.trow.password) }}

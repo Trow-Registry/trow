@@ -58,4 +58,6 @@ then
     # sign once for each registry, will sign corresponding hash
     # (assumes keyless signing is enabled)
     cosign sign --yes --recursive $GH_IMAGE
+
+    echo "container-image=$GH_IMAGE" >> $GITHUB_OUTPUT
 fi

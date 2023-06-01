@@ -46,7 +46,6 @@ mod validation_tests {
             .env_clear()
             .envs(Environment::inherit().compile())
             .arg("--")
-            .arg("--no-tls")
             .arg("--name")
             .arg(HOST)
             .arg("--port")

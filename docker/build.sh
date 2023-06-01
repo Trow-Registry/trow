@@ -38,10 +38,6 @@ then
     docker tag $IMAGE containersol/trow:default
     docker push containersol/trow:default
 
-    # To run the Conformance tests in github actions, we need an image with --no-tls configured
-    docker build -f Dockerfile.notls -t containersol/trow:notls ../
-    docker push containersol/trow:notls
-
     docker tag $IMAGE containersol/trow:latest
     docker push containersol/trow:latest
     docker tag $IMAGE $GH_REPO:default

@@ -34,7 +34,6 @@ mod no_cors_tests {
             .arg("run")
             .env_clear()
             .arg("--")
-            .arg("--no-tls")
             .arg("--name")
             .arg(HOST)
             .arg("--port")

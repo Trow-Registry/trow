@@ -9,8 +9,7 @@ mod interface_tests {
     use crate::common;
 
     use reqwest::StatusCode;
-    use std::fs::{self, File};
-    use std::io::Read;
+    use std::fs;
     use std::process::Child;
     use std::process::Command;
     use std::thread;
@@ -29,7 +28,6 @@ mod interface_tests {
         let mut child = Command::new("cargo")
             .arg("run")
             .arg("--")
-            .arg("--no-tls")
             .arg("--name")
             .arg(HOST)
             .arg("--port")

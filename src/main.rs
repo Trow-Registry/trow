@@ -21,25 +21,20 @@ struct Args {
     #[arg(
         short,
         long,
-        default_value_if("no_tls", "true", "8000"),
-        default_value("8443")
+        default_value_if("tls", ArgPredicate::IsPresent, "8443"),
+        default_value("8000")
     )]
     port: u16,
 
-    /// Turns off TLS
-    ///
-    /// Normally only used in development and debugging.
-    /// If used in production, make sure you understand the risks.
-    #[arg(long, default_value_t = false)]
-    no_tls: bool,
-
-    /// Path to TLS certificate
-    #[arg(short, long, default_value = "./certs/domain.crt")]
-    cert: String,
-
-    /// Path to TLS private key
-    #[arg(short, long, default_value = "./certs/domain.key")]
-    key: String,
+    /// Path to TLS certificate and key, separated by ','
+    #[arg(
+        long,
+        num_args(0..2),
+        default_missing_value = "./certs/domain.crt,./certs/domain.key",
+        require_equals(true),
+        value_delimiter(',')
+    )]
+    tls: Option<Vec<String>>,
 
     /// Path to directory to store images and metadata in
     #[arg(short, long, default_value = "./data")]
@@ -119,8 +114,12 @@ fn main() {
         args.max_blob_size,
         args.log_level,
     );
-    if !args.no_tls {
-        builder.with_tls(args.cert, args.key);
+    if let Some(tls) = args.tls {
+        if tls.len() != 2 {
+            eprintln!("tls must be a pair of paths, cert then key (got: {tls:?})");
+            std::process::exit(1);
+        }
+        builder.with_tls(tls[0].clone(), tls[1].clone());
     }
     if let Some(user) = args.user {
         let mut pass = args.password.unwrap();

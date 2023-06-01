@@ -54,7 +54,6 @@ mod interface_tests {
             .arg("--")
             .arg("--proxy-registry-config-file")
             .arg(config_file.path())
-            .arg("--no-tls")
             .arg("--port")
             .arg(PORT)
             .spawn()
