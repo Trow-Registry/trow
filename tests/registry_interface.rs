@@ -117,7 +117,7 @@ mod interface_tests {
     }
 
     async fn get_non_existent_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
-        //Might need accept headers here
+        // Might need accept headers here
         let resp = cl
             .get(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
             .send()
@@ -480,23 +480,24 @@ mod interface_tests {
         test_6level_error(&client).await;
 
         println!("Running push_oci_manifest()");
-        let digest = push_oci_manifest(&client, "puttest", "puttest1").await;
+        let manifest_digest = push_oci_manifest(&client, "puttest", "puttest1").await;
         println!("Running push_manifest_list()");
-        let digest_list = push_manifest_list(&client, &digest, "listtest", "listtest1").await;
+        let digest_manifest_list =
+            push_manifest_list(&client, &manifest_digest, "listtest", "listtest1").await;
         println!("Running get_manifest(puttest:puttest1)");
         get_manifest(&client, "puttest", "puttest1", Some(354)).await;
+        println!("Running get_manifest(puttest:digest)");
+        get_manifest(&client, "puttest", &manifest_digest, Some(354)).await;
         println!("Running delete_manifest(puttest:digest)");
-        delete_manifest(&client, "puttest", &digest).await;
+        delete_manifest(&client, "puttest", &manifest_digest).await;
         println!("Running delete_manifest(listtest)");
-        delete_manifest(&client, "listtest", &digest_list).await;
+        delete_manifest(&client, "listtest", &digest_manifest_list).await;
         println!("Running delete_non_existent_manifest(onename)");
         delete_non_existent_manifest(&client, "onename").await;
         println!("Running attempt_delete_by_tag(onename:tag)");
         attempt_delete_by_tag(&client, "onename", "tag").await;
         println!("Running get_non_existent_manifest(puttest:puttest1)");
         get_non_existent_manifest(&client, "puttest", "puttest1").await;
-        println!("Running get_non_existent_manifest(puttest:digest)");
-        get_non_existent_manifest(&client, "puttest", &digest).await;
 
         println!("Running push_oci_manifest_with_foreign_blob()");
         let digest = push_oci_manifest_with_foreign_blob(&client, "foreigntest", "blobtest1").await;

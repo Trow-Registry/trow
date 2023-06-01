@@ -113,7 +113,7 @@ impl AdmissionController for TrowServer {
                     let im = RemoteImage::new(
                         &ar.host_name,
                         format!("f/{}/{}", cfg.alias, image.get_repo()),
-                        image.tag.clone(),
+                        image.reference.clone(),
                     );
                     patch_operations.push(PatchOperation::Replace(ReplaceOperation {
                         path: image_path.clone(),

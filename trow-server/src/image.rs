@@ -27,10 +27,10 @@ const fn get_image_ref_regex() -> &'static str {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RemoteImage {
-    scheme: &'static str, // `http` or `https`
-    host: String,         // Including port, docker.io by default
-    repo: String,         // Between host and : including any /s
-    pub tag: String,      // Bit after the :, latest by default (can also be a digest)
+    scheme: &'static str,  // `http` or `https`
+    host: String,          // Including port, docker.io by default
+    repo: String,          // Between host and : including any /s
+    pub reference: String, // Tag or digest, `latest` by default
 }
 
 impl std::default::Default for RemoteImage {
@@ -39,7 +39,7 @@ impl std::default::Default for RemoteImage {
             scheme: "https",
             host: "(none)".to_string(),
             repo: "(none)".to_string(),
-            tag: "latest".to_string(),
+            reference: "latest".to_string(),
         }
     }
 }
@@ -73,7 +73,7 @@ impl RemoteImage {
         RemoteImage {
             host: host.to_string(),
             repo,
-            tag,
+            reference: tag,
             scheme,
         }
     }
@@ -88,13 +88,13 @@ impl RemoteImage {
     }
 
     pub fn get_manifest_url(&self) -> String {
-        format!("{}/manifests/{}", self.get_base_uri(), self.tag)
+        format!("{}/manifests/{}", self.get_base_uri(), self.reference)
     }
 
     /// Example return value: `registry-1.docker.io/library/nginx@sha256:12345`
     pub fn get_ref(&self) -> String {
-        let tag_sep = if is_digest(&self.tag) { "@" } else { ":" };
-        format!("{}/{}{tag_sep}{}", self.host, self.repo, self.tag)
+        let tag_sep = if is_digest(&self.reference) { "@" } else { ":" };
+        format!("{}/{}{tag_sep}{}", self.host, self.repo, self.reference)
     }
 
     pub fn get_repo(&self) -> &str {
@@ -174,7 +174,7 @@ mod test {
             RemoteImage {
                 host: "registry-1.docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
-                tag: "beta".to_string(),
+                reference: "beta".to_string(),
                 ..Default::default()
             }
         );
@@ -193,7 +193,7 @@ mod test {
             RemoteImage {
                 host: "localhost:8080".to_string(),
                 repo: "myimage".to_string(),
-                tag: "test".to_string(),
+                reference: "test".to_string(),
                 ..Default::default()
             }
         );
@@ -203,7 +203,7 @@ mod test {
             RemoteImage {
                 host: "localhost:8080".to_string(),
                 repo: "mydir/myimage".to_string(),
-                tag: "test".to_string(),
+                reference: "test".to_string(),
                 ..Default::default()
             }
         );
@@ -214,7 +214,7 @@ mod test {
             RemoteImage {
                 host: "quay.io".to_string(),
                 repo: "mydir/another/myimage".to_string(),
-                tag: "test".to_string(),
+                reference: "test".to_string(),
                 ..Default::default()
             }
         );
@@ -225,8 +225,9 @@ mod test {
             RemoteImage {
                 host: "quay.io:99".to_string(),
                 repo: "myimage".to_string(),
-                tag: "sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5"
-                    .to_string(),
+                reference:
+                    "sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5"
+                        .to_string(),
                 ..Default::default()
             }
         );
