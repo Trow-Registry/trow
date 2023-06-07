@@ -43,11 +43,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates
 
-COPY utils/self-cert /install/self-cert
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
 # keep this late for concurrency
 COPY --from=cross /usr/src/trow/trow /trow
-RUN chown -R trow /data /certs /install
+RUN chown -R trow /data /certs
 USER trow
 ENTRYPOINT ["env", "RUST_LOG=warn", "/trow]
 

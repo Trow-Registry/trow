@@ -5,7 +5,7 @@ set -eo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-GH_REPO="ghcr.io/extrality/trow"
+GH_REPO="ghcr.io/extrality/trow-dev"
 
 # Use trow-multi builder if it exists, otherwise create it
 if ! docker buildx ls | grep -s trow-multi ;

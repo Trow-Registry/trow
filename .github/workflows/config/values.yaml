@@ -1,4 +1,5 @@
 image:
+  repository: ghcr.io/extrality/trow-dev
   tag: "%TROW_IMAGE_TAG%"
 trow:
   domain: "127.0.0.1"
