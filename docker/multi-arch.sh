@@ -5,7 +5,7 @@ set -eo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-GH_REPO="ghcr.io/extrality/trow-dev"
+GH_REPO="ghcr.io/extrality/trow"
 
 # Use trow-multi builder if it exists, otherwise create it
 if ! docker buildx ls | grep -s trow-multi ;
@@ -17,16 +17,9 @@ then
 fi
 docker buildx use trow-multi
 
-# If we're in a github action, set the image name differently
-if [[ "$CI" = true ]]
-then
-    VERSION=$(date +"%Y-%m-%d")-$GITHUB_RUN_NUMBER
-else
-    VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
-fi
-
-TAG=${DOCKER_TAG:-"$VERSION"}
-GH_IMAGE=${IMAGE_NAME:-"$GH_REPO:$TAG"}
+VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
+TAG="$VERSION"
+GH_IMAGE="$GH_REPO:$TAG"
 DATE="$(date '+%Y-%m-%d %T%z')"
 
 if [[ "$CI" = "true" || "$RELEASE" = "true" ]]
@@ -52,7 +45,7 @@ docker buildx build \
   -f Dockerfile ../
 
 # Sign the images
-# Assumes runner has installed cosing e.g. uses: sigstore/cosign-installer@main
+# Assumes runner has installed cosign
 if [[ "$CI" = true ]]
 then
     # sign once for each registry, will sign corresponding hash

@@ -29,7 +29,7 @@ jobs:
       - uses: sigstore/cosign-installer@main
       - name: Check tag and Cargo.toml version match
         run: |
-          FROM_CARGO="trow/$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)"
+          FROM_CARGO="trow/v$(sed '/^version = */!d; s///;q' Cargo.toml | sed s/\"//g)"
           FROM_TAG="${GITHUB_REF#refs/tags/}"
           if [ "$FROM_CARGO" != "$FROM_TAG" ]; then
             echo "Versions do not match: $FROM_CARGO and $FROM_TAG"

@@ -1,6 +1,4 @@
-[![](https://github.com/extrality/trow/workflows/Tests/badge.svg)](https://github.com/extrality/trow/actions)
-
-[![](https://github.com/extrality/trow/workflows/OCI%20Conformance/badge.svg)](https://github.com/extrality/trow/actions)
+[![Tests](https://github.com/Extrality/trow/actions/workflows/pr-tests.yaml/badge.svg)](https://github.com/Extrality/trow/actions/workflows/pr-tests.yaml)
 
 # Trow
 Image Management for Kubernetes.
@@ -32,6 +30,7 @@ Features include:
 
  - [x] conforms to the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec) for registries
  - [x] controls images running inside the cluster via approve/deny lists
+ - [x] automagically proxies any registry
  - [ ] full auditing and authentication of image access _(in progress)_
  - [ ] distributed architecture for HA and scalability _(planned)_
 

@@ -3217,7 +3217,7 @@ dependencies = [
 
 [[package]]
 name = "trow"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3266,7 +3266,7 @@ dependencies = [
 
 [[package]]
 name = "trow-protobuf"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "bytes",
@@ -3283,7 +3283,7 @@ dependencies = [
 
 [[package]]
 name = "trow-server"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-recursion",
