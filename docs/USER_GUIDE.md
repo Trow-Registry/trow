@@ -132,7 +132,7 @@ kubectl get rs my-app-844d6db962
 If there is a failed create message, the image may have been refused validation by Trow. If the message reads like:
 
 ```
-Error creating: admission webhook "validator.trow.io" denied the request: my_registry.io/nginx: Image is neither explicitely allowed nor denied (using default behavior)
+Error creating: admission webhook "validator.trow.io" denied the request: my_registry.io/nginx: Image is neither explicitly allowed nor denied (using default behavior)
 ```
 
 That means:

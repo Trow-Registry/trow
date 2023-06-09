@@ -26,8 +26,6 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.3
       - name: Cargo fmt
         run: cargo fmt --all -- --check
-      - name: Cargo check
-        run: cargo check
       - name: Run trow-server test suite
         run: cargo test -p trow-server
       - name: Run Trow test suite
@@ -151,3 +149,12 @@ jobs:
         run: |
           kubectl wait pod/trow-test-0 --for condition=ready --timeout=300s
           docker push 127.0.0.1/test/nginx:alpine
+
+
+  typos:
+    name: Typos
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Check spelling
+      uses: crate-ci/typos@v1.0.4

@@ -207,7 +207,7 @@ mod admission_mutation_tests {
         )
         .await;
 
-        println!("Test uknown registry");
+        println!("Test unknown registry");
         test_request(&client, "example.com/area51", None).await;
 
         println!("Test invalid image");

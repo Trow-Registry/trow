@@ -207,11 +207,11 @@ mod tests {
     }
 
     #[test]
-    fn test_auth_non_existant_user() {
+    fn test_auth_non_existent_user() {
         env::set_var("DB_FILE", "test.db");
         assert!(
-            !User::authorize("non_existant".to_string(), "Password1".to_string()).is_ok(),
-            "Non Existant User passed auth"
+            !User::authorize("non_existent".to_string(), "Password1".to_string()).is_ok(),
+            "Non Existent User passed auth"
         );
     }
 

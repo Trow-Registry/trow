@@ -255,7 +255,7 @@ async fn get_bearer_auth_token(
         .or_else(|| resp_json.get("token"))
         .and_then(|s| s.as_str())
         .map(|s| strip_dquotes(s).unwrap_or(s).to_string())
-        .ok_or_else(|| anyhow!("Failed to find auth token in auth repsonse"))
+        .ok_or_else(|| anyhow!("Failed to find auth token in auth response"))
 }
 
 #[cfg(test)]

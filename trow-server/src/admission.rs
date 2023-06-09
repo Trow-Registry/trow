@@ -34,14 +34,14 @@ fn check_image_is_allowed(
         }
     };
     let mut match_len = 0;
-    let mut match_reson =
-        "Image is neither explicitely allowed nor denied (using default behavior)";
+    let mut match_reason =
+        "Image is neither explicitly allowed nor denied (using default behavior)";
 
     for m in config.deny.iter() {
         if m.len() > match_len && image_ref.starts_with(m) {
             is_allowed = false;
             match_len = m.len();
-            match_reson = "Image explicitely denied";
+            match_reason = "Image explicitly denied";
         }
     }
 
@@ -49,11 +49,11 @@ fn check_image_is_allowed(
         if m.len() > match_len && image_ref.starts_with(m) {
             is_allowed = true;
             match_len = m.len();
-            match_reson = "Image explicitely allowed";
+            match_reason = "Image explicitly allowed";
         }
     }
 
-    (is_allowed, match_reson)
+    (is_allowed, match_reason)
 }
 
 #[tonic::async_trait]

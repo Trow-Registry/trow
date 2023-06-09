@@ -47,7 +47,7 @@ struct Args {
     #[arg(short, long)]
     name: Option<String>,
 
-    /// Don't acutally run Trow, just validate arguments.
+    /// Don't actually run Trow, just validate arguments.
     ///
     /// For testing purposes.
     #[arg(long, default_value_t = false)]

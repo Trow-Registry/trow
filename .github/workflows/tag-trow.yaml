@@ -1,13 +1,12 @@
-# Also builds the Docker images, but we want this name on the badge
-name: publish container
+name: Release Trow
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "trow/*"
 
 jobs:
-  upload_images:
+  release-trow:
     outputs:
       container-image: ${{ steps.build-images.outputs.container-image }}
     runs-on: ubuntu-latest
@@ -28,6 +27,14 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
       - uses: sigstore/cosign-installer@main
+      - name: Check tag and Cargo.toml version match
+        run: |
+          FROM_CARGO="trow/$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)"
+          FROM_TAG="${GITHUB_REF#refs/tags/}"
+          if [ "$FROM_CARGO" != "$FROM_TAG" ]; then
+            echo "Versions do not match: $FROM_CARGO and $FROM_TAG"
+            exit 1
+          fi
       - name: Build and push multi-arch image
         id: build-images
         run: ./docker/multi-arch.sh

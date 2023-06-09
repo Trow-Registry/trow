@@ -21,7 +21,7 @@ There are several ways to produce multiplatform builds with Docker:
     with multi-stage builds.
  3. Use Rust cross-compilation to produce a binary for the target platform and copy into a base
     image for the target platform. This requires a bit more configuration, but does work. When
-    targetting a low-powered platform (e.g. Raspberry Pi), this option may be considerably faster
+    targeting a low-powered platform (e.g. Raspberry Pi), this option may be considerably faster
     than building directly on the hardware or using emulation.
 
 Our Dockerfile uses 3 (with Docker multiplatform support to assemble the final image). Assuming

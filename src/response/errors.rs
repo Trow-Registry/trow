@@ -118,7 +118,7 @@ impl error::Error for Error {
             Error::BlobUnknown => "Reference made to an unknown blob (e.g. invalid UUID)",
             Error::BlobUploadUnknown => "If a blob upload has been cancelled or was never started, this error code may be returned.",
             Error::BlobUploadInvalid(_) => "The blob upload encountered an error and can no longer proceed.",
-            Error::InternalError => "An internal error occured, please consult the logs for more details.",
+            Error::InternalError => "An internal error occurred, please consult the logs for more details.",
             Error::DigestInvalid => "When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key \"digest\", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest.",
             Error::ManifestInvalid(_) => "During upload, manifests undergo several checks ensuring validity. If those checks fail, this error may be returned, unless a more specific error is included. The detail will contain information the failed validation.",
             Error::ManifestUnknown(_) => "This error is returned when the manifest, identified by name and tag is unknown to the repository.",

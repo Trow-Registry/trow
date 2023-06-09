@@ -211,7 +211,7 @@ mod validation_tests {
 
         assert!(!response.allowed);
 
-        assert_eq!(response.result.message, "unknown_registry.io/nginx: Image is neither explicitely allowed nor denied (using default behavior)");
+        assert_eq!(response.result.message, "unknown_registry.io/nginx: Image is neither explicitly allowed nor denied (using default behavior)");
     }
 
     async fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
@@ -297,13 +297,13 @@ mod validation_tests {
         let _trow = start_trow().await;
         validate_example(&client).await;
 
-        // explicitely allowed
+        // explicitly allowed
         test_image(&client, "trow.test/am/test:tag", true).await;
         test_image(&client, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true).await;
         test_image(&client, "docker.io/amouat/myimage:test", true).await;
         test_image(&client, "localhost:8000/hello/world", true).await;
 
-        // explicitely denied
+        // explicitly denied
         test_image(&client, "localhost:8000/secret/shine-box", false).await;
 
         // default denied

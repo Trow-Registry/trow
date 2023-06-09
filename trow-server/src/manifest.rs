@@ -20,7 +20,7 @@ pub trait FromJson {
  *
  * I'm not really sure this buys us much over the JSON deserialization though...
  *
- * ARG, mistake here, manifest should be responsible for schema vesion tag
+ * ARG, mistake here, manifest should be responsible for schema version tag
  */
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]

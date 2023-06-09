@@ -107,7 +107,7 @@ mod test {
                 file.write_all(b"hello").await.unwrap();
                 // Sleep to ensure that the future stay active long enough to be cancelled
                 sleep(Duration::from_millis(500)).await;
-                // Ensure `file` isn't droped before the sleep
+                // Ensure `file` isn't dropped before the sleep
                 drop(file);
                 unreachable!();
             }
