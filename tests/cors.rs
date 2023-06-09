@@ -3,17 +3,15 @@ mod common;
 
 #[cfg(test)]
 mod cors_tests {
-    use std::fs;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
+    use std::process::{Child, Command};
     use std::time::Duration;
+    use std::{fs, thread};
 
-    use base64::{engine::general_purpose as base64_engine, Engine as _};
+    use base64::engine::general_purpose as base64_engine;
+    use base64::Engine as _;
     use environment::Environment;
-    use reqwest::header;
     use reqwest::header::HeaderMap;
-    use reqwest::StatusCode;
+    use reqwest::{header, StatusCode};
 
     use crate::common;
 
@@ -41,7 +39,8 @@ mod cors_tests {
             .arg(HOST)
             .arg("--port")
             .arg(PORT)
-            .arg("--enable-cors")
+            .arg("--cors")
+            .arg("http://extrality.ai:8973,https://example.com")
             .spawn()
             .expect("failed to start");
 
@@ -83,7 +82,7 @@ mod cors_tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+        assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             resp.headers()
                 .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)

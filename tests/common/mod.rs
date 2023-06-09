@@ -1,13 +1,10 @@
-use std::io::BufReader;
-use std::io::Write;
+use std::io::{BufReader, Write};
 use std::process::Child;
 
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::Serialize;
-
-use trow_server::digest;
-use trow_server::manifest;
+use trow_server::{digest, manifest};
 
 /* None of these are dead code, they are called from tests */
 #[allow(dead_code)]

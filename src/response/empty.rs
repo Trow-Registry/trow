@@ -1,29 +1,25 @@
-use rocket::http::Status;
-use rocket::request::Request;
-use rocket::response::{Responder, Response};
+use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct Empty;
 
-impl<'r> Responder<'r, 'static> for Empty {
-    fn respond_to(self, _: &Request) -> Result<Response<'static>, Status> {
-        Response::build().ok()
+impl IntoResponse for Empty {
+    fn into_response(self) -> Response {
+        ().into_response()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::response::empty::Empty;
-    use rocket::{http::Status, response::Responder};
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
 
-    use crate::response::test_helper::test_client;
+    use crate::response::empty::Empty;
 
     #[test]
     fn empty_ok() {
-        let cl = test_client();
-        let req = cl.get("/");
-        let response = Empty {}.respond_to(req.inner()).unwrap();
-        assert_eq!(response.status(), Status::Ok);
+        let response = Empty {}.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

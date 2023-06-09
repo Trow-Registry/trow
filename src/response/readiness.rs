@@ -1,36 +1,35 @@
-use std::io::Cursor;
-
-use rocket::http::ContentType;
-use rocket::http::Status;
-use rocket::request::Request;
-use rocket::response::{Responder, Response};
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, Response};
 
 use crate::types::ReadinessResponse;
 
-impl<'r> Responder<'r, 'static> for ReadinessResponse {
-    fn respond_to(self, _req: &Request) -> Result<Response<'static>, Status> {
+impl IntoResponse for ReadinessResponse {
+    fn into_response(self) -> Response {
         let json = serde_json::to_string(&self).unwrap_or_default();
+        let resp = Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CONTENT_LENGTH, json.len());
 
         match self.is_ready {
-            true => Response::build()
-                .header(ContentType::JSON)
-                .sized_body(None, Cursor::new(json))
-                .status(Status::Ok)
-                .ok(),
-            false => Response::build()
-                .header(ContentType::JSON)
-                .sized_body(None, Cursor::new(json))
-                .status(Status::ServiceUnavailable)
-                .ok(),
+            true => resp
+                .status(StatusCode::OK)
+                .body(json)
+                .unwrap()
+                .into_response(),
+            false => resp
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(json)
+                .unwrap()
+                .into_response(),
         }
     }
 }
 #[cfg(test)]
 mod test {
-    use crate::response::test_helper::test_client;
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
     use crate::types::ReadinessResponse;
-    use rocket::http::Status;
-    use rocket::response::Responder;
 
     fn build_ready_response() -> ReadinessResponse {
         ReadinessResponse {
@@ -48,18 +47,13 @@ mod test {
 
     #[test]
     fn test_ready_resp() {
-        let cl = test_client();
-        let req = cl.get("/");
-        let response = build_ready_response().respond_to(req.inner()).unwrap();
-
-        assert_eq!(response.status(), Status::Ok);
+        let response = build_ready_response().into_response();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[test]
     fn test_not_ready_resp() {
-        let cl = test_client();
-        let req = cl.get("/");
-        let response = build_not_ready_response().respond_to(req.inner()).unwrap();
-        assert_eq!(response.status(), Status::ServiceUnavailable);
+        let response = build_not_ready_response().into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 }

@@ -7,17 +7,14 @@ mod proxy_auth;
 mod server;
 mod temporary_file;
 
-use log::{debug, warn};
 use std::future::Future;
-use tokio::runtime::Runtime;
-use tonic::transport::Server;
-
-use server::trow_server::admission_controller_server::AdmissionControllerServer;
-use server::trow_server::registry_server::RegistryServer;
-use server::TrowServer;
 
 pub use admission::ImageValidationConfig;
 pub use proxy_auth::RegistryProxyConfig;
+use server::trow_server::admission_controller_server::AdmissionControllerServer;
+use server::trow_server::registry_server::RegistryServer;
+use server::TrowServer;
+use tonic::transport::Server;
 
 pub struct TrowServerBuilder {
     data_path: String,
@@ -56,23 +53,6 @@ impl TrowServerBuilder {
     pub fn add_root_cert(mut self, root_key: Vec<u8>) -> TrowServerBuilder {
         self.root_key = Some(root_key);
         self
-    }
-
-    pub fn start_trow_sync(self) {
-        let server = self.get_server_future();
-        let rt = Runtime::new().expect("Failed to start Tokio runtime");
-
-        debug!("Trow backend service running");
-
-        match rt.block_on(server) {
-            Ok(()) => {
-                warn!("Trow backend shutting down");
-            }
-            Err(e) => {
-                eprintln!("Failure in Trow server: {:?}", e);
-                std::process::exit(1);
-            }
-        }
     }
 
     pub fn get_server_future(self) -> impl Future<Output = Result<(), tonic::transport::Error>> {

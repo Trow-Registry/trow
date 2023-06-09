@@ -4,16 +4,14 @@ mod common;
 #[cfg(test)]
 mod interface_tests {
 
+    use std::process::{Child, Command};
+    use std::time::Duration;
+    use std::{fs, thread};
+
     use environment::Environment;
+    use reqwest::StatusCode;
 
     use crate::common;
-
-    use reqwest::StatusCode;
-    use std::fs;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
-    use std::time::Duration;
 
     const PORT: &str = "39376";
     const HOST: &str = "127.0.0.1:39376";

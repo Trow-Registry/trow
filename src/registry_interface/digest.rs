@@ -1,16 +1,15 @@
-use lazy_static::lazy_static;
-use regex::Regex;
+use std::fmt;
 use std::io::Read;
-
-// Crypto and crypto related imports
-use sha2::{Sha256, Sha512};
+use std::str::FromStr;
 
 // We need to rename here!
 use anyhow::{Error, Result};
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::Digest as ShaDigest;
-use std::fmt;
-use std::str::FromStr;
+// Crypto and crypto related imports
+use sha2::{Sha256, Sha512};
 use thiserror::Error;
 
 // Buffer size for SHA2 hashing
@@ -166,10 +165,11 @@ pub fn parse(component: &str) -> Result<Digest, DigestError> {
 
 #[cfg(test)]
 mod test {
+    use std::io::BufReader;
+
     use crate::registry_interface::digest::{
         sha256_digest, sha256_tag_digest, Digest, DigestAlgorithm,
     };
-    use std::io::BufReader;
 
     #[test]
     fn sha256_digest_test() {

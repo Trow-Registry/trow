@@ -1,22 +1,31 @@
-use crate::client_interface::ClientInterface;
+use std::sync::Arc;
+
+use anyhow::Result;
+use axum::extract::{Path, Query, State};
+use serde_derive::Deserialize;
+
 use crate::registry_interface::{CatalogOperations, ManifestHistory};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{RepoCatalog, TagList};
-use anyhow::Result;
-use rocket::get;
+use crate::TrowServerState;
 
-#[get("/v2/_catalog?<n>&<last>")]
-pub async fn get_catalog(
-    _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
+#[derive(Debug, Deserialize)]
+pub struct CatalogListQuery {
     n: Option<u32>,
     last: Option<String>,
-) -> Result<RepoCatalog, Error> {
-    let limit = n.unwrap_or(std::u32::MAX);
-    let last_repo = last.unwrap_or_default();
+}
 
-    let cat = ci
+pub async fn get_catalog(
+    _auth_user: TrowToken,
+    State(state): State<Arc<TrowServerState>>,
+    Query(query): Query<CatalogListQuery>,
+) -> Result<RepoCatalog, Error> {
+    let limit = query.n.unwrap_or(std::u32::MAX);
+    let last_repo = query.last.clone().unwrap_or_default();
+
+    let cat = state
+        .client
         .get_catalog(Some(&last_repo), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
@@ -24,198 +33,149 @@ pub async fn get_catalog(
     Ok(RepoCatalog::from(cat))
 }
 
-#[get("/v2/<repo_name>/tags/list?<last>&<n>")]
 pub async fn list_tags(
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    repo_name: String,
-    last: Option<String>,
-    n: Option<u32>,
+    State(state): State<Arc<TrowServerState>>,
+    Path(repo_name): Path<String>,
+    Query(query): Query<CatalogListQuery>,
 ) -> Result<TagList, Error> {
-    let limit = n.unwrap_or(std::u32::MAX);
-    let last_tag = last.unwrap_or_default();
+    let limit = query.n.unwrap_or(std::u32::MAX);
+    let last_tag = query.last.clone().unwrap_or_default();
 
-    let tags = ci
+    let tags = state
+        .client
         .get_tags(&repo_name, Some(&last_tag), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
     Ok(TagList::new_filled(repo_name, tags))
 }
-
-#[get("/v2/<user>/<repo>/tags/list?<last>&<n>")]
 pub async fn list_tags_2level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    user: String,
-    repo: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two)): Path<(String, String)>,
+    query: Query<CatalogListQuery>,
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}", user, repo), last, n).await
+    list_tags(auth_user, state, Path(format!("{one}/{two}")), query).await
 }
-
-#[get("/v2/<org>/<user>/<repo>/tags/list?<last>&<n>")]
 pub async fn list_tags_3level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    org: String,
-    user: String,
-    repo: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three)): Path<(String, String, String)>,
+    query: Query<CatalogListQuery>,
 ) -> Result<TagList, Error> {
-    list_tags(auth_user, ci, format!("{}/{}/{}", org, user, repo), last, n).await
+    list_tags(
+        auth_user,
+        state,
+        Path(format!("{one}/{two}/{three}")),
+        query,
+    )
+    .await
 }
-
-#[get("/v2/<fourth>/<org>/<user>/<repo>/tags/list?<last>&<n>")]
 pub async fn list_tags_4level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four)): Path<(String, String, String, String)>,
+    query: Query<CatalogListQuery>,
 ) -> Result<TagList, Error> {
     list_tags(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}", fourth, org, user, repo),
-        last,
-        n,
+        state,
+        Path(format!("{one}/{two}/{three}/{four}")),
+        query,
     )
     .await
 }
-
-#[get("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/tags/list?<last>&<n>")]
 pub async fn list_tags_5level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five)): Path<(String, String, String, String, String)>,
+    query: Query<CatalogListQuery>,
 ) -> Result<TagList, Error> {
     list_tags(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
-        last,
-        n,
+        state,
+        Path(format!("{one}/{two}/{three}/{four}/{five}")),
+        query,
     )
     .await
 }
 
-// TODO add support for pagination
-#[get("/<onename>/manifest_history/<reference>?<last>&<n>")]
 pub async fn get_manifest_history(
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    onename: String,
-    reference: String,
-    last: Option<String>,
-    n: Option<u32>,
+    State(state): State<Arc<TrowServerState>>,
+    Path((name, reference)): Path<(String, String)>,
+    Query(query): Query<CatalogListQuery>,
 ) -> Result<ManifestHistory, Error> {
-    let limit = n.unwrap_or(std::u32::MAX);
-    let last_digest = last.unwrap_or_default();
+    let limit = query.n.unwrap_or(std::u32::MAX);
+    let last_digest = query.last.clone().unwrap_or_default();
 
-    let mh = ci
-        .get_history(&onename, &reference, Some(&last_digest), Some(limit))
+    let mh = state
+        .client
+        .get_history(&name, &reference, Some(&last_digest), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
     Ok(mh)
 }
-
-#[get("/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 pub async fn get_manifest_history_2level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    user: String,
-    repo: String,
-    reference: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, reference)): Path<(String, String, String)>,
+    query: Query<CatalogListQuery>,
 ) -> Result<ManifestHistory, Error> {
     get_manifest_history(
         auth_user,
-        ci,
-        format!("{}/{}", user, repo),
-        reference,
-        last,
-        n,
+        state,
+        Path((format!("{one}/{two}"), reference)),
+        query,
     )
     .await
 }
-
-#[get("/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 pub async fn get_manifest_history_3level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, reference)): Path<(String, String, String, String)>,
+    query: Query<CatalogListQuery>,
 ) -> Result<ManifestHistory, Error> {
     get_manifest_history(
         auth_user,
-        ci,
-        format!("{}/{}/{}", org, user, repo),
-        reference,
-        last,
-        n,
+        state,
+        Path((format!("{one}/{two}/{three}"), reference)),
+        query,
     )
     .await
 }
-
-#[get("/<fourth>/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 pub async fn get_manifest_history_4level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, reference)): Path<(String, String, String, String, String)>,
+    query: Query<CatalogListQuery>,
 ) -> Result<ManifestHistory, Error> {
     get_manifest_history(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}", fourth, org, user, repo),
-        reference,
-        last,
-        n,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}"), reference)),
+        query,
     )
     .await
 }
-
-#[get("/<fifth>/<fourth>/<org>/<user>/<repo>/manifest_history/<reference>?<last>&<n>")]
 pub async fn get_manifest_history_5level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
-    last: Option<String>,
-    n: Option<u32>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, reference)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    query: Query<CatalogListQuery>,
 ) -> Result<ManifestHistory, Error> {
     get_manifest_history(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
-        reference,
-        last,
-        n,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), reference)),
+        query,
     )
     .await
 }

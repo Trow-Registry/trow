@@ -4,19 +4,17 @@ mod common;
 #[cfg(test)]
 mod interface_tests {
 
+    use std::io::BufReader;
+    use std::process::{Child, Command};
+    use std::time::Duration;
+    use std::{fs, thread};
+
     use environment::Environment;
+    use rand::Rng;
+    use reqwest::StatusCode;
+    use trow_server::digest;
 
     use crate::common;
-    use rand::Rng;
-
-    use reqwest::StatusCode;
-    use std::fs;
-    use std::io::BufReader;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
-    use std::time::Duration;
-    use trow_server::digest;
 
     const PORT: &str = "39368";
     const HOST: &str = "127.0.0.1:39368";

@@ -178,11 +178,12 @@ impl Manifest {
 
 #[cfg(test)]
 mod test {
-    use super::FromJson;
-    use super::Manifest;
-    use crate::digest::sha256_tag_digest;
-    use serde_json::{self, Value};
     use std::io::BufReader;
+
+    use serde_json::{self, Value};
+
+    use super::{FromJson, Manifest};
+    use crate::digest::sha256_tag_digest;
 
     #[test]
     fn valid_v2_2() {

@@ -4,18 +4,18 @@ mod common;
 #[cfg(test)]
 mod validation_tests {
     use std::collections::HashMap;
-    use std::process::Child;
-    use std::process::Command;
+    use std::process::{Child, Command};
     use std::thread;
     use std::time::Duration;
 
+    use axum::http::header;
     use environment::Environment;
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
     use reqwest::StatusCode;
+    use trow_server::ImageValidationConfig;
 
     use crate::common;
-    use trow_server::ImageValidationConfig;
 
     const PORT: &str = "39366";
     const HOST: &str = "127.0.0.1:39366";
@@ -194,6 +194,7 @@ mod validation_tests {
 
         let resp = cl
             .post(&format!("{}/validate-image", ORIGIN))
+            .header(header::CONTENT_TYPE, "application/json")
             .body(review)
             .send()
             .await
@@ -265,6 +266,7 @@ mod validation_tests {
 
         let resp = cl
             .post(&format!("{}/validate-image", ORIGIN))
+            .header(header::CONTENT_TYPE, "application/json")
             .body(review)
             .send()
             .await

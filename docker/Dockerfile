@@ -20,7 +20,7 @@ RUN dpkg --add-architecture $TARGETARCH
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && \
-    apt-get install -y unzip openssl libssl-dev:$TARGETARCH $(cat /.compiler)
+    apt-get install -y unzip openssl protobuf-compiler libssl-dev:$TARGETARCH $(cat /.compiler)
 
 COPY Cargo.toml .
 COPY Cargo.lock .

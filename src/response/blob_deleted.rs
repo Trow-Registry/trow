@@ -1,10 +1,10 @@
-use crate::types::BlobDeleted;
-use rocket::http::Status;
-use rocket::request::Request;
-use rocket::response::{self, Responder, Response};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 
-impl<'r> Responder<'r, 'static> for BlobDeleted {
-    fn respond_to(self, _req: &Request) -> response::Result<'static> {
-        Response::build().status(Status::Accepted).ok()
+use crate::types::BlobDeleted;
+
+impl IntoResponse for BlobDeleted {
+    fn into_response(self) -> Response {
+        StatusCode::ACCEPTED.into_response()
     }
 }

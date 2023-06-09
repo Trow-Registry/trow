@@ -1,6 +1,6 @@
-use anyhow::{Error, Result};
 use std::io::Read;
 
+use anyhow::{Error, Result};
 // Crypto and crypto related imports
 use sha2::{Digest, Sha256};
 
@@ -34,8 +34,9 @@ pub fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String> {
 
 #[cfg(test)]
 mod test {
-    use crate::digest::{sha256_digest, sha256_tag_digest};
     use std::io::BufReader;
+
+    use crate::digest::{sha256_digest, sha256_tag_digest};
 
     #[test]
     fn sha256_digest_test() {

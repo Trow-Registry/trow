@@ -1,6 +1,7 @@
-use super::StorageDriverError;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+use super::StorageDriverError;
 
 /*
 There are implementation details in this interface that could/should be abstracted out.
@@ -64,7 +65,7 @@ impl ManifestHistory {
     }
 }
 
-#[rocket::async_trait]
+#[axum::async_trait]
 pub trait CatalogOperations {
     /// Returns a vec of all repository names in the registry
     /// Can optionally be given a start value and maximum number of results to return.

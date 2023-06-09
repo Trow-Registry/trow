@@ -1,47 +1,44 @@
-use crate::response::get_base_url;
-use crate::types::AcceptedUpload;
+use axum::body;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use log::debug;
-use rocket::http::{Header, Status};
-use rocket::request::Request;
-use rocket::response::{self, Responder, Response};
 
-#[rocket::async_trait]
-impl<'r> Responder<'r, 'static> for AcceptedUpload {
-    fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
+use crate::types::AcceptedUpload;
+
+impl IntoResponse for AcceptedUpload {
+    fn into_response(self) -> Response {
         let location = format!(
             "{}/v2/{}/blobs/{}",
-            get_base_url(req),
+            self.base_url(),
             self.repo_name(),
             self.digest()
         );
         debug!("accepted upload response");
-        let location_header = Header::new("Location", location);
-        let digest_header = Header::new("Docker-Content-Digest", self.digest().to_string());
         let (left, right) = self.range();
-        let range_header = Header::new("Range", format!("{}-{}", left, right));
-        let length_header = Header::new("Content-Length", "0");
-
-        Response::build()
-            .status(Status::Created)
-            .header(location_header)
-            .header(digest_header)
-            .header(range_header)
-            .header(length_header)
-            .ok()
+        Response::builder()
+            .status(StatusCode::CREATED)
+            .header("Location", location)
+            .header("Docker-Content-Digest", self.digest().to_string())
+            .header("Range", format!("{}-{}", left, right))
+            .header("Content-Length", "0")
+            .body(body::Empty::new())
+            .unwrap()
+            .into_response()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::registry_interface::Digest;
-    use crate::types::{create_accepted_upload, AcceptedUpload};
-    use crate::types::{RepoName, Uuid};
-    use crate::{registry_interface::DigestAlgorithm, response::test_helper::test_client};
-    use rocket::http::Status;
-    use rocket::response::Responder;
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
 
-    fn build_response() -> AcceptedUpload {
-        create_accepted_upload(
+    use crate::registry_interface::{Digest, DigestAlgorithm};
+    use crate::types::{AcceptedUpload, RepoName, Uuid};
+
+    #[tokio::test]
+    async fn test_resp() {
+        let accepted_upload = AcceptedUpload::new(
+            "http://trowuw".to_string(),
             Digest {
                 algo: DigestAlgorithm::Sha256,
                 hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
@@ -50,20 +47,15 @@ mod test {
             RepoName("moredhel/test".to_owned()),
             Uuid("whatever".to_owned()),
             (0, 0),
-        )
-    }
+        );
 
-    #[test]
-    fn test_resp() {
-        let cl = test_client();
-        let req = cl.get("/");
-        let response = build_response().respond_to(req.inner()).unwrap();
+        let response = accepted_upload.into_response();
 
         let headers = response.headers();
-        assert_eq!(response.status(), Status::Created);
-        assert!(headers.contains("Location"));
-        assert!(headers.contains("Range"));
-        assert!(headers.contains("Docker-Content-Digest"));
-        assert!(headers.contains("Content-Length"));
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert!(headers.contains_key("Location"));
+        assert!(headers.contains_key("Range"));
+        assert!(headers.contains_key("Docker-Content-Digest"));
+        assert!(headers.contains_key("Content-Length"));
     }
 }

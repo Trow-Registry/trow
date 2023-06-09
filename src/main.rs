@@ -1,12 +1,12 @@
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
 
 use clap::builder::ArgPredicate;
 use clap::Parser;
-
-use trow::{NetAddr, TrowBuilder};
+use trow::TrowBuilder;
 
 #[derive(Parser, Debug)]
 #[command(name = "Trow")]
@@ -15,7 +15,7 @@ use trow::{NetAddr, TrowBuilder};
 struct Args {
     /// Name of the host or interface to start Trow on
     #[arg(long, default_value = "0.0.0.0")]
-    host: String,
+    host: IpAddr,
 
     /// Port that trow will listen on
     #[arg(
@@ -74,44 +74,28 @@ struct Args {
     proxy_registry_config_file: Option<String>,
 
     /// Enable Cross-Origin Resource Sharing(CORS) requests.
-    #[arg(long, default_value_t = false)]
-    enable_cors: bool,
-
-    /// Maximum size in mebibytes of manifest file that can be uploaded.
-    ///
-    /// This is JSON metadata, so usually relatively small.
-    #[arg(long, default_value_t = 4)]
-    max_manifest_size: u32,
-
-    /// Maximum size in mebibytes of "blob" that can be uploaded (a single layer of an image).
-    ///
-    /// This can be very large in some images (GBs).
-    #[arg(long, default_value_t = 8192)]
-    max_blob_size: u32,
+    #[arg(long, value_delimiter(','))]
+    cors: Option<Vec<String>>,
 
     /// The log level at which to output to stdout, valid values are OFF, ERROR, WARN, INFO, DEBUG and TRACE
     #[arg(long, default_value_t = env::var("RUST_LOG").unwrap_or_else(|_| "error".to_string()))]
     log_level: String,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
 
-    let host_name = args.name.unwrap_or(args.host.clone());
+    let addr = SocketAddr::new(args.host, args.port);
+    let host_name = args.name.unwrap_or(addr.to_string());
 
-    let addr = NetAddr {
-        host: args.host.clone(),
-        port: args.port,
-    };
     let mut builder = TrowBuilder::new(
         args.data_dir.clone(),
         addr,
         "127.0.0.1:51000".to_string(),
         host_name,
         args.dry_run,
-        args.enable_cors,
-        args.max_manifest_size,
-        args.max_blob_size,
+        args.cors,
         args.log_level,
     );
     if let Some(tls) = args.tls {
@@ -154,7 +138,7 @@ fn main() {
         }
     }
 
-    builder.start().unwrap_or_else(|e| {
+    builder.start().await.unwrap_or_else(|e| {
         eprintln!("Error launching Trow:\n\n{}", e);
         std::process::exit(1);
     });

@@ -1,10 +1,11 @@
+use std::path::Path;
+
 use anyhow::Result;
 use lazy_static::lazy_static;
 use prometheus::{
     labels, opts, register_int_counter, register_int_gauge, Encoder, IntCounter, IntGauge,
     TextEncoder,
 };
-use std::path::Path;
 
 //  Metrics static values executed at runtime and registered to default
 //  prometheus registry

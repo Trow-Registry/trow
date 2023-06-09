@@ -7,8 +7,7 @@ use lazy_static::lazy_static;
 use log::info;
 use quoted_string::strip_dquotes;
 use regex::Regex;
-use reqwest::StatusCode;
-use reqwest::{self, Method};
+use reqwest::{self, Method, StatusCode};
 use rusoto_core::Region;
 use rusoto_ecr::{Ecr, EcrClient};
 use serde::{Deserialize, Serialize};
@@ -261,9 +260,10 @@ async fn get_bearer_auth_token(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use httpmock::prelude::*;
     use serde_json::json;
+
+    use super::*;
 
     const AUTHZ_HEADER: &str = "Authorization";
 

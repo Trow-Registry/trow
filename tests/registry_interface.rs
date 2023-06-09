@@ -4,21 +4,18 @@ mod common;
 #[cfg(test)]
 mod interface_tests {
 
+    use std::io::BufReader;
+    use std::process::{Child, Command};
+    use std::time::Duration;
+    use std::{fs, thread};
+
     use environment::Environment;
+    use reqwest::StatusCode;
+    use trow::types::{HealthResponse, ReadinessResponse, RepoCatalog, TagList};
+    use trow_server::{digest, manifest};
 
     use crate::common;
     use crate::common::DIST_API_HEADER;
-
-    use reqwest::StatusCode;
-
-    use std::fs;
-    use std::io::BufReader;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
-    use std::time::Duration;
-    use trow::types::{HealthResponse, ReadinessResponse, RepoCatalog, TagList};
-    use trow_server::{digest, manifest};
 
     const PORT: &str = "39365";
     const HOST: &str = "127.0.0.1:39365";
@@ -376,16 +373,6 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    async fn test_6level_error(cl: &reqwest::Client) {
-        let name = "one/two/three/four/five/six";
-        let resp = cl
-            .post(&format!("{}/v2/{}/blobs/uploads/", ORIGIN, name))
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
     async fn get_health(cl: &reqwest::Client) {
         let resp = cl.get(&format!("{}/healthz", ORIGIN)).send().await.unwrap();
 
@@ -474,10 +461,6 @@ mod interface_tests {
         upload_with_put(&client, "puttest").await;
         println!("Running upload_with_post");
         upload_with_post(&client, "posttest").await;
-
-        println!("Running test_5level_error()");
-        test_6level_error(&client).await;
-
         println!("Running push_oci_manifest()");
         let manifest_digest = push_oci_manifest(&client, "puttest", "puttest1").await;
         println!("Running push_manifest_list()");

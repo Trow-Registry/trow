@@ -4,10 +4,9 @@ mod common;
 #[cfg(test)]
 mod cli {
     use predicates::prelude::*;
+    use trow_server::{ImageValidationConfig, RegistryProxyConfig};
 
     use crate::common::get_file;
-    use trow_server::ImageValidationConfig;
-    use trow_server::RegistryProxyConfig;
 
     fn get_command() -> assert_cmd::Command {
         let mut cmd = assert_cmd::Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
@@ -137,31 +136,12 @@ mod cli {
     #[test]
     fn cors() {
         get_command()
-            .args(["--enable-cors"])
+            .args(["--cors", "ftp://trow.test"])
             .assert()
             .success()
             .stdout(predicate::str::contains(
                 "Cross-Origin Resource Sharing(CORS) requests are allowed",
             ));
-    }
-
-    #[test]
-    fn file_size_parsing() {
-        get_command()
-            .args(["--max-manifest-size", "3"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("manifest size: 3"));
-
-        get_command()
-            .args(["--max-manifest-size", "-4"])
-            .assert()
-            .failure();
-
-        get_command()
-            .args(["--max-manifest-size", "1.1"])
-            .assert()
-            .failure();
     }
 
     #[test]

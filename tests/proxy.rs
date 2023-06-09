@@ -3,19 +3,16 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
-    use crate::common;
+    use std::path::Path;
+    use std::process::{Child, Command};
+    use std::time::Duration;
+    use std::{fs, thread};
 
     use environment::Environment;
     use reqwest::StatusCode;
-    use std::fs;
-    use std::path::Path;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
-    use std::time::Duration;
-    use trow_server::RegistryProxyConfig;
+    use trow_server::{manifest, RegistryProxyConfig};
 
-    use trow_server::manifest;
+    use crate::common;
 
     const PORT: &str = "39369";
     const ORIGIN: &str = "http://127.0.0.1:39369";
@@ -101,7 +98,7 @@ mod interface_tests {
 
     async fn upload_to_nonwritable_repo(cl: &reqwest::Client, name: &str) {
         let resp = cl
-            .post(&format!("{}/v2/{}/blobs/uploads/", ORIGIN, name))
+            .post(&format!("{ORIGIN}/v2/{name}/blobs/uploads/"))
             .send()
             .await
             .expect("Error uploading layer");

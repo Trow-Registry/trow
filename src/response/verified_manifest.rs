@@ -1,42 +1,40 @@
-use crate::response::get_base_url;
-use crate::types::VerifiedManifest;
-use rocket::http::Header;
-use rocket::http::Status;
-use rocket::request::Request;
-use rocket::response::{Responder, Response};
+use axum::body;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 
-impl<'r> Responder<'r, 'static> for VerifiedManifest {
-    fn respond_to(self, req: &Request) -> Result<Response<'static>, Status> {
+use crate::types::VerifiedManifest;
+
+impl IntoResponse for VerifiedManifest {
+    fn into_response(self) -> Response {
         //The front end is responsible for assembling URLs, backend should deal in arguments
         let location = format!(
             "{}/v2/{}/manifests/{}",
-            get_base_url(req),
+            self.base_url().unwrap(),
             self.repo_name(),
             self.tag()
         );
-        let location_header = Header::new("Location", location);
-        let digest = Header::new("Docker-Content-Digest", self.digest().to_string());
-        Response::build()
-            .status(Status::Created)
-            .header(location_header)
-            .header(digest)
-            .ok()
+        Response::builder()
+            .header("Location", location)
+            .header("Docker-Content-Digest", self.digest().to_string())
+            .status(StatusCode::CREATED)
+            .body(body::Empty::new())
+            .unwrap()
+            .into_response()
     }
 }
 
 #[cfg(test)]
 mod test {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
     use crate::registry_interface::{Digest, DigestAlgorithm};
-    use crate::response::test_helper::test_client;
-    use crate::types::{create_verified_manifest, RepoName};
-    use rocket::http::Status;
-    use rocket::response::Responder;
+    use crate::types::{RepoName, VerifiedManifest};
 
     #[test]
     fn accepted_ok() {
-        let cl = test_client();
-        let req = cl.get("/");
-        let response = create_verified_manifest(
+        let response = VerifiedManifest::new(
+            Some("https://extrality.ai".to_string()),
             RepoName("repo_name".to_string()),
             Digest {
                 algo: DigestAlgorithm::Sha256,
@@ -45,8 +43,7 @@ mod test {
             },
             "ref".to_string(),
         )
-        .respond_to(req.inner())
-        .unwrap();
-        assert_eq!(response.status(), Status::Created);
+        .into_response();
+        assert_eq!(response.status(), StatusCode::CREATED);
     }
 }

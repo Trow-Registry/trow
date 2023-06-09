@@ -1,8 +1,7 @@
-use crate::registry_interface::Digest;
-
 use derive_more::Display;
-use rocket::Responder;
 use serde::{Deserialize, Serialize};
+
+use crate::registry_interface::Digest;
 
 // TODO: Kill this file. Move types and methods to where they're used.
 
@@ -14,8 +13,14 @@ pub struct Uuid(pub String);
 #[display(fmt = "{}", _0)]
 pub struct RepoName(pub String);
 
+#[derive(Deserialize, Debug)]
+pub struct DigestQuery {
+    pub digest: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
+    base_url: String,
     uuid: Uuid,
     repo_name: RepoName,
     range: (u32, u32),
@@ -26,6 +31,15 @@ pub struct BlobDeleted {}
 pub struct ManifestDeleted {}
 
 impl UploadInfo {
+    pub fn new(base_url: String, uuid: Uuid, repo_name: RepoName, range: (u32, u32)) -> Self {
+        Self {
+            base_url,
+            uuid,
+            repo_name,
+            range,
+        }
+    }
+
     pub fn uuid(&self) -> &Uuid {
         &self.uuid
     }
@@ -37,39 +51,38 @@ impl UploadInfo {
     pub fn range(&self) -> (u32, u32) {
         self.range
     }
-}
 
-pub fn create_upload_info(uuid: Uuid, repo_name: RepoName, range: (u32, u32)) -> UploadInfo {
-    UploadInfo {
-        uuid,
-        repo_name,
-        range,
+    pub fn base_url(&self) -> &str {
+        &self.base_url
     }
 }
 
 #[derive(Debug, Serialize)]
 pub struct AcceptedUpload {
+    base_url: String,
     digest: Digest,
     repo_name: RepoName,
     uuid: Uuid,
     range: (u32, u32),
-}
-
-pub fn create_accepted_upload(
-    digest: Digest,
-    repo_name: RepoName,
-    uuid: Uuid,
-    range: (u32, u32),
-) -> AcceptedUpload {
-    AcceptedUpload {
-        digest,
-        repo_name,
-        uuid,
-        range,
-    }
 }
 
 impl AcceptedUpload {
+    pub fn new(
+        base_url: String,
+        digest: Digest,
+        repo_name: RepoName,
+        uuid: Uuid,
+        range: (u32, u32),
+    ) -> Self {
+        Self {
+            base_url,
+            digest,
+            repo_name,
+            uuid,
+            range,
+        }
+    }
+
     pub fn digest(&self) -> &Digest {
         &self.digest
     }
@@ -81,9 +94,13 @@ impl AcceptedUpload {
     pub fn range(&self) -> (u32, u32) {
         self.range
     }
+
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
 }
 
-#[derive(Responder)]
+#[derive(Serialize, Debug)]
 pub enum Upload {
     Accepted(AcceptedUpload),
     Info(UploadInfo),
@@ -91,12 +108,22 @@ pub enum Upload {
 
 #[derive(Debug, Serialize)]
 pub struct VerifiedManifest {
+    base_url: Option<String>,
     repo_name: RepoName,
     digest: Digest,
     tag: String,
 }
 
 impl VerifiedManifest {
+    pub fn new(base_url: Option<String>, repo_name: RepoName, digest: Digest, tag: String) -> Self {
+        Self {
+            base_url,
+            repo_name,
+            digest,
+            tag,
+        }
+    }
+
     pub fn digest(&self) -> &Digest {
         &self.digest
     }
@@ -108,17 +135,8 @@ impl VerifiedManifest {
     pub fn repo_name(&self) -> &RepoName {
         &self.repo_name
     }
-}
-
-pub fn create_verified_manifest(
-    repo_name: RepoName,
-    digest: Digest,
-    tag: String,
-) -> VerifiedManifest {
-    VerifiedManifest {
-        repo_name,
-        digest,
-        tag,
+    pub fn base_url(&self) -> Option<&String> {
+        self.base_url.as_ref()
     }
 }
 

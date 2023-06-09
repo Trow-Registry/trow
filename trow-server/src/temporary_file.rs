@@ -1,8 +1,9 @@
+use std::path::{Path, PathBuf};
+
 use anyhow::Result;
 use bytes::Bytes;
 use futures::stream::Stream;
 use futures::StreamExt;
-use std::path::{Path, PathBuf};
 use tokio::fs::{self, File};
 use tokio::io::{self, AsyncWriteExt};
 
@@ -66,8 +67,9 @@ impl Drop for TemporaryFile {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use tempfile::tempdir;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_temporary_file() {

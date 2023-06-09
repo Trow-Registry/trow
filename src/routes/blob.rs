@@ -1,16 +1,17 @@
-use crate::client_interface::ClientInterface;
+use std::sync::Arc;
+
+use anyhow::Result;
+use axum::extract::{BodyStream, Path, Query, State};
+use axum::http::header::HeaderMap;
+use log::error;
+
 use crate::registry_interface::{digest, BlobReader, BlobStorage, ContentInfo, StorageDriverError};
 use crate::response::errors::Error;
+use crate::response::get_base_url;
 use crate::response::trow_token::TrowToken;
 use crate::response::upload_info::UploadInfo;
-use crate::types::{
-    create_accepted_upload, create_upload_info, AcceptedUpload, BlobDeleted, RepoName, Upload, Uuid,
-};
-use crate::TrowConfig;
-use anyhow::Result;
-use rocket::data::ToByteUnit;
-use rocket::http::uri::Origin;
-use rocket::{delete, get, patch, post, put};
+use crate::types::{AcceptedUpload, BlobDeleted, DigestQuery, RepoName, Upload, Uuid};
+use crate::TrowServerState;
 
 /*
 ---
@@ -23,92 +24,79 @@ digest - unique identifier for the blob to be downoaded
 200 - blob is downloaded
 307 - redirect to another service for downloading[1]
  */
-
-#[get("/v2/<name_repo>/blobs/<digest>")]
 pub async fn get_blob(
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    name_repo: String,
-    digest: String,
-) -> Option<BlobReader> {
-    let digest = digest::parse(&digest);
-    match digest {
-        Ok(d) => ci.get_blob(&name_repo, &d).await.ok(),
-        Err(_) => None,
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, digest)): Path<(String, String)>,
+) -> Result<BlobReader, Error> {
+    let digest = match digest::parse(&digest) {
+        Ok(d) => d,
+        Err(e) => {
+            log::error!("Error parsing digest: {}", e);
+            return Err(Error::DigestInvalid);
+        }
+    };
+
+    match state.client.get_blob(&one, &digest).await {
+        Ok(r) => Ok(r),
+        Err(e) => {
+            log::error!("Error getting blob: {}", e);
+            Err(Error::NotFound)
+        }
     }
 }
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to get_blob
- */
-
-#[get("/v2/<name>/<repo>/blobs/<digest>")]
 pub async fn get_blob_2level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    name: String,
-    repo: String,
-    digest: String,
-) -> Option<BlobReader> {
-    get_blob(auth_user, ci, format!("{}/{}", name, repo), digest).await
-}
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to get_blob
- */
-#[get("/v2/<org>/<name>/<repo>/blobs/<digest>")]
-pub async fn get_blob_3level(
-    auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    org: String,
-    name: String,
-    repo: String,
-    digest: String,
-) -> Option<BlobReader> {
-    get_blob(auth_user, ci, format!("{}/{}/{}", org, name, repo), digest).await
-}
-
-/*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to get_blob
- */
-#[get("/v2/<fourth>/<org>/<name>/<repo>/blobs/<digest>")]
-pub async fn get_blob_4level(
-    auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fourth: String,
-    org: String,
-    name: String,
-    repo: String,
-    digest: String,
-) -> Option<BlobReader> {
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, two, digest)): Path<(String, String, String)>,
+) -> Result<BlobReader, Error> {
     get_blob(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}", fourth, org, name, repo),
-        digest,
+        State(state),
+        Path((format!("{one}/{two}"), digest)),
     )
     .await
 }
-
-/*
- * Parse 5 level <org>/<repo>/<name> style path and pass it to get_blob
- */
-#[get("/v2/<fifth>/<fourth>/<org>/<name>/<repo>/blobs/<digest>")]
-pub async fn get_blob_5level(
+pub async fn get_blob_3level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    name: String,
-    repo: String,
-    digest: String,
-) -> Option<BlobReader> {
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, two, three, digest)): Path<(String, String, String, String)>,
+) -> Result<BlobReader, Error> {
     get_blob(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, name, repo),
-        digest,
+        State(state),
+        Path((format!("{one}/{two}/{three}"), digest)),
+    )
+    .await
+}
+pub async fn get_blob_4level(
+    auth_user: TrowToken,
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, two, three, four, digest)): Path<(String, String, String, String, String)>,
+) -> Result<BlobReader, Error> {
+    get_blob(
+        auth_user,
+        State(state),
+        Path((format!("{one}/{two}/{three}/{four}"), digest)),
+    )
+    .await
+}
+pub async fn get_blob_5level(
+    auth_user: TrowToken,
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, digest)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+) -> Result<BlobReader, Error> {
+    get_blob(
+        auth_user,
+        State(state),
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), digest)),
     )
     .await
 }
@@ -126,167 +114,132 @@ Content-Type: application/octet-stream
 /**
  * Completes the upload.
  */
-#[put("/v2/<repo_name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
 pub async fn put_blob(
+    headers: HeaderMap,
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    repo_name: String,
-    uuid: String,
-    digest: String,
-    chunk: rocket::data::Data<'_>,
+    State(state): State<Arc<TrowServerState>>,
+    Path((repo, uuid)): Path<(String, String)>,
+    Query(digest): Query<DigestQuery>,
+    chunk: BodyStream,
 ) -> Result<AcceptedUpload, Error> {
-    let ds = chunk.open(tc.max_blob_size.mebibytes());
+    let digest = match digest.digest {
+        Some(d) => d,
+        None => return Err(Error::DigestInvalid),
+    };
 
-    let size = match ci.store_blob_chunk(&repo_name, &uuid, None, ds).await {
-        Ok(stored) => {
-            if !stored.complete {
-                return Err(Error::BlobUploadInvalid(format!(
-                    "Content over data limit {} mebibytes",
-                    tc.max_blob_size
-                )));
-            } else {
-                stored.total_stored
-            }
-        }
+    let size = match state
+        .client
+        .store_blob_chunk(&repo, &uuid, None, chunk)
+        .await
+    {
+        Ok(stored) => stored.total_stored,
         Err(StorageDriverError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
         Err(StorageDriverError::InvalidContentRange) => {
             return Err(Error::BlobUploadInvalid(
                 "Invalid Content Range".to_string(),
             ))
         }
-        Err(_) => return Err(Error::InternalError),
+        Err(e) => {
+            error!("Error storing blob chunk: {}", e);
+            return Err(Error::InternalError);
+        }
     };
 
     let digest_obj = digest::parse(&digest).map_err(|_| Error::DigestInvalid)?;
-    ci.complete_and_verify_blob_upload(&repo_name, &uuid, &digest_obj)
+    state
+        .client
+        .complete_and_verify_blob_upload(&repo, &uuid, &digest_obj)
         .await
         .map_err(|e| match e {
             StorageDriverError::InvalidDigest => Error::DigestInvalid,
-            _ => Error::InternalError,
+            e => {
+                error!("Error completing blob upload: {}", e);
+                Error::InternalError
+            }
         })?;
 
-    Ok(create_accepted_upload(
+    Ok(AcceptedUpload::new(
+        get_base_url(&headers, &state.config),
         digest_obj,
-        RepoName(repo_name),
+        RepoName(repo),
         Uuid(uuid),
         (0, (size as u32).saturating_sub(1)), // Note first byte is 0
     ))
 }
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to put_blob
- */
-#[put("/v2/<repo>/<name>/blobs/uploads/<uuid>?<digest>", data = "<chunk>")]
 pub async fn put_blob_2level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    config: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    repo: String,
-    name: String,
-    uuid: String,
-    digest: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, uuid)): Path<(String, String, String)>,
+    digest: Query<DigestQuery>,
+    chunk: BodyStream,
 ) -> Result<AcceptedUpload, Error> {
     put_blob(
+        headers,
         auth_user,
-        config,
-        tc,
-        format!("{}/{}", repo, name),
-        uuid,
+        state,
+        Path((format!("{one}/{two}"), uuid)),
         digest,
         chunk,
     )
     .await
 }
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob
- */
-#[put(
-    "/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
-    data = "<chunk>"
-)]
 pub async fn put_blob_3level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    config: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    org: String,
-    repo: String,
-    name: String,
-    uuid: String,
-    digest: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, uuid)): Path<(String, String, String, String)>,
+    digest: Query<DigestQuery>,
+    chunk: BodyStream,
 ) -> Result<AcceptedUpload, Error> {
     put_blob(
+        headers,
         auth_user,
-        config,
-        tc,
-        format!("{}/{}/{}", org, repo, name),
-        uuid,
+        state,
+        Path((format!("{one}/{two}/{three}"), uuid)),
         digest,
         chunk,
     )
     .await
 }
-
-/*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to put_blob
- */
-#[put(
-    "/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
-    data = "<chunk>"
-)]
 pub async fn put_blob_4level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    config: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fourth: String,
-    org: String,
-    repo: String,
-    name: String,
-    uuid: String,
-    digest: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, uuid)): Path<(String, String, String, String, String)>,
+    digest: Query<DigestQuery>,
+    chunk: BodyStream,
 ) -> Result<AcceptedUpload, Error> {
     put_blob(
+        headers,
         auth_user,
-        config,
-        tc,
-        format!("{}/{}/{}/{}", fourth, org, repo, name),
-        uuid,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}"), uuid)),
         digest,
         chunk,
     )
     .await
 }
-
-/*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to put_blob
- */
-#[put(
-    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>?<digest>",
-    data = "<chunk>"
-)]
 pub async fn put_blob_5level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    config: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    repo: String,
-    name: String,
-    uuid: String,
-    digest: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, uuid)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    digest: Query<DigestQuery>,
+    chunk: BodyStream,
 ) -> Result<AcceptedUpload, Error> {
     put_blob(
+        headers,
         auth_user,
-        config,
-        tc,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, repo, name),
-        uuid,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), uuid)),
         digest,
         chunk,
     )
@@ -311,34 +264,28 @@ Uploads a blob or chunk of a blob.
 Checks UUID. Returns UploadInfo with range set to correct position.
 
 */
-#[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 pub async fn patch_blob(
+    headers: HeaderMap,
     _auth_user: TrowToken,
     info: Option<ContentInfo>,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    repo_name: String,
-    uuid: String,
-    chunk: rocket::data::Data<'_>,
+    State(state): State<Arc<TrowServerState>>,
+    Path((repo, uuid)): Path<(String, String)>,
+    chunk: BodyStream,
 ) -> Result<UploadInfo, Error> {
-    let data = chunk.open(tc.max_blob_size.mebibytes());
-
-    match ci.store_blob_chunk(&repo_name, &uuid, info, data).await {
+    match state
+        .client
+        .store_blob_chunk(&repo, &uuid, info, chunk)
+        .await
+    {
         Ok(stored) => {
-            let repo_name = RepoName(repo_name);
+            let repo_name = RepoName(repo);
             let uuid = Uuid(uuid);
-            if !stored.complete {
-                Err(Error::BlobUploadInvalid(format!(
-                    "Content over data limit {} mebibytes",
-                    tc.max_blob_size
-                )))
-            } else {
-                Ok(create_upload_info(
-                    uuid,
-                    repo_name,
-                    (0, (stored.total_stored as u32).saturating_sub(1)), // First byte is 0
-                ))
-            }
+            Ok(UploadInfo::new(
+                get_base_url(&headers, &state.config),
+                uuid,
+                repo_name,
+                (0, (stored.total_stored as u32).saturating_sub(1)), // First byte is 0
+            ))
         }
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
         Err(StorageDriverError::InvalidContentRange) => Err(Error::BlobUploadInvalid(
@@ -348,117 +295,84 @@ pub async fn patch_blob(
     }
 }
 
-/*
- * Parse 2 level <repo>/<name> style path and pass it to patch_blob
- */
-#[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 pub async fn patch_blob_2level(
+    headers: HeaderMap,
     auth_user: TrowToken,
     info: Option<ContentInfo>,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    repo: String,
-    name: String,
-    uuid: String,
-    chunk: rocket::data::Data<'_>,
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, two, uuid)): Path<(String, String, String)>,
+    chunk: BodyStream,
 ) -> Result<UploadInfo, Error> {
     patch_blob(
+        headers,
         auth_user,
         info,
-        ci,
-        tc,
-        format!("{}/{}", repo, name),
-        uuid,
+        State(state),
+        Path((format!("{one}/{two}"), uuid)),
         chunk,
     )
     .await
 }
 
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to patch_blob
- */
-#[patch("/v2/<org>/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 pub async fn patch_blob_3level(
+    headers: HeaderMap,
     auth_user: TrowToken,
     info: Option<ContentInfo>,
-    handler: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    org: String,
-    repo: String,
-    name: String,
-    uuid: String,
-    chunk: rocket::data::Data<'_>,
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, two, three, uuid)): Path<(String, String, String, String)>,
+    chunk: BodyStream,
 ) -> Result<UploadInfo, Error> {
     patch_blob(
+        headers,
         auth_user,
         info,
-        handler,
-        tc,
-        format!("{}/{}/{}", org, repo, name),
-        uuid,
+        State(state),
+        Path((format!("{one}/{two}/{three}"), uuid)),
         chunk,
     )
     .await
 }
 
-/*
- * Parse 4 level <org>/<repo>/<name> style path and pass it to patch_blob
- */
-#[patch(
-    "/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>",
-    data = "<chunk>"
-)]
 pub async fn patch_blob_4level(
+    headers: HeaderMap,
     auth_user: TrowToken,
     info: Option<ContentInfo>,
-    handler: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fourth: String,
-    org: String,
-    repo: String,
-    name: String,
-    uuid: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, uuid)): Path<(String, String, String, String, String)>,
+    chunk: BodyStream,
 ) -> Result<UploadInfo, Error> {
     patch_blob(
+        headers,
         auth_user,
         info,
-        handler,
-        tc,
-        format!("{}/{}/{}/{}", fourth, org, repo, name),
-        uuid,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}"), uuid)),
         chunk,
     )
     .await
 }
 
-/*
- * Parse 5 level <org>/<repo>/<name> style path and pass it to patch_blob
- */
-#[patch(
-    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads/<uuid>",
-    data = "<chunk>"
-)]
 pub async fn patch_blob_5level(
+    headers: HeaderMap,
     auth_user: TrowToken,
     info: Option<ContentInfo>,
-    handler: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    repo: String,
-    name: String,
-    uuid: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, uuid)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    chunk: BodyStream,
 ) -> Result<UploadInfo, Error> {
     patch_blob(
+        headers,
         auth_user,
         info,
-        handler,
-        tc,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, repo, name),
-        uuid,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), uuid)),
         chunk,
     )
     .await
@@ -472,27 +386,26 @@ pub async fn patch_blob_5level(
  No data is being transferred _unless_ the request ends with "?digest".
  In this case the whole blob is attached.
 */
-#[post("/v2/<repo_name>/blobs/uploads", data = "<data>")]
 pub async fn post_blob_upload(
-    uri: &Origin<'_>, // This is a mess, but needed to check for ?digest
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    repo_name: String,
-    data: rocket::data::Data<'_>,
+    State(state): State<Arc<TrowServerState>>,
+    headers: HeaderMap,
+    Query(digest): Query<DigestQuery>,
+    Path(repo_name): Path<String>,
+    data: BodyStream,
 ) -> Result<Upload, Error> {
     /*
-    Ask the backend for a UUID.
+        Ask the backend for a UUID.
 
-    We should also need to do some checking that the user is allowed
-    to upload first.
+        We should also need to do some checking that the user is allowed
+        to upload first.
 
-    If using a true UUID it is possible for the frontend to generate
-    and tell the backend what the UUID is. This is a potential
-    optimisation, but is arguably less flexible.
+        If using a true UUID it is possible for the frontend to generate
+        and tell the backend what the UUID is. This is a potential
+        optimisation, but is arguably less flexible.
     */
-
-    let uuid = ci
+    let uuid = state
+        .client
         .start_blob_upload(&repo_name)
         .await
         .map_err(|e| match e {
@@ -500,163 +413,98 @@ pub async fn post_blob_upload(
             _ => Error::InternalError,
         })?;
 
-    if let Some(digest) = uri.query() {
-        if digest.starts_with("digest=") {
-            //Have a monolithic upload with data
-
-            //Unwrap must be safe given above statement
-            let digest = digest
-                .strip_prefix("digest=")
-                .unwrap()
-                .percent_decode_lossy();
-            return put_blob(
-                auth_user,
-                ci,
-                tc,
-                repo_name.to_string(),
-                uuid,
-                digest.to_string(),
-                data,
-            )
-            .await
-            .map(Upload::Accepted);
-        }
+    if digest.digest.is_some() {
+        // Have a monolithic upload with data
+        return put_blob(
+            headers,
+            auth_user,
+            State(state),
+            Path((repo_name, uuid)),
+            Query(digest),
+            data,
+        )
+        .await
+        .map(Upload::Accepted);
     }
 
-    Ok(Upload::Info(create_upload_info(
+    Ok(Upload::Info(UploadInfo::new(
+        get_base_url(&headers, &state.config),
         Uuid(uuid),
         RepoName(repo_name.clone()),
         (0, 0),
     )))
 }
-
-/*
- * Parse 2 level <repo>/<name> style path and pass it to put_blob_upload_onename
- */
-#[post("/v2/<repo>/<name>/blobs/uploads", data = "<data>")]
 pub async fn post_blob_upload_2level(
-    //digest: PossibleDigest, //create requestguard to handle /?digest
-    uri: &Origin<'_>,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    repo: String,
-    name: String,
-    data: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    headers: HeaderMap,
+    digest: Query<DigestQuery>,
+    Path((one, two)): Path<(String, String)>,
+    data: BodyStream,
 ) -> Result<Upload, Error> {
-    post_blob_upload(uri, auth_user, ci, tc, format!("{}/{}", repo, name), data).await
+    post_blob_upload(
+        auth_user,
+        state,
+        headers,
+        digest,
+        Path(format!("{one}/{two}")),
+        data,
+    )
+    .await
 }
-
-/*
- * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
- */
-#[post("/v2/<org>/<repo>/<name>/blobs/uploads", data = "<data>")]
 pub async fn post_blob_upload_3level(
-    //digest: PossibleDigest, //create requestguard to handle /?digest
-    uri: &Origin<'_>,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    org: String,
-    repo: String,
-    name: String,
-    data: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    headers: HeaderMap,
+    digest: Query<DigestQuery>,
+    Path((one, two, three)): Path<(String, String, String)>,
+    data: BodyStream,
 ) -> Result<Upload, Error> {
     post_blob_upload(
-        uri,
         auth_user,
-        ci,
-        tc,
-        format!("{}/{}/{}", org, repo, name),
+        state,
+        headers,
+        digest,
+        Path(format!("{one}/{two}/{three}")),
         data,
     )
     .await
 }
-
-/*
- * Parse 4 level <fourth>/<org>/<repo>/<name> style path
- */
-#[post("/v2/<fourth>/<org>/<repo>/<name>/blobs/uploads", data = "<data>")]
 pub async fn post_blob_upload_4level(
-    //digest: PossibleDigest, //create requestguard to handle /?digest
-    uri: &Origin<'_>,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fourth: String,
-    org: String,
-    repo: String,
-    name: String,
-    data: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    headers: HeaderMap,
+    digest: Query<DigestQuery>,
+    Path((one, two, three, four)): Path<(String, String, String, String)>,
+    data: BodyStream,
 ) -> Result<Upload, Error> {
     post_blob_upload(
-        uri,
         auth_user,
-        ci,
-        tc,
-        format!("{}/{}/{}/{}", fourth, org, repo, name),
+        state,
+        headers,
+        digest,
+        Path(format!("{one}/{two}/{three}/{four}")),
         data,
     )
     .await
 }
-
-/*
- * Parse 5 level <fith>/<fourth>/<org>/<repo>/<name> style path
- */
-#[post(
-    "/v2/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads",
-    data = "<data>"
-)]
 pub async fn post_blob_upload_5level(
-    //digest: PossibleDigest, //create requestguard to handle /?digest
-    uri: &Origin<'_>,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    repo: String,
-    name: String,
-    data: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    headers: HeaderMap,
+    digest: Query<DigestQuery>,
+    Path((one, two, three, four, five)): Path<(String, String, String, String, String)>,
+    data: BodyStream,
 ) -> Result<Upload, Error> {
     post_blob_upload(
-        uri,
         auth_user,
-        ci,
-        tc,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, repo, name),
+        state,
+        headers,
+        digest,
+        Path(format!("{one}/{two}/{three}/{four}/{five}")),
         data,
     )
     .await
-}
-
-/*
- * Parse 6 level path and error.
- *
- * We really shouldn't error any number of paths, but it doesn't seem easy with Rocket.
- *
- * This should return a proper JSON error such as NAME_INVALID, but that causes the Docker
- * client to retry. Passing non-json causes an error and a reasonable message to the user.
- */
-#[post(
-    "/v2/<sixth>/<fifth>/<fourth>/<org>/<repo>/<name>/blobs/uploads",
-    data = "<_data>"
-)]
-pub fn post_blob_upload_6level(
-    _auth_user: TrowToken,
-    sixth: String,
-    fifth: String,
-    fourth: String,
-    org: String,
-    repo: String,
-    name: String,
-    _data: rocket::data::Data,
-) -> rocket::response::status::BadRequest<String> {
-    rocket::response::status::BadRequest(Some(format!(
-        "Repository names are limited to 5 levels: {}/{}/{}/{}/{}/{} is not allowed",
-        sixth, fifth, fourth, org, repo, name
-    )))
 }
 
 /**
@@ -666,78 +514,66 @@ pub fn post_blob_upload_6level(
  * TODO: This should probably be denied if the blob is referenced by any manifests
  * (manifest should be deleted first)
  */
-#[delete("/v2/<repo>/blobs/<digest>")]
 pub async fn delete_blob(
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    repo: String,
-    digest: String,
+    State(state): State<Arc<TrowServerState>>,
+    Path((one, digest)): Path<(String, String)>,
 ) -> Result<BlobDeleted, Error> {
     let digest = digest::parse(&digest).map_err(|_| Error::DigestInvalid)?;
-    ci.delete_blob(&repo, &digest)
+    state
+        .client
+        .delete_blob(&one, &digest)
         .await
-        .map_err(|_| Error::BlobUnknown)?;
+        .map_err(|_| Error::NotFound)?;
     Ok(BlobDeleted {})
 }
-
-#[delete("/v2/<user>/<repo>/blobs/<digest>")]
 pub async fn delete_blob_2level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    user: String,
-    repo: String,
-    digest: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, digest)): Path<(String, String, String)>,
 ) -> Result<BlobDeleted, Error> {
-    delete_blob(auth_user, ci, format!("{}/{}", user, repo), digest).await
+    delete_blob(auth_user, state, Path((format!("{one}/{two}"), digest))).await
 }
-
-#[delete("/v2/<org>/<user>/<repo>/blobs/<digest>")]
 pub async fn delete_blob_3level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    org: String,
-    user: String,
-    repo: String,
-    digest: String,
-) -> Result<BlobDeleted, Error> {
-    delete_blob(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest).await
-}
-
-#[delete("/v2/<fourth>/<org>/<user>/<repo>/blobs/<digest>")]
-pub async fn delete_blob_4level(
-    auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    digest: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, digest)): Path<(String, String, String, String)>,
 ) -> Result<BlobDeleted, Error> {
     delete_blob(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}", fourth, org, user, repo),
-        digest,
+        state,
+        Path((format!("{one}/{two}/{three}"), digest)),
     )
     .await
 }
-
-#[delete("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/blobs/<digest>")]
-pub async fn delete_blob_5level(
+pub async fn delete_blob_4level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    digest: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, digest)): Path<(String, String, String, String, String)>,
 ) -> Result<BlobDeleted, Error> {
     delete_blob(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
-        digest,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}"), digest)),
+    )
+    .await
+}
+pub async fn delete_blob_5level(
+    auth_user: TrowToken,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, digest)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+) -> Result<BlobDeleted, Error> {
+    delete_blob(
+        auth_user,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), digest)),
     )
     .await
 }

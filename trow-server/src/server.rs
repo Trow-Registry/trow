@@ -1,10 +1,9 @@
 use std::collections::HashSet;
 use std::fs::{self, DirEntry, File};
-use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::str;
 use std::sync::{Arc, RwLock};
+use std::{io, str};
 
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
@@ -12,11 +11,8 @@ use chrono::prelude::*;
 use futures::future::try_join_all;
 use log::{debug, error, info, warn};
 use prost_types::Timestamp;
-use reqwest::Method;
-use reqwest::{
-    self,
-    header::{HeaderMap, HeaderValue},
-};
+use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::{self, Method};
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
@@ -32,8 +28,7 @@ use crate::manifest::{manifest_media_type, FromJson, Manifest};
 use crate::proxy_auth::ProxyClient;
 use crate::server::trow_server::registry_server::Registry;
 use crate::temporary_file::TemporaryFile;
-use crate::RegistryProxyConfig;
-use crate::{metrics, ImageValidationConfig};
+use crate::{metrics, ImageValidationConfig, RegistryProxyConfig};
 
 pub mod trow_server {
     include!("../../trow-protobuf/out/trow.rs");

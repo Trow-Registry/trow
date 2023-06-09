@@ -4,19 +4,19 @@ mod common;
 #[cfg(test)]
 mod admission_mutation_tests {
     use std::collections::HashMap;
-    use std::process::Child;
-    use std::process::Command;
+    use std::process::{Child, Command};
     use std::thread;
     use std::time::Duration;
 
     use environment::Environment;
+    use hyper::header;
     use json_patch::PatchOperation;
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
     use reqwest::StatusCode;
+    use trow_server::RegistryProxyConfig;
 
     use crate::common;
-    use trow_server::RegistryProxyConfig;
 
     const PORT: &str = "39365";
     const HOST: &str = "127.0.0.1:39365";
@@ -136,13 +136,13 @@ mod admission_mutation_tests {
 
         let resp = cl
             .post(&format!("{}/mutate-image", ORIGIN))
+            .header(header::CONTENT_TYPE, "application/json")
             .body(review.to_string())
             .send()
             .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
-
         let mut val = resp.json::<serde_json::Value>().await.unwrap();
         // Fixes "missing field" (which is bollocks)
         val["response"]["auditAnnotations"] =
@@ -183,6 +183,7 @@ mod admission_mutation_tests {
         let client = reqwest::Client::new();
         let _trow = start_trow().await;
 
+        println!("Test explicit docker.io/library");
         test_request(
             &client,
             "docker.io/library/nginx:tag",
@@ -190,6 +191,7 @@ mod admission_mutation_tests {
         )
         .await;
 
+        println!("Test implicit docker.io/library");
         test_request(
             &client,
             "nginx:tag",
@@ -197,6 +199,7 @@ mod admission_mutation_tests {
         )
         .await;
 
+        println!("Test ecr");
         test_request(
             &client,
             "1234.dkr.ecr.saturn-5.amazonaws.com/spyops:secret",
@@ -204,8 +207,10 @@ mod admission_mutation_tests {
         )
         .await;
 
+        println!("Test uknown registry");
         test_request(&client, "example.com/area51", None).await;
 
+        println!("Test invalid image");
         test_request(&client, "http://invalid.com/DANCE", None).await;
     }
 }

@@ -1,11 +1,10 @@
+use std::env;
+
 use argon2::{self, Config};
 use bytes::Bytes;
 use data_encoding::HEXUPPER;
-use failure;
-use rand;
-use rusqlite::NO_PARAMS;
-use rusqlite::{params, Connection};
-use std::env;
+use rusqlite::{params, Connection, NO_PARAMS};
+use {failure, rand};
 
 // User Struct
 pub struct User {
@@ -136,9 +135,9 @@ impl User {
 #[cfg(test)]
 mod tests {
 
-    use super::User;
-    use super::{get_hash_from_password, get_salt, verify_password};
     use std::env;
+
+    use super::{get_hash_from_password, get_salt, verify_password, User};
 
     #[test]
     fn test_get_salt() {

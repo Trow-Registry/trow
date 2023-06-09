@@ -1,17 +1,18 @@
-use std::io::Cursor;
+use axum::body::Body;
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
 
 use crate::types::RepoCatalog;
-use rocket::http::ContentType;
-use rocket::request::Request;
-use rocket::response::{self, Responder, Response};
 
-impl<'r> Responder<'r, 'static> for RepoCatalog {
-    fn respond_to(self, _req: &Request) -> response::Result<'static> {
+impl IntoResponse for RepoCatalog {
+    fn into_response(self) -> Response {
         let json = serde_json::to_string(&self).unwrap();
 
-        Response::build()
-            .header(ContentType::JSON)
-            .sized_body(None, Cursor::new(json))
-            .ok()
+        Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CONTENT_LENGTH, json.len())
+            .body(Body::from(json))
+            .unwrap()
+            .into_response()
     }
 }

@@ -5,10 +5,7 @@ authors = []
 edition = "2021"
 
 [workspace]
-members = [
-    "trow-server",
-    "trow-protobuf"
-]
+members = ["trow-server", "trow-protobuf"]
 
 
 [features]
@@ -16,9 +13,11 @@ sqlite = []
 
 [dependencies]
 futures = "0.3"
-rocket = { version = "0.5.0-rc", features = ["tls", "json"] }
+axum = { version = "0.6.18", features = ["headers", "tracing"] }
+axum-server = { version = "0.5", features = ["tls-rustls"] }
+tower = "0.4"
+tower-http = { version = "0.4", features = ["cors", "normalize-path"] }
 rand = "0.8"
-jwt = "0.16"
 frank_jwt = "3.1"
 rust-argon2 = "1.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -33,33 +32,29 @@ anyhow = "1.0"
 trow-protobuf = { path = "./trow-protobuf" }
 trow-server = { path = "./trow-server" }
 derive_more = "0.99"
-hostname = "0.3"
 clap = { version = "4.1.0", features = ["derive"] }
-tonic = "0.6.0"
-prost = "0.9.0"
-prost-types = "0.9.0"
+tonic = "0.9.0"
+prost = "0.11.9"
+prost-types = "0.11.9"
 bytes = "1"
-chrono = { version="^0.4", features = ["serde"] }
-rusqlite = "0.28.0"
-data-encoding = "2.3"
+chrono = { version = "^0.4", features = ["serde"] }
+# rusqlite = "0.28.0"
 lazy_static = "1.4.0"
 regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
 thiserror = "1.0"
-rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", branch = "master" }
-kube = {version="0.82", features=["admission"]}
-k8s-openapi = {version="0.18.0", features=["v1_24"]}
+kube = { version = "0.83", features = ["admission"] }
+k8s-openapi = { version = "0.18.0", features = ["v1_24"] }
 json-patch = "1.0.0"
+tokio = { version = "1", features = ["macros"] }
+tokio-util = { version = "0.7.8", features = ["codec"] }
+hyper = "0.14"
 
 [dev-dependencies]
 assert_cmd = "2.0"
-predicates = "2.1"
+predicates = "3.0"
 environment = "^0.1"
-hyper = "0.14"
-rand = "^0.8"
 reqwest = { version = "0.11", features = ["blocking", "json", "gzip"] }
 libc = "0.2"
-derive_more = "0.99"
-tokio = { version = "1", features = ["macros"] }
 tempfile = "3"

@@ -1,18 +1,22 @@
+use axum::body;
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
+use tokio_util::codec::{BytesCodec, FramedRead};
+
 use crate::registry_interface::ManifestReader;
-use rocket::http::Header;
-use rocket::request::Request;
-use rocket::response::{self, Responder, Response};
 
-impl<'r> Responder<'r, 'static> for ManifestReader {
-    fn respond_to(self, _: &Request) -> response::Result<'static> {
-        let ct = Header::new("Content-Type", self.content_type().to_string());
-        let digest = Header::new("Docker-Content-Digest", self.digest().to_string());
-
-        // Important to used sized_body in order to have content length set correctly
-        let mut resp = Response::build().sized_body(None, self.get_reader()).ok()?;
-        resp.set_header(ct);
-        resp.set_header(digest);
-
-        Ok(resp)
+impl IntoResponse for ManifestReader {
+    fn into_response(self) -> Response {
+        let content_type = self.content_type().to_string();
+        let digest = self.digest().to_string();
+        let size = self.size();
+        let stream = FramedRead::new(self.get_reader(), BytesCodec::new());
+        Response::builder()
+            .header(header::CONTENT_TYPE, content_type)
+            .header(header::CONTENT_LENGTH, size)
+            .header("Docker-Content-Digest", digest)
+            .body(body::StreamBody::from(stream))
+            .unwrap()
+            .into_response()
     }
 }

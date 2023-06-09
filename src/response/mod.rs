@@ -1,6 +1,7 @@
-use crate::TrowConfig;
+use axum::http::header::HeaderMap;
 use log::warn;
-use rocket::request::Request;
+
+use crate::TrowConfig;
 
 pub mod accepted_upload;
 pub mod authenticate;
@@ -18,8 +19,8 @@ pub mod metrics;
 pub mod readiness;
 pub mod repo_catalog;
 pub mod tag_list;
-mod test_helper;
 pub mod trow_token;
+pub mod upload;
 pub mod upload_info;
 pub mod verified_manifest;
 
@@ -27,35 +28,24 @@ pub mod verified_manifest;
 /// Falls back to hostname if it doesn't exist.
 ///
 /// Move this.
-fn get_base_url(req: &Request<'_>) -> String {
-    let host = get_domain_name(req);
-
-    let config = req
-        .rocket()
-        .state::<TrowConfig>()
-        .expect("TrowConfig not present!");
+pub fn get_base_url(headers: &HeaderMap, config: &TrowConfig) -> String {
+    let host = headers
+        .get("Host")
+        .expect("No host header")
+        .to_str()
+        .expect("invalid host header");
 
     // Check if we have an upstream load balancer doing TLS termination
-    match req.headers().get("X-Forwarded-Proto").next() {
-        None => match config.tls {
-            None => format!("http://{}", host),
-            Some(_) => format!("https://{}", host),
-        },
-        Some(proto) => {
+    match headers.get("X-Forwarded-Proto").map(|h| h.to_str()) {
+        Some(Ok(proto)) => {
             if proto == "http" {
                 warn!("Security issue! Upstream proxy is using HTTP");
             }
             format!("{}://{}", proto, host)
         }
-    }
-}
-
-fn get_domain_name(req: &Request) -> String {
-    match req.headers().get("HOST").next() {
-        None => hostname::get()
-            .expect("Server has no name; cannot give clients my address")
-            .into_string()
-            .unwrap(),
-        Some(s_host) => s_host.to_string(),
+        _ => match config.tls {
+            None => format!("http://{}", host),
+            Some(_) => format!("https://{}", host),
+        },
     }
 }
