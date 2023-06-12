@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.5
 
 #Note we build on host plaftform and cross-compile to target arch
-FROM --platform=$BUILDPLATFORM rust:1.69-bookworm as cross
+FROM --platform=$BUILDPLATFORM rust:bookworm as cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
