@@ -2,8 +2,8 @@ name: Release Chart
 
 on:
   push:
-    tags:
-      - "helm-chart/*"
+    branches:
+      - main
 
 jobs:
   release-helm:
