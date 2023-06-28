@@ -1,7 +1,7 @@
 use axum::body;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use log::debug;
+use tracing::{event, Level};
 
 use crate::types::AcceptedUpload;
 
@@ -13,7 +13,7 @@ impl IntoResponse for AcceptedUpload {
             self.repo_name(),
             self.digest()
         );
-        debug!("accepted upload response");
+        event!(Level::DEBUG, "accepted upload response");
         let (left, right) = self.range();
         Response::builder()
             .status(StatusCode::CREATED)

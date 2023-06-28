@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::extract::{BodyStream, Path, Query, State};
 use axum::http::header::HeaderMap;
-use log::error;
+use tracing::{event, Level};
 
 use crate::registry_interface::{digest, BlobReader, BlobStorage, ContentInfo, StorageDriverError};
 use crate::response::errors::Error;
@@ -32,7 +32,7 @@ pub async fn get_blob(
     let digest = match digest::parse(&digest) {
         Ok(d) => d,
         Err(e) => {
-            log::error!("Error parsing digest: {}", e);
+            event!(Level::ERROR, "Error parsing digest: {}", e);
             return Err(Error::DigestInvalid);
         }
     };
@@ -40,7 +40,7 @@ pub async fn get_blob(
     match state.client.get_blob(&one, &digest).await {
         Ok(r) => Ok(r),
         Err(e) => {
-            log::error!("Error getting blob: {}", e);
+            event!(Level::ERROR, "Error getting blob: {}", e);
             Err(Error::NotFound)
         }
     }
@@ -140,7 +140,7 @@ pub async fn put_blob(
             ))
         }
         Err(e) => {
-            error!("Error storing blob chunk: {}", e);
+            event!(Level::ERROR, "Error storing blob chunk: {}", e);
             return Err(Error::InternalError);
         }
     };
@@ -153,7 +153,7 @@ pub async fn put_blob(
         .map_err(|e| match e {
             StorageDriverError::InvalidDigest => Error::DigestInvalid,
             e => {
-                error!("Error completing blob upload: {}", e);
+                event!(Level::ERROR, "Error completing blob upload: {}", e);
                 Error::InternalError
             }
         })?;

@@ -11,10 +11,10 @@ use chrono::TimeZone;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
-use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tonic::{Code, Request};
+use tracing::{event, Level};
 use trow_proto::admission_controller_client::AdmissionControllerClient;
 use trow_proto::registry_client::RegistryClient;
 use trow_proto::{
@@ -79,7 +79,7 @@ impl ManifestStorage for ClientInterface {
     ) -> Result<ManifestReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let mr = self.get_reader_for_manifest(&rn, tag).await.map_err(|e| {
-            warn!("Error getting manifest: {}", e);
+            event!(Level::WARN, "Error getting manifest: {}", e);
             StorageDriverError::Internal
         })?;
 
@@ -135,7 +135,7 @@ impl BlobStorage for ClientInterface {
     ) -> Result<BlobReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let br = self.get_reader_for_blob(&rn, digest).await.map_err(|e| {
-            warn!("Error getting blob: {}", e);
+            event!(Level::WARN, "Error getting blob: {}", e);
             StorageDriverError::Internal
         })?;
 
@@ -155,7 +155,7 @@ impl BlobStorage for ClientInterface {
             .get_write_sink_for_upload(&rn, &uuid)
             .await
             .map_err(|e| {
-                warn!("Error finding write sink for blob {:?}", e);
+                event!(Level::WARN, "Error finding write sink for blob {:?}", e);
                 StorageDriverError::InvalidName(format!("{} {}", name, session_id))
             })?;
 
@@ -167,9 +167,11 @@ impl BlobStorage for ClientInterface {
 
         let start_index = sink.seek(SeekFrom::End(0)).await.unwrap_or(0);
         if have_range && (start_index != info.range.0) {
-            warn!(
+            event!(
+                Level::WARN,
                 "Asked to store blob with invalid start index. Expected {} got {}",
-                start_index, info.range.0
+                start_index,
+                info.range.0
             );
             return Err(StorageDriverError::InvalidContentRange);
         }
@@ -180,12 +182,12 @@ impl BlobStorage for ClientInterface {
                 Ok(v) => {
                     chunk_size += v.len() as u64;
                     if let Err(e) = sink.write_all(&v).await {
-                        error!("Error writing out manifest {:?}", e);
+                        event!(Level::ERROR, "Error writing out manifest {:?}", e);
                         return Err(StorageDriverError::Internal);
                     }
                 }
                 Err(e) => {
-                    error!("Error reading manifest {e}",);
+                    event!(Level::ERROR, "Error reading manifest {e}",);
                     return Err(StorageDriverError::Internal);
                 }
             }
@@ -194,12 +196,17 @@ impl BlobStorage for ClientInterface {
         let total = sink.seek(SeekFrom::End(0)).await.unwrap();
         if have_range {
             if (info.range.1 + 1) != total {
-                warn!("total {} r + 1 {}", total, info.range.1 + 1);
+                event!(Level::WARN, "total {} r + 1 {}", total, info.range.1 + 1);
                 return Err(StorageDriverError::InvalidContentRange);
             }
             //Check length if chunked upload
             if info.length != chunk_size {
-                warn!("info.length {} len {}", info.length, chunk_size);
+                event!(
+                    Level::WARN,
+                    "info.length {} len {}",
+                    info.length,
+                    chunk_size
+                );
                 return Err(StorageDriverError::InvalidContentRange);
             }
         }
@@ -224,7 +231,7 @@ impl BlobStorage for ClientInterface {
                     _ => StorageDriverError::Internal,
                 },
                 Err(e) => {
-                    warn!("Error finalising upload {:?}", e);
+                    event!(Level::WARN, "Error finalising upload {:?}", e);
                     StorageDriverError::Internal
                 }
             })?;
@@ -241,7 +248,12 @@ impl BlobStorage for ClientInterface {
     }
 
     async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
-        info!("Attempting to delete blob {} in {}", digest, name);
+        event!(
+            Level::INFO,
+            "Attempting to delete blob {} in {}",
+            digest,
+            name
+        );
         let rn = RepoName(name.to_string());
 
         self.delete_blob_local(&rn, digest)
@@ -370,23 +382,23 @@ impl ClientInterface {
     async fn connect_registry(
         &self,
     ) -> Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
-        debug!("Connecting to {}", self.server);
+        event!(Level::DEBUG, "Connecting to {}", self.server);
         let x = RegistryClient::connect(self.server.to_string()).await;
-        debug!("Connected to {}", self.server);
+        event!(Level::DEBUG, "Connected to {}", self.server);
         x
     }
 
     async fn connect_admission_controller(
         &self,
     ) -> Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
-        debug!("Connecting to {}", self.server);
+        event!(Level::DEBUG, "Connecting to {}", self.server);
         let x = AdmissionControllerClient::connect(self.server.to_string()).await;
-        debug!("Connected to {}", self.server);
+        event!(Level::DEBUG, "Connected to {}", self.server);
         x
     }
 
     async fn request_upload(&self, repo_name: &str) -> Result<String> {
-        info!("Request Upload called for {}", repo_name);
+        event!(Level::INFO, "Request Upload called for {}", repo_name);
         let req = UploadRequest {
             repo_name: repo_name.to_string(),
         };
@@ -402,9 +414,12 @@ impl ClientInterface {
     }
 
     async fn complete_upload(&self, repo_name: &str, uuid: &str, digest: &Digest) -> Result<()> {
-        info!(
+        event!(
+            Level::INFO,
             "Complete Upload called for repository {} with upload id {} digest {}",
-            repo_name, uuid, digest
+            repo_name,
+            uuid,
+            digest
         );
 
         let req = CompleteRequest {
@@ -426,9 +441,11 @@ impl ClientInterface {
         repo_name: &RepoName,
         uuid: &Uuid,
     ) -> Result<impl AsyncWrite + AsyncSeek> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting write location for blob in repo {} with upload id {}",
-            repo_name, uuid
+            repo_name,
+            uuid
         );
         let br = UploadRef {
             uuid: uuid.0.clone(),
@@ -475,13 +492,13 @@ impl ClientInterface {
         while let Some(v) = manifest.next().await {
             match v {
                 Err(e) => {
-                    error!("Could not read manifest: {e}");
+                    event!(Level::ERROR, "Could not read manifest: {e}");
                     return Err(RegistryError::Internal);
                 }
                 Ok(bytes) => match sink_loc.write_all(&bytes).await {
                     Ok(_) => {}
                     Err(e) => {
-                        error!("Could not write manifest: {e}");
+                        event!(Level::ERROR, "Could not write manifest: {e}");
                         return Err(RegistryError::Internal);
                     }
                 },
@@ -508,9 +525,11 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<(impl AsyncWrite, String)> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting write location for manifest in repo {} with ref {}",
-            repo_name, reference
+            repo_name,
+            reference
         );
         let mr = ManifestRef {
             reference: reference.to_owned(),
@@ -539,9 +558,11 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<ManifestReader> {
-        info!(
+        event!(
+            Level::DEBUG,
             "Getting read location for {} with ref {}",
-            repo_name, reference
+            repo_name,
+            reference
         );
         let mr = ManifestRef {
             reference: reference.to_owned(),
@@ -568,9 +589,13 @@ impl ClientInterface {
         limit: u32,
         last_digest: &str,
     ) -> Result<ManifestHistory> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting manifest history for repo {} ref {} limit {} last_digest {}",
-            repo_name, reference, limit, last_digest
+            repo_name,
+            reference,
+            limit,
+            last_digest
         );
         let mr = ManifestHistoryRequest {
             tag: reference.to_owned(),
@@ -593,7 +618,10 @@ impl ClientInterface {
                     .earliest()
                     .unwrap()
             } else {
-                warn!("Manifest digest stored without timestamp. Using Epoch.");
+                event!(
+                    Level::WARN,
+                    "Manifest digest stored without timestamp. Using Epoch."
+                );
                 chrono::Utc.timestamp_opt(0, 0).earliest().unwrap()
             };
             history.insert(entry.digest, ts);
@@ -607,7 +635,12 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobReader> {
-        info!("Getting read location for blob {} in {}", digest, repo_name);
+        event!(
+            Level::DEBUG,
+            "Getting read location for blob {} in {}",
+            digest,
+            repo_name
+        );
         let br = BlobRef {
             digest: digest.to_string(),
             repo_name: repo_name.0.clone(),
@@ -631,7 +664,12 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobDeleted> {
-        info!("Attempting to delete blob {} in {}", digest, repo_name);
+        event!(
+            Level::INFO,
+            "Attempting to delete blob {} in {}",
+            digest,
+            repo_name
+        );
         let br = BlobRef {
             digest: digest.to_string(),
             repo_name: repo_name.0.clone(),
@@ -651,9 +689,12 @@ impl ClientInterface {
         reference: &str,
         uuid: &str,
     ) -> Result<types::VerifiedManifest> {
-        info!(
+        event!(
+            Level::INFO,
             "Verifying manifest {} in {} uuid {}",
-            reference, repo_name, uuid
+            reference,
+            repo_name,
+            uuid
         );
         let vmr = VerifyManifestRequest {
             manifest: Some(ManifestRef {
@@ -680,7 +721,12 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<ManifestDeleted> {
-        info!("Attempting to delete manifest {} in {}", digest, repo_name);
+        event!(
+            Level::INFO,
+            "Attempting to delete manifest {} in {}",
+            digest,
+            repo_name
+        );
         let mr = ManifestRef {
             reference: digest.to_string(),
             repo_name: repo_name.0.clone(),
@@ -695,9 +741,11 @@ impl ClientInterface {
     }
 
     async fn get_catalog_part(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting image catalog limit {} last_repo {}",
-            limit, last_repo
+            limit,
+            last_repo
         );
 
         let cr = CatalogRequest {
@@ -720,9 +768,12 @@ impl ClientInterface {
     }
 
     async fn list_tags(&self, repo_name: &str, limit: u32, last_tag: &str) -> Result<TagList> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting tag list for {} limit {} last_tag {}",
-            repo_name, limit, last_tag
+            repo_name,
+            limit,
+            last_tag
         );
         let ltr = ListTagsRequest {
             repo_name: repo_name.to_string(),
@@ -753,9 +804,11 @@ impl ClientInterface {
         req: &AdmissionRequest<Pod>,
         host_name: &str,
     ) -> Result<AdmissionResponse> {
-        info!(
+        event!(
+            Level::INFO,
             "Validating admission request {} host_name {:?}",
-            req.uid, host_name
+            req.uid,
+            host_name
         );
         // TODO: we should really be sending the full object to the backend.
         let obj = req
@@ -793,9 +846,11 @@ impl ClientInterface {
         req: &AdmissionRequest<Pod>,
         host_name: &str,
     ) -> Result<AdmissionResponse> {
-        info!(
+        event!(
+            Level::INFO,
             "Mutating admission request {} host_name {:?}",
-            req.uid, host_name
+            req.uid,
+            host_name
         );
         // TODO: we should really be sending the full object to the backend.
         let obj = req
@@ -839,7 +894,7 @@ impl ClientInterface {
     Note that the server will indicate unhealthy by returning an error.
     */
     async fn is_healthy(&self) -> types::HealthResponse {
-        debug!("Calling health check");
+        event!(Level::DEBUG, "Calling health check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
             Err(_) => {
@@ -874,7 +929,7 @@ impl ClientInterface {
      Note that the server will indicate not ready by returning an error.
     */
     async fn is_ready(&self) -> types::ReadinessResponse {
-        debug!("Calling readiness check");
+        event!(Level::DEBUG, "Calling readiness check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
             Err(_) => {
@@ -908,7 +963,7 @@ impl ClientInterface {
      Returns disk and total request metrics(blobs, manifests).
     */
     async fn get_metrics(&self) -> Result<MetricsResponse> {
-        debug!("Getting metrics");
+        event!(Level::DEBUG, "Getting metrics");
         let req = Request::new(MetricsRequest {});
         let resp = self
             .connect_registry()

@@ -1,4 +1,3 @@
-use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::net::{IpAddr, SocketAddr};
@@ -76,14 +75,12 @@ struct Args {
     /// Enable Cross-Origin Resource Sharing(CORS) requests.
     #[arg(long, value_delimiter(','))]
     cors: Option<Vec<String>>,
-
-    /// The log level at which to output to stdout, valid values are OFF, ERROR, WARN, INFO, DEBUG and TRACE
-    #[arg(long, default_value_t = env::var("RUST_LOG").unwrap_or_else(|_| "error".to_string()))]
-    log_level: String,
 }
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     let args = Args::parse();
 
     let addr = SocketAddr::new(args.host, args.port);
@@ -96,7 +93,6 @@ async fn main() {
         host_name,
         args.dry_run,
         args.cors,
-        args.log_level,
     );
     if let Some(tls) = args.tls {
         if tls.len() != 2 {

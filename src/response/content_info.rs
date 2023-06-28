@@ -1,7 +1,7 @@
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::http::StatusCode;
-use log::warn;
+use tracing::{event, Level};
 
 use crate::registry_interface::blob_storage::ContentInfo;
 use crate::response::errors::Error;
@@ -21,7 +21,10 @@ where
             Some(l) => match l.to_str().map(|s| s.parse::<u64>()) {
                 Ok(Ok(i)) => i,
                 _ => {
-                    warn!("Received request with invalid Content-Length header");
+                    event!(
+                        Level::WARN,
+                        "Received request with invalid Content-Length header"
+                    );
                     return Err((
                         StatusCode::BAD_REQUEST,
                         Error::BlobUploadInvalid("Invalid Content-Length".to_string()),
@@ -53,7 +56,10 @@ where
                 }
             }
         }
-        warn!("Received request with invalid Content-Range header");
+        event!(
+            Level::WARN,
+            "Received request with invalid Content-Range header"
+        );
         Err((
             StatusCode::BAD_REQUEST,
             Error::BlobUploadInvalid("Invalid Content-Range".to_string()),

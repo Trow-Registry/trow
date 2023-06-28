@@ -9,7 +9,6 @@ use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
 use futures::future::try_join_all;
-use log::{debug, error, info, warn};
 use prost_types::Timestamp;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
@@ -19,6 +18,7 @@ use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+use tracing::{event, Level};
 use uuid::Uuid;
 
 use self::trow_server::*;
@@ -104,12 +104,14 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
         return match fs::create_dir_all(&dir_path) {
             Ok(_) => Ok(dir_path),
             Err(e) => {
-                error!(
+                event!(
+                    Level::ERROR,
                     r#"
                 Failed to create directory required by trow {:?}
                 Please check the parent directory is writable by the trow user.
                 {:?}"#,
-                    dir_path, e
+                    dir_path,
+                    e
                 );
                 Err(e)
             }
@@ -123,7 +125,7 @@ fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
         == match get_digest_from_manifest_path(manifest.path()) {
             Ok(test_digest) => test_digest,
             Err(e) => {
-                warn!("Failure reading repo {:?}", e);
+                event!(Level::WARN, "Failure reading repo {:?}", e);
                 "NO_MATCH".to_string()
             }
         }
@@ -147,7 +149,7 @@ impl Iterator for RepoIterator {
             None => None,
             Some(res_path) => match res_path {
                 Err(e) => {
-                    warn!("Error iterating over repos {:?}", e);
+                    event!(Level::WARN, "Error iterating over repos {:?}", e);
                     self.next()
                 }
                 Ok(path) => {
@@ -177,9 +179,11 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
     let calculated_digest = sha256_tag_digest(reader)?;
 
     if calculated_digest != digest {
-        error!(
+        event!(
+            Level::ERROR,
             "Upload did not match given digest. Was given {} but got {}",
-            digest, calculated_digest
+            digest,
+            calculated_digest
         );
         return Err(anyhow!(DigestValidationError {
             user_digest: digest.to_string(),
@@ -360,14 +364,18 @@ impl TrowServer {
         digest: &str,
     ) -> Result<()> {
         if self.get_catalog_path_for_blob(digest)?.exists() {
-            info!("Already have blob {}", digest);
+            event!(Level::DEBUG, "Already have blob {}", digest);
             return Ok(());
         }
         let path = self.scratch_path.join(digest);
         let mut file = match TemporaryFile::open_for_writing(path.clone()).await? {
             Some(f) => f,
             None => {
-                info!("Waiting for concurrently fetched blob {}", digest);
+                event!(
+                    Level::DEBUG,
+                    "Waiting for concurrently fetched blob {}",
+                    digest
+                );
                 while path.exists() {
                     // wait for download to be done (temp file to be moved)
                     // TODO: use notify crate instead
@@ -378,7 +386,7 @@ impl TrowServer {
         };
 
         let addr = format!("{}/blobs/{}", remote_image.get_base_uri(), digest);
-        info!("Downloading blob {}", addr);
+        event!(Level::INFO, "Downloading blob {}", addr);
         let resp = cl.authenticated_request(Method::GET, &addr).send().await?;
 
         file.write_stream(resp.bytes_stream()).await?;
@@ -393,7 +401,11 @@ impl TrowServer {
         remote_image: &RemoteImage,
         local_repo_name: &str,
     ) -> Result<()> {
-        debug!("Downloading manifest + layers for {}", remote_image);
+        event!(
+            Level::DEBUG,
+            "Downloading manifest + layers for {}",
+            remote_image
+        );
         let resp = cl
             .authenticated_request(Method::GET, &remote_image.get_manifest_url())
             .headers(create_accept_header())
@@ -466,7 +478,8 @@ impl TrowServer {
 
         match resp {
             Err(e) => {
-                error!(
+                event!(
+                    Level::ERROR,
                     "Remote registry didn't respond correctly to HEAD request {}",
                     e
                 );
@@ -491,9 +504,11 @@ impl TrowServer {
         let try_cl = match ProxyClient::try_new(proxy_cfg.clone(), &remote_image).await {
             Ok(cl) => Some(cl),
             Err(e) => {
-                error!(
+                event!(
+                    Level::ERROR,
                     "Could not create client for proxied registry {}: {}",
-                    proxy_cfg.host, e
+                    proxy_cfg.host,
+                    e
                 );
                 None
             }
@@ -546,14 +561,21 @@ impl TrowServer {
                         {
                             Ok(_) => return Ok(digest),
                             Err(e) => {
-                                error!("Internal error updating tag for proxied image ({})", e)
+                                event!(
+                                    Level::DEBUG,
+                                    "Internal error updating tag for proxied image ({})",
+                                    e
+                                )
                             }
                         },
                         Ok(_) => return Ok(digest),
-                        Err(e) => warn!("Failed to download proxied image: {}", e),
+                        Err(e) => event!(Level::WARN, "Failed to download proxied image: {}", e),
                     };
                 }
-                false => warn!("Missing manifest for proxied image, proxy client not available"),
+                false => event!(
+                    Level::WARN,
+                    "Missing manifest for proxied image, proxy client not available"
+                ),
             }
         }
 
@@ -573,9 +595,12 @@ impl TrowServer {
         let path = if let Some((remote_image, proxy_cfg)) =
             self.get_remote_image_and_cfg(&repo_name, &reference)
         {
-            info!(
+            event!(
+                Level::INFO,
                 "Request for proxied repo {}:{} maps to {}",
-                repo_name, reference, remote_image
+                repo_name,
+                reference,
+                remote_image
             );
             let digest = self.download_remote_image(remote_image, proxy_cfg).await?;
             // These are not up to date and should not be used !
@@ -610,7 +635,7 @@ impl TrowServer {
     }
 
     fn validate_and_save_blob(&self, user_digest: &str, uuid: &str) -> Result<()> {
-        debug!("Saving blob {}", user_digest);
+        event!(Level::DEBUG, "Saving blob {}", user_digest);
 
         let scratch_path = self.get_upload_path_for_blob(uuid);
         let res = match validate_digest(&scratch_path, user_digest) {
@@ -644,7 +669,7 @@ impl Registry for TrowServer {
             let upload = Upload { repo_name, uuid };
             {
                 self.active_uploads.write().unwrap().insert(upload);
-                debug!("Upload Table: {:?}", self.active_uploads);
+                event!(Level::DEBUG, "Upload Table: {:?}", self.active_uploads);
             }
             Ok(Response::new(reply))
         } else {
@@ -694,7 +719,7 @@ impl Registry for TrowServer {
             .map_err(|e| Status::invalid_argument(format!("Error parsing digest {:?}", e)))?;
 
         if !path.exists() {
-            warn!("Request for unknown blob: {:?}", path);
+            event!(Level::WARN, "Request for unknown blob: {:?}", path);
             Err(Status::not_found(format!(
                 "No blob found matching {:?}",
                 br
@@ -715,7 +740,7 @@ impl Registry for TrowServer {
             .get_catalog_path_for_blob(&br.digest)
             .map_err(|e| Status::invalid_argument(format!("Error parsing digest {:?}", e)))?;
         if !path.exists() {
-            warn!("Request for unknown blob: {:?}", path);
+            event!(Level::WARN, "Request for unknown blob: {:?}", path);
             Err(Status::not_found(format!(
                 "No blob found matching {:?}",
                 br
@@ -723,7 +748,7 @@ impl Registry for TrowServer {
         } else {
             fs::remove_file(&path)
                 .map_err(|e| {
-                    error!("Failed to delete blob {:?} {:?}", br, e);
+                    event!(Level::ERROR, "Failed to delete blob {:?} {:?}", br, e);
                     Status::internal("Internal error deleting blob")
                 })
                 .and(Ok(Response::new(BlobDeleted {})))
@@ -746,7 +771,7 @@ impl Registry for TrowServer {
         //Can only delete manifest if no other tags in any repo reference it
 
         let ri = RepoIterator::new(&self.manifests_path.join(&mr.repo_name)).map_err(|e| {
-            error!("Problem reading manifest catalog {:?}", e);
+            event!(Level::ERROR, "Problem reading manifest catalog {:?}", e);
             Status::failed_precondition("Repository not found")
         })?;
 
@@ -754,7 +779,7 @@ impl Registry for TrowServer {
         ri.filter(|de| does_manifest_match_digest(de, &digest))
             .for_each(|man| match fs::remove_file(man.path()) {
                 Ok(_) => (),
-                Err(e) => error!("Failed to delete manifest {:?} {:?}", &man, e),
+                Err(e) => event!(Level::DEBUG, "Failed to delete manifest {:?} {:?}", &man, e),
             });
 
         Ok(Response::new(ManifestDeleted {}))
@@ -796,7 +821,7 @@ impl Registry for TrowServer {
         {
             Ok(vm) => Ok(Response::new(vm)),
             Err(e) => {
-                warn!("Internal error with manifest: {:?}", e);
+                event!(Level::WARN, "Internal error with manifest: {:?}", e);
                 Err(Status::internal("Internal error finding manifest"))
             }
         }
@@ -822,15 +847,18 @@ impl Registry for TrowServer {
                     .and(self.save_tag(&digest, &mr.repo_name, &mr.reference).await)
                     .map(|_| Response::new(vm))
                     .map_err(|e| {
-                        error!(
+                        event!(
+                            Level::ERROR,
                             "Failure cataloguing manifest {}/{} {:?}",
-                            &mr.repo_name, &mr.reference, e
+                            &mr.repo_name,
+                            &mr.reference,
+                            e
                         );
                         Status::internal("Internal error copying manifest")
                     })
             }
             Err(e) => {
-                error!("Error verifying manifest {:?}", e);
+                event!(Level::ERROR, "Error verifying manifest {:?}", e);
                 Err(Status::invalid_argument("Failed to verify manifest"))
             }
         }
@@ -848,7 +876,7 @@ impl Registry for TrowServer {
             Err(e) => match e.downcast::<DigestValidationError>() {
                 Ok(v_e) => Err(Status::invalid_argument(v_e.to_string())),
                 Err(e) => {
-                    warn!("Failure when saving layer: {:?}", e);
+                    event!(Level::WARN, "Failure when saving layer: {:?}", e);
                     Err(Status::internal("Internal error saving layer"))
                 }
             },
@@ -862,7 +890,7 @@ impl Registry for TrowServer {
 
         let mut set = self.active_uploads.write().unwrap();
         if !set.remove(&upload) {
-            warn!("Upload {:?} not found when deleting", upload);
+            event!(Level::WARN, "Upload {:?} not found when deleting", upload);
         }
         ret
     }
@@ -879,7 +907,7 @@ impl Registry for TrowServer {
         let (tx, rx) = mpsc::channel(4);
         let catalog: HashSet<String> = RepoIterator::new(&self.manifests_path)
             .map_err(|e| {
-                error!("Error accessing catalog {:?}", e);
+                event!(Level::ERROR, "Error accessing catalog {:?}", e);
                 Status::internal("Internal error streaming catalog")
             })?
             .map(|de| de.path())
@@ -928,7 +956,7 @@ impl Registry for TrowServer {
 
         let mut catalog: Vec<String> = RepoIterator::new(&path)
             .map_err(|e| {
-                error!("Error accessing catalog {:?}", e);
+                event!(Level::ERROR, "Error accessing catalog {:?}", e);
                 Status::internal("Internal error streaming catalog")
             })?
             .map(|de| de.path().file_name().unwrap().to_string_lossy().to_string())
@@ -1010,13 +1038,13 @@ impl Registry for TrowServer {
                                 nanos: dt.timestamp_subsec_nanos() as i32,
                             })
                         } else {
-                            warn!("Failed to parse timestamp {}", date_str);
+                            event!(Level::WARN, "Failed to parse timestamp {}", date_str);
                             None
                         };
                         (digest_str, ts)
                     }
                     None => {
-                        warn!("No timestamp found in manifest");
+                        event!(Level::WARN, "No timestamp found in manifest");
                         (line.as_ref(), None)
                     }
                 };

@@ -10,9 +10,9 @@ use axum::{body, headers};
 use base64::engine::general_purpose as base64_engine;
 use base64::Engine as _;
 use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
-use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::{event, Level};
 use uuid::Uuid;
 
 use super::authenticate::Authenticate;
@@ -40,7 +40,7 @@ where
         let user_cfg = match config.user {
             Some(ref user_cfg) => user_cfg,
             None => {
-                warn!("Attempted login, but no users are configured");
+                event!(Level::WARN, "Attempted login, but no users are configured");
                 return Err((StatusCode::UNAUTHORIZED, ()));
             }
         };
@@ -220,7 +220,7 @@ where
         ) {
             Ok((_, payload)) => payload,
             Err(_) => {
-                warn!("Failed to decode user token");
+                event!(Level::WARN, "Failed to decode user token");
                 return Err(Authenticate::new(base_url));
             }
         };

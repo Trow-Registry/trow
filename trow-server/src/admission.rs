@@ -1,8 +1,8 @@
 use anyhow::Result;
 use json_patch::{Patch, PatchOperation, ReplaceOperation};
-use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
+use tracing::{event, Level};
 
 use crate::image::RemoteImage;
 use crate::server::trow_server::admission_controller_server::AdmissionController;
@@ -29,7 +29,7 @@ fn check_image_is_allowed(
         "Allow" => true,
         "Deny" => false,
         _ => {
-            warn!("Invalid default image validation config: `{}`. Should be `Allow` or `Deny`. Default to `Deny`.", config.default);
+            event!(Level::WARN, "Invalid default image validation config: `{}`. Should be `Allow` or `Deny`. Default to `Deny`.", config.default);
             false
         }
     };
@@ -106,9 +106,11 @@ impl AdmissionController for TrowServer {
 
             for cfg in self.proxy_registry_config.iter() {
                 if image.get_host() == cfg.host {
-                    info!(
+                    event!(
+                        Level::INFO,
                         "mutate_admission: proxying image {} to {}",
-                        raw_image, cfg.alias
+                        raw_image,
+                        cfg.alias
                     );
                     let im = RemoteImage::new(
                         &ar.host_name,
@@ -121,7 +123,11 @@ impl AdmissionController for TrowServer {
                     }));
                     break;
                 }
-                info!("mutate_admission: could not proxy image {}", raw_image);
+                event!(
+                    Level::INFO,
+                    "mutate_admission: could not proxy image {}",
+                    raw_image
+                );
             }
         }
         let patch = Patch(patch_operations);

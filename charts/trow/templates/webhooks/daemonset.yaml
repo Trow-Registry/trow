@@ -40,8 +40,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
-          - "--cert=/etc/trow/webhook-cert/cert"
-          - "--key=/etc/trow/webhook-cert/key"
+          - "--tls=/etc/trow/webhook-cert/cert,/etc/trow/webhook-cert/key"
           - "-n"
           - {{ .Values.trow.domain | quote }}
           {{- if (not (empty .Values.trow.proxyConfig.config)) }}
@@ -50,6 +49,9 @@ spec:
           {{- if (not (empty .Values.trow.validation.config)) }}
           - "--image-validation-config-file=/etc/trow/validation.yaml"
           {{- end }}
+        env:
+        - name: RUST_LOG
+          value: {{ .Values.trow.logLevel }}
         ports:
         - name: webhook
           containerPort: 8443

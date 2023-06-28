@@ -1,5 +1,5 @@
 use axum::http::header::HeaderMap;
-use log::warn;
+use tracing::{event, Level};
 
 use crate::TrowConfig;
 
@@ -39,7 +39,7 @@ pub fn get_base_url(headers: &HeaderMap, config: &TrowConfig) -> String {
     match headers.get("X-Forwarded-Proto").map(|h| h.to_str()) {
         Some(Ok(proto)) => {
             if proto == "http" {
-                warn!("Security issue! Upstream proxy is using HTTP");
+                event!(Level::WARN, "Security issue! Upstream proxy is using HTTP");
             }
             format!("{}://{}", proto, host)
         }

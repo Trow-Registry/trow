@@ -4,13 +4,13 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
-use log::info;
 use quoted_string::strip_dquotes;
 use regex::Regex;
 use reqwest::{self, Method, StatusCode};
 use rusoto_core::Region;
 use rusoto_ecr::{Ecr, EcrClient};
 use serde::{Deserialize, Serialize};
+use tracing::{event, Level};
 
 use crate::image::RemoteImage;
 use crate::server::create_accept_header;
@@ -221,18 +221,22 @@ async fn get_bearer_auth_token(
     auth: &RegistryProxyConfig,
 ) -> Result<String> {
     let mut bearer_param_map = get_bearer_param_map(www_authenticate_header);
-    info!("bearer param map: {:?}", bearer_param_map);
+    event!(Level::DEBUG, "bearer param map: {:?}", bearer_param_map);
     let realm = bearer_param_map
         .get("realm")
         .cloned()
         .ok_or_else(|| anyhow!("Expected realm key in authenticate header"))?;
 
     bearer_param_map.remove("realm");
-    info!("Realm is {}", realm);
+    event!(Level::DEBUG, "Realm is {}", realm);
     let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
 
     if let Some(u) = &auth.username {
-        info!("Attempting proxy authentication with user {}", u);
+        event!(
+            Level::INFO,
+            "Attempting proxy authentication with user {}",
+            u
+        );
         request = request.basic_auth(u, auth.password.as_ref());
     }
 
@@ -240,7 +244,6 @@ async fn get_bearer_auth_token(
         .send()
         .await
         .with_context(|| format!("Failed to send authenticate to {} request", realm))?;
-    info!("resp: {:?}", resp);
     if !resp.status().is_success() {
         return Err(anyhow!("Failed to authenticate to {}", realm));
     }

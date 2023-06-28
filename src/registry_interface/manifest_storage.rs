@@ -1,6 +1,6 @@
 use axum::extract::BodyStream;
-use log::error;
 use tokio::fs::File;
+use tracing::{event, Level};
 
 use super::{AsyncSeekRead, Digest, DigestAlgorithm, StorageDriverError};
 
@@ -20,7 +20,7 @@ impl ManifestReader {
         let size = match reader.metadata().await {
             Ok(meta) => meta.len(),
             Err(e) => {
-                error!("Could not get manifest file size: {}", e);
+                event!(Level::ERROR, "Could not get manifest file size: {}", e);
                 return Err(StorageDriverError::Internal);
             }
         };

@@ -40,6 +40,8 @@ trow:
         host: quay.io
       # - alias: toto
       #  host: http://toto.land
+  ## For more info on log levels see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html
+  logLevel: info
 
 webhookPatch:
   image:

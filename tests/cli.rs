@@ -143,12 +143,4 @@ mod cli {
                 "Cross-Origin Resource Sharing(CORS) requests are allowed",
             ));
     }
-
-    #[test]
-    fn log_level_setting() {
-        get_command()
-            .args(["--log-level", "TRACE"])
-            .assert()
-            .success();
-    }
 }

@@ -9,21 +9,18 @@ mod registry_interface;
 #[cfg(feature = "sqlite")]
 mod users;
 
-use std::io::Write;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
 
 use anyhow::{anyhow, Context, Result};
 use axum::extract::FromRef;
 use axum_server::tls_rustls::RustlsConfig;
-use chrono::Utc;
 use client_interface::ClientInterface;
 use futures::Future;
-use log::{debug, LevelFilter, SetLoggerError};
 use thiserror::Error;
+use tracing::{event, Level};
 use trow_server::{ImageValidationConfig, RegistryProxyConfig};
 use uuid::Uuid;
 
@@ -67,7 +64,6 @@ pub struct TrowConfig {
     token_secret: String,
     user: Option<UserConfig>,
     cors: Option<Vec<String>>,
-    log_level: String,
 }
 
 #[derive(Clone, Debug)]
@@ -90,7 +86,7 @@ struct UserConfig {
 fn init_trow_server(
     config: TrowConfig,
 ) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>> {
-    debug!("Starting Trow server");
+    event!(Level::DEBUG, "Starting Trow server");
 
     //Could pass full config here.
     //Pros: less work, new args added automatically
@@ -112,27 +108,6 @@ fn init_trow_server(
     Ok(ts.get_server_future())
 }
 
-/// Build the logging agent with formatting.
-fn init_logger(log_level: String) -> Result<(), SetLoggerError> {
-    // If there env variable RUST_LOG is set, then take the configuration from it.
-    // Otherwise create a default logger
-    let mut builder = env_logger::Builder::new();
-    builder
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{} [{}] {} {}",
-                Utc::now().format("%Y-%m-%dT%H:%M:%S"),
-                record.target(),
-                record.level(),
-                record.args()
-            )
-        })
-        .filter(None, LevelFilter::from_str(&log_level).unwrap());
-    builder.init();
-    Ok(())
-}
-
 pub struct TrowBuilder {
     config: TrowConfig,
 }
@@ -146,7 +121,6 @@ impl TrowBuilder {
         service_name: String,
         dry_run: bool,
         cors: Option<Vec<String>>,
-        log_level: String,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
@@ -160,7 +134,6 @@ impl TrowBuilder {
             token_secret: Uuid::new_v4().to_string(),
             user: None,
             cors,
-            log_level,
         };
         TrowBuilder { config }
     }
@@ -205,8 +178,6 @@ impl TrowBuilder {
     }
 
     pub async fn start(&self) -> Result<()> {
-        init_logger(self.config.log_level.clone())?;
-
         println!(
             "Starting Trow {} on {}",
             env!("CARGO_PKG_VERSION"),
@@ -277,7 +248,7 @@ impl TrowBuilder {
 }
 
 pub fn build_handlers(listen_addr: String) -> Result<ClientInterface> {
-    debug!("Address for backend: {}", listen_addr);
+    event!(Level::DEBUG, "Address for backend: {}", listen_addr);
 
     //TODO this function is useless currently
     ClientInterface::new(listen_addr)
