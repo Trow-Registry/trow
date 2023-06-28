@@ -48,7 +48,7 @@ RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
 COPY --from=cross /usr/src/trow/trow /trow
 RUN chown -R trow /data /certs
 USER trow
-ENTRYPOINT ["env", "RUST_LOG=warn", "/trow"]
+ENTRYPOINT ["/trow"]
 
 ARG VCS_REF
 ARG VCS_BRANCH
