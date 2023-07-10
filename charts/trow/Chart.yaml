@@ -3,5 +3,5 @@ name: trow
 description: Helm chart for Trow registry
 
 type: application
-version: 0.5.3
-appVersion: 0.5.2
+version: 0.6.0
+appVersion: 0.6.0

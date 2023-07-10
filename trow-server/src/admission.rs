@@ -97,6 +97,14 @@ impl AdmissionController for TrowServer {
     ) -> Result<Response<AdmissionResponse>, Status> {
         let ar = ar.into_inner();
         let mut patch_operations = Vec::<PatchOperation>::new();
+        let proxy_config = match self.proxy_registry_config.as_ref() {
+            Some(s) => s,
+            None => {
+                return Err(Status::internal(
+                    "Proxy registry config not set, cannot mutate image references",
+                ))
+            }
+        };
 
         for (raw_image, image_path) in ar.images.iter().zip(ar.image_paths.iter()) {
             let image = match RemoteImage::try_from_str(raw_image) {
@@ -104,7 +112,7 @@ impl AdmissionController for TrowServer {
                 Err(_) => continue,
             };
 
-            for cfg in self.proxy_registry_config.iter() {
+            for cfg in proxy_config.registries.iter() {
                 if image.get_host() == cfg.host {
                     event!(
                         Level::INFO,

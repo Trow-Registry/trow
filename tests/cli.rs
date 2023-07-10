@@ -4,7 +4,7 @@ mod common;
 #[cfg(test)]
 mod cli {
     use predicates::prelude::*;
-    use trow_server::{ImageValidationConfig, RegistryProxyConfig};
+    use trow_server::{ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common::get_file;
 
@@ -101,20 +101,23 @@ mod cli {
                 "Image validation webhook not configured",
             ));
 
-        let file = get_file::<Vec<RegistryProxyConfig>>(vec![
-            RegistryProxyConfig {
-                alias: "lovni".to_string(),
-                host: "jul.example.com".to_string(),
-                username: Some("robert".to_string()),
-                password: Some("1234".to_string()),
-            },
-            RegistryProxyConfig {
-                alias: "trow".to_string(),
-                host: "127.0.0.1".to_string(),
-                username: None,
-                password: None,
-            },
-        ]);
+        let file = get_file(RegistryProxiesConfig {
+            offline: true,
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    alias: "lovni".to_string(),
+                    host: "jul.example.com".to_string(),
+                    username: Some("robert".to_string()),
+                    password: Some("1234".to_string()),
+                },
+                SingleRegistryProxyConfig {
+                    alias: "trow".to_string(),
+                    host: "127.0.0.1".to_string(),
+                    username: None,
+                    password: None,
+                },
+            ],
+        });
 
         get_command()
             .args([

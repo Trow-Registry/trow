@@ -14,7 +14,7 @@ mod admission_mutation_tests {
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
     use reqwest::StatusCode;
-    use trow_server::RegistryProxyConfig;
+    use trow_server::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
 
@@ -29,20 +29,23 @@ mod admission_mutation_tests {
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
     async fn start_trow() -> TrowInstance {
-        let config_file = common::get_file(vec![
-            RegistryProxyConfig {
-                alias: "docker".to_string(),
-                host: "registry-1.docker.io".to_string(),
-                username: None,
-                password: None,
-            },
-            RegistryProxyConfig {
-                alias: "ecr".to_string(),
-                host: "1234.dkr.ecr.saturn-5.amazonaws.com".to_string(),
-                username: Some("AWS".to_string()),
-                password: None,
-            },
-        ]);
+        let config_file = common::get_file(RegistryProxiesConfig {
+            offline: false,
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    alias: "docker".to_string(),
+                    host: "registry-1.docker.io".to_string(),
+                    username: None,
+                    password: None,
+                },
+                SingleRegistryProxyConfig {
+                    alias: "ecr".to_string(),
+                    host: "1234.dkr.ecr.saturn-5.amazonaws.com".to_string(),
+                    username: Some("AWS".to_string()),
+                    password: None,
+                },
+            ],
+        });
 
         let mut child = Command::new("cargo")
             .arg("run")

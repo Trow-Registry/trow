@@ -25,7 +25,14 @@ pub enum HttpAuth {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RegistryProxyConfig {
+pub struct RegistryProxiesConfig {
+    pub registries: Vec<SingleRegistryProxyConfig>,
+    #[serde(default)]
+    pub offline: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SingleRegistryProxyConfig {
     pub alias: String,
     /// This field is unvalidated and may contain a scheme or not.
     /// eg: `http://example.com` and `example.com`
@@ -43,7 +50,7 @@ pub struct ProxyClient {
 
 impl ProxyClient {
     pub async fn try_new(
-        mut proxy_cfg: RegistryProxyConfig,
+        mut proxy_cfg: SingleRegistryProxyConfig,
         proxy_image: &RemoteImage,
     ) -> Result<Self> {
         let base_client = reqwest::ClientBuilder::new()
@@ -83,7 +90,7 @@ impl ProxyClient {
     }
 
     async fn try_new_with_basic_auth(
-        proxy_cfg: &RegistryProxyConfig,
+        proxy_cfg: &SingleRegistryProxyConfig,
         cl: reqwest::Client,
     ) -> Result<Self> {
         if proxy_cfg.username.is_none() {
@@ -102,7 +109,7 @@ impl ProxyClient {
     }
 
     async fn try_new_with_bearer_auth(
-        proxy_cfg: &RegistryProxyConfig,
+        proxy_cfg: &SingleRegistryProxyConfig,
         cl: reqwest::Client,
         authn_header: &str,
     ) -> Result<Self> {
@@ -218,7 +225,7 @@ fn get_bearer_param_map(www_authenticate_header: &str) -> HashMap<String, String
 async fn get_bearer_auth_token(
     cl: &reqwest::Client,
     www_authenticate_header: &str,
-    auth: &RegistryProxyConfig,
+    auth: &SingleRegistryProxyConfig,
 ) -> Result<String> {
     let mut bearer_param_map = get_bearer_param_map(www_authenticate_header);
     event!(Level::DEBUG, "bearer param map: {:?}", bearer_param_map);
@@ -270,10 +277,10 @@ mod tests {
 
     const AUTHZ_HEADER: &str = "Authorization";
 
-    fn get_basic_setup() -> (MockServer, RegistryProxyConfig, RemoteImage) {
+    fn get_basic_setup() -> (MockServer, SingleRegistryProxyConfig, RemoteImage) {
         let server = MockServer::start();
 
-        let proxy_cfg = RegistryProxyConfig {
+        let proxy_cfg = SingleRegistryProxyConfig {
             host: format!("http://{}", server.address()),
             alias: "toto".to_string(),
             username: None,

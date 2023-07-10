@@ -10,7 +10,7 @@ mod temporary_file;
 use std::future::Future;
 
 pub use admission::ImageValidationConfig;
-pub use proxy_auth::RegistryProxyConfig;
+pub use proxy_auth::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 use server::trow_server::admission_controller_server::AdmissionControllerServer;
 use server::trow_server::registry_server::RegistryServer;
 use server::TrowServer;
@@ -19,7 +19,7 @@ use tonic::transport::Server;
 pub struct TrowServerBuilder {
     data_path: String,
     listen_addr: std::net::SocketAddr,
-    proxy_registry_config: Vec<RegistryProxyConfig>,
+    proxy_registry_config: Option<RegistryProxiesConfig>,
     image_validation_config: Option<ImageValidationConfig>,
     tls_cert: Option<Vec<u8>>,
     tls_key: Option<Vec<u8>>,
@@ -29,7 +29,7 @@ pub struct TrowServerBuilder {
 pub fn build_server(
     data_path: &str,
     listen_addr: std::net::SocketAddr,
-    proxy_registry_config: Vec<RegistryProxyConfig>,
+    proxy_registry_config: Option<RegistryProxiesConfig>,
     image_validation_config: Option<ImageValidationConfig>,
 ) -> TrowServerBuilder {
     TrowServerBuilder {

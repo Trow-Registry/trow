@@ -21,7 +21,7 @@ use client_interface::ClientInterface;
 use futures::Future;
 use thiserror::Error;
 use tracing::{event, Level};
-use trow_server::{ImageValidationConfig, RegistryProxyConfig};
+use trow_server::{ImageValidationConfig, RegistryProxiesConfig};
 use uuid::Uuid;
 
 //TODO: Make this take a cause or description
@@ -58,7 +58,7 @@ pub struct TrowConfig {
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
     service_name: String,
-    proxy_registry_config: Vec<RegistryProxyConfig>,
+    proxy_registry_config: Option<RegistryProxiesConfig>,
     image_validation_config: Option<ImageValidationConfig>,
     dry_run: bool,
     token_secret: String,
@@ -128,7 +128,7 @@ impl TrowBuilder {
             tls: None,
             grpc: GrpcConfig { listen },
             service_name,
-            proxy_registry_config: Vec::new(),
+            proxy_registry_config: None,
             image_validation_config: None,
             dry_run,
             token_secret: Uuid::new_v4().to_string(),
@@ -142,9 +142,9 @@ impl TrowBuilder {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
             .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml::from_str::<Vec<RegistryProxyConfig>>(&config_str)
+        let config = serde_yaml::from_str::<RegistryProxiesConfig>(&config_str)
             .with_context(|| format!("Could not parse file `{}`", config_file))?;
-        self.config.proxy_registry_config = config;
+        self.config.proxy_registry_config = Some(config);
         Ok(self)
     }
 
@@ -197,9 +197,9 @@ impl TrowBuilder {
             }
             None => println!("Image validation webhook not configured"),
         }
-        if !self.config.proxy_registry_config.is_empty() {
+        if let Some(proxy_config) = &self.config.proxy_registry_config {
             println!("Proxy registries configured:");
-            for config in &self.config.proxy_registry_config {
+            for config in &proxy_config.registries {
                 println!("  - {}: {}", config.alias, config.host);
             }
         } else {

@@ -25,10 +25,10 @@ use self::trow_server::*;
 use crate::digest::sha256_tag_digest;
 use crate::image::RemoteImage;
 use crate::manifest::{manifest_media_type, FromJson, Manifest};
-use crate::proxy_auth::ProxyClient;
+use crate::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
 use crate::server::trow_server::registry_server::Registry;
 use crate::temporary_file::TemporaryFile;
-use crate::{metrics, ImageValidationConfig, RegistryProxyConfig};
+use crate::{metrics, ImageValidationConfig, RegistryProxiesConfig};
 
 pub mod trow_server {
     include!("../../trow-protobuf/out/trow.rs");
@@ -58,7 +58,7 @@ pub struct TrowServer {
     manifests_path: PathBuf,
     blobs_path: PathBuf,
     scratch_path: PathBuf,
-    pub proxy_registry_config: Vec<RegistryProxyConfig>,
+    pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
 }
 
@@ -229,7 +229,7 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String> {
 impl TrowServer {
     pub fn new(
         data_path: &str,
-        proxy_registry_config: Vec<RegistryProxyConfig>,
+        proxy_registry_config: Option<RegistryProxiesConfig>,
         image_validation_config: Option<ImageValidationConfig>,
     ) -> Result<Self> {
         let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
@@ -338,15 +338,17 @@ impl TrowServer {
         &self,
         repo_name: &str,
         reference: &str,
-    ) -> Option<(RemoteImage, RegistryProxyConfig)> {
-        //All proxies are under "f_"
-        if repo_name.starts_with(PROXY_DIR) {
+    ) -> Option<(RemoteImage, SingleRegistryProxyConfig)> {
+        // All proxies are under "f_"
+        if repo_name.starts_with(PROXY_DIR) && self.proxy_registry_config.is_some() {
+            let proxy_config = self.proxy_registry_config.as_ref().unwrap();
+
             let segments = repo_name.splitn(3, '/').collect::<Vec<_>>();
             debug_assert_eq!(segments[0], "f");
             let proxy_alias = segments[1].to_string();
             let repo = segments[2].to_string();
 
-            for proxy in self.proxy_registry_config.iter() {
+            for proxy in proxy_config.registries.iter() {
                 if proxy.alias == proxy_alias {
                     let image = RemoteImage::new(&proxy.host, repo, reference.into());
                     return Some((image, proxy.clone()));
@@ -496,7 +498,7 @@ impl TrowServer {
     async fn download_remote_image(
         &self,
         remote_image: RemoteImage,
-        proxy_cfg: RegistryProxyConfig,
+        proxy_cfg: SingleRegistryProxyConfig,
     ) -> Result<String> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
@@ -602,12 +604,16 @@ impl TrowServer {
                 reference,
                 remote_image
             );
-            let digest = self.download_remote_image(remote_image, proxy_cfg).await?;
             // These are not up to date and should not be used !
             drop(repo_name);
             drop(reference);
-
-            self.get_catalog_path_for_blob(&digest)?
+            if self.proxy_registry_config.as_ref().unwrap().offline {
+                let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
+                self.get_path_for_manifest(&repo_name, &remote_image.reference)?
+            } else {
+                let digest = self.download_remote_image(remote_image, proxy_cfg).await?;
+                self.get_catalog_path_for_blob(&digest)?
+            }
         } else {
             self.get_path_for_manifest(&repo_name, &reference)?
         };

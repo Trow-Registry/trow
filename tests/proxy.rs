@@ -10,7 +10,7 @@ mod interface_tests {
 
     use environment::Environment;
     use reqwest::StatusCode;
-    use trow_server::{manifest, RegistryProxyConfig};
+    use trow_server::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
 
@@ -22,26 +22,29 @@ mod interface_tests {
     }
 
     async fn start_trow() -> TrowInstance {
-        let config_file = common::get_file(vec![
-            RegistryProxyConfig {
-                alias: "docker".to_string(),
-                host: "registry-1.docker.io".to_string(),
-                username: None,
-                password: None,
-            },
-            RegistryProxyConfig {
-                alias: "nvcr".to_string(),
-                host: "nvcr.io".to_string(),
-                username: None,
-                password: None,
-            },
-            RegistryProxyConfig {
-                alias: "quay".to_string(),
-                host: "quay.io".to_string(),
-                username: None,
-                password: None,
-            },
-        ]);
+        let config_file = common::get_file(RegistryProxiesConfig {
+            offline: false,
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    alias: "docker".to_string(),
+                    host: "registry-1.docker.io".to_string(),
+                    username: None,
+                    password: None,
+                },
+                SingleRegistryProxyConfig {
+                    alias: "nvcr".to_string(),
+                    host: "nvcr.io".to_string(),
+                    username: None,
+                    password: None,
+                },
+                SingleRegistryProxyConfig {
+                    alias: "quay".to_string(),
+                    host: "quay.io".to_string(),
+                    username: None,
+                    password: None,
+                },
+            ],
+        });
 
         let mut child = Command::new("cargo")
             .arg("run")
