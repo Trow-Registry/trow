@@ -148,10 +148,8 @@ mod interface_tests {
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
         get_manifest(&client, "f/docker/library/alpine", "3.17").await;
         //NOTE: if tag is updated also update nginx tag
-                //This should use same alpine image as base (so partially cached)
+        //This should use same alpine image as base (so partially cached)
         get_manifest(&client, "f/docker/library/nginx", "1.25-alpine").await;
-
-
 
         //Download an amd64 manifest, then the multi platform version of the same manifest
         get_manifest(
