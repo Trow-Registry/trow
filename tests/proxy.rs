@@ -13,7 +13,7 @@ mod interface_tests {
     use std::io::Read;
     use std::process::Child;
     use std::process::Command;
-    use std::thread;
+    use std::thread::{self, sleep};
     use std::time::Duration;
     use trow_server::manifest;
 
@@ -142,18 +142,16 @@ mod interface_tests {
 
         //Using docker proxy should be able to download image even though it's not in registry
         //These tests are repeated to exercise caching logic
+        //TODO: tests are interleaved to avoid some race condition that should be investigated
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
+        get_manifest(&client, "f/docker/library/alpine", "3.17").await;
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
-
+        get_manifest(&client, "f/docker/library/alpine", "3.17").await;
         //NOTE: if tag is updated also update nginx tag
-        get_manifest(&client, "f/docker/library/alpine", "3.17").await;
-        get_manifest(&client, "f/docker/library/alpine", "3.17").await;
-
-        //This should use same alpine image as base (so partially cached)
+                //This should use same alpine image as base (so partially cached)
         get_manifest(&client, "f/docker/library/nginx", "1.25-alpine").await;
 
-        //Need to special case single name repos
-        get_manifest(&client, "f/docker/alpine", "latest").await;
+
 
         //Download an amd64 manifest, then the multi platform version of the same manifest
         get_manifest(
@@ -162,6 +160,9 @@ mod interface_tests {
             "sha256:f54a58bc1aac5ea1a25d796ae155dc228b3f0e11d046ae276b39c4bf2f13d8c4",
         )
         .await;
+
+        //Need to special case single name repos
+        get_manifest(&client, "f/docker/alpine", "latest").await;
         get_manifest(&client, "f/docker/hello-world", "linux").await;
 
         //test writing manifest to proxy dir isn't allowed
