@@ -226,6 +226,10 @@ impl TrowBuilder {
         // Start GRPC Backend task
         tokio::task::spawn(init_trow_server(self.config.clone())?);
 
+        // Listen for termination signal
+        let handle = axum_server::Handle::new();
+        tokio::spawn(shutdown_signal(handle.clone()));
+
         if let Some(ref tls) = self.config.tls {
             if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
                 return Err(anyhow!(
@@ -236,15 +240,48 @@ impl TrowBuilder {
             }
             let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file).await?;
             axum_server::bind_rustls(self.config.addr, config)
+                .handle(handle)
                 .serve(app.into_make_service())
                 .await?;
         } else {
             axum_server::bind(self.config.addr)
+                .handle(handle)
                 .serve(app.into_make_service())
                 .await?;
         };
         Ok(())
     }
+}
+
+async fn shutdown_signal(handle: axum_server::Handle) {
+    use std::time::Duration;
+    use tokio::signal;
+
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    println!("signal received, starting graceful shutdown");
+    // Signal the server to shutdown using Handle.
+    handle.graceful_shutdown(Some(Duration::from_secs(30)));
 }
 
 pub fn build_handlers(listen_addr: String) -> Result<ClientInterface> {
