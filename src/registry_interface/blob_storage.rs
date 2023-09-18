@@ -1,9 +1,7 @@
-use rocket::data::DataStream;
+use axum::extract::BodyStream;
 
 use super::digest::Digest;
-use super::AsyncSeekRead;
-use super::StorageDriverError;
-use std::pin::Pin;
+use super::{AsyncSeekRead, StorageDriverError};
 
 pub struct ContentInfo {
     pub length: u64,
@@ -19,26 +17,39 @@ pub struct UploadInfo {
 }
 
 pub struct BlobReader {
-    pub digest: Digest,
-    pub reader: Pin<Box<dyn AsyncSeekRead>>,
+    digest: Digest,
+    reader: tokio::fs::File,
+    size: u64,
 }
 pub struct Stored {
     pub total_stored: u64,
     pub chunk: u64,
-    pub complete: bool, // true if whole stream was read, false if hit data cap
 }
 
 impl BlobReader {
-    pub fn get_reader(self) -> Pin<Box<dyn AsyncSeekRead>> {
+    pub async fn new(digest: Digest, file: tokio::fs::File) -> Self {
+        let file_size = file.metadata().await.unwrap().len();
+        Self {
+            digest,
+            reader: file,
+            size: file_size,
+        }
+    }
+
+    pub fn get_reader(self) -> impl AsyncSeekRead {
         self.reader
     }
 
     pub fn digest(&self) -> &Digest {
         &self.digest
     }
+
+    pub fn blob_size(&self) -> u64 {
+        self.size
+    }
 }
 
-#[rocket::async_trait]
+#[axum::async_trait]
 pub trait BlobStorage {
     /// Retrieve the blob from the registry identified by digest.
     /// A HEAD request can also be issued to this endpoint to obtain resource information without receiving all data.
@@ -75,7 +86,7 @@ pub trait BlobStorage {
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: DataStream<'a>,
+        data: BodyStream,
     ) -> Result<Stored, StorageDriverError>;
 
     /// Finalises the upload of the given session_id.

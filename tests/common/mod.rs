@@ -1,14 +1,12 @@
+use std::io::{BufReader, Write};
+use std::process::Child;
+
 use rand::Rng;
 use reqwest::StatusCode;
-use std::io::BufReader;
-use std::process::Child;
-use trow_server::digest;
-use trow_server::manifest;
+use serde::Serialize;
+use trow_server::{digest, manifest};
 
 /* None of these are dead code, they are called from tests */
-
-#[allow(dead_code)]
-pub const TROW_ADDRESS: &str = "https://trow.test:8443";
 #[allow(dead_code)]
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 #[allow(dead_code)]
@@ -40,9 +38,9 @@ pub fn kill_gracefully(child: &Child) {
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
+pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, tag: &str) {
     let resp = cl
-        .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
+        .post(&format!("{}/v2/{}/blobs/uploads/", trow_address, name))
         .send()
         .await
         .expect("Error uploading layer");
@@ -71,7 +69,7 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
     let resp = cl
         .put(&format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
-            TROW_ADDRESS, name, uuid, digest
+            trow_address, name, uuid, digest
         ))
         .send()
         .await
@@ -80,7 +78,7 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
 
     //Finally get it back again
     let resp = cl
-        .get(&format!("{}/v2/{}/blobs/{}", TROW_ADDRESS, name, digest))
+        .get(&format!("{}/v2/{}/blobs/{}", trow_address, name, digest))
         .send()
         .await
         .unwrap();
@@ -113,9 +111,21 @@ pub async fn upload_layer(cl: &reqwest::Client, name: &str, tag: &str) {
         config,
         layers,
     };
-    let manifest_addr = format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag);
+    let manifest_addr = format!("{}/v2/{}/manifests/{}", trow_address, name, tag);
     let resp = cl.put(&manifest_addr).json(&mani).send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();
     assert_eq!(&location, &manifest_addr);
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+/// Returns a temporary file filled with `contents`
+pub fn get_file<T: Serialize>(contents: T) -> tempfile::NamedTempFile {
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(serde_yaml::to_string(&contents).unwrap().as_bytes())
+        .unwrap();
+    file.flush().unwrap();
+
+    file
 }

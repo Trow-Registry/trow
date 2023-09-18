@@ -1,14 +1,10 @@
-use rocket::http::{ContentType, Status};
-use rocket::request::Request;
-use rocket::response;
-use rocket::response::Responder;
-use rocket::Response;
+use std::{error, fmt};
+
+use axum::body;
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use serde_json::Value;
-use std::error;
-use std::fmt;
-use std::io::Cursor;
+use serde_json::{json, Value};
 
 #[derive(Debug)]
 pub enum Error {
@@ -36,6 +32,7 @@ pub enum Error {
     Unsupported,
     InternalError,
     DigestInvalid,
+    NotFound,
 }
 
 // Create ErrorMsg struct that serializes to json of appropriate type
@@ -89,6 +86,7 @@ impl fmt::Display for Error {
                 "Invalid repository name",
                 Some(json!({ "Repository": name })),
             ),
+            Error::NotFound => format_error_json(f, "NOT_FOUND", "Not Found", None),
         }
     }
 }
@@ -120,35 +118,38 @@ impl error::Error for Error {
             Error::BlobUnknown => "Reference made to an unknown blob (e.g. invalid UUID)",
             Error::BlobUploadUnknown => "If a blob upload has been cancelled or was never started, this error code may be returned.",
             Error::BlobUploadInvalid(_) => "The blob upload encountered an error and can no longer proceed.",
-            Error::InternalError => "An internal error occured, please consult the logs for more details.",
+            Error::InternalError => "An internal error occurred, please consult the logs for more details.",
             Error::DigestInvalid => "When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key \"digest\", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest.",
             Error::ManifestInvalid(_) => "During upload, manifests undergo several checks ensuring validity. If those checks fail, this error may be returned, unless a more specific error is included. The detail will contain information the failed validation.",
             Error::ManifestUnknown(_) => "This error is returned when the manifest, identified by name and tag is unknown to the repository.",
-            Error::NameInvalid(_) => "Invalid repository name encountered either during manifest validation or any API operation."
-
+            Error::NameInvalid(_) => "Invalid repository name encountered either during manifest validation or any API operation.",
+            Error::NotFound => "The specified resource could not be found. This error may also occur if the client does not have permission to access the resource.",
         }
     }
 }
 
-impl<'r> Responder<'r, 'static> for Error {
-    fn respond_to(self, _req: &Request) -> response::Result<'static> {
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
         let json = format!("{}", self);
 
         let status = match self {
-            Error::Unsupported => Status::MethodNotAllowed,
-            Error::Unauthorized => Status::Unauthorized,
-            Error::BlobUploadUnknown | Error::ManifestUnknown(_) => Status::NotFound,
-            Error::InternalError => Status::InternalServerError,
-            Error::BlobUploadInvalid(_) => Status::RangeNotSatisfiable,
+            Error::Unsupported => StatusCode::METHOD_NOT_ALLOWED,
+            Error::Unauthorized => StatusCode::UNAUTHORIZED,
+            Error::BlobUploadUnknown | Error::ManifestUnknown(_) => StatusCode::NOT_FOUND,
+            Error::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::BlobUploadInvalid(_) => StatusCode::RANGE_NOT_SATISFIABLE,
             Error::DigestInvalid
             | Error::ManifestInvalid(_)
             | Error::BlobUnknown
-            | Error::NameInvalid(_) => Status::BadRequest,
+            | Error::NameInvalid(_) => StatusCode::BAD_REQUEST,
+            Error::NotFound => StatusCode::NOT_FOUND,
         };
-        Response::build()
-            .header(ContentType::JSON)
-            .sized_body(None, Cursor::new(json))
+        Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CONTENT_LENGTH, json.len())
             .status(status)
-            .ok()
+            .body(body::Full::from(json))
+            .unwrap()
+            .into_response()
     }
 }

@@ -4,95 +4,89 @@ kind: StatefulSet
 metadata:
   name: {{ include "trow.fullname" . }}
   labels:
-    {{- include "trow.labels" . | nindent 4 }}
+    {{- include "registry.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "trow.selectorLabels" . | nindent 6 }}
+      {{- include "registry.selectorLabels" . | nindent 6 }}
   serviceName: trow
   template:
     metadata:
       labels:
-        {{- include "trow.selectorLabels" . | nindent 8 }}
+        {{- include "registry.selectorLabels" . | nindent 8 }}
     spec:
-      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
     {{- end }}
       containers:
-      - name: trow-pod
+      - name: trow
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
-          - "--no-tls" 
-          - "-n" 
+          - "-n"
           - {{ .Values.trow.domain | quote }}
-          {{- if .Values.trow.host }}
-          - "--host"
-          - {{ .Values.trow.host | quote }}
-          {{- end}}
           {{- if and (.Values.trow.user) (.Values.trow.password) }}
-          - "-u" 
-          - {{ .Values.trow.user | quote }} 
-          - "--password-file" 
-          - "/etc/trow/pass"
+          - "--user"
+          - {{ .Values.trow.user | quote }}
+          - "--password"
+          - "file:///etc/trow/pass"
           {{- end }}
-        {{- with .Values.trow.validation }} 
-          {{- if .proxyDockerHub }}
-          - "--proxy-docker-hub"
+          {{- if (not (empty .Values.trow.proxyConfig.config)) }}
+          - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
           {{- end }}
-          {{- if .allowDocker }}
-          - "--allow-docker-official"
+          {{- if (not (empty .Values.trow.validation.config)) }}
+          - "--image-validation-config-file=/etc/trow/validation.yaml"
           {{- end }}
-          {{- if not .allowKubernetes }}
-          - "--deny-k8s-images"
-          {{- end }}
-          {{- if .allowPrefixes }}
-          - "--allow-prefixes"
-          - {{ .allowPrefixes | join "," | quote }}
-          {{- end }}
-          {{- if .allowImages }}
-          - "--allow-images"
-          - {{ .allowImages | join "," | quote }}
-          {{- end }}
-          {{- if .disallowLocalPrefixes }}
-          - "--disallow-local-prefixes"
-          - {{ .disallowLocalPrefixes | join "," | quote }}
-          {{- end }}
-          {{- if .disallowLocalImages }}
-          - "--disallow-local-images"
-          - {{ .disallowLocalImages | join "," | quote }}
-          {{- end }}
-        {{- end }}
+        env:
+        - name: RUST_LOG
+          value: {{ .Values.trow.logLevel }}
         ports:
         - name: http
           containerPort: 8000
         volumeMounts:
         - name: data-vol
           mountPath: /data
-    {{- if and (.Values.trow.user) (.Values.trow.password) }}
+      {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
-          mountPath: /etc/trow
+          mountPath: /etc/trow/pass
+          subPath: pass
           readOnly: true
-    {{- end}}
-        {{- with .Values.containerSecurityContext }}
-        securityContext:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-    {{- if and (.Values.trow.user) (.Values.trow.password) }}
+      {{- end}}
+      {{- if (not (empty .Values.trow.proxyConfig.config)) }}
+        - name: trow-proxy-cfg
+          mountPath: /etc/trow/proxy-registries.yaml
+          subPath: proxy-registries.yaml
+          readOnly: true
+      {{- end}}
+      {{- if (not (empty .Values.trow.validation.config)) }}
+        - name: trow-validation-cfg
+          mountPath: /etc/trow/validation.yaml
+          subPath: validation.yaml
+          readOnly: true
+      {{- end}}
       volumes:
+      {{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
           secret:
             secretName: {{ include "trow.fullname" . }}-password
-            items:
-              - key: pass
-                path: pass
-    {{- end}}
-      {{- with .Values.podSecurityContext }}
+      {{- end}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
+        runAsUser: 333333
+        runAsGroup: 333333
+        fsGroup: 333333
+      volumes:
+      {{- if (not (empty .Values.trow.proxyConfig.config)) }}
+        - name: trow-proxy-cfg
+          secret:
+            secretName: {{ include "trow.fullname" . }}-proxy-cfg
+      {{- end }}
+      {{- if (not (empty .Values.trow.validation.config)) }}
+        - name: trow-validation-cfg
+          configMap:
+            name: {{ include "trow.fullname" . }}-validation-cfg
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

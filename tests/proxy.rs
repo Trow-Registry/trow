@@ -3,57 +3,70 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
+    use std::path::Path;
+    use std::process::{Child, Command};
+    use std::time::Duration;
+    use std::{fs, thread};
 
     use environment::Environment;
+    use reqwest::StatusCode;
+    use trow_server::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
 
-    use reqwest::StatusCode;
-    use std::fs::{self, File};
-    use std::io::Read;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
-    use std::time::Duration;
-    use trow_server::manifest;
-
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    const PORT: &str = "39369";
+    const ORIGIN: &str = "http://127.0.0.1:39369";
 
     struct TrowInstance {
         pid: Child,
     }
-    /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.
 
     async fn start_trow() -> TrowInstance {
+        let config_file = common::get_file(RegistryProxiesConfig {
+            offline: false,
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    alias: "docker".to_string(),
+                    host: "registry-1.docker.io".to_string(),
+                    username: None,
+                    password: None,
+                },
+                SingleRegistryProxyConfig {
+                    alias: "nvcr".to_string(),
+                    host: "nvcr.io".to_string(),
+                    username: None,
+                    password: None,
+                },
+                SingleRegistryProxyConfig {
+                    alias: "quay".to_string(),
+                    host: "quay.io".to_string(),
+                    username: None,
+                    password: None,
+                },
+            ],
+        });
+
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
             .envs(Environment::inherit().compile())
+            .env("RUST_LOG", "info")
             .arg("--")
-            .arg("--proxy-docker-hub")
+            .arg("--proxy-registry-config-file")
+            .arg(config_file.path())
+            .arg("--port")
+            .arg(PORT)
             .spawn()
             .expect("failed to start");
 
-        let mut timeout = 100;
+        let mut timeout = 600;
 
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::new();
 
-        let mut response = client.get(TROW_ADDRESS).send().await;
+        let mut response = client.get(ORIGIN).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send().await;
+            response = client.get(ORIGIN).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -69,10 +82,10 @@ mod interface_tests {
         }
     }
 
-    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
+    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> manifest::Manifest {
         //Might need accept headers here
         let resp = cl
-            .get(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
+            .get(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
             .send()
             .await
             .unwrap();
@@ -83,12 +96,12 @@ mod interface_tests {
             name,
             tag
         );
-        let _: manifest::Manifest = resp.json().await.unwrap();
+        resp.json().await.unwrap()
     }
 
     async fn upload_to_nonwritable_repo(cl: &reqwest::Client, name: &str) {
         let resp = cl
-            .post(&format!("{}/v2/{}/blobs/uploads/", TROW_ADDRESS, name))
+            .post(&format!("{ORIGIN}/v2/{name}/blobs/uploads/"))
             .send()
             .await
             .expect("Error uploading layer");
@@ -113,7 +126,7 @@ mod interface_tests {
             config,
             layers,
         };
-        let manifest_addr = format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, "tag");
+        let manifest_addr = format!("{}/v2/{}/manifests/{}", ORIGIN, name, "tag");
         let resp = cl.put(&manifest_addr).json(&mani).send().await.unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
@@ -126,34 +139,25 @@ mod interface_tests {
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
         let _trow = start_trow().await;
+        let client = reqwest::Client::new();
 
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
-
-        //Using docker proxy should be able to download image even though it's not in registry
+        //Using registry proxy should be able to download image even though it's not in registry
         //These tests are repeated to exercise caching logic
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
         get_manifest(&client, "f/docker/amouat/trow", "latest").await;
 
-        //NOTE: if tag is updated also update nginx tag
-        get_manifest(&client, "f/docker/library/alpine", "3.13").await;
-        get_manifest(&client, "f/docker/library/alpine", "3.13").await;
+        get_manifest(&client, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
+        get_manifest(&client, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
 
         //This should use same alpine image as base (so partially cached)
-        get_manifest(&client, "f/docker/library/nginx", "1.21.0-alpine").await;
+        get_manifest(&client, "f/docker/library/alpine", "3.13.4").await;
+        get_manifest(&client, "f/docker/library/nginx", "1.20.0-alpine").await;
 
-        //Need to special case single name repos
-        get_manifest(&client, "f/docker/alpine", "latest").await;
+        // Special case: docker/library
+        // check that it works and that manifests are written in the correct location
+        get_manifest(&client, "f/docker/alpine", "3.13.4").await;
+        assert!(!Path::new("./data/manifests/f/docker/alpine/3.13.4").exists());
+        assert!(Path::new("./data/manifests/f/docker/library/alpine/3.13.4").exists());
 
         //Download an amd64 manifest, then the multi platform version of the same manifest
         get_manifest(
@@ -163,6 +167,25 @@ mod interface_tests {
         )
         .await;
         get_manifest(&client, "f/docker/hello-world", "linux").await;
+
+        // test a registry that doesn't require auth
+        get_manifest(&client, "f/quay/openshifttest/scratch", "latest").await;
+
+        // Check that tags get updated to point to latest digest
+        {
+            let man_3_13 = get_manifest(&client, "f/docker/alpine", "3.13.4").await;
+            fs::copy(
+                "./data/manifests/f/docker/library/alpine/3.13.4",
+                "./data/manifests/f/docker/library/alpine/latest",
+            )
+            .unwrap();
+            let man_latest = get_manifest(&client, "f/docker/library/alpine", "latest").await;
+            assert_ne!(
+                serde_json::to_string(&man_3_13).unwrap(),
+                serde_json::to_string(&man_latest).unwrap(),
+                "Trow did not update digest of `latest` tag"
+            );
+        }
 
         //test writing manifest to proxy dir isn't allowed
         upload_to_nonwritable_repo(&client, "f/failthis").await;

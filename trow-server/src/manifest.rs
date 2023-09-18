@@ -20,7 +20,7 @@ pub trait FromJson {
  *
  * I'm not really sure this buys us much over the JSON deserialization though...
  *
- * ARG, mistake here, manifest should be responsible for schema vesion tag
+ * ARG, mistake here, manifest should be responsible for schema version tag
  */
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -178,11 +178,12 @@ impl Manifest {
 
 #[cfg(test)]
 mod test {
-    use super::FromJson;
-    use super::Manifest;
-    use crate::digest::sha256_tag_digest;
-    use serde_json::{self, Value};
     use std::io::BufReader;
+
+    use serde_json::{self, Value};
+
+    use super::{FromJson, Manifest};
+    use crate::digest::sha256_tag_digest;
 
     #[test]
     fn valid_v2_2() {
@@ -368,7 +369,7 @@ mod test {
                   }
                   "#;
 
-        let v: Value = serde_json::from_str(&data).unwrap();
+        let v: Value = serde_json::from_str(data).unwrap();
         assert!(Manifest::from_json(&v).is_ok());
     }
 }

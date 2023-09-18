@@ -1,16 +1,4 @@
-use futures::Future;
-use log::{LevelFilter, SetLoggerError};
-
-use rand::rngs::OsRng;
-use rocket::fairing;
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::str::FromStr;
-use uuid::Uuid;
-
 mod client_interface;
-mod fairings;
 
 pub mod response;
 #[allow(clippy::too_many_arguments)]
@@ -21,18 +9,20 @@ mod registry_interface;
 #[cfg(feature = "sqlite")]
 mod users;
 
-use chrono::Utc;
-use client_interface::ClientInterface;
-use fairings::conditional_fairing::AttachConditionalFairing;
-use rand::RngCore;
-use std::io::Write;
+use std::net::SocketAddr;
+use std::path::Path;
+use std::sync::Arc;
+use std::{env, fs};
 
-use anyhow::{anyhow, Result};
-use log::debug;
-use rocket::http::Method;
-use rocket_cors::AllowedHeaders;
-use rocket_cors::AllowedOrigins;
+use anyhow::{anyhow, Context, Result};
+use axum::extract::FromRef;
+use axum_server::tls_rustls::RustlsConfig;
+use client_interface::ClientInterface;
+use futures::Future;
 use thiserror::Error;
+use tracing::{event, Level};
+use trow_server::{ImageValidationConfig, RegistryProxiesConfig};
+use uuid::Uuid;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -45,6 +35,18 @@ pub struct NetAddr {
     pub port: u16,
 }
 
+#[derive(Debug)]
+pub struct TrowServerState {
+    pub client: ClientInterface,
+    pub config: TrowConfig,
+}
+
+impl FromRef<Arc<TrowServerState>> for TrowConfig {
+    fn from_ref(state: &Arc<TrowServerState>) -> Self {
+        state.config.clone()
+    }
+}
+
 /*
  * Configuration for Trow. This isn't direct fields on the builder so that we can pass it
  * to Rocket to manage.
@@ -52,24 +54,16 @@ pub struct NetAddr {
 #[derive(Clone, Debug)]
 pub struct TrowConfig {
     data_dir: String,
-    addr: NetAddr,
+    addr: SocketAddr,
     tls: Option<TlsConfig>,
     grpc: GrpcConfig,
-    host_names: Vec<String>,
-    proxy_hub: bool,
-    hub_user: Option<String>,
-    hub_pass: Option<String>,
-    allow_prefixes: Vec<String>,
-    allow_images: Vec<String>,
-    deny_prefixes: Vec<String>,
-    deny_images: Vec<String>,
+    service_name: String,
+    proxy_registry_config: Option<RegistryProxiesConfig>,
+    image_validation_config: Option<ImageValidationConfig>,
     dry_run: bool,
-    max_manifest_size: u32,
-    max_blob_size: u32,
     token_secret: String,
     user: Option<UserConfig>,
-    cors: bool,
-    log_level: String,
+    cors: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -92,7 +86,7 @@ struct UserConfig {
 fn init_trow_server(
     config: TrowConfig,
 ) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>> {
-    debug!("Starting Trow server");
+    event!(Level::DEBUG, "Starting Trow server");
 
     //Could pass full config here.
     //Pros: less work, new args added automatically
@@ -101,13 +95,8 @@ fn init_trow_server(
     let ts = trow_server::build_server(
         &config.data_dir,
         config.grpc.listen.parse::<std::net::SocketAddr>()?,
-        config.proxy_hub,
-        config.hub_user,
-        config.hub_pass,
-        config.allow_prefixes,
-        config.allow_images,
-        config.deny_prefixes,
-        config.deny_images,
+        config.proxy_registry_config,
+        config.image_validation_config,
     );
     //TODO: probably shouldn't be reusing this cert
     let ts = if let Some(tls) = config.tls {
@@ -119,27 +108,6 @@ fn init_trow_server(
     Ok(ts.get_server_future())
 }
 
-/// Build the logging agent with formatting.
-fn init_logger(log_level: String) -> Result<(), SetLoggerError> {
-    // If there env variable RUST_LOG is set, then take the configuration from it.
-    // Otherwise create a default logger
-    let mut builder = env_logger::Builder::new();
-    builder
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{} [{}] {} {}",
-                Utc::now().format("%Y-%m-%dT%H:%M:%S"),
-                record.target(),
-                record.level(),
-                record.args()
-            )
-        })
-        .filter(None, LevelFilter::from_str(&log_level).unwrap());
-    builder.init();
-    Ok(())
-}
-
 pub struct TrowBuilder {
     config: TrowConfig,
 }
@@ -148,42 +116,46 @@ impl TrowBuilder {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         data_dir: String,
-        addr: NetAddr,
+        addr: SocketAddr,
         listen: String,
-        host_names: Vec<String>,
-        proxy_hub: bool,
-        allow_prefixes: Vec<String>,
-        allow_images: Vec<String>,
-        deny_prefixes: Vec<String>,
-        deny_images: Vec<String>,
+        service_name: String,
         dry_run: bool,
-        cors: bool,
-        max_manifest_size: u32,
-        max_blob_size: u32,
-        log_level: String,
+        cors: Option<Vec<String>>,
     ) -> TrowBuilder {
         let config = TrowConfig {
             data_dir,
             addr,
             tls: None,
             grpc: GrpcConfig { listen },
-            host_names,
-            proxy_hub,
-            hub_user: None,
-            hub_pass: None,
-            allow_prefixes,
-            allow_images,
-            deny_prefixes,
-            deny_images,
+            service_name,
+            proxy_registry_config: None,
+            image_validation_config: None,
             dry_run,
-            max_manifest_size,
-            max_blob_size,
             token_secret: Uuid::new_v4().to_string(),
             user: None,
             cors,
-            log_level,
         };
         TrowBuilder { config }
+    }
+
+    pub fn with_proxy_registries(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
+        let config_file = config_file.as_ref();
+        let config_str = fs::read_to_string(config_file)
+            .with_context(|| format!("Could not read file `{}`", config_file))?;
+        let config = serde_yaml::from_str::<RegistryProxiesConfig>(&config_str)
+            .with_context(|| format!("Could not parse file `{}`", config_file))?;
+        self.config.proxy_registry_config = Some(config);
+        Ok(self)
+    }
+
+    pub fn with_image_validation(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
+        let config_file = config_file.as_ref();
+        let config_str = fs::read_to_string(config_file)
+            .with_context(|| format!("Could not read file `{}`", config_file))?;
+        let config = serde_yaml::from_str::<ImageValidationConfig>(&config_str)
+            .with_context(|| format!("Could not parse file `{}`", config_file))?;
+        self.config.image_validation_config = Some(config);
+        Ok(self)
     }
 
     pub fn with_tls(&mut self, cert_file: String, key_file: String) -> &mut TrowBuilder {
@@ -205,150 +177,115 @@ impl TrowBuilder {
         self
     }
 
-    pub fn with_hub_auth(&mut self, hub_user: String, token: String) -> &mut TrowBuilder {
-        self.config.hub_pass = Some(token);
-        self.config.hub_user = Some(hub_user);
-        self
-    }
-
-    fn build_rocket_config(&self) -> Result<rocket::config::Config> {
-        // When run in production, Rocket wants a secret key for private cookies.
-        // As we don't use private cookies, we just generate it here.
-        let mut key = [0u8; 32];
-        OsRng.fill_bytes(&mut key);
-        let secret_key = base64::encode(&key);
-
-        //TODO: with Rocket 0.5 should be able to pass our config file and let Rocket pick out the parts it wants
-        //This will be simpler and allow more flexibility.
-        let mut figment = rocket::Config::figment()
-            .merge(("address", self.config.addr.host.clone()))
-            .merge(("port", self.config.addr.port))
-            .merge(("workers", 256))
-            .merge(("secret_key", secret_key));
-
-        if let Some(ref tls) = self.config.tls {
-            if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
-                return  Err(anyhow!("Trow requires a TLS certificate and key, but failed to find them. \nExpected to find TLS certificate at {} and key at {}", tls.cert_file, tls.key_file));
-            }
-
-            let tls_config =
-                rocket::config::TlsConfig::from_paths(tls.cert_file.clone(), tls.key_file.clone());
-            figment = figment.merge(("tls", tls_config));
-        }
-        let cfg = rocket::Config::from(figment);
-        Ok(cfg)
-    }
-
-    pub fn start(&self) -> Result<()> {
-        init_logger(self.config.log_level.clone())?;
-
-        let rocket_config = &self.build_rocket_config()?;
+    pub async fn start(&self) -> Result<()> {
         println!(
-            "Starting Trow {} on {}:{}",
+            "Starting Trow {} on {}",
             env!("CARGO_PKG_VERSION"),
-            self.config.addr.host,
-            self.config.addr.port
-        );
-        println!(
-            "\nMaximum blob size: {} Mebibytes",
-            self.config.max_blob_size
-        );
-        println!(
-            "Maximum manifest size: {} Mebibytes",
-            self.config.max_manifest_size
+            self.config.addr
         );
 
-        println!("\n**Validation callback configuration\n");
-
-        println!("  By default all remote images are denied, and all local images present in the repository are allowed\n");
-
         println!(
-            "  These host names will be considered local (refer to this registry): {:?}",
-            self.config.host_names
+            "Hostname of this registry (for the MutatingWebhook): {:?}",
+            self.config.service_name
         );
-        println!(
-            "  Images with these prefixes are explicitly allowed: {:?}",
-            self.config.allow_prefixes
-        );
-        println!(
-            "  Images with these names are explicitly allowed: {:?}",
-            self.config.allow_images
-        );
-        println!(
-            "  Local images with these prefixes are explicitly denied: {:?}",
-            self.config.deny_prefixes
-        );
-        println!(
-            "  Local images with these names are explicitly denied: {:?}\n",
-            self.config.deny_images
-        );
-
-        if self.config.proxy_hub {
-            println!("  Docker Hub repostories are being proxy-cached under f/docker/\n");
+        match self.config.image_validation_config {
+            Some(ref config) => {
+                println!("Image validation webhook configured:");
+                println!("  Default action: {}", config.default);
+                println!("  Allowed prefixes: {:?}", config.allow);
+                println!("  Denied prefixes: {:?}", config.deny);
+            }
+            None => println!("Image validation webhook not configured"),
+        }
+        if let Some(proxy_config) = &self.config.proxy_registry_config {
+            println!("Proxy registries configured:");
+            for config in &proxy_config.registries {
+                println!("  - {}: {}", config.alias, config.host);
+            }
+        } else {
+            println!("Proxy registries not configured");
         }
 
-        if self.config.cors {
-            println!("  Cross-Origin Resource Sharing(CORS) requests are allowed\n");
+        if self.config.cors.is_some() {
+            println!("Cross-Origin Resource Sharing(CORS) requests are allowed\n");
         }
 
         if self.config.dry_run {
             println!("Dry run, exiting.");
             std::process::exit(0);
         }
+
         let s = format!("https://{}", self.config.grpc.listen);
-        let ci: ClientInterface = build_handlers(s)?;
+        let server_state = TrowServerState {
+            config: self.config.clone(),
+            client: build_handlers(s)?,
+        };
 
-        let cors = rocket_cors::CorsOptions {
-            allowed_origins: AllowedOrigins::all(),
-            allowed_methods: vec![Method::Get, Method::Post, Method::Options]
-                .into_iter()
-                .map(From::from)
-                .collect(),
-            allowed_headers: AllowedHeaders::some(&["Authorization", "Content-Type"]),
-            allow_credentials: true,
-            ..Default::default()
-        }
-        .to_cors()?;
+        let app = routes::create_app(server_state);
 
-        let f = rocket::custom(rocket_config.clone())
-            .manage(self.config.clone())
-            .manage(ci)
-            .attach(fairing::AdHoc::on_response(
-                "Set API Version Header",
-                |_, resp| {
-                    Box::pin(async move {
-                        //Only serve v2. If we also decide to support older clients, this will to be dropped on some paths
-                        resp.set_raw_header("Docker-Distribution-API-Version", "registry/2.0");
-                    })
-                },
-            ))
-            .attach(fairing::AdHoc::on_liftoff("Launch Message", |_| {
-                Box::pin(async move {
-                    println!("Trow is up and running!");
-                })
-            }))
-            .attach_if(self.config.cors, cors)
-            .mount("/", routes::routes())
-            .register("/", routes::catchers())
-            .launch();
+        // Start GRPC Backend task
+        tokio::task::spawn(init_trow_server(self.config.clone())?);
 
-        let rt = rocket::tokio::runtime::Builder::new_multi_thread()
-            // NOTE: graceful shutdown depends on the "rocket-worker" prefix.
-            .thread_name("rocket-worker-thread")
-            .enable_all()
-            .build()?;
+        // Listen for termination signal
+        let handle = axum_server::Handle::new();
+        tokio::spawn(shutdown_signal(handle.clone()));
 
-        // Start GRPC Backend thread.
-        rt.spawn(init_trow_server(self.config.clone())?);
-        //And now rocket
-        _ = rt.block_on(f)?;
-
+        if let Some(ref tls) = self.config.tls {
+            if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
+                return Err(anyhow!(
+                    "Could not find TLS certificate and key at {} and {}",
+                    tls.cert_file,
+                    tls.key_file
+                ));
+            }
+            let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file).await?;
+            axum_server::bind_rustls(self.config.addr, config)
+                .handle(handle)
+                .serve(app.into_make_service())
+                .await?;
+        } else {
+            axum_server::bind(self.config.addr)
+                .handle(handle)
+                .serve(app.into_make_service())
+                .await?;
+        };
         Ok(())
     }
 }
 
+async fn shutdown_signal(handle: axum_server::Handle) {
+    use std::time::Duration;
+    use tokio::signal;
+
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    println!("signal received, starting graceful shutdown");
+    // Signal the server to shutdown using Handle.
+    handle.graceful_shutdown(Some(Duration::from_secs(30)));
+}
+
 pub fn build_handlers(listen_addr: String) -> Result<ClientInterface> {
-    debug!("Address for backend: {}", listen_addr);
+    event!(Level::DEBUG, "Address for backend: {}", listen_addr);
 
     //TODO this function is useless currently
     ClientInterface::new(listen_addr)

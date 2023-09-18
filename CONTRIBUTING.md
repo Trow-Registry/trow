@@ -14,7 +14,7 @@ unacceptable behaviour to any of the project admins or adrian.mouat@container-so
 
 ## Bugs
 
-If you find a bug, please [open an issue](https://github.com/ContainerSolutions/trow/issues)! Do try
+If you find a bug, please [open an issue](https://github.com/trow-registry/trow/issues)! Do try
 to include all the details needed to recreate your problem. This is likely to include:
 
  - The version of Trow being used
@@ -25,7 +25,7 @@ to include all the details needed to recreate your problem. This is likely to in
 ## Building Features and Documentation
 
 If you're looking for something to work on, take look at the issue tracker, in particular any items
-labelled [good first issue](https://github.com/ContainerSolutions/trow/labels/good%20first%20issue).
+labelled [good first issue](https://github.com/trow-registry/trow/labels/good%20first%20issue).
 Please leave a comment on the issue to mention that you have started work, in order to avoid
 multiple people working on the same issue.
 
@@ -47,7 +47,7 @@ Most of the code is written in Rust and uses the standard style guidelines - ple
 through `rustfmt` prior to opening a PR.
 
 On opening a PR, a GitHub action will execute the test suite against the new code. All code is
-required to pass the tests, and new code must be accompanied by new tests. 
+required to pass the tests, and new code must be accompanied by new tests.
 
 All PRs have to be reviewed and signed off by another developer before being merged to the main
 branch. This review will likely ask for some changes to the code - please don't be alarmed or upset
@@ -55,9 +55,11 @@ at this; it is expected that all PRs will need tweaks and a normal part of the p
 
 Be aware that all Trow code is released under the [Apache 2.0 licence](LICENSE).
 
-### Thanks
+## Thanks
 
-These guidelines were best on several sources, including
-[Atom](https://github.com/atom/atom/blob/main/CONTRIBUTING.md), [PurpleBooth's
+Thanks to [Container Solutions](https://www.container-solutions.com/) for creating the project and to [Extrality](https://www.extrality.ai/) for further developping the poject.
+
+Contribution guidelines take inspiration from
+[Atom](https://github.com/atom/atom/blob/master/CONTRIBUTING.md), [PurpleBooth's
 advice](https://gist.github.com/PurpleBooth/b24679402957c63ec426) and the [Contributor
 Covenant](https://www.contributor-covenant.org/).

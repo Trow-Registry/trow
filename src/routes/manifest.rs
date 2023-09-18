@@ -1,12 +1,14 @@
-use rocket::data::ToByteUnit;
-use rocket::{delete, get, put};
+use std::sync::Arc;
 
-use crate::client_interface::ClientInterface;
+use axum::extract::{BodyStream, Path, State};
+use axum::headers::HeaderMap;
+
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
 use crate::response::errors::Error;
+use crate::response::get_base_url;
 use crate::response::trow_token::TrowToken;
-use crate::types::{create_verified_manifest, ManifestDeleted, RepoName, VerifiedManifest};
-use crate::TrowConfig;
+use crate::types::{ManifestDeleted, RepoName, VerifiedManifest};
+use crate::TrowServerState;
 
 /*
 ---
@@ -28,91 +30,64 @@ Accept: manifest-version
 200 - return the manifest
 404 - manifest not known to the registry
  */
-#[get("/v2/<onename>/manifests/<reference>")]
 pub async fn get_manifest(
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    onename: String,
-    reference: String,
+    State(state): State<Arc<TrowServerState>>,
+    Path((name, reference)): Path<(String, String)>,
 ) -> Result<ManifestReader, Error> {
-    ci.get_manifest(&onename, &reference)
+    state
+        .client
+        .get_manifest(&name, &reference)
         .await
         .map_err(|_| Error::ManifestUnknown(reference))
 }
-
-#[get("/v2/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_2level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    user: String,
-    repo: String,
-    reference: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, reference)): Path<(String, String, String)>,
 ) -> Result<ManifestReader, Error> {
-    get_manifest(auth_user, ci, format!("{}/{}", user, repo), reference).await
+    get_manifest(auth_user, state, Path((format!("{one}/{two}"), reference))).await
 }
-
-/*
- * Process 3 level manifest path
- */
-#[get("/v2/<org>/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_3level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, reference)): Path<(String, String, String, String)>,
 ) -> Result<ManifestReader, Error> {
     get_manifest(
         auth_user,
-        ci,
-        format!("{}/{}/{}", org, user, repo),
-        reference,
+        state,
+        Path((format!("{one}/{two}/{three}"), reference)),
     )
     .await
 }
-
-/*
- * Process 4 level manifest path
- */
-#[get("/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_4level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, reference)): Path<(String, String, String, String, String)>,
 ) -> Result<ManifestReader, Error> {
     get_manifest(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}", fourth, org, user, repo),
-        reference,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}"), reference)),
     )
     .await
 }
-
-/*
- * Process 4 level manifest path
- */
-#[get("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<reference>")]
 pub async fn get_manifest_5level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, reference)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
 ) -> Result<ManifestReader, Error> {
     get_manifest(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}/{} ", fifth, fourth, org, user, repo),
-        reference,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), reference)),
     )
     .await
 }
@@ -125,136 +100,98 @@ PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
  */
-#[put("/v2/<repo_name>/manifests/<reference>", data = "<chunk>")]
 pub async fn put_image_manifest(
+    headers: HeaderMap,
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    repo_name: String,
-    reference: String,
-    chunk: rocket::data::Data<'_>,
+    State(state): State<Arc<TrowServerState>>,
+    Path((repo_name, reference)): Path<(String, String)>,
+    chunk: BodyStream,
 ) -> Result<VerifiedManifest, Error> {
-    let data = chunk.open(tc.max_manifest_size.mebibytes());
+    let base_url = get_base_url(&headers, &state.config);
 
-    match ci.store_manifest(&repo_name, &reference, data).await {
-        Ok(digest) => Ok(create_verified_manifest(
+    match state
+        .client
+        .store_manifest(&repo_name, &reference, chunk)
+        .await
+    {
+        Ok(digest) => Ok(VerifiedManifest::new(
+            Some(base_url),
             RepoName(repo_name),
             digest,
             reference,
         )),
         Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
         Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid("".to_string())),
-        Err(StorageDriverError::InvalidContentRange) => Err(Error::ManifestInvalid(format!(
-            "Content over data limit {} mebibytes",
-            tc.max_blob_size
-        ))),
         Err(_) => Err(Error::InternalError),
     }
 }
-
-/*
- * Parse 2 level <user>/<repo> style path and pass it to put_image_manifest
- */
-#[put("/v2/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 pub async fn put_image_manifest_2level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    user: String,
-    repo: String,
-    reference: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, reference)): Path<(String, String, String)>,
+    chunk: BodyStream,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
+        headers,
         auth_user,
-        ci,
-        tc,
-        format!("{}/{}", user, repo),
-        reference,
+        state,
+        Path((format!("{one}/{two}"), reference)),
         chunk,
     )
     .await
 }
-
-/*
- * Parse 3 level <org>/<user>/<repo> style path and pass it to put_image_manifest
- */
-#[put("/v2/<org>/<user>/<repo>/manifests/<reference>", data = "<chunk>")]
 pub async fn put_image_manifest_3level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, reference)): Path<(String, String, String, String)>,
+    chunk: BodyStream,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
+        headers,
         auth_user,
-        ci,
-        tc,
-        format!("{}/{}/{}", org, user, repo),
-        reference,
+        state,
+        Path((format!("{one}/{two}/{three}"), reference)),
         chunk,
     )
     .await
 }
-
-/*
- * Parse 4 level <fourth>/<org>/<user>/<repo> style path and pass it to put_image_manifest
- */
-#[put(
-    "/v2/<fourth>/<org>/<user>/<repo>/manifests/<reference>",
-    data = "<chunk>"
-)]
 pub async fn put_image_manifest_4level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, reference)): Path<(String, String, String, String, String)>,
+    chunk: BodyStream,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
+        headers,
         auth_user,
-        ci,
-        tc,
-        format!("{}/{}/{}/{}", fourth, org, user, repo),
-        reference,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}"), reference)),
         chunk,
     )
     .await
 }
-
-/*
- * Parse 5 level <fifth>/<fourth>/<org>/<user>/<repo> style path and pass it to put_image_manifest
- */
-#[put(
-    "/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<reference>",
-    data = "<chunk>"
-)]
 pub async fn put_image_manifest_5level(
+    headers: HeaderMap,
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    tc: &rocket::State<TrowConfig>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    reference: String,
-    chunk: rocket::data::Data<'_>,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, reference)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    chunk: BodyStream,
 ) -> Result<VerifiedManifest, Error> {
     put_image_manifest(
+        headers,
         auth_user,
-        ci,
-        tc,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
-        reference,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), reference)),
         chunk,
     )
     .await
@@ -265,81 +202,66 @@ pub async fn put_image_manifest_5level(
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
 */
-
-#[delete("/v2/<repo>/manifests/<digest>")]
 pub async fn delete_image_manifest(
     _auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    repo: String,
-    digest: String,
+    State(state): State<Arc<TrowServerState>>,
+    Path((repo, digest)): Path<(String, String)>,
 ) -> Result<ManifestDeleted, Error> {
     let digest = digest::parse(&digest).map_err(|_| Error::Unsupported)?;
-    match ci.delete_manifest(&repo, &digest).await {
+    match state.client.delete_manifest(&repo, &digest).await {
         Ok(_) => Ok(ManifestDeleted {}),
         Err(StorageDriverError::Unsupported) => Err(Error::Unsupported),
         Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestUnknown(repo)),
         Err(_) => Err(Error::InternalError),
     }
 }
-
-#[delete("/v2/<user>/<repo>/manifests/<digest>")]
 pub async fn delete_image_manifest_2level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    user: String,
-    repo: String,
-    digest: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, digest)): Path<(String, String, String)>,
 ) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, ci, format!("{}/{}", user, repo), digest).await
+    delete_image_manifest(auth_user, state, Path((format!("{one}/{two}"), digest))).await
 }
-
-#[delete("/v2/<org>/<user>/<repo>/manifests/<digest>")]
 pub async fn delete_image_manifest_3level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    org: String,
-    user: String,
-    repo: String,
-    digest: String,
-) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, ci, format!("{}/{}/{}", org, user, repo), digest).await
-}
-
-#[delete("/v2/<fourth>/<org>/<user>/<repo>/manifests/<digest>")]
-pub async fn delete_image_manifest_4level(
-    auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    digest: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, digest)): Path<(String, String, String, String)>,
 ) -> Result<ManifestDeleted, Error> {
     delete_image_manifest(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}", fourth, org, user, repo),
-        digest,
+        state,
+        Path((format!("{one}/{two}/{three}"), digest)),
     )
     .await
 }
-
-#[delete("/v2/<fifth>/<fourth>/<org>/<user>/<repo>/manifests/<digest>")]
-pub async fn delete_image_manifest_5level(
+pub async fn delete_image_manifest_4level(
     auth_user: TrowToken,
-    ci: &rocket::State<ClientInterface>,
-    fifth: String,
-    fourth: String,
-    org: String,
-    user: String,
-    repo: String,
-    digest: String,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, digest)): Path<(String, String, String, String, String)>,
 ) -> Result<ManifestDeleted, Error> {
     delete_image_manifest(
         auth_user,
-        ci,
-        format!("{}/{}/{}/{}/{}", fifth, fourth, org, user, repo),
-        digest,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}"), digest)),
+    )
+    .await
+}
+pub async fn delete_image_manifest_5level(
+    auth_user: TrowToken,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, digest)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+) -> Result<ManifestDeleted, Error> {
+    delete_image_manifest(
+        auth_user,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}"), digest)),
     )
     .await
 }

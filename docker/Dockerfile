@@ -1,43 +1,54 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.5
 
 #Note we build on host plaftform and cross-compile to target arch
-FROM --platform=$BUILDPLATFORM rust:latest as cross
+FROM --platform=$BUILDPLATFORM rust:bookworm as cross
+
 ARG TARGETARCH
 WORKDIR /usr/src/trow
-COPY docker/platform.sh .
-RUN ./platform.sh # should write /.platform and /.compiler
+
+ENV PKG_CONFIG_SYSROOT_DIR=/
+
+# should write /.platform and
+RUN --mount=type=bind,source=docker/platform.sh,target=/platform.sh \
+    /platform.sh
+
 RUN rustup component add rustfmt
 RUN rustup target add $(cat /.platform)
-RUN apt update && apt-get install -y unzip $(cat /.compiler)
+
+RUN dpkg --add-architecture $TARGETARCH
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt update && \
+    apt-get install -y unzip openssl protobuf-compiler libssl-dev:$TARGETARCH $(cat /.compiler)
 
 COPY Cargo.toml .
 COPY Cargo.lock .
-COPY .cargo/config .cargo/config
-
+COPY .cargo/config.toml .cargo/config.toml
 COPY trow-server/ trow-server/
 COPY trow-protobuf/ trow-protobuf/
 COPY src src
 
-RUN cargo build --release --target $(cat /.platform)
-RUN cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/ # Get rid of this when build --out is stable
+# Get rid of the "cp" when cargo build --out is stable
+RUN --mount=type=cache,target=./target \
+    cargo build --release --target $(cat /.platform) && \
+    cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
 
-FROM debian:stable-slim
+FROM debian:bookworm-slim
 RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 
 # Note that certs are needed for proxying
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates\
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates
 
-COPY quick-install/self-cert /install/self-cert
-COPY start-trow.sh /
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
 # keep this late for concurrency
 COPY --from=cross /usr/src/trow/trow /trow
-RUN chown -R trow /data /certs /install
+RUN chown -R trow /data /certs
 USER trow
-ENTRYPOINT ["/start-trow.sh"]
+ENTRYPOINT ["/trow"]
 
 ARG VCS_REF
 ARG VCS_BRANCH
@@ -53,7 +64,7 @@ ENV VERSION=$VERSION
 LABEL org.opencontainers.image.created=$DATE \
   org.opencontainers.image.authors="Container Solutions Labs" \
   org.opencontainers.image.url="https://trow.io" \
-  org.opencontainers.image.source="https://github.com/ContainerSolutions/trow" \
+  org.opencontainers.image.source="https://github.com/trow-registry/trow" \
   org.opencontainers.image.version=$VERSION \
   org.opencontainers.image.revision=$VCS_REF \
   git.branch=$VCS_BRANCH \

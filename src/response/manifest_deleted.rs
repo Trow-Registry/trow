@@ -1,10 +1,15 @@
-use crate::types::ManifestDeleted;
-use rocket::http::Status;
-use rocket::request::Request;
-use rocket::response::{self, Responder, Response};
+use axum::body;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 
-impl<'r> Responder<'r, 'static> for ManifestDeleted {
-    fn respond_to(self, _req: &Request) -> response::Result<'static> {
-        Response::build().status(Status::Accepted).ok()
+use crate::types::ManifestDeleted;
+
+impl IntoResponse for ManifestDeleted {
+    fn into_response(self) -> Response {
+        Response::builder()
+            .status(StatusCode::ACCEPTED)
+            .body(body::Empty::new())
+            .unwrap()
+            .into_response()
     }
 }

@@ -1,25 +1,25 @@
+#[cfg(test)]
 mod common;
 
 #[cfg(test)]
 mod no_cors_tests {
 
-    use crate::common;
-    use environment::Environment;
+    use std::process::{Child, Command};
+    use std::time::Duration;
+    use std::{fs, thread};
 
-    use reqwest::header::HeaderMap;
+    use environment::Environment;
     use reqwest::header::{
-        ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_REQUEST_METHOD,
-        ORIGIN,
+        HeaderMap, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
+        ACCESS_CONTROL_REQUEST_METHOD, ORIGIN,
     };
     use reqwest::StatusCode;
-    use std::fs::{self, File};
-    use std::io::Read;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
-    use std::time::Duration;
 
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    use crate::common;
+
+    const PORT: &str = "39368";
+    const HOST: &str = "127.0.0.1:39368";
+    const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
 
     struct TrowInstance {
         pid: Child,
@@ -31,25 +31,17 @@ mod no_cors_tests {
         let mut child = Command::new("cargo")
             .arg("run")
             .env_clear()
+            .arg("--")
+            .arg("--name")
+            .arg(HOST)
+            .arg("--port")
+            .arg(PORT)
             .envs(Environment::inherit().compile())
             .spawn()
             .expect("failed to start");
 
         let mut timeout = 100;
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
-
+        let client = reqwest::Client::new();
         let mut response = client.get(TROW_ADDRESS).send().await;
 
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
@@ -83,7 +75,7 @@ mod no_cors_tests {
             .await
             .unwrap();
 
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_METHODS), None);
         assert_eq!(resp.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN), None);
     }
@@ -96,19 +88,7 @@ mod no_cors_tests {
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
         let _trow = start_trow().await;
-
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::new();
 
         println!("Running test_preflight()");
         test_preflight(&client).await;

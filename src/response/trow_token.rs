@@ -1,18 +1,23 @@
-use crate::TrowConfig;
-use crate::UserConfig;
-use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
-use log::warn;
-use rocket::http::ContentType;
-use rocket::http::Status;
-use rocket::request::{self, FromRequest, Request};
-use rocket::response::{Responder, Response};
-use rocket::{outcome::Outcome, State};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::io::Cursor;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use axum::extract::{FromRef, FromRequestParts};
+use axum::headers::HeaderMapExt;
+use axum::http::request::Parts;
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::{body, headers};
+use base64::engine::general_purpose as base64_engine;
+use base64::Engine as _;
+use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use tracing::{event, Level};
 use uuid::Uuid;
+
+use super::authenticate::Authenticate;
+use super::get_base_url;
+use crate::{TrowConfig, UserConfig};
 
 const TOKEN_DURATION: u64 = 3600;
 const AUTHORIZATION: &str = "authorization";
@@ -21,53 +26,56 @@ pub struct ValidBasicToken {
     user: String,
 }
 
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for ValidBasicToken {
-    type Error = ();
-    async fn from_request(req: &'r Request<'_>) -> request::Outcome<ValidBasicToken, ()> {
-        let config = req
-            .guard::<&rocket::State<TrowConfig>>()
-            .await
-            .expect("TrowConfig not present!");
+#[axum::async_trait]
+impl<S> FromRequestParts<S> for ValidBasicToken
+where
+    TrowConfig: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, ());
+
+    async fn from_request_parts(req: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
+        let config = TrowConfig::from_ref(config);
 
         let user_cfg = match config.user {
             Some(ref user_cfg) => user_cfg,
             None => {
-                warn!("Attempted login, but no users are configured");
-                return Outcome::Failure((Status::Unauthorized, ()));
+                event!(Level::WARN, "Attempted login, but no users are configured");
+                return Err((StatusCode::UNAUTHORIZED, ()));
             }
         };
 
         // As Authorization is a standard header
-        let auth_val = match req.headers().get_one(AUTHORIZATION) {
-            Some(a) => a,
-            None => return Outcome::Failure((Status::Unauthorized, ())),
+        let auth_val = match req.headers.get(AUTHORIZATION) {
+            Some(a) => a.to_str().map_err(|_| (StatusCode::UNAUTHORIZED, ()))?,
+            None => return Err((StatusCode::UNAUTHORIZED, ())),
         };
 
         // The value of the header is the type of the auth (Basic or Bearer), followed by an
         // encoded string, separate by whitespace.
+
         let auth_strings: Vec<String> = auth_val.split_whitespace().map(String::from).collect();
         if auth_strings.len() != 2 {
             //TODO: Should this be BadRequest?
-            return Outcome::Failure((Status::Unauthorized, ()));
+            return Err((StatusCode::UNAUTHORIZED, ()));
         }
         // We're looking for a Basic token
         if auth_strings[0] != "Basic" {
             //TODO: This probably isn't right, maybe check if bearer?
-            return Outcome::Failure((Status::Unauthorized, ()));
+            return Err((StatusCode::UNAUTHORIZED, ()));
         }
 
-        match base64::decode(&auth_strings[1]) {
+        match base64_engine::STANDARD.decode(&auth_strings[1]) {
             Ok(user_pass) => {
                 if verify_user(user_pass, user_cfg) {
-                    Outcome::Success(ValidBasicToken {
+                    Ok(ValidBasicToken {
                         user: user_cfg.user.clone(),
                     })
                 } else {
-                    Outcome::Failure((Status::Unauthorized, ()))
+                    Err((StatusCode::UNAUTHORIZED, ()))
                 }
             }
-            Err(_) => Outcome::Failure((Status::Unauthorized, ())),
+            Err(_) => Err((StatusCode::UNAUTHORIZED, ())),
         }
     }
 }
@@ -128,14 +136,14 @@ struct TokenClaim {
  * Create new jsonwebtoken.
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
-pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, frank_jwt::Error> {
+pub fn new(vbt: ValidBasicToken, config: &TrowConfig) -> Result<TrowToken, frank_jwt::Error> {
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
 
     // build token from structure and return token string
     let token_claim = TokenClaim {
-        iss: tc.host_names[0].clone(),
+        iss: config.service_name.clone(),
         sub: vbt.user.clone(),
         aud: "Trow Registry".to_owned(),
         exp: current_time.add(Duration::new(TOKEN_DURATION, 0)).as_secs(),
@@ -145,10 +153,10 @@ pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, fr
     };
 
     let header = json!({});
-    let payload = serde_json::to_value(&token_claim)?;
+    let payload = serde_json::to_value(token_claim)?;
 
     //Use generated config here
-    let token = encode(header, &tc.token_secret, &payload, Algorithm::HS256)?;
+    let token = encode(header, &config.token_secret, &payload, Algorithm::HS256)?;
 
     Ok(TrowToken {
         user: vbt.user,
@@ -158,26 +166,31 @@ pub fn new(vbt: ValidBasicToken, tc: &State<TrowConfig>) -> Result<TrowToken, fr
 /*
  * Responder returns token as JSON body
  */
-impl<'r> Responder<'r, 'static> for TrowToken {
-    fn respond_to(self, _: &Request) -> Result<Response<'static>, Status> {
+impl IntoResponse for TrowToken {
+    fn into_response(self) -> Response {
         //TODO: would be better to use serde here
-        let formatted_body = Cursor::new(format!("{{\"token\": \"{}\"}}", self.token));
-        Response::build()
-            .status(Status::Ok)
-            .header(ContentType::JSON)
-            .sized_body(None, formatted_body)
-            .ok()
+        let formatted_body = format!("{{\"token\": \"{}\"}}", self.token);
+        Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CONTENT_LENGTH, formatted_body.len())
+            .status(StatusCode::OK)
+            .body(body::Body::from(formatted_body))
+            .unwrap()
+            .into_response()
     }
 }
 
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for TrowToken {
-    type Error = ();
-    async fn from_request(req: &'r Request<'_>) -> request::Outcome<TrowToken, ()> {
-        let config = req
-            .guard::<&rocket::State<TrowConfig>>()
-            .await
-            .expect("TrowConfig not present!");
+#[axum::async_trait]
+impl<S> FromRequestParts<S> for TrowToken
+where
+    TrowConfig: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = Authenticate;
+
+    async fn from_request_parts(req: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
+        let config = &TrowConfig::from_ref(config);
+        let base_url = get_base_url(&req.headers, config);
 
         if config.user.is_none() {
             //Authentication is not configured
@@ -186,47 +199,38 @@ impl<'r> FromRequest<'r> for TrowToken {
                 user: "none".to_string(),
                 token: "none".to_string(),
             };
-            return Outcome::Success(no_auth_token);
+            return Ok(no_auth_token);
         }
-        let auth_val = match req.headers().get_one("Authorization") {
-            Some(a) => a,
-            None => return Outcome::Failure((Status::Unauthorized, ())),
+        let authorization = match req
+            .headers
+            .typed_get::<headers::Authorization<headers::authorization::Bearer>>()
+        {
+            Some(bt) => bt,
+            None => return Err(Authenticate::new(base_url)),
         };
-
-        // Check header handling - isn't there a next?
-        // split the header on white space
-        let auth_strings: Vec<String> = auth_val.split_whitespace().map(String::from).collect();
-        if auth_strings.len() != 2 {
-            return Outcome::Failure((Status::BadRequest, ()));
-        }
-        // We're looking for a Bearer token
-        //TODO: Maybe should forward or something on Basic
-        if auth_strings[0] != "Bearer" {
-            return Outcome::Failure((Status::Unauthorized, ()));
-        }
+        let token = authorization.token();
 
         // parse for bearer token
         // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
-
         let dec_token = match decode(
-            &auth_strings[1],
+            token,
             &config.token_secret,
             Algorithm::HS256,
             &ValidationOptions::default(),
         ) {
             Ok((_, payload)) => payload,
             Err(_) => {
-                warn!("Failed to decode user token");
-                return Outcome::Failure((Status::Unauthorized, ()));
+                event!(Level::WARN, "Failed to decode user token");
+                return Err(Authenticate::new(base_url));
             }
         };
 
         let trow_token = TrowToken {
             user: dec_token["sub"].to_string(),
-            token: auth_strings[1].clone(),
+            token: token.to_string(),
         };
 
-        Outcome::Success(trow_token)
+        Ok(trow_token)
     }
 }
 

@@ -1,16 +1,16 @@
-use std::io::Cursor;
-
-use rocket::http::{ContentType, Status};
-use rocket::request::Request;
-use rocket::response::{Responder, Response};
+use axum::body;
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
 
 pub struct HTML<'a>(pub &'a str);
 
-impl<'a> Responder<'a, 'a> for HTML<'a> {
-    fn respond_to(self, _: &Request) -> Result<Response<'a>, Status> {
-        Response::build()
-            .header(ContentType::HTML)
-            .sized_body(None, Cursor::new(self.0))
-            .ok()
+impl<'a> IntoResponse for HTML<'a> {
+    fn into_response(self) -> Response {
+        Response::builder()
+            .header(header::CONTENT_TYPE, "text/html")
+            .header(header::CONTENT_LENGTH, self.0.len())
+            .body(body::Body::from(self.0.to_owned()))
+            .unwrap()
+            .into_response()
     }
 }

@@ -1,24 +1,24 @@
+#[cfg(test)]
 mod common;
 
 #[cfg(test)]
 mod authentication_tests {
 
-    use crate::common;
-    use environment::Environment;
-
-    use base64::encode;
-    use reqwest::StatusCode;
-    use std::fs::{self, File};
-    use std::io::Read;
-    use std::process::Child;
-    use std::process::Command;
-    use std::thread;
+    use std::process::{Child, Command};
     use std::time::Duration;
+    use std::{fs, thread};
 
-    const TROW_ADDRESS: &str = "https://trow.test:8443";
+    use axum::http::header;
+    use base64::engine::general_purpose as base64_engine;
+    use base64::Engine as _;
+    use environment::Environment;
+    use reqwest::StatusCode;
 
-    const AUTHN_HEADER: &str = "www-authenticate";
-    const AUTHZ_HEADER: &str = "Authorization";
+    use crate::common;
+
+    const PORT: &str = "39367";
+    const HOST: &str = "127.0.0.1:39367";
+    const TROW_ADDRESS: &str = "http://127.0.0.1:39367";
 
     struct TrowInstance {
         pid: Child,
@@ -32,27 +32,21 @@ mod authentication_tests {
             .env_clear()
             .envs(Environment::inherit().compile())
             .arg("--")
-            .arg("-u")
+            .arg("--name")
+            .arg(HOST)
+            .arg("--port")
+            .arg(PORT)
+            .arg("--user")
             .arg("authtest")
-            .arg("-p")
+            .arg("--password")
             .arg("authpass")
             .spawn()
             .expect("failed to start");
 
         let mut timeout = 600; // This should be a full minute
 
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
         // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::builder().build().unwrap();
 
         let mut response = client.get(TROW_ADDRESS).send().await;
 
@@ -76,23 +70,26 @@ mod authentication_tests {
 
     async fn test_auth_redir(cl: &reqwest::Client) {
         let resp = cl
-            .get(&(TROW_ADDRESS.to_owned() + "/v2"))
+            .get(&(TROW_ADDRESS.to_owned() + "/v2/"))
             .send()
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         //Test get redir header
         assert_eq!(
-            resp.headers().get(AUTHN_HEADER).unwrap(),
-            "Bearer realm=\"https://trow.test:8443/login\",service=\"trow_registry\",scope=\"push/pull\""
+            resp.headers().get(header::WWW_AUTHENTICATE).unwrap(),
+            &format!(
+                "Bearer realm=\"{}/login\",service=\"trow_registry\",scope=\"push/pull\"",
+                TROW_ADDRESS
+            )
         );
     }
 
     async fn test_login(cl: &reqwest::Client) {
-        let bytes = encode(b"authtest:authpass");
+        let bytes = base64_engine::STANDARD.encode(b"authtest:authpass");
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned() + "/login"))
-            .header(AUTHZ_HEADER, format!("Basic {}", bytes))
+            .header(header::AUTHORIZATION, format!("Basic {}", bytes))
             .send()
             .await
             .unwrap();
@@ -113,7 +110,7 @@ mod authentication_tests {
     async fn test_login_fail(cl: &reqwest::Client) {
         let resp = cl
             .get(&(TROW_ADDRESS.to_owned() + "/login"))
-            .header(AUTHZ_HEADER, "Basic thisstringwillfail")
+            .header(header::AUTHORIZATION, "Basic thisstringwillfail")
             .send()
             .await
             .unwrap();
@@ -129,18 +126,8 @@ mod authentication_tests {
         //It might be possible to improve things with a thread_local
         let _trow = start_trow().await;
 
-        let mut buf = Vec::new();
-        File::open("./certs/domain.crt")
-            .unwrap()
-            .read_to_end(&mut buf)
-            .unwrap();
-        let cert = reqwest::Certificate::from_pem(&buf).unwrap();
         // get a client builder
-        let client = reqwest::Client::builder()
-            .add_root_certificate(cert)
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+        let client = reqwest::Client::builder().build().unwrap();
 
         println!("Running test_auth_redir()");
         test_auth_redir(&client).await;

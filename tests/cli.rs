@@ -1,9 +1,17 @@
 #[cfg(test)]
+mod common;
+
+#[cfg(test)]
 mod cli {
     use predicates::prelude::*;
+    use trow_server::{ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig};
+
+    use crate::common::get_file;
 
     fn get_command() -> assert_cmd::Command {
-        assert_cmd::Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap()
+        let mut cmd = assert_cmd::Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.arg("--dry-run");
+        cmd
     }
 
     #[test]
@@ -12,17 +20,9 @@ mod cli {
             .arg("-Z")
             .assert()
             .stderr(predicate::str::contains(
-                "Found argument '-Z' which wasn't expected, or isn't valid in this context",
+                "error: unexpected argument '-Z' found",
             ))
             .failure();
-
-        get_command()
-            .arg("-Z")
-            .assert()
-            .failure()
-            .stderr(predicate::str::contains(
-                "error: Found argument '-Z' which wasn't expected",
-            ));
     }
 
     #[test]
@@ -43,105 +43,107 @@ mod cli {
     #[test]
     fn host_name_parsing() {
         get_command()
-            .args(&["-n", "myhost.com", "--dry-run"])
+            .args(["-n", "myhost.com"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("[\"myhost.com\"]"));
+            .stdout(predicate::str::contains(": \"myhost.com\""));
 
         get_command()
-            .args(&["--names", "trow.test", "--dry-run"])
+            .args(["--name", "trow.test"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("[\"trow.test\"]"));
+            .stdout(predicate::str::contains(": \"trow.test\""));
 
         get_command()
-            .args(&["-n myhost.com second", "--dry-run"])
+            .args(["-n=port.io:3833"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("[\"myhost.com\", \"second\"]"));
-
-        get_command()
-            .args(&["-n port.io:3833 second", "--dry-run"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("[\"port.io:3833\", \"second\"]"));
+            .stdout(predicate::str::contains(": \"port.io:3833\""));
     }
 
     #[test]
     fn image_validation() {
         get_command()
-            .args(&[
-                "--deny-k8s-images",
-                "--allow-prefixes",
-                "myreg.com/",
-                "--dry-run",
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Proxy registries not configured"));
+
+        let file = get_file(ImageValidationConfig {
+            allow: vec!["trow.test/".to_string()],
+            deny: vec!["toto".to_string()],
+            default: "Allow".to_string(),
+        });
+
+        get_command()
+            .args([
+                "--image-validation-config-file",
+                file.path().to_str().unwrap(),
             ])
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "Images with these prefixes are explicitly allowed: [\"myreg.com/\"]",
+                [
+                    "Image validation webhook configured:",
+                    "  Default action: Allow",
+                    "  Allowed prefixes: [\"trow.test/\"]",
+                    "  Denied prefixes: [\"toto\"]",
+                ]
+                .join("\n"),
             ));
+    }
 
+    #[test]
+    fn registry_proxy() {
         get_command()
-            .args(&["--allow-images", "myreg.com/myimage:1.2", "--dry-run"])
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "Images with these names are explicitly allowed: [\"myreg.com/myimage:1.2\"]",
+                "Image validation webhook not configured",
             ));
 
+        let file = get_file(RegistryProxiesConfig {
+            offline: true,
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    alias: "lovni".to_string(),
+                    host: "jul.example.com".to_string(),
+                    username: Some("robert".to_string()),
+                    password: Some("1234".to_string()),
+                },
+                SingleRegistryProxyConfig {
+                    alias: "trow".to_string(),
+                    host: "127.0.0.1".to_string(),
+                    username: None,
+                    password: None,
+                },
+            ],
+        });
+
         get_command()
-            .args(&["--disallow-local-images", "myimage:1.2", "--dry-run"])
+            .args([
+                "--proxy-registry-config-file",
+                file.path().to_str().unwrap(),
+            ])
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "Local images with these names are explicitly denied: [\"myimage:1.2\"]",
-            ));
-
-        get_command()
-            .args(&["--disallow-local-prefixes", "beta/", "--dry-run"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains(
-                "Local images with these prefixes are explicitly denied: [\"beta/\"]",
+                [
+                    "Proxy registries configured:",
+                    "  - lovni: jul.example.com",
+                    "  - trow: 127.0.0.1",
+                ]
+                .join("\n"),
             ));
     }
 
     #[test]
     fn cors() {
         get_command()
-            .args(&["--enable-cors", "--dry-run"])
+            .args(["--cors", "ftp://trow.test"])
             .assert()
             .success()
             .stdout(predicate::str::contains(
                 "Cross-Origin Resource Sharing(CORS) requests are allowed",
             ));
-    }
-
-    #[test]
-    fn file_size_parsing() {
-        get_command()
-            .args(&["--max-manifest-size", "3", "--dry-run"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("manifest size: 3"));
-
-        get_command()
-            .args(&["--max-manifest-size", "-4"])
-            .assert()
-            .failure();
-
-        get_command()
-            .args(&["--max-manifest-size", "1.1"])
-            .assert()
-            .failure();
-    }
-
-    #[test]
-    fn log_level_setting() {
-        get_command()
-            .args(&["--log-level", "TRACE", "--dry-run"])
-            .assert()
-            .success();
     }
 }

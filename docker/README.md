@@ -10,11 +10,6 @@ docker build -f Dockerfile -t trow ..
 Note that the build context needs to be the root directory of the project (*not* the directory with
 the Dockerfile).
 
-To run tests, use the `build.sh` script or `Dockerfile.test` image (tests will run as part of the build).
-
-Once issues related to TLS libraries have been resolved, a minimal build based on a scratch image
-will be added.
-
 ## Mulitplatform Builds
 
 There are several ways to produce multiplatform builds with Docker:
@@ -26,7 +21,7 @@ There are several ways to produce multiplatform builds with Docker:
     with multi-stage builds.
  3. Use Rust cross-compilation to produce a binary for the target platform and copy into a base
     image for the target platform. This requires a bit more configuration, but does work. When
-    targetting a low-powered platform (e.g. Raspberry Pi), this option may be considerably faster
+    targeting a low-powered platform (e.g. Raspberry Pi), this option may be considerably faster
     than building directly on the hardware or using emulation.
 
 Our Dockerfile uses 3 (with Docker multiplatform support to assemble the final image). Assuming
@@ -43,7 +38,7 @@ docker buildx build --pull --load -t trow:armv7 -f Dockerfile --platform linux/a
 ```
 
 But be aware that you can't load the result into a local Docker instance as it doesn't
-currently understand multi-platform manifests. 
+currently understand multi-platform manifests.
 
 All of this assumes you have a recent version of Docker with buildkit installed.
 

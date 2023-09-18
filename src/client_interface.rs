@@ -2,65 +2,60 @@ pub mod trow_proto {
     include!("../trow-protobuf/out/trow.rs");
 }
 
-use crate::registry_interface::blob_storage::Stored;
-use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
-use crate::registry_interface::{
-    validation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory, ManifestReader,
-    Metrics, MetricsError, MetricsResponse, Validation, ValidationError,
-};
-use anyhow::Result;
-use log::{debug, info, warn};
-use rocket::data::DataStream;
-use rocket::tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite};
+use std::convert::TryInto;
+use std::io::SeekFrom;
+
+use anyhow::{anyhow, Result};
+use axum::extract::BodyStream;
+use chrono::TimeZone;
+use futures::StreamExt;
+use k8s_openapi::api::core::v1::Pod;
+use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use thiserror::Error;
+use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tonic::{Code, Request};
+use tracing::{event, Level};
+use trow_proto::admission_controller_client::AdmissionControllerClient;
+use trow_proto::registry_client::RegistryClient;
 use trow_proto::{
-    admission_controller_client::AdmissionControllerClient, registry_client::RegistryClient,
     BlobRef, CatalogRequest, CompleteRequest, HealthRequest, ListTagsRequest,
     ManifestHistoryRequest, ManifestRef, MetricsRequest, ReadinessRequest, UploadRef,
     UploadRequest, VerifyManifestRequest,
 };
 
-use crate::registry_interface::{BlobStorage, ManifestStorage, StorageDriverError};
+use crate::registry_interface::blob_storage::Stored;
+use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
+use crate::registry_interface::{
+    AdmissionValidation, BlobReader, BlobStorage, CatalogOperations, ContentInfo, ManifestHistory,
+    ManifestReader, ManifestStorage, Metrics, MetricsError, MetricsResponse, StorageDriverError,
+};
 use crate::types::{self, *};
-use chrono::TimeZone;
-use serde_json::Value;
-use std::convert::TryInto;
-use std::io::SeekFrom;
 
-// BIG TODO:
-// Creating a new runtime for each request is awful.
-// Best fix is to move to Rocket 0.5 or another framework
+#[derive(Debug)]
 pub struct ClientInterface {
     server: String,
 }
 
-/**
- * This is really bad way to do things on several levels, but it works for the moment.
- *
- * The major problem is Rust doesn't have TCO so we could be DOS'd by a malicious request.
- */
-fn extract_images<'a>(blob: &Value, images: &'a mut Vec<String>) -> &'a Vec<String> {
-    match blob {
-        Value::Array(vals) => {
-            for v in vals {
-                extract_images(v, images);
-            }
+fn extract_images(pod: &Pod) -> (Vec<String>, Vec<String>) {
+    let mut images = vec![];
+    let mut paths = vec![];
+
+    let spec = pod.spec.clone().unwrap_or_default();
+    for (i, container) in spec.containers.iter().enumerate() {
+        if let Some(image) = &container.image {
+            images.push(image.clone());
+            paths.push(format!("/spec/containers/{i}/image"));
         }
-        Value::Object(m) => {
-            for (k, v) in m {
-                if k == "image" {
-                    if let Value::String(image) = v {
-                        images.push(image.to_owned())
-                    }
-                } else {
-                    extract_images(v, images);
-                }
-            }
-        }
-        _ => (),
     }
-    images
+
+    for (i, container) in spec.init_containers.unwrap_or_default().iter().enumerate() {
+        if let Some(image) = &container.image {
+            images.push(image.clone());
+            paths.push(format!("/spec/initContainers/{i}/image"));
+        }
+    }
+
+    (images, paths)
 }
 
 // TODO: Each function should have it's own enum of the errors it can return
@@ -71,13 +66,11 @@ pub enum RegistryError {
     InvalidName,
     #[error("Invalid manifest")]
     InvalidManifest,
-    #[error("Invalid Range")]
-    ManifestClipped,
-    #[error("Manifest over data limit")]
+    #[error("Internal registry error")]
     Internal,
 }
 
-#[rocket::async_trait]
+#[axum::async_trait]
 impl ManifestStorage for ClientInterface {
     async fn get_manifest(
         &self,
@@ -86,7 +79,7 @@ impl ManifestStorage for ClientInterface {
     ) -> Result<ManifestReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let mr = self.get_reader_for_manifest(&rn, tag).await.map_err(|e| {
-            warn!("Error getting manifest {:?}", e);
+            event!(Level::WARN, "Error getting manifest: {}", e);
             StorageDriverError::Internal
         })?;
 
@@ -97,7 +90,7 @@ impl ManifestStorage for ClientInterface {
         &self,
         name: &str,
         tag: &str,
-        data: DataStream<'a>,
+        data: BodyStream,
     ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
@@ -107,7 +100,6 @@ impl ManifestStorage for ClientInterface {
                 Err(StorageDriverError::InvalidName(format!("{}:{}", name, tag)))
             }
             Err(RegistryError::InvalidManifest) => Err(StorageDriverError::InvalidManifest),
-            Err(RegistryError::ManifestClipped) => Err(StorageDriverError::InvalidContentRange),
             Err(_) => Err(StorageDriverError::Internal),
         }
     }
@@ -134,7 +126,7 @@ impl ManifestStorage for ClientInterface {
     }
 }
 
-#[rocket::async_trait]
+#[axum::async_trait]
 impl BlobStorage for ClientInterface {
     async fn get_blob(
         &self,
@@ -143,7 +135,7 @@ impl BlobStorage for ClientInterface {
     ) -> Result<BlobReader, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let br = self.get_reader_for_blob(&rn, digest).await.map_err(|e| {
-            warn!("Error getting manifest {:?}", e);
+            event!(Level::WARN, "Error getting blob: {}", e);
             StorageDriverError::Internal
         })?;
 
@@ -155,7 +147,7 @@ impl BlobStorage for ClientInterface {
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: DataStream<'a>,
+        mut data: BodyStream,
     ) -> Result<Stored, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let uuid = Uuid(session_id.to_string());
@@ -163,7 +155,7 @@ impl BlobStorage for ClientInterface {
             .get_write_sink_for_upload(&rn, &uuid)
             .await
             .map_err(|e| {
-                warn!("Error finding write sink for blob {:?}", e);
+                event!(Level::WARN, "Error finding write sink for blob {:?}", e);
                 StorageDriverError::InvalidName(format!("{} {}", name, session_id))
             })?;
 
@@ -175,38 +167,53 @@ impl BlobStorage for ClientInterface {
 
         let start_index = sink.seek(SeekFrom::End(0)).await.unwrap_or(0);
         if have_range && (start_index != info.range.0) {
-            warn!(
+            event!(
+                Level::WARN,
                 "Asked to store blob with invalid start index. Expected {} got {}",
-                start_index, info.range.0
+                start_index,
+                info.range.0
             );
             return Err(StorageDriverError::InvalidContentRange);
         }
 
-        let stream_res = data.stream_to(&mut sink).await.map_err(|e| {
-            warn!("Error writing blob {:?}", e);
-            StorageDriverError::Internal
-        })?;
+        let mut chunk_size = 0;
+        while let Some(v) = data.next().await {
+            match v {
+                Ok(v) => {
+                    chunk_size += v.len() as u64;
+                    if let Err(e) = sink.write_all(&v).await {
+                        event!(Level::ERROR, "Error writing out manifest {:?}", e);
+                        return Err(StorageDriverError::Internal);
+                    }
+                }
+                Err(e) => {
+                    event!(Level::ERROR, "Error reading manifest {e}",);
+                    return Err(StorageDriverError::Internal);
+                }
+            }
+        }
 
-        let chunk_len = stream_res.written;
-        let complete = stream_res.complete;
-
-        let total = sink.seek(SeekFrom::End(0)).await.unwrap_or(chunk_len);
+        let total = sink.seek(SeekFrom::End(0)).await.unwrap();
         if have_range {
             if (info.range.1 + 1) != total {
-                warn!("total {} r + 1 {}", total, info.range.1 + 1);
+                event!(Level::WARN, "total {} r + 1 {}", total, info.range.1 + 1);
                 return Err(StorageDriverError::InvalidContentRange);
             }
             //Check length if chunked upload
-            if info.length != chunk_len {
-                warn!("info.length {} len {}", info.length, chunk_len);
+            if info.length != chunk_size {
+                event!(
+                    Level::WARN,
+                    "info.length {} len {}",
+                    info.length,
+                    chunk_size
+                );
                 return Err(StorageDriverError::InvalidContentRange);
             }
         }
 
         Ok(Stored {
             total_stored: total,
-            chunk: chunk_len,
-            complete,
+            chunk: chunk_size,
         })
     }
 
@@ -224,7 +231,7 @@ impl BlobStorage for ClientInterface {
                     _ => StorageDriverError::Internal,
                 },
                 Err(e) => {
-                    warn!("Error finalising upload {:?}", e);
+                    event!(Level::WARN, "Error finalising upload {:?}", e);
                     StorageDriverError::Internal
                 }
             })?;
@@ -241,7 +248,12 @@ impl BlobStorage for ClientInterface {
     }
 
     async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
-        info!("Attempting to delete blob {} in {}", digest, name);
+        event!(
+            Level::INFO,
+            "Attempting to delete blob {} in {}",
+            digest,
+            name
+        );
         let rn = RepoName(name.to_string());
 
         self.delete_blob_local(&rn, digest)
@@ -271,7 +283,7 @@ impl BlobStorage for ClientInterface {
     }
 }
 
-#[rocket::async_trait]
+#[axum::async_trait]
 impl CatalogOperations for ClientInterface {
     async fn get_catalog(
         &self,
@@ -318,20 +330,34 @@ impl CatalogOperations for ClientInterface {
     }
 }
 
-#[rocket::async_trait]
-impl Validation for ClientInterface {
+#[axum::async_trait]
+impl AdmissionValidation for ClientInterface {
     async fn validate_admission(
         &self,
-        admission_req: &validation::AdmissionRequest,
-        host_names: &[String],
-    ) -> Result<validation::AdmissionResponse, ValidationError> {
-        self.validate_admission_internal(admission_req, host_names)
+        admission_req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> AdmissionResponse {
+        self.validate_admission_internal(admission_req, host_name)
             .await
-            .map_err(|_| ValidationError::Internal)
+            .unwrap_or_else(|e| {
+                AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
+            })
+    }
+
+    async fn mutate_admission(
+        &self,
+        admission_req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> AdmissionResponse {
+        self.mutate_admission_internal(admission_req, host_name)
+            .await
+            .unwrap_or_else(|e| {
+                AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
+            })
     }
 }
 
-#[rocket::async_trait]
+#[axum::async_trait]
 impl Metrics for ClientInterface {
     async fn is_healthy(&self) -> bool {
         self.is_healthy().await.is_healthy
@@ -356,23 +382,23 @@ impl ClientInterface {
     async fn connect_registry(
         &self,
     ) -> Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
-        debug!("Connecting to {}", self.server);
+        event!(Level::DEBUG, "Connecting to {}", self.server);
         let x = RegistryClient::connect(self.server.to_string()).await;
-        debug!("Connected to {}", self.server);
+        event!(Level::DEBUG, "Connected to {}", self.server);
         x
     }
 
     async fn connect_admission_controller(
         &self,
     ) -> Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
-        debug!("Connecting to {}", self.server);
+        event!(Level::DEBUG, "Connecting to {}", self.server);
         let x = AdmissionControllerClient::connect(self.server.to_string()).await;
-        debug!("Connected to {}", self.server);
+        event!(Level::DEBUG, "Connected to {}", self.server);
         x
     }
 
     async fn request_upload(&self, repo_name: &str) -> Result<String> {
-        info!("Request Upload called for {}", repo_name);
+        event!(Level::INFO, "Request Upload called for {}", repo_name);
         let req = UploadRequest {
             repo_name: repo_name.to_string(),
         };
@@ -388,9 +414,12 @@ impl ClientInterface {
     }
 
     async fn complete_upload(&self, repo_name: &str, uuid: &str, digest: &Digest) -> Result<()> {
-        info!(
+        event!(
+            Level::INFO,
             "Complete Upload called for repository {} with upload id {} digest {}",
-            repo_name, uuid, digest
+            repo_name,
+            uuid,
+            digest
         );
 
         let req = CompleteRequest {
@@ -412,9 +441,11 @@ impl ClientInterface {
         repo_name: &RepoName,
         uuid: &Uuid,
     ) -> Result<impl AsyncWrite + AsyncSeek> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting write location for blob in repo {} with upload id {}",
-            repo_name, uuid
+            repo_name,
+            uuid
         );
         let br = UploadRef {
             uuid: uuid.0.clone(),
@@ -429,7 +460,7 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = rocket::tokio::fs::OpenOptions::new()
+        let file = tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(resp.path)
@@ -441,7 +472,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-        manifest: DataStream<'_>,
+        mut manifest: BodyStream,
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)
@@ -458,18 +489,20 @@ impl ClientInterface {
                 }
             })?;
 
-        let stream_res = manifest.stream_to(&mut sink_loc).await.map_err(|e| {
-            warn!("Error writing out manifest {:?}", e);
-            RegistryError::Internal
-        })?;
-
-        //It's not going to verify if it's clipped
-        if !stream_res.complete {
-            warn!(
-                "Manifest {}:{} clipped by transfer limits",
-                repo_name, reference
-            );
-            return Err(RegistryError::ManifestClipped);
+        while let Some(v) = manifest.next().await {
+            match v {
+                Err(e) => {
+                    event!(Level::ERROR, "Could not read manifest: {e}");
+                    return Err(RegistryError::Internal);
+                }
+                Ok(bytes) => match sink_loc.write_all(&bytes).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        event!(Level::ERROR, "Could not write manifest: {e}");
+                        return Err(RegistryError::Internal);
+                    }
+                },
+            }
         }
 
         self.verify_manifest(repo_name, reference, &uuid)
@@ -492,9 +525,11 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<(impl AsyncWrite, String)> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting write location for manifest in repo {} with ref {}",
-            repo_name, reference
+            repo_name,
+            reference
         );
         let mr = ManifestRef {
             reference: reference.to_owned(),
@@ -510,7 +545,7 @@ impl ClientInterface {
 
         //For the moment we know it's a file location
         //Manifests don't append; just overwrite
-        let file = rocket::tokio::fs::OpenOptions::new()
+        let file = tokio::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .open(resp.path)
@@ -523,9 +558,11 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
     ) -> Result<ManifestReader> {
-        info!(
+        event!(
+            Level::DEBUG,
             "Getting read location for {} with ref {}",
-            repo_name, reference
+            repo_name,
+            reference
         );
         let mr = ManifestRef {
             reference: reference.to_owned(),
@@ -539,13 +576,9 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = rocket::tokio::fs::File::open(resp.path).await?;
+        let file = tokio::fs::File::open(resp.path).await?;
         let digest = digest::parse(&resp.digest)?;
-        let mr = ManifestReader {
-            reader: Box::pin(file),
-            content_type: resp.content_type,
-            digest,
-        };
+        let mr = ManifestReader::new(resp.content_type, digest, file).await?;
         Ok(mr)
     }
 
@@ -556,9 +589,13 @@ impl ClientInterface {
         limit: u32,
         last_digest: &str,
     ) -> Result<ManifestHistory> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting manifest history for repo {} ref {} limit {} last_digest {}",
-            repo_name, reference, limit, last_digest
+            repo_name,
+            reference,
+            limit,
+            last_digest
         );
         let mr = ManifestHistoryRequest {
             tag: reference.to_owned(),
@@ -581,7 +618,10 @@ impl ClientInterface {
                     .earliest()
                     .unwrap()
             } else {
-                warn!("Manifest digest stored without timestamp. Using Epoch.");
+                event!(
+                    Level::WARN,
+                    "Manifest digest stored without timestamp. Using Epoch."
+                );
                 chrono::Utc.timestamp_opt(0, 0).earliest().unwrap()
             };
             history.insert(entry.digest, ts);
@@ -595,7 +635,12 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobReader> {
-        info!("Getting read location for blob {} in {}", digest, repo_name);
+        event!(
+            Level::DEBUG,
+            "Getting read location for blob {} in {}",
+            digest,
+            repo_name
+        );
         let br = BlobRef {
             digest: digest.to_string(),
             repo_name: repo_name.0.clone(),
@@ -609,11 +654,8 @@ impl ClientInterface {
             .into_inner();
 
         //For the moment we know it's a file location
-        let file = rocket::tokio::fs::File::open(resp.path).await?;
-        let reader = BlobReader {
-            reader: Box::pin(file),
-            digest: digest.clone(),
-        };
+        let file = tokio::fs::File::open(resp.path).await?;
+        let reader = BlobReader::new(digest.clone(), file).await;
         Ok(reader)
     }
 
@@ -622,7 +664,12 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<BlobDeleted> {
-        info!("Attempting to delete blob {} in {}", digest, repo_name);
+        event!(
+            Level::INFO,
+            "Attempting to delete blob {} in {}",
+            digest,
+            repo_name
+        );
         let br = BlobRef {
             digest: digest.to_string(),
             repo_name: repo_name.0.clone(),
@@ -642,9 +689,12 @@ impl ClientInterface {
         reference: &str,
         uuid: &str,
     ) -> Result<types::VerifiedManifest> {
-        info!(
+        event!(
+            Level::INFO,
             "Verifying manifest {} in {} uuid {}",
-            reference, repo_name, uuid
+            reference,
+            repo_name,
+            uuid
         );
         let vmr = VerifyManifestRequest {
             manifest: Some(ManifestRef {
@@ -662,7 +712,7 @@ impl ClientInterface {
             .into_inner();
 
         let digest = digest::parse(&resp.digest)?;
-        let vm = create_verified_manifest(repo_name.clone(), digest, reference.to_string());
+        let vm = VerifiedManifest::new(None, repo_name.clone(), digest, reference.to_string());
         Ok(vm)
     }
 
@@ -671,7 +721,12 @@ impl ClientInterface {
         repo_name: &RepoName,
         digest: &Digest,
     ) -> Result<ManifestDeleted> {
-        info!("Attempting to delete manifest {} in {}", digest, repo_name);
+        event!(
+            Level::INFO,
+            "Attempting to delete manifest {} in {}",
+            digest,
+            repo_name
+        );
         let mr = ManifestRef {
             reference: digest.to_string(),
             repo_name: repo_name.0.clone(),
@@ -686,9 +741,11 @@ impl ClientInterface {
     }
 
     async fn get_catalog_part(&self, limit: u32, last_repo: &str) -> Result<RepoCatalog> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting image catalog limit {} last_repo {}",
-            limit, last_repo
+            limit,
+            last_repo
         );
 
         let cr = CatalogRequest {
@@ -711,9 +768,12 @@ impl ClientInterface {
     }
 
     async fn list_tags(&self, repo_name: &str, limit: u32, last_tag: &str) -> Result<TagList> {
-        info!(
+        event!(
+            Level::INFO,
             "Getting tag list for {} limit {} last_tag {}",
-            repo_name, limit, last_tag
+            repo_name,
+            limit,
+            last_tag
         );
         let ltr = ListTagsRequest {
             repo_name: repo_name.to_string(),
@@ -741,51 +801,91 @@ impl ClientInterface {
      */
     async fn validate_admission_internal(
         &self,
-        req: &validation::AdmissionRequest,
-        host_names: &[String],
-    ) -> Result<validation::AdmissionResponse> {
-        info!(
-            "Validating admission request {} host_names {:?}",
-            req.uid, host_names
+        req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> Result<AdmissionResponse> {
+        event!(
+            Level::INFO,
+            "Validating admission request {} host_name {:?}",
+            req.uid,
+            host_name
         );
-        //TODO: write something to convert automatically (into()) between AdmissionRequest types
         // TODO: we should really be sending the full object to the backend.
-        let mut images = Vec::new();
-        extract_images(&req.object, &mut images);
+        let obj = req
+            .object
+            .as_ref()
+            .ok_or_else(|| anyhow!("No pod in pod admission request"))?;
+        let (images, _) = extract_images(obj);
         let ar = trow_proto::AdmissionRequest {
+            host_name: host_name.to_string(),
+            image_paths: vec![], // unused in validation
             images,
-            namespace: req.namespace.clone(),
-            operation: req.operation.clone(),
-            host_names: host_names.to_vec(),
+            namespace: req
+                .namespace
+                .clone()
+                .ok_or_else(|| anyhow!("Object has no namespace"))?,
         };
 
-        let resp = self
+        let internal_resp = self
             .connect_admission_controller()
             .await?
             .validate_admission(Request::new(ar))
             .await?
             .into_inner();
 
-        //TODO: again, this should be an automatic conversion
-        let st = if resp.is_allowed {
-            validation::Status {
-                status: "Success".to_owned(),
-                message: None,
-                code: None,
-            }
-        } else {
-            //Not sure "Failure" is correct
-            validation::Status {
-                status: "Failure".to_owned(),
-                message: Some(resp.reason.to_string()),
-                code: None,
-            }
+        let mut resp = AdmissionResponse::from(req);
+        if !internal_resp.is_allowed {
+            resp = resp.deny(internal_resp.reason);
+        }
+
+        Ok(resp)
+    }
+
+    async fn mutate_admission_internal(
+        &self,
+        req: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> Result<AdmissionResponse> {
+        event!(
+            Level::INFO,
+            "Mutating admission request {} host_name {:?}",
+            req.uid,
+            host_name
+        );
+        // TODO: we should really be sending the full object to the backend.
+        let obj = req
+            .object
+            .as_ref()
+            .ok_or_else(|| anyhow!("No pod in pod admission request"))?;
+        let (images, image_paths) = extract_images(obj);
+        let ar = trow_proto::AdmissionRequest {
+            host_name: host_name.to_string(),
+            image_paths,
+            images,
+            namespace: req
+                .namespace
+                .clone()
+                .ok_or_else(|| anyhow!("Object has no namespace"))?,
         };
-        Ok(validation::AdmissionResponse {
-            uid: req.uid.clone(),
-            allowed: resp.is_allowed,
-            status: Some(st),
-        })
+
+        let internal_resp = self
+            .connect_admission_controller()
+            .await?
+            .mutate_admission(Request::new(ar))
+            .await?
+            .into_inner();
+
+        let mut resp = AdmissionResponse::from(req);
+        if let Some(raw_patch) = internal_resp.patch {
+            let patch: json_patch::Patch = serde_json::from_slice(raw_patch.as_slice())?;
+            resp = resp.with_patch(patch)?;
+        }
+
+        if !internal_resp.is_allowed {
+            resp = resp.deny("Failure");
+        }
+
+        Ok(resp)
     }
 
     /**
@@ -794,7 +894,7 @@ impl ClientInterface {
     Note that the server will indicate unhealthy by returning an error.
     */
     async fn is_healthy(&self) -> types::HealthResponse {
-        debug!("Calling health check");
+        event!(Level::DEBUG, "Calling health check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
             Err(_) => {
@@ -829,7 +929,7 @@ impl ClientInterface {
      Note that the server will indicate not ready by returning an error.
     */
     async fn is_ready(&self) -> types::ReadinessResponse {
-        debug!("Calling readiness check");
+        event!(Level::DEBUG, "Calling readiness check");
         let mut client = match self.connect_registry().await {
             Ok(cl) => cl,
             Err(_) => {
@@ -863,7 +963,7 @@ impl ClientInterface {
      Returns disk and total request metrics(blobs, manifests).
     */
     async fn get_metrics(&self) -> Result<MetricsResponse> {
-        debug!("Getting metrics");
+        event!(Level::DEBUG, "Getting metrics");
         let req = Request::new(MetricsRequest {});
         let resp = self
             .connect_registry()

@@ -1,8 +1,9 @@
+use std::path::{Path, PathBuf};
+
 use anyhow::Result;
 use bytes::Bytes;
 use futures::stream::Stream;
 use futures::StreamExt;
-use std::path::{Path, PathBuf};
 use tokio::fs::{self, File};
 use tokio::io::{self, AsyncWriteExt};
 
@@ -66,10 +67,9 @@ impl Drop for TemporaryFile {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use futures::future::try_join_all;
     use tempfile::tempdir;
-    use tokio::time::{sleep, Duration};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_temporary_file() {
@@ -107,7 +107,7 @@ mod test {
                 file.write_all(b"hello").await.unwrap();
                 // Sleep to ensure that the future stay active long enough to be cancelled
                 sleep(Duration::from_millis(500)).await;
-                // Ensure `file` isn't droped before the sleep
+                // Ensure `file` isn't dropped before the sleep
                 drop(file);
                 unreachable!();
             }

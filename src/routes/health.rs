@@ -1,19 +1,19 @@
-use crate::client_interface::ClientInterface;
+use std::sync::Arc;
+
+use axum::extract::State;
+
 use crate::registry_interface::metrics::Metrics;
 use crate::types::HealthResponse;
-
-use rocket::get;
-use rocket::State;
+use crate::TrowServerState;
 
 /*
 * Trow health endpoint
 * GET /healthz
 */
 
-#[get("/healthz")]
-pub async fn healthz(ci: &State<ClientInterface>) -> HealthResponse {
+pub async fn healthz(State(state): State<Arc<TrowServerState>>) -> HealthResponse {
     HealthResponse {
         message: "".to_string(),
-        is_healthy: ci.is_healthy().await,
+        is_healthy: state.client.is_healthy().await,
     }
 }

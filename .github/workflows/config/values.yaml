@@ -1,0 +1,13 @@
+image:
+  repository: ghcr.io/trow-registry/trow-dev
+  tag: "%TROW_IMAGE_TAG%"
+trow:
+  domain: "127.0.0.1"
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+  hosts:
+    - paths: ['/']
+      host: "none"

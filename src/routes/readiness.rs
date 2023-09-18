@@ -1,18 +1,18 @@
-use crate::client_interface::ClientInterface;
+use std::sync::Arc;
+
+use axum::extract::State;
+
 use crate::registry_interface::Metrics;
 use crate::types::ReadinessResponse;
-use rocket::get;
-use rocket::State;
+use crate::TrowServerState;
 
 /*
 * Trow readiness endpoint
 * GET /readiness
 */
-
-#[get("/readiness")]
-pub async fn readiness(ci: &State<ClientInterface>) -> ReadinessResponse {
+pub async fn readiness(State(state): State<Arc<TrowServerState>>) -> ReadinessResponse {
     ReadinessResponse {
         message: "".to_string(),
-        is_ready: ci.is_ready().await,
+        is_ready: state.client.is_ready().await,
     }
 }
