@@ -44,13 +44,7 @@ docker buildx build \
   -t $GH_REPO:latest \
   -f Dockerfile ../
 
-# Sign the images
-# Assumes runner has installed cosign
 if [[ "$CI" = true ]]
 then
-    # sign once for each registry, will sign corresponding hash
-    # (assumes keyless signing is enabled)
-    cosign sign --yes --recursive $GH_IMAGE
-
     echo "container-image=$GH_IMAGE" >> $GITHUB_OUTPUT
 fi

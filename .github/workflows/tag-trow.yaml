@@ -26,7 +26,6 @@ jobs:
         uses: docker/setup-buildx-action@v2
         with:
           platforms: linux/amd64,linux/arm64
-      - uses: sigstore/cosign-installer@main
       - name: Check tag and Cargo.toml version match
         run: |
           FROM_CARGO="v$(sed '/^version = */!d; s///;q' Cargo.toml | sed s/\"//g)"
@@ -38,5 +37,3 @@ jobs:
       - name: Build and push multi-arch image
         id: build-images
         run: ./docker/multi-arch.sh
-        env:
-          COSIGN_EXPERIMENTAL: 1
