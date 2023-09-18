@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/extrality/trow
+  repository: ghcr.io/trow-registry/trow
   tag:
   pullPolicy: IfNotPresent
 

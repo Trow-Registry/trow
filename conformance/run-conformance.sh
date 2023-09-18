@@ -12,7 +12,7 @@ prod_name=example
 trow_version=v0.2.0
 
 # check out trow repo
-rm -rf trow-tmp && git clone --branch "$trow_version" git://github.com/extrality/trow.git trow-tmp
+rm -rf trow-tmp && git clone --branch "$trow_version" git://github.com/trow-registry/trow.git trow-tmp
 (cd trow-tmp/docker && ./build.sh) # Builds containersol/trow:default image
 rm -rf trow-tmp
 # start trow

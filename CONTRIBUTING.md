@@ -14,7 +14,7 @@ unacceptable behaviour to any of the project admins or adrian.mouat@container-so
 
 ## Bugs
 
-If you find a bug, please [open an issue](https://github.com/Extrality/trow/issues)! Do try
+If you find a bug, please [open an issue](https://github.com/trow-registry/trow/issues)! Do try
 to include all the details needed to recreate your problem. This is likely to include:
 
  - The version of Trow being used
@@ -25,7 +25,7 @@ to include all the details needed to recreate your problem. This is likely to in
 ## Building Features and Documentation
 
 If you're looking for something to work on, take look at the issue tracker, in particular any items
-labelled [good first issue](https://github.com/Extrality/trow/labels/good%20first%20issue).
+labelled [good first issue](https://github.com/trow-registry/trow/labels/good%20first%20issue).
 Please leave a comment on the issue to mention that you have started work, in order to avoid
 multiple people working on the same issue.
 
@@ -55,9 +55,11 @@ at this; it is expected that all PRs will need tweaks and a normal part of the p
 
 Be aware that all Trow code is released under the [Apache 2.0 licence](LICENSE).
 
-### Thanks
+## Thanks
 
-These guidelines were best on several sources, including
-[Atom](https://github.com/atom/atom/blob/main/CONTRIBUTING.md), [PurpleBooth's
+Thanks to [Container Solutions](https://www.container-solutions.com/) for creating the project and to [Extrality](https://www.extrality.ai/) for further developping the poject.
+
+Contribution guidelines take inspiration from
+[Atom](https://github.com/atom/atom/blob/master/CONTRIBUTING.md), [PurpleBooth's
 advice](https://gist.github.com/PurpleBooth/b24679402957c63ec426) and the [Contributor
 Covenant](https://www.contributor-covenant.org/).

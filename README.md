@@ -1,4 +1,4 @@
-[![Tests](https://github.com/Extrality/trow/actions/workflows/pr-tests.yaml/badge.svg)](https://github.com/Extrality/trow/actions/workflows/pr-tests.yaml)
+[![Tests](https://github.com/trow-registry/trow/actions/workflows/pr-tests.yaml/badge.svg)](https://github.com/trow-registry/trow/actions/workflows/pr-tests.yaml)
 
 # Trow
 Image Management for Kubernetes.

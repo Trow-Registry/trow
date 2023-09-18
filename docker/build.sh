@@ -5,7 +5,7 @@ set -eo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-REPO="ghcr.io/extrality/trow-dev"
+REPO="ghcr.io/trow-registry/trow-dev"
 VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 
 TAG="$VERSION"
