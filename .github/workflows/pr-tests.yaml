@@ -86,7 +86,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Run OCI Distribution Spec conformance tests
-        uses: opencontainers/distribution-spec@main
+        uses: opencontainers/distribution-spec@v1.1.0-rc3
         env:
           OCI_ROOT_URL: http://trow:8000
           OCI_NAMESPACE: oci-conformance/distribution-test
