@@ -6,7 +6,7 @@ information in the [standard install instructions](../docs/KUSTOMIZE_INSTALL.md)
 ## Add the Trow Helm Repo
 
 ```bash
-helm repo add trow https://trow.io
+helm repo add trow https://trow-registry.github.io/trow
 ```
 
 ## Install Trow with Helm
