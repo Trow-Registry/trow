@@ -99,6 +99,34 @@ pub async fn list_tags_5level(
     )
     .await
 }
+pub async fn list_tags_6level(
+    auth_user: TrowToken,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, six)): Path<(String, String, String, String, String, String)>,
+    query: Query<CatalogListQuery>,
+) -> Result<TagList, Error> {
+    list_tags(
+        auth_user,
+        state,
+        Path(format!("{one}/{two}/{three}/{four}/{five}/{six}")),
+        query,
+    )
+    .await
+}
+pub async fn list_tags_7level(
+    auth_user: TrowToken,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, six, seven)): Path<(String, String, String, String, String, String, String)>,
+    query: Query<CatalogListQuery>,
+) -> Result<TagList, Error> {
+    list_tags(
+        auth_user,
+        state,
+        Path(format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}")),
+        query,
+    )
+    .await
+}
 
 pub async fn get_manifest_history(
     _auth_user: TrowToken,
@@ -175,6 +203,51 @@ pub async fn get_manifest_history_5level(
         auth_user,
         state,
         Path((format!("{one}/{two}/{three}/{four}/{five}"), reference)),
+        query,
+    )
+    .await
+}
+pub async fn get_manifest_history_6level(
+    auth_user: TrowToken,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, six, reference)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    query: Query<CatalogListQuery>,
+) -> Result<ManifestHistory, Error> {
+    get_manifest_history(
+        auth_user,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), reference)),
+        query,
+    )
+    .await
+}
+pub async fn get_manifest_history_7level(
+    auth_user: TrowToken,
+    state: State<Arc<TrowServerState>>,
+    Path((one, two, three, four, five, six, seven, reference)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    query: Query<CatalogListQuery>,
+) -> Result<ManifestHistory, Error> {
+    get_manifest_history(
+        auth_user,
+        state,
+        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), reference)),
         query,
     )
     .await
