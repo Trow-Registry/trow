@@ -317,7 +317,7 @@ pub async fn put_blob_7level(
     headers: HeaderMap,
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, uuid)): Path<(
+    Path((one, two, three, four, five, six, seven, uuid)): Path<(
         String,
         String,
         String,
@@ -505,7 +505,7 @@ pub async fn patch_blob_7level(
     auth_user: TrowToken,
     info: Option<ContentInfo>,
     state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, uuid)): Path<(
+    Path((one, two, three, four, five, six, seven, uuid)): Path<(
         String,
         String,
         String,
@@ -679,7 +679,7 @@ pub async fn post_blob_upload_7level(
     state: State<Arc<TrowServerState>>,
     headers: HeaderMap,
     digest: Query<DigestQuery>,
-    Path((one, two, three, four, five)): Path<(String, String, String, String, String, String)>,
+    Path((one, two, three, four, five, six, seven)): Path<(String, String, String, String, String, String, String)>,
     data: BodyStream,
 ) -> Result<Upload, Error> {
     post_blob_upload(

@@ -384,6 +384,8 @@ pub async fn delete_image_manifest_7level(
         String,
         String,
         String,
+        String,
+        String,
     )>,
 ) -> Result<ManifestDeleted, Error> {
     delete_image_manifest(
