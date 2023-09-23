@@ -31,8 +31,8 @@ COPY src src
 
 # Get rid of the "cp" when cargo build --out is stable
 RUN --mount=type=cache,target=./target \
-    cargo build --release --target $(cat /.platform) && \
-    cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
+    cargo build --release --target x86_64-unknown-linux-gnu && \
+    cp /usr/src/trow/target/x86_64-unknown-linux-gnu/release/trow /usr/src/trow/
 
 FROM debian:bookworm-slim
 RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow

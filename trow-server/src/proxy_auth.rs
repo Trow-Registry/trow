@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
+use base64::{Engine as _, engine::general_purpose};
 use lazy_static::lazy_static;
 use quoted_string::strip_dquotes;
 use regex::Regex;
@@ -165,7 +166,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
         .unwrap();
     // The token is base64(username:password). Here, username is "AWS".
     // To get the password, we trim "AWS:" from the decoded token.
-    let mut auth_str = base64::decode(token)?;
+    let mut auth_str = general_purpose::STANDARD_NO_PAD.decode(token)?;
     auth_str.drain(0..4);
 
     String::from_utf8(auth_str).context("Could not convert ECR token to valid password")
