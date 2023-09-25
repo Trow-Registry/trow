@@ -107,7 +107,10 @@ pub async fn get_manifest_6level(
     get_manifest(
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), reference)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}"),
+            reference,
+        )),
     )
     .await
 }
@@ -128,7 +131,10 @@ pub async fn get_manifest_7level(
     get_manifest(
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), reference)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            reference,
+        )),
     )
     .await
 }
@@ -256,7 +262,10 @@ pub async fn put_image_manifest_6level(
         headers,
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), reference)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}"),
+            reference,
+        )),
         chunk,
     )
     .await
@@ -281,7 +290,10 @@ pub async fn put_image_manifest_7level(
         headers,
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), reference)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            reference,
+        )),
         chunk,
     )
     .await
@@ -391,7 +403,10 @@ pub async fn delete_image_manifest_7level(
     delete_image_manifest(
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), digest)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            digest,
+        )),
     )
     .await
 }

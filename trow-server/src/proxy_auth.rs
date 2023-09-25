@@ -3,7 +3,8 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
-use base64::{Engine as _, engine::general_purpose};
+use base64::engine::general_purpose;
+use base64::Engine as _;
 use lazy_static::lazy_static;
 use quoted_string::strip_dquotes;
 use regex::Regex;

@@ -102,7 +102,14 @@ pub async fn list_tags_5level(
 pub async fn list_tags_6level(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six)): Path<(String, String, String, String, String, String)>,
+    Path((one, two, three, four, five, six)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
     query: Query<CatalogListQuery>,
 ) -> Result<TagList, Error> {
     list_tags(
@@ -116,7 +123,15 @@ pub async fn list_tags_6level(
 pub async fn list_tags_7level(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven)): Path<(String, String, String, String, String, String, String)>,
+    Path((one, two, three, four, five, six, seven)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
     query: Query<CatalogListQuery>,
 ) -> Result<TagList, Error> {
     list_tags(
@@ -224,7 +239,10 @@ pub async fn get_manifest_history_6level(
     get_manifest_history(
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), reference)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}"),
+            reference,
+        )),
         query,
     )
     .await
@@ -247,7 +265,10 @@ pub async fn get_manifest_history_7level(
     get_manifest_history(
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), reference)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            reference,
+        )),
         query,
     )
     .await

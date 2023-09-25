@@ -137,11 +137,13 @@ pub async fn get_blob_7level(
     get_blob(
         auth_user,
         State(state),
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), digest)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            digest,
+        )),
     )
     .await
 }
-
 
 /*
 ---
@@ -334,7 +336,10 @@ pub async fn put_blob_7level(
         headers,
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), uuid)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            uuid,
+        )),
         digest,
         chunk,
     )
@@ -522,7 +527,10 @@ pub async fn patch_blob_7level(
         auth_user,
         info,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), uuid)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            uuid,
+        )),
         chunk,
     )
     .await
@@ -661,7 +669,14 @@ pub async fn post_blob_upload_6level(
     state: State<Arc<TrowServerState>>,
     headers: HeaderMap,
     digest: Query<DigestQuery>,
-    Path((one, two, three, four, five, six)): Path<(String, String, String, String, String, String)>,
+    Path((one, two, three, four, five, six)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
     data: BodyStream,
 ) -> Result<Upload, Error> {
     post_blob_upload(
@@ -679,7 +694,15 @@ pub async fn post_blob_upload_7level(
     state: State<Arc<TrowServerState>>,
     headers: HeaderMap,
     digest: Query<DigestQuery>,
-    Path((one, two, three, four, five, six, seven)): Path<(String, String, String, String, String, String, String)>,
+    Path((one, two, three, four, five, six, seven)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
     data: BodyStream,
 ) -> Result<Upload, Error> {
     post_blob_upload(
@@ -800,8 +823,10 @@ pub async fn delete_blob_7level(
     delete_blob(
         auth_user,
         state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"), digest)),
+        Path((
+            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
+            digest,
+        )),
     )
     .await
 }
-
