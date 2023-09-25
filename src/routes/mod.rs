@@ -27,8 +27,8 @@ mod manifest;
 mod metrics;
 mod readiness;
 
-macro_rules! route_5_levels {
-    ($app:ident, $prefix:literal $route:literal, $($method:ident($handler1:expr, $handler2:expr, $handler3:expr, $handler4:expr, $handler5:expr)),*) => {
+macro_rules! route_7_levels {
+    ($app:ident, $prefix:literal $route:literal, $($method:ident($handler1:expr, $handler2:expr, $handler3:expr, $handler4:expr, $handler5:expr, $handler6:expr, $handler7:expr)),*) => {
         $app = $app
             .route(
                 concat!($prefix, "/:one", $route),
@@ -50,6 +50,14 @@ macro_rules! route_5_levels {
                 concat!($prefix, "/:one/:two/:three/:four/:five", $route),
                 $($method($handler5)).*,
             )
+            .route(
+                concat!($prefix, "/:one/:two/:three/:four/:five/:six", $route),
+                $($method($handler6)).*,
+            )
+            .route(
+                concat!($prefix, "/:one/:two/:three/:four/:five/:six/:seven", $route),
+                $($method($handler7)).*,
+            )
             ;
     };
 }
@@ -67,49 +75,49 @@ pub fn create_app(state: super::TrowServerState) -> Router {
 
     // blob
     #[rustfmt::skip]
-    route_5_levels!(
+    route_7_levels!(
         app,
         "/v2" "/blobs/:digest",
-        get(blob::get_blob, blob::get_blob_2level, blob::get_blob_3level, blob::get_blob_4level, blob::get_blob_5level),
-        delete(blob::delete_blob, blob::delete_blob_2level, blob::delete_blob_3level, blob::delete_blob_4level, blob::delete_blob_5level)
+        get(blob::get_blob, blob::get_blob_2level, blob::get_blob_3level, blob::get_blob_4level, blob::get_blob_5level, blob::get_blob_6level, blob::get_blob_7level),
+        delete(blob::delete_blob, blob::delete_blob_2level, blob::delete_blob_3level, blob::delete_blob_4level, blob::delete_blob_5level, blob::delete_blob_6level, blob::delete_blob_7level)
     );
     #[rustfmt::skip]
-    route_5_levels!(
+    route_7_levels!(
         app,
         "/v2" "/blobs/uploads/",
-        post(blob::post_blob_upload, blob::post_blob_upload_2level, blob::post_blob_upload_3level, blob::post_blob_upload_4level, blob::post_blob_upload_5level)
+        post(blob::post_blob_upload, blob::post_blob_upload_2level, blob::post_blob_upload_3level, blob::post_blob_upload_4level, blob::post_blob_upload_5level, blob::post_blob_upload_6level, blob::post_blob_upload_7level)
     );
     #[rustfmt::skip]
-    route_5_levels!(
+    route_7_levels!(
         app,
         "/v2" "/blobs/uploads/:uuid",
-        put(blob::put_blob, blob::put_blob_2level, blob::put_blob_3level, blob::put_blob_4level, blob::put_blob_5level),
-        patch(blob::patch_blob, blob::patch_blob_2level, blob::patch_blob_3level, blob::patch_blob_4level, blob::patch_blob_5level)
+        put(blob::put_blob, blob::put_blob_2level, blob::put_blob_3level, blob::put_blob_4level, blob::put_blob_5level, blob::put_blob_6level, blob::put_blob_7level),
+        patch(blob::patch_blob, blob::patch_blob_2level, blob::patch_blob_3level, blob::patch_blob_4level, blob::patch_blob_5level, blob::patch_blob_6level, blob::patch_blob_7level)
     );
 
     // catalog
     app = app.route("/v2/_catalog", get(catalog::get_catalog));
     #[rustfmt::skip]
-    route_5_levels!(
+    route_7_levels!(
         app,
         "/v2" "/tags/list",
-        get(catalog::list_tags, catalog::list_tags_2level, catalog::list_tags_3level, catalog::list_tags_4level, catalog::list_tags_5level)
+        get(catalog::list_tags, catalog::list_tags_2level, catalog::list_tags_3level, catalog::list_tags_4level, catalog::list_tags_5level, catalog::list_tags_6level, catalog::list_tags_7level)
     );
     #[rustfmt::skip]
-    route_5_levels!(
+    route_7_levels!(
         app,
         "" "/manifest_history/:reference",
-        get(catalog::get_manifest_history, catalog::get_manifest_history_2level, catalog::get_manifest_history_3level, catalog::get_manifest_history_4level, catalog::get_manifest_history_5level)
+        get(catalog::get_manifest_history, catalog::get_manifest_history_2level, catalog::get_manifest_history_3level, catalog::get_manifest_history_4level, catalog::get_manifest_history_5level, catalog::get_manifest_history_6level, catalog::get_manifest_history_7level)
     );
 
     // manifest
     #[rustfmt::skip]
-    route_5_levels!(
+    route_7_levels!(
         app,
         "/v2" "/manifests/:reference",
-        get(manifest::get_manifest, manifest::get_manifest_2level, manifest::get_manifest_3level, manifest::get_manifest_4level, manifest::get_manifest_5level),
-        put(manifest::put_image_manifest, manifest::put_image_manifest_2level, manifest::put_image_manifest_3level, manifest::put_image_manifest_4level, manifest::put_image_manifest_5level),
-        delete(manifest::delete_image_manifest, manifest::delete_image_manifest_2level, manifest::delete_image_manifest_3level, manifest::delete_image_manifest_4level, manifest::delete_image_manifest_5level)
+        get(manifest::get_manifest, manifest::get_manifest_2level, manifest::get_manifest_3level, manifest::get_manifest_4level, manifest::get_manifest_5level, manifest::get_manifest_6level, manifest::get_manifest_7level),
+        put(manifest::put_image_manifest, manifest::put_image_manifest_2level, manifest::put_image_manifest_3level, manifest::put_image_manifest_4level, manifest::put_image_manifest_5level, manifest::put_image_manifest_6level, manifest::put_image_manifest_7level),
+        delete(manifest::delete_image_manifest, manifest::delete_image_manifest_2level, manifest::delete_image_manifest_3level, manifest::delete_image_manifest_4level, manifest::delete_image_manifest_5level, manifest::delete_image_manifest_6level, manifest::delete_image_manifest_7level)
     );
 
     app = app.layer(

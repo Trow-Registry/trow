@@ -255,6 +255,7 @@ impl TrowBuilder {
 
 async fn shutdown_signal(handle: axum_server::Handle) {
     use std::time::Duration;
+
     use tokio::signal;
 
     let ctrl_c = async {
