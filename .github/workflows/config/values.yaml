@@ -1,6 +1,6 @@
 image:
-  repository: ghcr.io/trow-registry/trow-dev
-  tag: "%TROW_IMAGE_TAG%"
+  repository: trow
+  tag: onpr
 trow:
   domain: "127.0.0.1"
 ingress:
