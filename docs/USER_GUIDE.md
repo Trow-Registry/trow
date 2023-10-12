@@ -16,24 +16,15 @@
     - [Errors When Pushing or Pulling Large Images](#errors-when-pushing-or-pulling-large-images)
 
 More information is available in the [README](../README.md) and [Installation
-instructions](../docs/KUSTOMIZE_INSTALL.md).
+instructions](../docs/HELM_INSTALL.md).
 
 ## Persisting Data/Images
-
-If you are using the quick install, note that Trow will store images and metadata in a Kubernetes
-[emptyDir volume](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir). This means that
-the data will survive pod restarts, but will be lost if the Trow pod is deleted or evicted from the
-node it is running on. This can occur when a node fails or is brought down for maintenance.
-
-The standard install initialises a Kubernetes [Persistent
-Volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/), as a permanent store of
-data. This should be reattached in the case of node or pod failure, thus avoiding data loss.
 
 If your cluster does not support Persistent Volumes, or you would like to use a different driver
 (e.g. cephfs) you will need to manually assign a volume. This should be straightforward, but is
 cluster-specific. Make sure that the volume is writeable by the Trow user (user id 333333 by
 default). Normally this is taken care of by the `fsGroup` setting in the `securityContext` part of
-the deployment YAML, but this may not work for certain types of volume e.g. `hostPath` - in these
+the deployment, but this may not work for certain types of volume e.g. `hostPath` - in these
 cases you may need to perform an explicit `chown` or `chmod` using the UID of the Trow user.
 
 Backing up the Trow registry can be done by copying the data directory (`/data` by default).
@@ -45,28 +36,25 @@ Trow can be configured as a proxy cache for other registries by passing the argu
 from the matching registry. For example, if we start Trow with:
 
 ```yaml
-# cfg.yaml
-- alias: docker
-  host: registry-1.docker.io
-- alias: my-custom-registry
-  host: my_custom_registry.example.com
-  username: toto
-  password: pass1234
+# proxy.yaml
+registries:
+  - alias: docker
+    host: registry-1.docker.io
+  - alias: my-custom-registry
+    host: my_custom_registry.example.com
+    username: toto
+    password: pass1234
 ```
 
 ```
-$ trow --proxy-registry-config-file ./cfg.yaml
-Starting Trow 0.3.5 on 0.0.0.0:8000
-
-Maximum blob size: 8192 Mebibytes
-Maximum manifest size: 4 Mebibytes
-Hostname of this registry (for the MutatingWebhook): "0.0.0.0"
+$ trow --proxy-registry-config-file ./proxy.yaml
+Starting Trow 0.6.0 on 0.0.0.0:8000
+Hostname of this registry (for the MutatingWebhook): "0.0.0.0:8000"
 Image validation webhook not configured
 Proxy registries configured:
-  - docker: docker.io
+  - docker: registry-1.docker.io
   - quay: quay.io
   - nvcr: nvcr.io
-Trow is up and running!
 ```
 
 And then make the following request to the empty registry:
@@ -108,17 +96,13 @@ deny:
 
 ```console
 $ ./trow --image-validation-config-file ./validation.yaml
-Starting Trow 0.3.5 on 0.0.0.0:8000
-
-Maximum blob size: 8192 Mebibytes
-Maximum manifest size: 4 Mebibytes
+Starting Trow 0.6.0 on 0.0.0.0:8000
 Hostname of this registry (for the MutatingWebhook): "0.0.0.0"
 Image validation webhook configured:
   Default action: Deny
   Allowed prefixes: ["my-trow-domain.trow.io/", "k8s.gcr.io/"]
   Denied prefixes: ["my-trow-domain.trow.io/my-secret-image"]
 Proxy registries not configured
-Trow is up and running!
 ```
 
 ### Troubleshooting
@@ -234,46 +218,6 @@ $ kubectl logs -n trow trow-deploy-596bf849c8-m7b7l -c trow-init
 
 ### I can't push images into Trow
 
-If you get an error like:
-
-```
-$ docker push trow.kube-public:31000/nginx:alpine
-The push refers to repository [trow.kube-public:31000/nginx]
-Get https://trow.kube-public:31000/v2/: dial tcp 192.168.39.211:31000: connect: no route to host
-```
-
-Your client isn't reaching the Trow service. Please check the following:
-
- - Verify that Trow is running (e.g. `kubectl get deploy -n trow trow-deploy`).
-   If not, refer to the section on logs above to diagnose the issue.
- - Check that a service exists for Trow (e.g. `kubectl describe svc -n trow trow`).
- - Check that your network or cloud provider isn't blocking access.
-
-
-If you get an error like:
-
-```
-$ docker push trow.kube-public:31000/nginx:alpine
-The push refers to repository [trow.kube-public:31000/nginx]
-Get https://trow.kube-public:31000/v2/: x509: certificate signed by unknown authority
-```
-
-This indicates the Docker client doesn't trust the remote server. To fix this,
-we need to add Kubernetes CA certificate or the Trow certificate to Docker. The
-easiest way to do this is by running the `install/configure-host.sh`, which
-should place the correct under `/etc/docker/certs.d/_registry-name_`.
-
-If you get an error like:
-
-```
-docker push trow.kube-public:31000/nginx:alpine
-The push refers to repository [trow.kube-public:31000/nginx]
-Get https://trow.kube-public:31000/v2/: dial tcp: lookup trow.kube-public: No address associated with hostname
-```
-
-This indicates it can't resolve the host name. Running `install/configure-host.sh` should add an
-entry to `/etc/hosts` that will fix the issue.
-
 If it seems like you can connect to Trow successfully but then uploads fail with `manifest invalid`
 or `Internal Server Error`, Trow may be having trouble saving to the filesystem. First check
 the logs (see "Where are the logs?" above). If this is the case, check there is free space on the
@@ -284,8 +228,7 @@ that the settings for the volume match the UID of the Trow user (333333 by defau
 # ...
     spec:
       containers:
-      - name: trow-pod
-        image: containersol/trow:0.3
+      - name: trow
       # ...
       securityContext:
         runAsUser: 333333
@@ -303,13 +246,6 @@ Error creating: Internal error occurred: failed calling admission webhook "valid
 
 Trow probably isn't running and the webhook is configured to `Fail` on error. You will need to disable the admission webhook (or, for helm chart: `onWebhookFailure: Ignore`) and restart Trow.
 
-
-```
-The push refers to repository [trow.kube-public:31000/test/nginx]
-Get https://trow.kube-public:31000/v2/: x509: certificate signed by unknown authority
-```
-
-If you get this error, and you are using the quick install on Docker for Mac, try restarting Docker.
 
 ### Permission Denied Errors in Logs
 
