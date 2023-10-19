@@ -14,8 +14,8 @@ use rusoto_ecr::{Ecr, EcrClient};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use crate::image::RemoteImage;
-use crate::server::create_accept_header;
+use super::image::RemoteImage;
+use super::server::create_accept_header;
 
 const AUTHN_HEADER: &str = "www-authenticate";
 

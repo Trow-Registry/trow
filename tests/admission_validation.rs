@@ -13,7 +13,7 @@ mod validation_tests {
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
     use reqwest::StatusCode;
-    use trow_server::ImageValidationConfig;
+    use trow::trow_server::ImageValidationConfig;
 
     use crate::common;
 

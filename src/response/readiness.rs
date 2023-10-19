@@ -1,9 +1,9 @@
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 
-use crate::types::ReadinessResponse;
+use crate::trow_server::api_types::ReadyStatus;
 
-impl IntoResponse for ReadinessResponse {
+impl IntoResponse for ReadyStatus {
     fn into_response(self) -> Response {
         let json = serde_json::to_string(&self).unwrap_or_default();
         let resp = Response::builder()
@@ -29,17 +29,17 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::types::ReadinessResponse;
+    use crate::trow_server::api_types::ReadyStatus;
 
-    fn build_ready_response() -> ReadinessResponse {
-        ReadinessResponse {
+    fn build_ready_response() -> ReadyStatus {
+        ReadyStatus {
             message: String::from("Ready"),
             is_ready: true,
         }
     }
 
-    fn build_not_ready_response() -> ReadinessResponse {
-        ReadinessResponse {
+    fn build_not_ready_response() -> ReadyStatus {
+        ReadyStatus {
             message: String::from("Not Ready"),
             is_ready: false,
         }

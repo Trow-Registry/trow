@@ -1,13 +1,11 @@
 use anyhow::Result;
 use json_patch::{Patch, PatchOperation, ReplaceOperation};
 use serde::{Deserialize, Serialize};
-use tonic::{Request, Response, Status};
 use tracing::{event, Level};
 
-use crate::image::RemoteImage;
-use crate::server::trow_server::admission_controller_server::AdmissionController;
-use crate::server::trow_server::{AdmissionRequest, AdmissionResponse};
-use crate::server::TrowServer;
+use super::api_types::{AdmissionRequest, AdmissionResponse, Status};
+use super::image::RemoteImage;
+use super::TrowServer;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageValidationConfig {
@@ -56,20 +54,16 @@ fn check_image_is_allowed(
     (is_allowed, match_reason)
 }
 
-#[tonic::async_trait]
-impl AdmissionController for TrowServer {
-    async fn validate_admission(
-        &self,
-        ar: Request<AdmissionRequest>,
-    ) -> Result<Response<AdmissionResponse>, Status> {
+// AdmissionController
+impl TrowServer {
+    pub async fn validate_admission(&self, ar: AdmissionRequest) -> Result<AdmissionResponse> {
         if self.image_validation_config.is_none() {
-            return Ok(Response::new(AdmissionResponse {
+            return Ok(AdmissionResponse {
                 patch: None,
                 is_allowed: false,
                 reason: "Missing image validation config !".to_string(),
-            }));
+            });
         }
-        let ar = ar.into_inner();
         let mut valid = true;
         let mut reasons = Vec::new();
 
@@ -88,20 +82,19 @@ impl AdmissionController for TrowServer {
             is_allowed: valid,
             reason: reasons.join("; "),
         };
-        Ok(Response::new(ar))
+        Ok(ar)
     }
 
-    async fn mutate_admission(
+    pub async fn mutate_admission(
         &self,
-        ar: Request<AdmissionRequest>,
-    ) -> Result<Response<AdmissionResponse>, Status> {
-        let ar = ar.into_inner();
+        ar: AdmissionRequest,
+    ) -> Result<AdmissionResponse, Status> {
         let mut patch_operations = Vec::<PatchOperation>::new();
         let proxy_config = match self.proxy_registry_config.as_ref() {
             Some(s) => s,
             None => {
-                return Err(Status::internal(
-                    "Proxy registry config not set, cannot mutate image references",
+                return Err(Status::Internal(
+                    "Proxy registry config not set, cannot mutate image references".to_owned(),
                 ))
             }
         };
@@ -139,16 +132,18 @@ impl AdmissionController for TrowServer {
             }
         }
         let patch = Patch(patch_operations);
-        let patch_vec = Some(
-            serde_json::to_vec(&patch)
-                .map_err(|e| Status::internal(format!("Could not serialize patch: {}", e)))?,
-        );
+        let patch_vec = Some(serde_json::to_vec(&patch).map_err(|e| {
+            Status::Internal(format!(
+                "Could not serialize patch: {}",
+                e
+            ))
+        })?);
 
-        return Ok(Response::new(AdmissionResponse {
+        Ok(AdmissionResponse {
             patch: patch_vec,
             is_allowed: true,
             reason: "".to_string(),
-        }));
+        })
     }
 }
 #[cfg(test)]

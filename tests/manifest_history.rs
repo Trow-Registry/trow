@@ -12,7 +12,7 @@ mod interface_tests {
     use environment::Environment;
     use rand::Rng;
     use reqwest::StatusCode;
-    use trow_server::digest;
+    use trow::trow_server::digest;
 
     use crate::common;
 

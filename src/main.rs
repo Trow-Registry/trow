@@ -89,7 +89,6 @@ async fn main() {
     let mut builder = TrowBuilder::new(
         args.data_dir.clone(),
         addr,
-        "127.0.0.1:51000".to_string(),
         host_name,
         args.dry_run,
         args.cors,

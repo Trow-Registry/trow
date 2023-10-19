@@ -1,18 +1,10 @@
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use crate::trow_server::api_types::MetricsResponse;
 
 #[derive(Error, Debug)]
 pub enum MetricsError {
     #[error("Internal metrics error")]
     Internal,
-}
-
-/*
-Could just use a string here, but later on we probably want more structure.
-*/
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct MetricsResponse {
-    pub metrics: String,
 }
 
 #[axum::async_trait]

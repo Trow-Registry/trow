@@ -209,15 +209,3 @@ impl TagList {
         self.list
     }
 }
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub struct HealthResponse {
-    pub message: String,
-    pub is_healthy: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct ReadinessResponse {
-    pub message: String,
-    pub is_ready: bool,
-}

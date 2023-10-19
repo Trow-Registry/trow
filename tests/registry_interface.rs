@@ -11,8 +11,9 @@ mod interface_tests {
 
     use environment::Environment;
     use reqwest::StatusCode;
-    use trow::types::{HealthResponse, ReadinessResponse, RepoCatalog, TagList};
-    use trow_server::{digest, manifest};
+    use trow::types::{ RepoCatalog, TagList};
+    use trow::trow_server::api_types::{HealthStatus, ReadyStatus};
+    use trow::trow_server::{digest, manifest};
 
     use crate::common;
     use crate::common::DIST_API_HEADER;
@@ -378,7 +379,7 @@ mod interface_tests {
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let hr: HealthResponse = resp.json().await.unwrap();
+        let hr: HealthStatus = resp.json().await.unwrap();
 
         assert!(hr.is_healthy);
     }
@@ -392,7 +393,7 @@ mod interface_tests {
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let rr: ReadinessResponse = resp.json().await.unwrap();
+        let rr: ReadyStatus = resp.json().await.unwrap();
 
         assert!(rr.is_ready);
     }

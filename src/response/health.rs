@@ -1,9 +1,10 @@
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 
-use crate::types::HealthResponse;
+use crate::trow_server::api_types::HealthStatus;
 
-impl IntoResponse for HealthResponse {
+
+impl IntoResponse for HealthStatus {
     fn into_response(self) -> Response {
         let json = serde_json::to_string(&self).unwrap_or_else(|_| "{}".to_string());
         let resp = Response::builder()
@@ -30,17 +31,17 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::types::HealthResponse;
+    use crate::trow_server::api_types::HealthStatus;
 
-    fn build_healthy_response() -> HealthResponse {
-        HealthResponse {
+    fn build_healthy_response() -> HealthStatus {
+        HealthStatus {
             message: String::from("Healthy"),
             is_healthy: true,
         }
     }
 
-    fn build_unhealthy_response() -> HealthResponse {
-        HealthResponse {
+    fn build_unhealthy_response() -> HealthStatus {
+        HealthStatus {
             message: String::from("Healthy"),
             is_healthy: false,
         }

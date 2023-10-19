@@ -1,10 +1,8 @@
-pub mod trow_proto {
-    include!("../trow-protobuf/out/trow.rs");
-}
-
 use std::convert::TryInto;
 use std::io::SeekFrom;
 
+use crate::trow_server;
+use crate::trow_server::api_types::{HealthStatus, ReadyStatus, Status};
 use anyhow::{anyhow, Result};
 use axum::extract::BodyStream;
 use chrono::TimeZone;
@@ -13,27 +11,25 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use thiserror::Error;
 use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
-use tonic::{Code, Request};
 use tracing::{event, Level};
-use trow_proto::admission_controller_client::AdmissionControllerClient;
-use trow_proto::registry_client::RegistryClient;
-use trow_proto::{
-    BlobRef, CatalogRequest, CompleteRequest, HealthRequest, ListTagsRequest,
-    ManifestHistoryRequest, ManifestRef, MetricsRequest, ReadinessRequest, UploadRef,
-    UploadRequest, VerifyManifestRequest,
+use trow_server::api_types::{
+    BlobRef, CatalogRequest, CompleteRequest, ListTagsRequest, ManifestHistoryRequest, ManifestRef,
+    MetricsRequest, UploadRef, UploadRequest, VerifyManifestRequest,
 };
 
 use crate::registry_interface::blob_storage::Stored;
 use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
 use crate::registry_interface::{
     AdmissionValidation, BlobReader, BlobStorage, CatalogOperations, ContentInfo, ManifestHistory,
-    ManifestReader, ManifestStorage, Metrics, MetricsError, MetricsResponse, StorageDriverError,
+    ManifestReader, ManifestStorage, Metrics, MetricsError, StorageDriverError,
 };
 use crate::types::{self, *};
+use trow_server::api_types::MetricsResponse;
+use trow_server::TrowServer;
 
 #[derive(Debug)]
 pub struct ClientInterface {
-    server: String,
+    trow_server: TrowServer,
 }
 
 fn extract_images(pod: &Pod) -> (Vec<String>, Vec<String>) {
@@ -106,18 +102,15 @@ impl ManifestStorage for ClientInterface {
 
     async fn delete_manifest(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         let repo = RepoName(name.to_string());
-        self.delete_by_manifest(&repo, digest).await.map_err(|e| {
-            let e = e.downcast::<tonic::Status>();
-            if let Ok(ts) = e {
-                match ts.code() {
-                    Code::InvalidArgument => StorageDriverError::Unsupported,
-                    Code::NotFound => StorageDriverError::InvalidManifest,
-                    _ => StorageDriverError::Internal,
-                }
-            } else {
-                StorageDriverError::Internal
-            }
-        })?;
+        self
+            .delete_by_manifest(&repo, digest)
+            .await
+            .map_err(|e| match e {
+                Status::InvalidArgument(_) => StorageDriverError::Unsupported,
+                Status::NotFound(_) => StorageDriverError::InvalidManifest,
+                _ => StorageDriverError::Internal,
+            })?;
+
         Ok(())
     }
 
@@ -223,27 +216,19 @@ impl BlobStorage for ClientInterface {
         session_id: &str,
         digest: &Digest,
     ) -> Result<(), StorageDriverError> {
-        self.complete_upload(name, session_id, digest)
-            .await
-            .map_err(|e| match e.downcast::<tonic::Status>() {
-                Ok(ts) => match ts.code() {
-                    Code::InvalidArgument => StorageDriverError::InvalidDigest,
-                    _ => StorageDriverError::Internal,
-                },
-                Err(e) => {
-                    event!(Level::WARN, "Error finalising upload {:?}", e);
-                    StorageDriverError::Internal
-                }
-            })?;
+        self.complete_upload(name, session_id, digest).await.map_err(|e| {
+            match e {
+                Status::InvalidArgument(_) => StorageDriverError::InvalidDigest,
+                _ => StorageDriverError::Internal,
+            }
+        })?;
         Ok(())
     }
 
     async fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError> {
-        self.request_upload(name).await.map_err(|e| {
-            match e.downcast::<tonic::Status>().map(|s| s.code()) {
-                Ok(Code::InvalidArgument) => StorageDriverError::InvalidName(name.to_string()),
-                _ => StorageDriverError::Internal,
-            }
+        self.request_upload(name).await.map_err(|e| match e {
+            Status::InvalidArgument(_) => StorageDriverError::InvalidName(name.to_string()),
+            _ => StorageDriverError::Internal,
         })
     }
 
@@ -375,45 +360,22 @@ impl Metrics for ClientInterface {
 }
 
 impl ClientInterface {
-    pub fn new(server: String) -> Result<Self> {
-        Ok(ClientInterface { server })
+    pub fn new(ts: TrowServer) -> Result<Self> {
+        Ok(ClientInterface { trow_server: ts })
     }
 
-    async fn connect_registry(
-        &self,
-    ) -> Result<RegistryClient<tonic::transport::Channel>, tonic::transport::Error> {
-        event!(Level::DEBUG, "Connecting to {}", self.server);
-        let x = RegistryClient::connect(self.server.to_string()).await;
-        event!(Level::DEBUG, "Connected to {}", self.server);
-        x
-    }
-
-    async fn connect_admission_controller(
-        &self,
-    ) -> Result<AdmissionControllerClient<tonic::transport::Channel>, tonic::transport::Error> {
-        event!(Level::DEBUG, "Connecting to {}", self.server);
-        let x = AdmissionControllerClient::connect(self.server.to_string()).await;
-        event!(Level::DEBUG, "Connected to {}", self.server);
-        x
-    }
-
-    async fn request_upload(&self, repo_name: &str) -> Result<String> {
+    async fn request_upload(&self, repo_name: &str) -> Result<String, Status> {
         event!(Level::INFO, "Request Upload called for {}", repo_name);
         let req = UploadRequest {
             repo_name: repo_name.to_string(),
         };
 
-        let response = self
-            .connect_registry()
-            .await?
-            .request_upload(Request::new(req))
-            .await?
-            .into_inner();
+        let response = self.trow_server.request_upload(req).await?;
 
         Ok(response.uuid)
     }
 
-    async fn complete_upload(&self, repo_name: &str, uuid: &str, digest: &Digest) -> Result<()> {
+    async fn complete_upload(&self, repo_name: &str, uuid: &str, digest: &Digest) -> Result<(), Status> {
         event!(
             Level::INFO,
             "Complete Upload called for repository {} with upload id {} digest {}",
@@ -428,10 +390,7 @@ impl ClientInterface {
             user_digest: digest.to_string(),
         };
 
-        self.connect_registry()
-            .await?
-            .complete_upload(Request::new(req))
-            .await?;
+        self.trow_server.complete_upload(req).await?;
 
         Ok(())
     }
@@ -452,12 +411,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone(),
         };
 
-        let resp = self
-            .connect_registry()
-            .await?
-            .get_write_location_for_blob(Request::new(br))
-            .await?
-            .into_inner();
+        let resp = self.trow_server.get_write_location_for_blob(br).await?;
 
         //For the moment we know it's a file location
         let file = tokio::fs::OpenOptions::new()
@@ -477,17 +431,7 @@ impl ClientInterface {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)
             .await
-            .map_err(|e| {
-                let e = e.downcast::<tonic::Status>();
-                if let Ok(ts) = e {
-                    match ts.code() {
-                        Code::InvalidArgument => RegistryError::InvalidName,
-                        _ => RegistryError::Internal,
-                    }
-                } else {
-                    RegistryError::Internal
-                }
-            })?;
+            ?;
 
         while let Some(v) = manifest.next().await {
             match v {
@@ -507,24 +451,13 @@ impl ClientInterface {
 
         self.verify_manifest(repo_name, reference, &uuid)
             .await
-            .map_err(|e| {
-                let e = e.downcast::<tonic::Status>();
-                if let Ok(ts) = e {
-                    match ts.code() {
-                        Code::InvalidArgument => RegistryError::InvalidManifest,
-                        _ => RegistryError::Internal,
-                    }
-                } else {
-                    RegistryError::Internal
-                }
-            })
     }
 
     async fn get_write_sink_for_manifest(
         &self,
         repo_name: &RepoName,
         reference: &str,
-    ) -> Result<(impl AsyncWrite, String)> {
+    ) -> Result<(impl AsyncWrite, String), RegistryError> {
         event!(
             Level::INFO,
             "Getting write location for manifest in repo {} with ref {}",
@@ -536,12 +469,9 @@ impl ClientInterface {
             repo_name: repo_name.0.clone(),
         };
 
-        let resp = self
-            .connect_registry()
-            .await?
-            .get_write_details_for_manifest(Request::new(mr))
-            .await?
-            .into_inner();
+        let resp = self.trow_server.get_write_details_for_manifest(mr).await.map_err(|_| {
+            RegistryError::InvalidName
+        })?;
 
         //For the moment we know it's a file location
         //Manifests don't append; just overwrite
@@ -549,7 +479,7 @@ impl ClientInterface {
             .create(true)
             .write(true)
             .open(resp.path)
-            .await?;
+            .await.map_err(|_| RegistryError::Internal)?;
         Ok((file, resp.uuid))
     }
 
@@ -568,12 +498,7 @@ impl ClientInterface {
             reference: reference.to_owned(),
             repo_name: repo_name.0.clone(),
         };
-        let resp = self
-            .connect_registry()
-            .await?
-            .get_read_location_for_manifest(Request::new(mr))
-            .await?
-            .into_inner();
+        let resp = self.trow_server.get_read_location_for_manifest(mr).await?;
 
         //For the moment we know it's a file location
         let file = tokio::fs::File::open(resp.path).await?;
@@ -603,15 +528,10 @@ impl ClientInterface {
             limit,
             last_digest: last_digest.to_owned(),
         };
-        let mut stream = self
-            .connect_registry()
-            .await?
-            .get_manifest_history(Request::new(mr))
-            .await?
-            .into_inner();
+        let stream = self.trow_server.get_manifest_history(mr).await?;
         let mut history = ManifestHistory::new(format!("{}:{}", repo_name, reference));
 
-        while let Some(entry) = stream.message().await? {
+        for entry in stream {
             let ts = if let Some(date) = entry.date {
                 chrono::Utc
                     .timestamp_opt(date.seconds, date.nanos.try_into().unwrap())
@@ -646,12 +566,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone(),
         };
 
-        let resp = self
-            .connect_registry()
-            .await?
-            .get_read_location_for_blob(Request::new(br))
-            .await?
-            .into_inner();
+        let resp = self.trow_server.get_read_location_for_blob(br).await?;
 
         //For the moment we know it's a file location
         let file = tokio::fs::File::open(resp.path).await?;
@@ -675,11 +590,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone(),
         };
 
-        self.connect_registry()
-            .await?
-            .delete_blob(Request::new(br))
-            .await?
-            .into_inner();
+        self.trow_server.delete_blob(br).await?;
         Ok(BlobDeleted {})
     }
 
@@ -688,7 +599,7 @@ impl ClientInterface {
         repo_name: &RepoName,
         reference: &str,
         uuid: &str,
-    ) -> Result<types::VerifiedManifest> {
+    ) -> Result<types::VerifiedManifest, RegistryError> {
         event!(
             Level::INFO,
             "Verifying manifest {} in {} uuid {}",
@@ -705,13 +616,15 @@ impl ClientInterface {
         };
 
         let resp = self
-            .connect_registry()
-            .await?
-            .verify_manifest(Request::new(vmr))
-            .await?
-            .into_inner();
+            .trow_server
+            .verify_manifest(vmr)
+            .await
+            .map_err(|e| match e {
+                Status::InvalidArgument(_) => RegistryError::InvalidManifest,
+                _ => RegistryError::Internal,
+            })?;
 
-        let digest = digest::parse(&resp.digest)?;
+        let digest = digest::parse(&resp.digest).map_err(|_| RegistryError::InvalidManifest)?;
         let vm = VerifiedManifest::new(None, repo_name.clone(), digest, reference.to_string());
         Ok(vm)
     }
@@ -720,7 +633,7 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         digest: &Digest,
-    ) -> Result<ManifestDeleted> {
+    ) -> Result<ManifestDeleted, Status> {
         event!(
             Level::INFO,
             "Attempting to delete manifest {} in {}",
@@ -732,11 +645,7 @@ impl ClientInterface {
             repo_name: repo_name.0.clone(),
         };
 
-        self.connect_registry()
-            .await?
-            .delete_manifest(Request::new(mr))
-            .await?
-            .into_inner();
+        self.trow_server.delete_manifest(mr).await?;
         Ok(ManifestDeleted {})
     }
 
@@ -752,15 +661,10 @@ impl ClientInterface {
             limit,
             last_repo: last_repo.to_string(),
         };
-        let mut stream = self
-            .connect_registry()
-            .await?
-            .get_catalog(Request::new(cr))
-            .await?
-            .into_inner();
+        let stream = self.trow_server.get_catalog(cr).await?;
         let mut catalog = RepoCatalog::new();
 
-        while let Some(ce) = stream.message().await? {
+        for ce in stream {
             catalog.insert(ce.repo_name.to_owned());
         }
 
@@ -781,16 +685,10 @@ impl ClientInterface {
             last_tag: last_tag.to_string(),
         };
 
-        let mut stream = self
-            .connect_registry()
-            .await?
-            .list_tags(Request::new(ltr))
-            .await?
-            .into_inner();
+        let stream = self.trow_server.list_tags(ltr).await?;
         let mut list = TagList::new(repo_name.to_string());
-
-        while let Some(tag) = stream.message().await? {
-            list.insert(tag.tag.to_owned());
+        for tag in stream {
+            list.insert(tag.tag);
         }
 
         Ok(list)
@@ -816,7 +714,7 @@ impl ClientInterface {
             .as_ref()
             .ok_or_else(|| anyhow!("No pod in pod admission request"))?;
         let (images, _) = extract_images(obj);
-        let ar = trow_proto::AdmissionRequest {
+        let ar = trow_server::api_types::AdmissionRequest {
             host_name: host_name.to_string(),
             image_paths: vec![], // unused in validation
             images,
@@ -826,12 +724,7 @@ impl ClientInterface {
                 .ok_or_else(|| anyhow!("Object has no namespace"))?,
         };
 
-        let internal_resp = self
-            .connect_admission_controller()
-            .await?
-            .validate_admission(Request::new(ar))
-            .await?
-            .into_inner();
+        let internal_resp = self.trow_server.validate_admission(ar).await?;
 
         let mut resp = AdmissionResponse::from(req);
         if !internal_resp.is_allowed {
@@ -858,7 +751,7 @@ impl ClientInterface {
             .as_ref()
             .ok_or_else(|| anyhow!("No pod in pod admission request"))?;
         let (images, image_paths) = extract_images(obj);
-        let ar = trow_proto::AdmissionRequest {
+        let ar = trow_server::api_types::AdmissionRequest {
             host_name: host_name.to_string(),
             image_paths,
             images,
@@ -868,12 +761,7 @@ impl ClientInterface {
                 .ok_or_else(|| anyhow!("Object has no namespace"))?,
         };
 
-        let internal_resp = self
-            .connect_admission_controller()
-            .await?
-            .mutate_admission(Request::new(ar))
-            .await?
-            .into_inner();
+        let internal_resp = self.trow_server.mutate_admission(ar).await?;
 
         let mut resp = AdmissionResponse::from(req);
         if let Some(raw_patch) = internal_resp.patch {
@@ -893,34 +781,9 @@ impl ClientInterface {
 
     Note that the server will indicate unhealthy by returning an error.
     */
-    async fn is_healthy(&self) -> types::HealthResponse {
+    async fn is_healthy(&self) -> HealthStatus {
         event!(Level::DEBUG, "Calling health check");
-        let mut client = match self.connect_registry().await {
-            Ok(cl) => cl,
-            Err(_) => {
-                return types::HealthResponse {
-                    is_healthy: false,
-                    message: "Failed to connect to registry".to_string(),
-                }
-            }
-        };
-
-        let req = Request::new(HealthRequest {});
-        let resp = match client.is_healthy(req).await {
-            Ok(r) => r,
-            Err(e) => {
-                return types::HealthResponse {
-                    is_healthy: false,
-                    message: e.to_string(),
-                }
-            }
-        };
-        let response_value = resp.into_inner();
-
-        types::HealthResponse {
-            is_healthy: true,
-            message: response_value.message,
-        }
+        self.trow_server.is_healthy().await
     }
 
     /**
@@ -928,33 +791,9 @@ impl ClientInterface {
 
      Note that the server will indicate not ready by returning an error.
     */
-    async fn is_ready(&self) -> types::ReadinessResponse {
+    async fn is_ready(&self) -> ReadyStatus {
         event!(Level::DEBUG, "Calling readiness check");
-        let mut client = match self.connect_registry().await {
-            Ok(cl) => cl,
-            Err(_) => {
-                return types::ReadinessResponse {
-                    is_ready: false,
-                    message: "Failed to connect to registry".to_string(),
-                }
-            }
-        };
-
-        let req = Request::new(ReadinessRequest {});
-        let resp = match client.is_ready(req).await {
-            Ok(r) => r,
-            Err(e) => {
-                return types::ReadinessResponse {
-                    is_ready: false,
-                    message: e.to_string(),
-                }
-            }
-        };
-        let response_value = resp.into_inner();
-        types::ReadinessResponse {
-            is_ready: true,
-            message: response_value.message,
-        }
+        self.trow_server.is_ready().await
     }
 
     /**
@@ -962,18 +801,12 @@ impl ClientInterface {
 
      Returns disk and total request metrics(blobs, manifests).
     */
-    async fn get_metrics(&self) -> Result<MetricsResponse> {
+    async fn get_metrics(&self) -> Result<MetricsResponse, MetricsError> {
         event!(Level::DEBUG, "Getting metrics");
-        let req = Request::new(MetricsRequest {});
-        let resp = self
-            .connect_registry()
-            .await?
+        let req = MetricsRequest {};
+        self.trow_server
             .get_metrics(req)
-            .await?
-            .into_inner();
-
-        Ok(MetricsResponse {
-            metrics: resp.metrics,
-        })
+            .await
+            .map_err(|_| MetricsError::Internal)
     }
 }

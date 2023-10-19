@@ -36,7 +36,7 @@ pub fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String> {
 mod test {
     use std::io::BufReader;
 
-    use crate::digest::{sha256_digest, sha256_tag_digest};
+    use crate::trow_server::digest::{sha256_digest, sha256_tag_digest};
 
     #[test]
     fn sha256_digest_test() {

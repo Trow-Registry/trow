@@ -10,7 +10,7 @@ mod interface_tests {
 
     use environment::Environment;
     use reqwest::StatusCode;
-    use trow_server::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::trow_server::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
 
