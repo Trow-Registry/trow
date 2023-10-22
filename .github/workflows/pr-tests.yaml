@@ -15,7 +15,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
@@ -42,7 +41,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
