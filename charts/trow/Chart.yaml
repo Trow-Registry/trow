@@ -1,7 +1,9 @@
 apiVersion: v2
 name: trow
 description: Helm chart for Trow registry
-
 type: application
-version: 0.6.0
-appVersion: 0.6.0
+home: https://trow.io
+kubeVersion: ">= 1.26.0-0"
+
+version: 0.6.1
+appVersion: 0.6.1

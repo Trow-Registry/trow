@@ -8,7 +8,7 @@ There are implementation details in this interface that could/should be abstract
 */
 
 mod history_date_format {
-    use chrono::{DateTime, TimeZone, Utc};
+    use chrono::{DateTime, Utc};
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     const FORMAT: &str = "%Y-%m-%d %H:%M:%S%.f %Z";
@@ -26,8 +26,7 @@ mod history_date_format {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Utc.datetime_from_str(&s, FORMAT)
-            .map_err(serde::de::Error::custom)
+        s.parse().map_err(serde::de::Error::custom)
     }
 }
 

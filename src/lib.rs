@@ -168,7 +168,9 @@ impl TrowBuilder {
     }
 
     pub fn with_user(&mut self, user: String, pass: String) -> &mut TrowBuilder {
-        let hash_config = argon2::Config::default();
+        let mut hash_config = argon2::Config::rfc9106();
+        hash_config.mem_cost = 4066;
+        hash_config.time_cost = 3;
         let hash_encoded =
             argon2::hash_encoded(pass.as_bytes(), Uuid::new_v4().as_bytes(), &hash_config)
                 .expect("Error hashing password");
