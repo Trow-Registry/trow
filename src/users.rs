@@ -29,8 +29,10 @@ fn get_salt() -> Vec<u8> {
 // Takes in a salt and password and returns the hash
 // using the argon 2 algorithm
 fn get_hash_from_password(password: String, salt: Vec<u8>) -> Result<String, failure::Error> {
-    let config = Config::default();
-    let hash = argon2::hash_encoded(password.as_bytes(), &Bytes::from(salt), &config)?;
+    let mut hash_config = argon2::Config::rfc9106();
+    hash_config.mem_cost = 4066;
+    hash_config.time_cost = 3;
+    let hash = argon2::hash_encoded(password.as_bytes(), &Bytes::from(salt), &hash_config)?;
     Ok(hash)
 }
 
