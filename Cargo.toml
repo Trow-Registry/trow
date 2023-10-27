@@ -13,7 +13,6 @@ axum = { version = "0.6.18", features = ["headers", "tracing"] }
 axum-server = { version = "0.5", features = ["tls-rustls"] }
 tower = "0.4"
 tower-http = { version = "0.4", features = ["cors", "normalize-path"] }
-rand = "0.8"
 frank_jwt = "3.1"
 rust-argon2 = "2.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -43,15 +42,13 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing = "0.1.37"
 paste = "1.0.14"
 async-recursion = "1.0"
-async-stream = "0.3"
-tokio-stream = "0.1"
-rustc-serialize = "0.3"
 reqwest = { version = "0.11", features = ["json", "stream"] }
 prometheus = { version = "0.13"}
 fs3 = "0.5.0"
 quoted-string = "0.6.1"
-rusoto_core = "0.48"
-rusoto_ecr = "0.48"
+aws-config = "0.56.1"
+aws-types = "0.56.1"
+aws-sdk-ecr = "0.34.0"
 const_format = "0.2.24"
 async-trait = "0.1.74"
 
@@ -64,3 +61,4 @@ reqwest = { version = "0.11", features = ["blocking", "json", "gzip"] }
 libc = "0.2"
 tempfile = "3"
 httpmock = "0.6"
+fastrand = "2.0.1"

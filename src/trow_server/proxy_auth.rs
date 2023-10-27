@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
@@ -9,8 +8,6 @@ use lazy_static::lazy_static;
 use quoted_string::strip_dquotes;
 use regex::Regex;
 use reqwest::{self, Method, StatusCode};
-use rusoto_core::Region;
-use rusoto_ecr::{Ecr, EcrClient};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
@@ -150,21 +147,21 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
     let region = ecr_host
         .split('.')
         .nth(3)
-        .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?;
-
-    let ecr_clt = EcrClient::new(Region::from_str(region)?);
-
-    let token_resp = ecr_clt
-        .get_authorization_token(rusoto_ecr::GetAuthorizationTokenRequest::default())
-        .await;
-    let token = token_resp?
+        .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?
+        .to_owned();
+    let region = aws_types::region::Region::new(region);
+    let config = aws_config::from_env().region(region).load().await;
+    let ecr_clt = aws_sdk_ecr::Client::new(&config);
+    let token_response = ecr_clt.get_authorization_token().send().await?;
+    let token = token_response
         .authorization_data
-        .ok_or_else(|| anyhow!("AWS ECR get token response lacks authorization_data"))?
-        .first()
+        .unwrap()
+        .into_iter()
+        .next()
         .unwrap()
         .authorization_token
-        .clone()
         .unwrap();
+
     // The token is base64(username:password). Here, username is "AWS".
     // To get the password, we trim "AWS:" from the decoded token.
     let mut auth_str = general_purpose::STANDARD_NO_PAD.decode(token)?;

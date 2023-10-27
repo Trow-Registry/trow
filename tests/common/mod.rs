@@ -1,7 +1,6 @@
 use std::io::{BufReader, Write};
 use std::process::Child;
 
-use rand::Rng;
 use reqwest::StatusCode;
 use serde::Serialize;
 use trow::trow_server::{digest, manifest};
@@ -19,10 +18,9 @@ pub const RANGE_HEADER: &str = "Range";
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn gen_rand_blob(size: usize) -> Vec<u8> {
-    let mut rng = rand::thread_rng();
     let mut blob = Vec::with_capacity(size);
     for _ in 0..size {
-        blob.push(rng.gen::<u8>());
+        blob.push(fastrand::u8(0..=255));
     }
     blob
 }

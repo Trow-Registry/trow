@@ -8,9 +8,9 @@ mod interface_tests {
     use std::process::{Child, Command};
     use std::time::Duration;
     use std::{fs, thread};
+    use std::fmt::Write;
 
     use environment::Environment;
-    use rand::Rng;
     use reqwest::StatusCode;
     use trow::trow_server::digest;
 
@@ -81,14 +81,11 @@ mod interface_tests {
         let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
-        let mut rng = rand::thread_rng();
-        let ran_size: u32 = rng.gen();
-        let mut digest = [0u8; 32];
-        rng.fill(&mut digest[..]);
-        let mut ran_digest = "".to_string();
-        for b in &digest {
-            ran_digest.push_str(&format!("{:x}", b).to_string());
-        }
+        let ran_size: u32 = fastrand::u32(0..=u32::MAX);
+        let ran_digest = (0..32).fold(String::new(), |mut output, _| {
+            write!(output, "{:x}", fastrand::u8(0..=u8::MAX)).unwrap();
+            output
+        });
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
