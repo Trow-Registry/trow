@@ -4,11 +4,11 @@ mod common;
 #[cfg(test)]
 mod interface_tests {
 
+    use std::fmt::Write;
     use std::io::BufReader;
     use std::process::{Child, Command};
     use std::time::Duration;
     use std::{fs, thread};
-    use std::fmt::Write;
 
     use environment::Environment;
     use reqwest::StatusCode;

@@ -1,8 +1,6 @@
 use std::convert::TryInto;
 use std::io::SeekFrom;
 
-use crate::trow_server;
-use crate::trow_server::api_types::{HealthStatus, ReadyStatus, Status};
 use anyhow::{anyhow, Result};
 use axum::extract::BodyStream;
 use chrono::TimeZone;
@@ -14,8 +12,9 @@ use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tracing::{event, Level};
 use trow_server::api_types::{
     BlobRef, CatalogRequest, CompleteRequest, ListTagsRequest, ManifestHistoryRequest, ManifestRef,
-    MetricsRequest, UploadRef, UploadRequest, VerifyManifestRequest,
+    MetricsRequest, MetricsResponse, UploadRef, UploadRequest, VerifyManifestRequest,
 };
+use trow_server::TrowServer;
 
 use crate::registry_interface::blob_storage::Stored;
 use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
@@ -23,9 +22,9 @@ use crate::registry_interface::{
     AdmissionValidation, BlobReader, BlobStorage, CatalogOperations, ContentInfo, ManifestHistory,
     ManifestReader, ManifestStorage, Metrics, MetricsError, StorageDriverError,
 };
+use crate::trow_server;
+use crate::trow_server::api_types::{HealthStatus, ReadyStatus, Status};
 use crate::types::{self, *};
-use trow_server::api_types::MetricsResponse;
-use trow_server::TrowServer;
 
 #[derive(Debug)]
 pub struct ClientInterface {
@@ -102,8 +101,7 @@ impl ManifestStorage for ClientInterface {
 
     async fn delete_manifest(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
         let repo = RepoName(name.to_string());
-        self
-            .delete_by_manifest(&repo, digest)
+        self.delete_by_manifest(&repo, digest)
             .await
             .map_err(|e| match e {
                 Status::InvalidArgument(_) => StorageDriverError::Unsupported,
@@ -216,12 +214,12 @@ impl BlobStorage for ClientInterface {
         session_id: &str,
         digest: &Digest,
     ) -> Result<(), StorageDriverError> {
-        self.complete_upload(name, session_id, digest).await.map_err(|e| {
-            match e {
+        self.complete_upload(name, session_id, digest)
+            .await
+            .map_err(|e| match e {
                 Status::InvalidArgument(_) => StorageDriverError::InvalidDigest,
                 _ => StorageDriverError::Internal,
-            }
-        })?;
+            })?;
         Ok(())
     }
 
@@ -375,7 +373,12 @@ impl ClientInterface {
         Ok(response.uuid)
     }
 
-    async fn complete_upload(&self, repo_name: &str, uuid: &str, digest: &Digest) -> Result<(), Status> {
+    async fn complete_upload(
+        &self,
+        repo_name: &str,
+        uuid: &str,
+        digest: &Digest,
+    ) -> Result<(), Status> {
         event!(
             Level::INFO,
             "Complete Upload called for repository {} with upload id {} digest {}",
@@ -430,8 +433,7 @@ impl ClientInterface {
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)
-            .await
-            ?;
+            .await?;
 
         while let Some(v) = manifest.next().await {
             match v {
@@ -449,8 +451,7 @@ impl ClientInterface {
             }
         }
 
-        self.verify_manifest(repo_name, reference, &uuid)
-            .await
+        self.verify_manifest(repo_name, reference, &uuid).await
     }
 
     async fn get_write_sink_for_manifest(
@@ -469,9 +470,11 @@ impl ClientInterface {
             repo_name: repo_name.0.clone(),
         };
 
-        let resp = self.trow_server.get_write_details_for_manifest(mr).await.map_err(|_| {
-            RegistryError::InvalidName
-        })?;
+        let resp = self
+            .trow_server
+            .get_write_details_for_manifest(mr)
+            .await
+            .map_err(|_| RegistryError::InvalidName)?;
 
         //For the moment we know it's a file location
         //Manifests don't append; just overwrite
@@ -479,7 +482,8 @@ impl ClientInterface {
             .create(true)
             .write(true)
             .open(resp.path)
-            .await.map_err(|_| RegistryError::Internal)?;
+            .await
+            .map_err(|_| RegistryError::Internal)?;
         Ok((file, resp.uuid))
     }
 

@@ -77,9 +77,7 @@ struct UserConfig {
     hash_encoded: String, //Surprised not bytes
 }
 
-fn init_trow_server(
-    config: TrowConfig,
-) -> Result<TrowServer> {
+fn init_trow_server(config: TrowConfig) -> Result<TrowServer> {
     event!(Level::DEBUG, "Starting Trow server");
 
     //Could pass full config here.
@@ -209,7 +207,6 @@ impl TrowBuilder {
         };
 
         let app = routes::create_app(server_state);
-
 
         // Listen for termination signal
         let handle = axum_server::Handle::new();

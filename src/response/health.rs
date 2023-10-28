@@ -3,7 +3,6 @@ use axum::response::{IntoResponse, Response};
 
 use crate::trow_server::api_types::HealthStatus;
 
-
 impl IntoResponse for HealthStatus {
     fn into_response(self) -> Response {
         let json = serde_json::to_string(&self).unwrap_or_else(|_| "{}".to_string());

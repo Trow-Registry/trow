@@ -8,9 +8,8 @@ mod proxy_auth;
 mod server;
 mod temporary_file;
 
-use anyhow::Result;
-
 pub use admission::ImageValidationConfig;
+use anyhow::Result;
 pub use proxy_auth::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 pub use server::TrowServer;
 

@@ -1,6 +1,6 @@
 //! types for the trow <=> trow-server interface
 
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq)]
 pub struct UploadRequest {

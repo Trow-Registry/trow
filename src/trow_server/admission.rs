@@ -132,12 +132,10 @@ impl TrowServer {
             }
         }
         let patch = Patch(patch_operations);
-        let patch_vec = Some(serde_json::to_vec(&patch).map_err(|e| {
-            Status::Internal(format!(
-                "Could not serialize patch: {}",
-                e
-            ))
-        })?);
+        let patch_vec = Some(
+            serde_json::to_vec(&patch)
+                .map_err(|e| Status::Internal(format!("Could not serialize patch: {}", e)))?,
+        );
 
         Ok(AdmissionResponse {
             patch: patch_vec,

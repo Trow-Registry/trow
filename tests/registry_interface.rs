@@ -11,9 +11,9 @@ mod interface_tests {
 
     use environment::Environment;
     use reqwest::StatusCode;
-    use trow::types::{ RepoCatalog, TagList};
     use trow::trow_server::api_types::{HealthStatus, ReadyStatus};
     use trow::trow_server::{digest, manifest};
+    use trow::types::{RepoCatalog, TagList};
 
     use crate::common;
     use crate::common::DIST_API_HEADER;
