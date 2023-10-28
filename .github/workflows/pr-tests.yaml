@@ -23,10 +23,8 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.3
       - name: Cargo fmt
         run: cargo fmt --all -- --check
-      - name: Run trow-server test suite
-        run: cargo test -p trow-server
       - name: Run Trow test suite
-        run: cargo test -p trow
+        run: cargo test
       - name: Smoke test
         run: cargo test -- --ignored
 
