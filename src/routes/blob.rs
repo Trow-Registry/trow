@@ -19,7 +19,7 @@ use crate::TrowServerState;
 Pulling a Layer
 GET /v2/<name>/blobs/<digest>
 name - name of the repository
-digest - unique identifier for the blob to be downoaded
+digest - unique identifier for the blob to be downloaded
 
 # Responses
 200 - blob is downloaded

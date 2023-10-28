@@ -57,7 +57,7 @@ Be aware that all Trow code is released under the [Apache 2.0 licence](LICENSE).
 
 ## Thanks
 
-Thanks to [Container Solutions](https://www.container-solutions.com/) for creating the project and to [Extrality](https://www.extrality.ai/) for further developping the poject.
+Thanks to [Container Solutions](https://www.container-solutions.com/) for creating the project and to [Extrality](https://www.extrality.ai/) for further developing the project.
 
 Contribution guidelines take inspiration from
 [Atom](https://github.com/atom/atom/blob/master/CONTRIBUTING.md), [PurpleBooth's
