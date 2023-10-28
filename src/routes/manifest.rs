@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::extract::{BodyStream, Path, State};
 use axum::headers::HeaderMap;
 
+use super::macros::endpoint_fn_7_levels;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::get_base_url;
@@ -41,103 +42,14 @@ pub async fn get_manifest(
         .await
         .map_err(|_| Error::ManifestUnknown(reference))
 }
-pub async fn get_manifest_2level(
+
+endpoint_fn_7_levels!(
+    get_manifest,
     auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, reference)): Path<(String, String, String)>,
-) -> Result<ManifestReader, Error> {
-    get_manifest(auth_user, state, Path((format!("{one}/{two}"), reference))).await
-}
-pub async fn get_manifest_3level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, reference)): Path<(String, String, String, String)>,
-) -> Result<ManifestReader, Error> {
-    get_manifest(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}"), reference)),
-    )
-    .await
-}
-pub async fn get_manifest_4level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, reference)): Path<(String, String, String, String, String)>,
-) -> Result<ManifestReader, Error> {
-    get_manifest(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}"), reference)),
-    )
-    .await
-}
-pub async fn get_manifest_5level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, reference)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<ManifestReader, Error> {
-    get_manifest(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}"), reference)),
-    )
-    .await
-}
-pub async fn get_manifest_6level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, reference)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<ManifestReader, Error> {
-    get_manifest(
-        auth_user,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}"),
-            reference,
-        )),
-    )
-    .await
-}
-pub async fn get_manifest_7level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven, reference)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<ManifestReader, Error> {
-    get_manifest(
-        auth_user,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
-            reference,
-        )),
-    )
-    .await
-}
+    state: State<Arc<TrowServerState>>
+    ;image_name/reference;;
+    -> Result<ManifestReader, Error>
+);
 
 /*
 
@@ -172,132 +84,16 @@ pub async fn put_image_manifest(
         Err(_) => Err(Error::InternalError),
     }
 }
-pub async fn put_image_manifest_2level(
+endpoint_fn_7_levels!(
+    put_image_manifest,
     headers: HeaderMap,
     auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, reference)): Path<(String, String, String)>,
-    chunk: BodyStream,
-) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}"), reference)),
-        chunk,
-    )
-    .await
-}
-pub async fn put_image_manifest_3level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, reference)): Path<(String, String, String, String)>,
-    chunk: BodyStream,
-) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}"), reference)),
-        chunk,
-    )
-    .await
-}
-pub async fn put_image_manifest_4level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, reference)): Path<(String, String, String, String, String)>,
-    chunk: BodyStream,
-) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}"), reference)),
-        chunk,
-    )
-    .await
-}
-pub async fn put_image_manifest_5level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, reference)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    chunk: BodyStream,
-) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}"), reference)),
-        chunk,
-    )
-    .await
-}
-pub async fn put_image_manifest_6level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, reference)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    chunk: BodyStream,
-) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(
-        headers,
-        auth_user,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}"),
-            reference,
-        )),
-        chunk,
-    )
-    .await
-}
-pub async fn put_image_manifest_7level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven, reference)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    chunk: BodyStream,
-) -> Result<VerifiedManifest, Error> {
-    put_image_manifest(
-        headers,
-        auth_user,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
-            reference,
-        )),
-        chunk,
-    )
-    .await
-}
+    state: State<Arc<TrowServerState>>
+    ;image_name/reference;
+    chunk: BodyStream;
+    -> Result<VerifiedManifest, Error>
+);
+
 /*
 ---
 Deleting an Image
@@ -316,97 +112,10 @@ pub async fn delete_image_manifest(
         Err(_) => Err(Error::InternalError),
     }
 }
-pub async fn delete_image_manifest_2level(
+endpoint_fn_7_levels!(
+    delete_image_manifest,
     auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, digest)): Path<(String, String, String)>,
-) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(auth_user, state, Path((format!("{one}/{two}"), digest))).await
-}
-pub async fn delete_image_manifest_3level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, digest)): Path<(String, String, String, String)>,
-) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}"), digest)),
-    )
-    .await
-}
-pub async fn delete_image_manifest_4level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, digest)): Path<(String, String, String, String, String)>,
-) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}"), digest)),
-    )
-    .await
-}
-pub async fn delete_image_manifest_5level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}"), digest)),
-    )
-    .await
-}
-pub async fn delete_image_manifest_6level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), digest)),
-    )
-    .await
-}
-pub async fn delete_image_manifest_7level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<ManifestDeleted, Error> {
-    delete_image_manifest(
-        auth_user,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
-            digest,
-        )),
-    )
-    .await
-}
+    state: State<Arc<TrowServerState>>
+    ;image_name/digest;;
+    -> Result<ManifestDeleted, Error>
+);

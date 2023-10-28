@@ -1,3 +1,12 @@
+mod admission;
+mod blob;
+mod catalog;
+mod health;
+mod manifest;
+mod metrics;
+mod readiness;
+pub mod macros;
+
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,49 +27,8 @@ use crate::response::errors::Error;
 use crate::response::html::HTML;
 use crate::response::trow_token::{self, TrowToken, ValidBasicToken};
 use crate::TrowServerState;
+use macros::route_7_levels;
 
-mod admission;
-mod blob;
-mod catalog;
-mod health;
-mod manifest;
-mod metrics;
-mod readiness;
-
-macro_rules! route_7_levels {
-    ($app:ident, $prefix:literal $route:literal, $($method:ident($handler1:expr, $handler2:expr, $handler3:expr, $handler4:expr, $handler5:expr, $handler6:expr, $handler7:expr)),*) => {
-        $app = $app
-            .route(
-                concat!($prefix, "/:one", $route),
-                $($method($handler1)).*
-            )
-            .route(
-                concat!($prefix, "/:one/:two", $route),
-                $($method($handler2)).*
-            )
-            .route(
-                concat!($prefix, "/:one/:two/:three", $route),
-                $($method($handler3)).*,
-            )
-            .route(
-                concat!($prefix, "/:one/:two/:three/:four", $route),
-                $($method($handler4)).*,
-            )
-            .route(
-                concat!($prefix, "/:one/:two/:three/:four/:five", $route),
-                $($method($handler5)).*,
-            )
-            .route(
-                concat!($prefix, "/:one/:two/:three/:four/:five/:six", $route),
-                $($method($handler6)).*,
-            )
-            .route(
-                concat!($prefix, "/:one/:two/:three/:four/:five/:six/:seven", $route),
-                $($method($handler7)).*,
-            )
-            ;
-    };
-}
 
 pub fn create_app(state: super::TrowServerState) -> Router {
     let mut app = Router::new()
