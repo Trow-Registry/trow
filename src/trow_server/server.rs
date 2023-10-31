@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::{io, str};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
 use futures::future::try_join_all;
@@ -297,8 +297,9 @@ impl TrowServer {
         verify_assets_exist: bool,
     ) -> Result<VerifiedManifest> {
         let manifest_bytes = std::fs::read(manifest_path)?;
-        let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
-        let manifest = Manifest::from_json(&manifest_json)?;
+        let manifest_json: serde_json::Value =
+            serde_json::from_slice(&manifest_bytes).context("not valid json")?;
+        let manifest = Manifest::from_json(&manifest_json).context("not a valid manifest")?;
 
         if verify_assets_exist {
             for digest in manifest.get_local_asset_digests() {
@@ -839,7 +840,7 @@ impl TrowServer {
                     })
             }
             Err(e) => {
-                event!(Level::ERROR, "Error verifying manifest {:?}", e);
+                event!(Level::ERROR, "Error verifying manifest: {:?}", e);
                 Err(Status::InvalidArgument(
                     "Failed to verify manifest".to_owned(),
                 ))

@@ -450,6 +450,7 @@ impl ClientInterface {
                 },
             }
         }
+        sink_loc.flush().await.unwrap();
 
         self.verify_manifest(repo_name, reference, &uuid).await
     }

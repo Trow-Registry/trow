@@ -81,9 +81,9 @@ mod interface_tests {
         let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
-        let ran_size: u32 = fastrand::u32(0..=u32::MAX);
+        let ran_size = fastrand::u32(0..=u32::MAX);
         let ran_digest = (0..32).fold(String::new(), |mut output, _| {
-            write!(output, "{:2x}", fastrand::u8(0..=u8::MAX)).unwrap();
+            write!(output, "{:02x}", fastrand::u8(0..=u8::MAX)).unwrap();
             output
         });
 
