@@ -391,7 +391,10 @@ mod tests {
                 .query_param("scope", "repository:nvidia/cuda:pull,push")
                 .header(
                     AUTHZ_HEADER,
-                    format!("Basic {}", base64::encode("like-this:reign-of-the-septims")),
+                    format!(
+                        "Basic {}",
+                        general_purpose::STANDARD_NO_PAD.encode("like-this:reign-of-the-septims")
+                    ),
                 );
             then.status(200).json_body(json!({
                 "token": token,

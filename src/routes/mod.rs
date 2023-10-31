@@ -2,10 +2,10 @@ mod admission;
 mod blob;
 mod catalog;
 mod health;
+pub mod macros;
 mod manifest;
 mod metrics;
 mod readiness;
-pub mod macros;
 
 use std::str;
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use axum::routing::{get, post, put};
 use axum::Router;
 use hyper::body::HttpBody;
 use hyper::http::HeaderValue;
+use macros::route_7_levels;
 use tower::ServiceBuilder;
 use tower_http::{cors, trace};
 
@@ -27,8 +28,6 @@ use crate::response::errors::Error;
 use crate::response::html::HTML;
 use crate::response::trow_token::{self, TrowToken, ValidBasicToken};
 use crate::TrowServerState;
-use macros::route_7_levels;
-
 
 pub fn create_app(state: super::TrowServerState) -> Router {
     let mut app = Router::new()

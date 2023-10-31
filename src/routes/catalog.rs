@@ -51,12 +51,12 @@ pub async fn list_tags(
     Ok(TagList::new_filled(repo_name, tags))
 }
 endpoint_fn_7_levels!(
-    list_tags,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/;
-    query: Query<CatalogListQuery>;
-    -> Result<TagList, Error>
+    list_tags(
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name],
+        query: Query<CatalogListQuery>
+    ) -> Result<TagList, Error>
 );
 
 pub async fn get_manifest_history(
@@ -77,10 +77,10 @@ pub async fn get_manifest_history(
 }
 
 endpoint_fn_7_levels!(
-    get_manifest_history,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/reference;
-    query: Query<CatalogListQuery>;
-    -> Result<ManifestHistory, Error>
+    get_manifest_history(
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, reference],
+        query: Query<CatalogListQuery>
+    ) -> Result<ManifestHistory, Error>
 );

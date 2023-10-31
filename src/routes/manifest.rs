@@ -44,11 +44,11 @@ pub async fn get_manifest(
 }
 
 endpoint_fn_7_levels!(
-    get_manifest,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/reference;;
-    -> Result<ManifestReader, Error>
+    get_manifest(
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, reference]
+    ) -> Result<ManifestReader, Error>
 );
 
 /*
@@ -85,13 +85,13 @@ pub async fn put_image_manifest(
     }
 }
 endpoint_fn_7_levels!(
-    put_image_manifest,
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/reference;
-    chunk: BodyStream;
-    -> Result<VerifiedManifest, Error>
+    put_image_manifest(
+        headers: HeaderMap,
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, reference],
+        chunk: BodyStream
+    ) -> Result<VerifiedManifest, Error>
 );
 
 /*
@@ -113,9 +113,9 @@ pub async fn delete_image_manifest(
     }
 }
 endpoint_fn_7_levels!(
-    delete_image_manifest,
+    delete_image_manifest(
     auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/digest;;
-    -> Result<ManifestDeleted, Error>
+    state: State<Arc<TrowServerState>>;
+    path: [image_name, digest]
+    ) -> Result<ManifestDeleted, Error>
 );

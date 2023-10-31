@@ -44,7 +44,7 @@ macro_rules! replace_expr {
 /// Macro to quickly write functions for image names several layers depp
 /// eg: `nvidia/dcgm/whatever`
 macro_rules! endpoint_fn_7_levels {
-    ($fn_name:ident, $($arg:ident: $t:ty),+; image_name/$($p:ident),*; $($pa:ident: $pt:ty),*; -> $ret:ty) => {
+    ($fn_name:ident($($arg:ident: $t:ty),+; path: [image_name $(,$p:ident)*] $(,$pa:ident: $pt:ty)*) -> $ret:ty) => {
         paste::item! {
             pub async fn [< $fn_name _2level >](
                 $($arg: $t),*,
@@ -171,6 +171,4 @@ macro_rules! endpoint_fn_7_levels {
     };
 }
 
-pub(crate) use route_7_levels;
-pub(crate) use replace_expr;
-pub(crate) use endpoint_fn_7_levels;
+pub(crate) use {endpoint_fn_7_levels, replace_expr, route_7_levels};

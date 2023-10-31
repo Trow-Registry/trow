@@ -48,11 +48,11 @@ pub async fn get_blob(
 }
 
 endpoint_fn_7_levels!(
-    get_blob,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/digest;;
-    -> Result<BlobReader, Error>
+    get_blob(
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, digest]
+    ) -> Result<BlobReader, Error>
 );
 
 /*
@@ -122,14 +122,14 @@ pub async fn put_blob(
 }
 
 endpoint_fn_7_levels!(
-    put_blob,
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/uuid;
-    digest: Query<DigestQuery>,
-    chunk: BodyStream;
-    -> Result<AcceptedUpload, Error>
+    put_blob(
+        headers: HeaderMap,
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, uuid],
+        digest: Query<DigestQuery>,
+        chunk: BodyStream
+    ) -> Result<AcceptedUpload, Error>
 );
 
 /*
@@ -182,14 +182,14 @@ pub async fn patch_blob(
 }
 
 endpoint_fn_7_levels!(
-    patch_blob,
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    info: Option<ContentInfo>,
-    state: State<Arc<TrowServerState>>
-    ;image_name/uuid;
-    chunk: BodyStream;
-    -> Result<UploadInfo, Error>
+    patch_blob(
+        headers: HeaderMap,
+        auth_user: TrowToken,
+        info: Option<ContentInfo>,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, uuid],
+        chunk: BodyStream
+    ) -> Result<UploadInfo, Error>
 );
 
 /*
@@ -250,14 +250,14 @@ pub async fn post_blob_upload(
 }
 
 endpoint_fn_7_levels!(
-    post_blob_upload,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    headers: HeaderMap,
-    digest: Query<DigestQuery>
-    ;image_name/;
-    data: BodyStream;
-    -> Result<Upload, Error>
+    post_blob_upload(
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>,
+        headers: HeaderMap,
+        digest: Query<DigestQuery>;
+        path: [image_name],
+        data: BodyStream
+    ) -> Result<Upload, Error>
 );
 
 /**
@@ -282,9 +282,9 @@ pub async fn delete_blob(
 }
 
 endpoint_fn_7_levels!(
-    delete_blob,
+    delete_blob(
     auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>
-    ;image_name/digest;
-    ; -> Result<BlobDeleted, Error>
+    state: State<Arc<TrowServerState>>;
+    path: [image_name, digest]
+    ) -> Result<BlobDeleted, Error>
 );
