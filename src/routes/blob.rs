@@ -5,6 +5,7 @@ use axum::extract::{BodyStream, Path, Query, State};
 use axum::http::header::HeaderMap;
 use tracing::{event, Level};
 
+use super::macros::endpoint_fn_7_levels;
 use crate::registry_interface::{digest, BlobReader, BlobStorage, ContentInfo, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::get_base_url;
@@ -45,105 +46,14 @@ pub async fn get_blob(
         }
     }
 }
-pub async fn get_blob_2level(
-    auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, digest)): Path<(String, String, String)>,
-) -> Result<BlobReader, Error> {
+
+endpoint_fn_7_levels!(
     get_blob(
-        auth_user,
-        State(state),
-        Path((format!("{one}/{two}"), digest)),
-    )
-    .await
-}
-pub async fn get_blob_3level(
-    auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, three, digest)): Path<(String, String, String, String)>,
-) -> Result<BlobReader, Error> {
-    get_blob(
-        auth_user,
-        State(state),
-        Path((format!("{one}/{two}/{three}"), digest)),
-    )
-    .await
-}
-pub async fn get_blob_4level(
-    auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, three, four, digest)): Path<(String, String, String, String, String)>,
-) -> Result<BlobReader, Error> {
-    get_blob(
-        auth_user,
-        State(state),
-        Path((format!("{one}/{two}/{three}/{four}"), digest)),
-    )
-    .await
-}
-pub async fn get_blob_5level(
-    auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<BlobReader, Error> {
-    get_blob(
-        auth_user,
-        State(state),
-        Path((format!("{one}/{two}/{three}/{four}/{five}"), digest)),
-    )
-    .await
-}
-pub async fn get_blob_6level(
-    auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<BlobReader, Error> {
-    get_blob(
-        auth_user,
-        State(state),
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), digest)),
-    )
-    .await
-}
-pub async fn get_blob_7level(
-    auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<BlobReader, Error> {
-    get_blob(
-        auth_user,
-        State(state),
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
-            digest,
-        )),
-    )
-    .await
-}
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, digest]
+    ) -> Result<BlobReader, Error>
+);
 
 /*
 ---
@@ -210,141 +120,17 @@ pub async fn put_blob(
         (0, (size as u32).saturating_sub(1)), // Note first byte is 0
     ))
 }
-pub async fn put_blob_2level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, uuid)): Path<(String, String, String)>,
-    digest: Query<DigestQuery>,
-    chunk: BodyStream,
-) -> Result<AcceptedUpload, Error> {
+
+endpoint_fn_7_levels!(
     put_blob(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}"), uuid)),
-        digest,
-        chunk,
-    )
-    .await
-}
-pub async fn put_blob_3level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, uuid)): Path<(String, String, String, String)>,
-    digest: Query<DigestQuery>,
-    chunk: BodyStream,
-) -> Result<AcceptedUpload, Error> {
-    put_blob(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}"), uuid)),
-        digest,
-        chunk,
-    )
-    .await
-}
-pub async fn put_blob_4level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, uuid)): Path<(String, String, String, String, String)>,
-    digest: Query<DigestQuery>,
-    chunk: BodyStream,
-) -> Result<AcceptedUpload, Error> {
-    put_blob(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}"), uuid)),
-        digest,
-        chunk,
-    )
-    .await
-}
-pub async fn put_blob_5level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, uuid)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    digest: Query<DigestQuery>,
-    chunk: BodyStream,
-) -> Result<AcceptedUpload, Error> {
-    put_blob(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}"), uuid)),
-        digest,
-        chunk,
-    )
-    .await
-}
-pub async fn put_blob_6level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, uuid)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    digest: Query<DigestQuery>,
-    chunk: BodyStream,
-) -> Result<AcceptedUpload, Error> {
-    put_blob(
-        headers,
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), uuid)),
-        digest,
-        chunk,
-    )
-    .await
-}
-pub async fn put_blob_7level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven, uuid)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    digest: Query<DigestQuery>,
-    chunk: BodyStream,
-) -> Result<AcceptedUpload, Error> {
-    put_blob(
-        headers,
-        auth_user,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
-            uuid,
-        )),
-        digest,
-        chunk,
-    )
-    .await
-}
+        headers: HeaderMap,
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, uuid],
+        digest: Query<DigestQuery>,
+        chunk: BodyStream
+    ) -> Result<AcceptedUpload, Error>
+);
 
 /*
 
@@ -395,146 +181,16 @@ pub async fn patch_blob(
     }
 }
 
-pub async fn patch_blob_2level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    info: Option<ContentInfo>,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, uuid)): Path<(String, String, String)>,
-    chunk: BodyStream,
-) -> Result<UploadInfo, Error> {
+endpoint_fn_7_levels!(
     patch_blob(
-        headers,
-        auth_user,
-        info,
-        State(state),
-        Path((format!("{one}/{two}"), uuid)),
-        chunk,
-    )
-    .await
-}
-
-pub async fn patch_blob_3level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    info: Option<ContentInfo>,
-    State(state): State<Arc<TrowServerState>>,
-    Path((one, two, three, uuid)): Path<(String, String, String, String)>,
-    chunk: BodyStream,
-) -> Result<UploadInfo, Error> {
-    patch_blob(
-        headers,
-        auth_user,
-        info,
-        State(state),
-        Path((format!("{one}/{two}/{three}"), uuid)),
-        chunk,
-    )
-    .await
-}
-
-pub async fn patch_blob_4level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    info: Option<ContentInfo>,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, uuid)): Path<(String, String, String, String, String)>,
-    chunk: BodyStream,
-) -> Result<UploadInfo, Error> {
-    patch_blob(
-        headers,
-        auth_user,
-        info,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}"), uuid)),
-        chunk,
-    )
-    .await
-}
-
-pub async fn patch_blob_5level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    info: Option<ContentInfo>,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, uuid)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    chunk: BodyStream,
-) -> Result<UploadInfo, Error> {
-    patch_blob(
-        headers,
-        auth_user,
-        info,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}"), uuid)),
-        chunk,
-    )
-    .await
-}
-
-pub async fn patch_blob_6level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    info: Option<ContentInfo>,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, uuid)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    chunk: BodyStream,
-) -> Result<UploadInfo, Error> {
-    patch_blob(
-        headers,
-        auth_user,
-        info,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), uuid)),
-        chunk,
-    )
-    .await
-}
-
-pub async fn patch_blob_7level(
-    headers: HeaderMap,
-    auth_user: TrowToken,
-    info: Option<ContentInfo>,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven, uuid)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    chunk: BodyStream,
-) -> Result<UploadInfo, Error> {
-    patch_blob(
-        headers,
-        auth_user,
-        info,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
-            uuid,
-        )),
-        chunk,
-    )
-    .await
-}
+        headers: HeaderMap,
+        auth_user: TrowToken,
+        info: Option<ContentInfo>,
+        state: State<Arc<TrowServerState>>;
+        path: [image_name, uuid],
+        chunk: BodyStream
+    ) -> Result<UploadInfo, Error>
+);
 
 /*
  Starting point for an uploading a new image or new version of an image.
@@ -592,129 +248,17 @@ pub async fn post_blob_upload(
         (0, 0),
     )))
 }
-pub async fn post_blob_upload_2level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    headers: HeaderMap,
-    digest: Query<DigestQuery>,
-    Path((one, two)): Path<(String, String)>,
-    data: BodyStream,
-) -> Result<Upload, Error> {
+
+endpoint_fn_7_levels!(
     post_blob_upload(
-        auth_user,
-        state,
-        headers,
-        digest,
-        Path(format!("{one}/{two}")),
-        data,
-    )
-    .await
-}
-pub async fn post_blob_upload_3level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    headers: HeaderMap,
-    digest: Query<DigestQuery>,
-    Path((one, two, three)): Path<(String, String, String)>,
-    data: BodyStream,
-) -> Result<Upload, Error> {
-    post_blob_upload(
-        auth_user,
-        state,
-        headers,
-        digest,
-        Path(format!("{one}/{two}/{three}")),
-        data,
-    )
-    .await
-}
-pub async fn post_blob_upload_4level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    headers: HeaderMap,
-    digest: Query<DigestQuery>,
-    Path((one, two, three, four)): Path<(String, String, String, String)>,
-    data: BodyStream,
-) -> Result<Upload, Error> {
-    post_blob_upload(
-        auth_user,
-        state,
-        headers,
-        digest,
-        Path(format!("{one}/{two}/{three}/{four}")),
-        data,
-    )
-    .await
-}
-pub async fn post_blob_upload_5level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    headers: HeaderMap,
-    digest: Query<DigestQuery>,
-    Path((one, two, three, four, five)): Path<(String, String, String, String, String)>,
-    data: BodyStream,
-) -> Result<Upload, Error> {
-    post_blob_upload(
-        auth_user,
-        state,
-        headers,
-        digest,
-        Path(format!("{one}/{two}/{three}/{four}/{five}")),
-        data,
-    )
-    .await
-}
-pub async fn post_blob_upload_6level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    headers: HeaderMap,
-    digest: Query<DigestQuery>,
-    Path((one, two, three, four, five, six)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    data: BodyStream,
-) -> Result<Upload, Error> {
-    post_blob_upload(
-        auth_user,
-        state,
-        headers,
-        digest,
-        Path(format!("{one}/{two}/{three}/{four}/{five}/{six}")),
-        data,
-    )
-    .await
-}
-pub async fn post_blob_upload_7level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    headers: HeaderMap,
-    digest: Query<DigestQuery>,
-    Path((one, two, three, four, five, six, seven)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-    data: BodyStream,
-) -> Result<Upload, Error> {
-    post_blob_upload(
-        auth_user,
-        state,
-        headers,
-        digest,
-        Path(format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}")),
-        data,
-    )
-    .await
-}
+        auth_user: TrowToken,
+        state: State<Arc<TrowServerState>>,
+        headers: HeaderMap,
+        digest: Query<DigestQuery>;
+        path: [image_name],
+        data: BodyStream
+    ) -> Result<Upload, Error>
+);
 
 /**
  * Deletes the given blob.
@@ -736,97 +280,11 @@ pub async fn delete_blob(
         .map_err(|_| Error::NotFound)?;
     Ok(BlobDeleted {})
 }
-pub async fn delete_blob_2level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, digest)): Path<(String, String, String)>,
-) -> Result<BlobDeleted, Error> {
-    delete_blob(auth_user, state, Path((format!("{one}/{two}"), digest))).await
-}
-pub async fn delete_blob_3level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, digest)): Path<(String, String, String, String)>,
-) -> Result<BlobDeleted, Error> {
+
+endpoint_fn_7_levels!(
     delete_blob(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}"), digest)),
-    )
-    .await
-}
-pub async fn delete_blob_4level(
     auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, digest)): Path<(String, String, String, String, String)>,
-) -> Result<BlobDeleted, Error> {
-    delete_blob(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}"), digest)),
-    )
-    .await
-}
-pub async fn delete_blob_5level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<BlobDeleted, Error> {
-    delete_blob(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}"), digest)),
-    )
-    .await
-}
-pub async fn delete_blob_6level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<BlobDeleted, Error> {
-    delete_blob(
-        auth_user,
-        state,
-        Path((format!("{one}/{two}/{three}/{four}/{five}/{six}"), digest)),
-    )
-    .await
-}
-pub async fn delete_blob_7level(
-    auth_user: TrowToken,
-    state: State<Arc<TrowServerState>>,
-    Path((one, two, three, four, five, six, seven, digest)): Path<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )>,
-) -> Result<BlobDeleted, Error> {
-    delete_blob(
-        auth_user,
-        state,
-        Path((
-            format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}"),
-            digest,
-        )),
-    )
-    .await
-}
+    state: State<Arc<TrowServerState>>;
+    path: [image_name, digest]
+    ) -> Result<BlobDeleted, Error>
+);
