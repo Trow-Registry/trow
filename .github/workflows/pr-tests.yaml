@@ -34,7 +34,6 @@ jobs:
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
-      BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
     outputs:
       container-image: ${{ steps.meta.outputs.tags }}
     timeout-minutes: 20
@@ -70,10 +69,6 @@ jobs:
   oci-conformance:
     runs-on: ubuntu-latest
     needs: build
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
-      BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
     timeout-minutes: 10
     steps:
       - name: Download container image artifact
