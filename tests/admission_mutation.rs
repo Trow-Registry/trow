@@ -14,7 +14,7 @@ mod admission_mutation_tests {
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
     use reqwest::StatusCode;
-    use trow_server::{RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::trow_server::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
 

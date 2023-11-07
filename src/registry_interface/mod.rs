@@ -3,7 +3,7 @@ pub use blob_storage::{BlobReader, BlobStorage, ContentInfo, UploadInfo};
 pub use catalog_operations::{CatalogOperations, ManifestHistory};
 pub use digest::{Digest, DigestAlgorithm};
 pub use manifest_storage::{ManifestReader, ManifestStorage};
-pub use metrics::{Metrics, MetricsError, MetricsResponse};
+pub use metrics::{Metrics, MetricsError};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncSeek};
 

@@ -183,7 +183,7 @@ mod test {
     use serde_json::{self, Value};
 
     use super::{FromJson, Manifest};
-    use crate::digest::sha256_tag_digest;
+    use crate::trow_server::digest::sha256_tag_digest;
 
     #[test]
     fn valid_v2_2() {

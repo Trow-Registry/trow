@@ -4,15 +4,15 @@ mod common;
 #[cfg(test)]
 mod interface_tests {
 
+    use std::fmt::Write;
     use std::io::BufReader;
     use std::process::{Child, Command};
     use std::time::Duration;
     use std::{fs, thread};
 
     use environment::Environment;
-    use rand::Rng;
     use reqwest::StatusCode;
-    use trow_server::digest;
+    use trow::trow_server::digest;
 
     use crate::common;
 
@@ -81,34 +81,28 @@ mod interface_tests {
         let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
-        let mut rng = rand::thread_rng();
-        let ran_size: u32 = rng.gen();
-        let mut digest = [0u8; 32];
-        rng.fill(&mut digest[..]);
-        let mut ran_digest = "".to_string();
-        for b in &digest {
-            ran_digest.push_str(&format!("{:x}", b).to_string());
-        }
+        let ran_size = fastrand::u32(0..=u32::MAX);
+        let ran_digest = (0..32).fold(String::new(), |mut output, _| {
+            write!(output, "{:02x}", fastrand::u8(0..=u8::MAX)).unwrap();
+            output
+        });
 
+        let config_len = config.len();
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
-                 "config": {{ "digest": "{}",
+                  "config": {{ "digest": "{config_digest}",
                              "mediaType": "application/vnd.oci.image.config.v1+json",
-                             "size": {} }},
+                             "size": {config_len} }},
                  "layers": [
                     {{
                               "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
-                              "size": {},
-                              "digest": "sha256:{}",
+                              "size": {ran_size},
+                              "digest": "sha256:{ran_digest}",
                               "urls": [
                                  "https://mcr.microsoft.com/v2/windows/servercore/blobs/sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
                               ]
                            }}
                  ], "schemaVersion": 2 }}"#,
-            config_digest,
-            config.len(),
-            ran_size,
-            ran_digest
         );
         let bytes = manifest.clone();
         let resp = cl
@@ -119,8 +113,7 @@ mod interface_tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
-        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
-        digest
+        digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap()
     }
 
     async fn get_history(

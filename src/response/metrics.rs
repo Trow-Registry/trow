@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 
-use crate::registry_interface::MetricsResponse;
+use crate::trow_server::api_types::MetricsResponse;
 
 impl IntoResponse for MetricsResponse {
     fn into_response(self) -> Response {
@@ -21,7 +21,7 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::registry_interface::MetricsResponse;
+    use crate::trow_server::api_types::MetricsResponse;
 
     fn build_metrics_response() -> MetricsResponse {
         MetricsResponse {

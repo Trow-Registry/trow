@@ -6,6 +6,7 @@ mod routes;
 pub mod types;
 
 mod registry_interface;
+pub mod trow_server;
 #[cfg(feature = "sqlite")]
 mod users;
 
@@ -18,10 +19,9 @@ use anyhow::{anyhow, Context, Result};
 use axum::extract::FromRef;
 use axum_server::tls_rustls::RustlsConfig;
 use client_interface::ClientInterface;
-use futures::Future;
 use thiserror::Error;
 use tracing::{event, Level};
-use trow_server::{ImageValidationConfig, RegistryProxiesConfig};
+use trow_server::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
 use uuid::Uuid;
 
 //TODO: Make this take a cause or description
@@ -56,7 +56,6 @@ pub struct TrowConfig {
     data_dir: String,
     addr: SocketAddr,
     tls: Option<TlsConfig>,
-    grpc: GrpcConfig,
     service_name: String,
     proxy_registry_config: Option<RegistryProxiesConfig>,
     image_validation_config: Option<ImageValidationConfig>,
@@ -64,11 +63,6 @@ pub struct TrowConfig {
     token_secret: String,
     user: Option<UserConfig>,
     cors: Option<Vec<String>>,
-}
-
-#[derive(Clone, Debug)]
-struct GrpcConfig {
-    listen: String,
 }
 
 #[derive(Clone, Debug)]
@@ -83,9 +77,7 @@ struct UserConfig {
     hash_encoded: String, //Surprised not bytes
 }
 
-fn init_trow_server(
-    config: TrowConfig,
-) -> Result<impl Future<Output = Result<(), tonic::transport::Error>>> {
+fn init_trow_server(config: TrowConfig) -> Result<TrowServer> {
     event!(Level::DEBUG, "Starting Trow server");
 
     //Could pass full config here.
@@ -94,18 +86,11 @@ fn init_trow_server(
 
     let ts = trow_server::build_server(
         &config.data_dir,
-        config.grpc.listen.parse::<std::net::SocketAddr>()?,
         config.proxy_registry_config,
         config.image_validation_config,
     );
-    //TODO: probably shouldn't be reusing this cert
-    let ts = if let Some(tls) = config.tls {
-        ts.add_tls(fs::read(tls.cert_file)?, fs::read(tls.key_file)?)
-    } else {
-        ts
-    };
 
-    Ok(ts.get_server_future())
+    ts.get_server()
 }
 
 pub struct TrowBuilder {
@@ -117,7 +102,6 @@ impl TrowBuilder {
     pub fn new(
         data_dir: String,
         addr: SocketAddr,
-        listen: String,
         service_name: String,
         dry_run: bool,
         cors: Option<Vec<String>>,
@@ -126,7 +110,6 @@ impl TrowBuilder {
             data_dir,
             addr,
             tls: None,
-            grpc: GrpcConfig { listen },
             service_name,
             proxy_registry_config: None,
             image_validation_config: None,
@@ -216,17 +199,14 @@ impl TrowBuilder {
             println!("Dry run, exiting.");
             std::process::exit(0);
         }
+        let trow_server = init_trow_server(self.config.clone())?;
 
-        let s = format!("https://{}", self.config.grpc.listen);
         let server_state = TrowServerState {
             config: self.config.clone(),
-            client: build_handlers(s)?,
+            client: build_handlers(trow_server)?,
         };
 
         let app = routes::create_app(server_state);
-
-        // Start GRPC Backend task
-        tokio::task::spawn(init_trow_server(self.config.clone())?);
 
         // Listen for termination signal
         let handle = axum_server::Handle::new();
@@ -287,9 +267,7 @@ async fn shutdown_signal(handle: axum_server::Handle) {
     handle.graceful_shutdown(Some(Duration::from_secs(30)));
 }
 
-pub fn build_handlers(listen_addr: String) -> Result<ClientInterface> {
-    event!(Level::DEBUG, "Address for backend: {}", listen_addr);
-
+pub fn build_handlers(ts: TrowServer) -> Result<ClientInterface> {
     //TODO this function is useless currently
-    ClientInterface::new(listen_addr)
+    ClientInterface::new(ts)
 }

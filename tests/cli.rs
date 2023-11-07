@@ -4,7 +4,9 @@ mod common;
 #[cfg(test)]
 mod cli {
     use predicates::prelude::*;
-    use trow_server::{ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::trow_server::{
+        ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig,
+    };
 
     use crate::common::get_file;
 

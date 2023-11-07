@@ -90,7 +90,7 @@ pub trait BlobStorage {
     ) -> Result<Stored, StorageDriverError>;
 
     /// Finalises the upload of the given session_id.
-    /// Also verfies uploaded blob matches user digest
+    /// Also verifies uploaded blob matches user digest
     async fn complete_and_verify_blob_upload(
         &self,
         name: &str,
