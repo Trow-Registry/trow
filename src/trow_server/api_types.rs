@@ -2,6 +2,12 @@
 
 use serde_derive::{Deserialize, Serialize};
 
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
+pub struct Upload {
+    repo_name: String,
+    uuid: String,
+}
+
 #[derive(Clone, PartialEq)]
 pub struct UploadRequest {
     /// e.g. "amouat/network-utils", "nginx", "my-org/my-team/my-repo"

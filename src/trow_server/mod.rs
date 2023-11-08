@@ -7,6 +7,7 @@ mod metrics;
 mod proxy_auth;
 mod server;
 mod temporary_file;
+mod errors;
 
 pub use admission::ImageValidationConfig;
 use anyhow::Result;

@@ -51,6 +51,7 @@ aws-types = "0.56.1"
 aws-sdk-ecr = "0.34.0"
 const_format = "0.2.24"
 async-trait = "0.1.74"
+object_store = "0.8.0"
 
 
 [dev-dependencies]
