@@ -11,11 +11,11 @@ use chrono::prelude::*;
 use futures::future::try_join_all;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
-use thiserror::Error;
-use tokio::io::AsyncWriteExt;
+use super::errors::{DigestValidationError, ProxyError};
 use tokio::time::Duration;
 use tracing::{event, Level};
 use uuid::Uuid;
+use object_store::ObjectStore;
 
 use super::api_types::*;
 use super::digest::sha256_tag_digest;
@@ -33,43 +33,17 @@ static UPLOADS_DIR: &str = "scratch";
 static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
-/* Struct implementing callbacks for the Frontend
- *
- * _active_uploads_: a HashSet of all uuids that are currently being tracked
- * _manifests_path_: path to where the manifests are
- * _layers_path_: path to where blobs are stored
- * _scratch_path_: path to temporary storage for uploads
- *
- * Each "route" gets a clone of this struct.
- * The Arc makes sure they all point to the same data.
- */
+
+/// Struct implementing callbacks for the Frontend
 #[derive(Clone, Debug)]
 pub struct TrowServer {
+    /// active_uploads: a HashSet of all uuids that are currently being tracked
     active_uploads: Arc<RwLock<HashSet<Upload>>>,
-    manifests_path: PathBuf,
-    blobs_path: PathBuf,
-    scratch_path: PathBuf,
+    /// ObjectStore where manifests and blobs are written
+    data_store: Arc<dyn ObjectStore>,
+    // file_locks: Arc<RwLock<HashSet<String>>>,
     pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
-}
-
-#[derive(Eq, PartialEq, Hash, Debug, Clone)]
-struct Upload {
-    repo_name: String,
-    uuid: String,
-}
-
-#[derive(Error, Debug)]
-#[error("Error getting proxied repo {msg:?}")]
-pub struct ProxyError {
-    msg: String,
-}
-
-#[derive(Error, Debug)]
-#[error("Expected digest {user_digest:?} but got {actual_digest:?}")]
-pub struct DigestValidationError {
-    user_digest: String,
-    actual_digest: String,
 }
 
 pub fn create_accept_header() -> HeaderMap {
@@ -238,10 +212,6 @@ impl TrowServer {
         Ok(svc)
     }
 
-    fn get_upload_path_for_blob(&self, uuid: &str) -> PathBuf {
-        self.scratch_path.join(uuid)
-    }
-
     fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf> {
         let mut iter = digest.split(':');
         let alg = iter
@@ -254,7 +224,7 @@ impl TrowServer {
             .next()
             .ok_or_else(|| anyhow!("Digest {} did not contain value component", digest))?;
         assert_eq!(None, iter.next());
-        Ok(self.blobs_path.join(alg).join(val))
+        Ok(PathBuf::from("blobs").join(alg).join(val))
     }
 
     fn get_digest_from_manifest(&self, repo_name: &str, reference: &str) -> Result<String> {
@@ -266,10 +236,15 @@ impl TrowServer {
         // Last line should always be the current digest
 
         let repo_dir = self.manifests_path.join(repo_name);
-        fs::create_dir_all(&repo_dir)?;
+        // fs::create_dir_all(&repo_dir)?;
 
         let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
         let contents = format!("{} {}\n", digest, ts).into_bytes();
+
+        self.file_locks
+            .write()
+            .unwrap()
+            .insert(repo_name.to_string());
 
         let mut file = tokio::fs::OpenOptions::new()
             .create(true)
