@@ -1,6 +1,6 @@
 [package]
 name = "trow"
-version = "0.6.1"
+version = "0.6.2"
 authors = []
 edition = "2021"
 
@@ -32,7 +32,7 @@ regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
 thiserror = "1.0"
-kube = { version = "0.86", features = ["admission"] }
+kube = { version = "0.87.1", features = ["admission"] }
 k8s-openapi = { version = "0.20.0", features = ["v1_26"] }
 json-patch = "1.0.0"
 tokio = { version = "1", features = ["macros"] }
@@ -46,9 +46,9 @@ reqwest = { version = "0.11", features = ["json", "stream"] }
 prometheus = { version = "0.13"}
 fs3 = "0.5.0"
 quoted-string = "0.6.1"
-aws-config = "0.56.1"
-aws-types = "0.56.1"
-aws-sdk-ecr = "0.34.0"
+aws-config = "0.57.1"
+aws-types = "0.57.1"
+aws-sdk-ecr = "0.35.0"
 const_format = "0.2.24"
 async-trait = "0.1.74"
 
