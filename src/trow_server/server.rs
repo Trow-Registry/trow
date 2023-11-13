@@ -25,7 +25,7 @@ use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
 use super::temporary_file::TemporaryFile;
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
 
-static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
+pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 static MANIFESTS_DIR: &str = "manifests";
 static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
@@ -41,7 +41,6 @@ pub struct TrowServer {
     active_uploads: Arc<RwLock<HashSet<Upload>>>,
     /// ObjectStore where manifests and blobs are written
     data_store: Arc<dyn ObjectStore>,
-    // file_locks: Arc<RwLock<HashSet<String>>>,
     pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
 }
@@ -60,29 +59,6 @@ pub fn create_accept_header() -> HeaderMap {
         HeaderValue::from_str(&ACCEPT.join(", ")).unwrap(),
     );
     headers
-}
-
-fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
-    let data_path = Path::new(data_path);
-    let dir_path = data_path.join(dir);
-    if !dir_path.exists() {
-        return match fs::create_dir_all(&dir_path) {
-            Ok(_) => Ok(dir_path),
-            Err(e) => {
-                event!(
-                    Level::ERROR,
-                    r#"
-                Failed to create directory required by trow {:?}
-                Please check the parent directory is writable by the trow user.
-                {:?}"#,
-                    dir_path,
-                    e
-                );
-                Err(e)
-            }
-        };
-    };
-    Ok(dir_path)
 }
 
 fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
@@ -650,6 +626,35 @@ impl TrowServer {
         }
     }
 
+    pub async fn get_write_sync_for_blob(
+        &self,
+        br: UploadRef,
+    ) {
+        let upload = Upload {
+            repo_name: br.repo_name.clone(),
+            uuid: br.uuid.clone(),
+        };
+
+        // "We unwrap() the return value to assert that we are not expecting
+        // threads to ever fail while holding the lock."
+        let locked_set = self.active_uploads.read().unwrap();
+
+        let a = if locked_set.contains(&upload) {
+            drop(locked_set);
+            let path = self.get_upload_path_for_blob(&br.uuid);
+            Ok(WriteLocation {
+                path: path.to_string_lossy().to_string(),
+            })
+        } else {
+            Err(Status::FailedPrecondition(format!(
+                "No current upload matching {:?}",
+                br
+            )))
+        }
+
+        Ok(())
+    }
+
     pub async fn get_write_location_for_blob(
         &self,
         br: UploadRef,
@@ -783,6 +788,12 @@ impl TrowServer {
                 ))
             }
         }
+    }
+
+
+    async fn get_blob(&self, uuid: String) {
+        self.data_store.
+
     }
 
     /**
