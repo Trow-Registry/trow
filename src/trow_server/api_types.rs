@@ -4,8 +4,8 @@ use serde_derive::{Deserialize, Serialize};
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub struct Upload {
-    repo_name: String,
-    uuid: String,
+    pub repo_name: String,
+    pub uuid: String,
 }
 
 #[derive(Clone, PartialEq)]
@@ -24,7 +24,6 @@ pub struct UploadDetails {
 #[derive(Clone, PartialEq, Debug)]
 pub struct UploadRef {
     pub repo_name: String,
-
     pub uuid: String,
 }
 

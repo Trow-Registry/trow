@@ -7,8 +7,8 @@ use prometheus::{
     TextEncoder,
 };
 
-//  Metrics static values executed at runtime and registered to default
-//  prometheus registry
+// Metrics static values executed at runtime and registered to default
+// prometheus registry
 lazy_static! {
     pub static ref TOTAL_SPACE: IntGauge = register_int_gauge!(opts!(
         "total_space",

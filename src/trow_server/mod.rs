@@ -8,6 +8,7 @@ mod proxy_auth;
 mod server;
 mod temporary_file;
 mod errors;
+mod storage;
 
 pub use admission::ImageValidationConfig;
 use anyhow::Result;
