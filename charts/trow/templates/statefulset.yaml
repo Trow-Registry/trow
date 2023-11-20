@@ -67,6 +67,10 @@ spec:
           subPath: validation.yaml
           readOnly: true
       {{- end}}
+      {{- with .Values.resources }}
+        resources:
+        {{- toYaml . | nindent 10 }}
+      {{- end }}
       securityContext:
         runAsUser: 333333
         runAsGroup: 333333
