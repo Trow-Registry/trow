@@ -16,6 +16,8 @@ use tokio::time::Duration;
 use tracing::{event, Level};
 use uuid::Uuid;
 use object_store::ObjectStore;
+use tokio::io::AsyncWriteExt;
+use futures::stream::StreamExt;
 
 use super::api_types::*;
 use super::digest::sha256_tag_digest;
@@ -24,6 +26,7 @@ use super::manifest::{manifest_media_type, FromJson, Manifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
 use super::temporary_file::TemporaryFile;
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
+use super::storage::TrowStorageBackend;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 static MANIFESTS_DIR: &str = "manifests";
@@ -37,10 +40,9 @@ static DIGEST_HEADER: &str = "Docker-Content-Digest";
 /// Struct implementing callbacks for the Frontend
 #[derive(Clone, Debug)]
 pub struct TrowServer {
+    storage: TrowStorageBackend,
     /// active_uploads: a HashSet of all uuids that are currently being tracked
     active_uploads: Arc<RwLock<HashSet<Upload>>>,
-    /// ObjectStore where manifests and blobs are written
-    data_store: Arc<dyn ObjectStore>,
     pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
 }
@@ -61,79 +63,6 @@ pub fn create_accept_header() -> HeaderMap {
     headers
 }
 
-fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
-    digest
-        == match get_digest_from_manifest_path(manifest.path()) {
-            Ok(test_digest) => test_digest,
-            Err(e) => {
-                event!(Level::WARN, "Failure reading repo {:?}", e);
-                "NO_MATCH".to_string()
-            }
-        }
-}
-
-struct RepoIterator {
-    paths: Vec<Result<DirEntry, std::io::Error>>,
-}
-
-impl RepoIterator {
-    fn new(base_dir: &Path) -> Result<RepoIterator> {
-        let paths = fs::read_dir(base_dir)?.collect();
-        Ok(RepoIterator { paths })
-    }
-}
-
-impl Iterator for RepoIterator {
-    type Item = DirEntry;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.paths.pop() {
-            None => None,
-            Some(res_path) => match res_path {
-                Err(e) => {
-                    event!(Level::WARN, "Error iterating over repos {:?}", e);
-                    self.next()
-                }
-                Ok(path) => {
-                    if path.file_type().unwrap().is_dir() {
-                        let new_paths = fs::read_dir(path.path()).unwrap();
-                        self.paths.extend(new_paths);
-                        self.next()
-                    } else {
-                        Some(path)
-                    }
-                }
-            },
-        }
-    }
-}
-
-/**
- * Checks a file matches the given digest.
- *
- * TODO: should be able to use range of hashes.
- * TODO: check if using a static for the hasher speeds things up.
- */
-fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
-    let f = File::open(file)?;
-    let reader = BufReader::new(f);
-
-    let calculated_digest = sha256_tag_digest(reader)?;
-
-    if calculated_digest != digest {
-        event!(
-            Level::ERROR,
-            "Upload did not match given digest. Was given {} but got {}",
-            digest,
-            calculated_digest
-        );
-        return Err(anyhow!(DigestValidationError {
-            user_digest: digest.to_string(),
-            actual_digest: calculated_digest,
-        }));
-    }
-
-    Ok(())
-}
 
 pub fn is_digest(maybe_digest: &str) -> bool {
     for alg in &SUPPORTED_DIGESTS {
@@ -145,27 +74,6 @@ pub fn is_digest(maybe_digest: &str) -> bool {
     false
 }
 
-fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
-    let file = File::open(path)?;
-    let metadata = file.metadata()?;
-    let permissions = metadata.permissions();
-    Ok(!permissions.readonly())
-}
-
-fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String> {
-    let manifest = fs::read_to_string(path)?;
-    let latest_digest_line = manifest
-        .lines()
-        .last()
-        .ok_or_else(|| anyhow!("Empty manifest"))?;
-    // Each line is `{digest} {date}`
-    let latest_digest = latest_digest_line
-        .split(' ')
-        .next()
-        .ok_or_else(|| anyhow!("Invalid manifest line: `{}`", latest_digest_line))?;
-
-    Ok(latest_digest.to_string())
-}
 
 impl TrowServer {
     pub fn new(
@@ -312,30 +220,11 @@ impl TrowServer {
             event!(Level::DEBUG, "Already have blob {}", digest);
             return Ok(());
         }
-        let path = self.scratch_path.join(digest);
-        let mut file = match TemporaryFile::open_for_writing(path.clone()).await? {
-            Some(f) => f,
-            None => {
-                event!(
-                    Level::DEBUG,
-                    "Waiting for concurrently fetched blob {}",
-                    digest
-                );
-                while path.exists() {
-                    // wait for download to be done (temp file to be moved)
-                    // TODO: use notify crate instead
-                    tokio::time::sleep(Duration::from_millis(200)).await;
-                }
-                return Ok(());
-            }
-        };
-
         let addr = format!("{}/blobs/{}", remote_image.get_base_uri(), digest);
         event!(Level::INFO, "Downloading blob {}", addr);
-        let resp = cl.authenticated_request(Method::GET, &addr).send().await?;
+        let resp = cl.authenticated_request(Method::GET, &addr).send().await.context("GET blob failed")?;
+        self.storage.write_blob_stream(digest, resp.bytes_stream()).await.context("Failed to write blob")?;
 
-        file.write_stream(resp.bytes_stream()).await?;
-        self.save_blob(file.path(), digest)?;
         Ok(())
     }
 
@@ -364,13 +253,7 @@ impl TrowServer {
                 resp.status()
             ));
         }
-
-        let mut buf =
-            TemporaryFile::open_for_writing(self.scratch_path.join(Uuid::new_v4().to_string()))
-                .await?
-                .unwrap();
         let bytes = resp.bytes().await?;
-        buf.write_all(&bytes).await?;
 
         let mani: Manifest = serde_json::from_slice(&bytes)?;
         match mani {
@@ -398,14 +281,7 @@ impl TrowServer {
             }
         }
 
-        //Save out manifest
-        let f = File::open(buf.path())?;
-        let reader = BufReader::new(f);
-        let calculated_digest = sha256_tag_digest(reader)?;
-
-        self.save_blob(buf.path(), &calculated_digest)?;
-        self.save_tag(&calculated_digest, local_repo_name, &remote_image.reference)
-            .await?;
+        self.storage.write_image_manifest(bytes, local_repo_name, &remote_image.reference).await?;
 
         Ok(())
     }
@@ -939,68 +815,12 @@ impl TrowServer {
             ));
         }
 
-        let manifest_path = self.manifests_path.join(&mr.repo_name).join(&mr.tag);
-
-        let file = File::open(&manifest_path);
-
-        if file.is_err() {
-            return Err(Status::NotFound(format!(
-                "Could not find the requested manifest at: {}",
-                &manifest_path.to_str().unwrap()
-            )));
+        let mut manifest_history = self.storage.get_manifest_history(&mr.repo_name, &mr.tag).await?.into_iter();
+        if !mr.last_digest.is_empty() {
+            manifest_history.skip_while(|entry| entry.digest != mr.last_digest);
+            manifest_history.skip(1);
         }
-
-        // It's safe to unwrap here
-        let reader = BufReader::new(file.unwrap());
-
-        let mut entries = Vec::new();
-
-        let mut searching_for_digest = !mr.last_digest.is_empty(); //Looking for a digest iff it's not empty
-
-        let mut sent = 0;
-        for line in reader.lines().flatten() {
-            let (digest, date) = match line.find(' ') {
-                Some(ind) => {
-                    let (digest_str, date_str) = line.split_at(ind);
-
-                    if searching_for_digest {
-                        if digest_str == mr.last_digest {
-                            searching_for_digest = false;
-                        }
-                        //Remember we want digest following matched digest
-                        continue;
-                    }
-
-                    let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
-
-                    let ts = if let Ok(dt) = dt_r {
-                        Some(Timestamp {
-                            seconds: dt.timestamp(),
-                            nanos: dt.timestamp_subsec_nanos() as i32,
-                        })
-                    } else {
-                        event!(Level::WARN, "Failed to parse timestamp {}", date_str);
-                        None
-                    };
-                    (digest_str, ts)
-                }
-                None => {
-                    event!(Level::WARN, "No timestamp found in manifest");
-                    (line.as_ref(), None)
-                }
-            };
-
-            let entry = ManifestHistoryEntry {
-                digest: digest.to_string(),
-                date,
-            };
-            entries.push(entry);
-
-            sent += 1;
-            if sent >= mr.limit {
-                break;
-            }
-        }
+        let entries = manifest_history.take(mr.limit as usize).collect();
 
         Ok(entries)
     }

@@ -169,11 +169,10 @@ pub struct Timestamp {
     pub nanos: i32,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct ManifestHistoryEntry {
     pub digest: String,
-
-    pub date: Option<Timestamp>,
+    pub timestamp: String,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
