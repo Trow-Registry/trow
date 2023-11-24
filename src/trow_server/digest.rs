@@ -23,7 +23,7 @@ fn digest<D: Digest + Default, R: Read>(reader: &mut R) -> Result<String> {
     Ok(hex::encode(sh.finalize()))
 }
 
-fn sha256_digest<R: Read>(mut reader: R) -> Result<String> {
+pub fn sha256_digest<R: Read>(mut reader: R) -> Result<String> {
     digest::<Sha256, _>(&mut reader)
 }
 
