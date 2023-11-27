@@ -8,9 +8,12 @@ use std::{io, str};
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
 use chrono::prelude::*;
+use futures::TryFutureExt;
 use futures::future::try_join_all;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
+use crate::registry_interface::Metrics;
+
 use super::errors::{DigestValidationError, ProxyError};
 use tokio::time::Duration;
 use tracing::{event, Level};
@@ -152,7 +155,7 @@ impl TrowServer {
 
     fn create_verified_manifest(
         &self,
-        manifest_path: &PathBuf,
+        manifest_uuid: &str,
         verify_assets_exist: bool,
     ) -> Result<VerifiedManifest> {
         let manifest_bytes = std::fs::read(manifest_path)?;
@@ -738,58 +741,37 @@ impl TrowServer {
     }
 
     pub async fn get_catalog(&self, cr: CatalogRequest) -> Result<Vec<CatalogEntry>, Status> {
+        let mut manifests = self.storage.list_repos().await.map_err(|e| {
+            Status::Internal(format!("Internal error streaming catalog: {e}"))
+        })?;
         let limit = cr.limit as usize;
-
-        let catalog: HashSet<String> = RepoIterator::new(&self.manifests_path)
-            .map_err(|e| {
-                event!(Level::ERROR, "Error accessing catalog {:?}", e);
-                Status::Internal("Internal error streaming catalog".to_owned())
-            })?
-            .map(|de| de.path())
-            .filter_map(|p| p.parent().map(|p| p.to_path_buf()))
-            .filter_map(|r| {
-                r.strip_prefix(&self.manifests_path)
-                    .ok()
-                    .map(|p| p.to_path_buf())
-            })
-            .map(|p| p.to_string_lossy().to_string())
-            .collect();
-        let partial_catalog: Vec<String> = if cr.last_repo.is_empty() {
-            catalog.into_iter().take(limit).collect()
+        let manifests = if !cr.last_repo.is_empty() {
+            manifests.truncate(limit);
+            manifests
         } else {
-            catalog
-                .into_iter()
-                .skip_while(|t| t != &cr.last_repo)
-                .skip(1)
-                .take(limit)
-                .collect()
+            manifests.into_iter().skip_while(|m| *m != cr.last_repo).skip(1).take(limit).collect()
         };
 
-        Ok(partial_catalog
+        Ok(manifests
             .into_iter()
             .map(|repo_name| CatalogEntry { repo_name })
             .collect())
     }
 
     pub async fn list_tags(&self, ltr: ListTagsRequest) -> Result<Vec<Tag>, Status> {
-        let mut path = PathBuf::from(&self.manifests_path);
-
         let limit = ltr.limit as usize;
-        path.push(&ltr.repo_name);
 
-        let mut catalog: Vec<String> = RepoIterator::new(&path)
-            .map_err(|e| {
-                event!(Level::ERROR, "Error accessing catalog {:?}", e);
-                Status::Internal("Internal error streaming catalog".to_owned())
-            })?
-            .map(|de| de.path().file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        catalog.sort();
+        let mut tags = self.storage.list_repo_tags(&ltr.repo_name).await.map_err(|e| {
+            event!(Level::ERROR, "Error listing catalog repo tags {:?}", e);
+            Status::Internal("Internal error streaming catalog".to_owned())
+        })?;
+        tags.sort();
 
         let partial_catalog: Vec<String> = if ltr.last_tag.is_empty() {
-            catalog.into_iter().take(limit).collect()
+            tags.truncate(limit);
+            tags
         } else {
-            catalog
+            tags
                 .into_iter()
                 .skip_while(|t| t != &ltr.last_tag)
                 .skip(1)
@@ -800,7 +782,7 @@ impl TrowServer {
         Ok(partial_catalog
             .into_iter()
             .map(|tag| Tag {
-                tag: tag.to_string(),
+                tag,
             })
             .collect())
     }
@@ -814,38 +796,25 @@ impl TrowServer {
                 "Require valid tag (not digest) to search for history".to_owned(),
             ));
         }
+        let mut manifest_history = self.storage.get_manifest_history(&mr.repo_name, &mr.tag).await.map_err(|e| {
+            event!(Level::ERROR, "Error listing manifest history: {e}");
+            Status::Internal("Could not list manifest history".to_owned())
+        })?;
 
-        let mut manifest_history = self.storage.get_manifest_history(&mr.repo_name, &mr.tag).await?.into_iter();
-        if !mr.last_digest.is_empty() {
-            manifest_history.skip_while(|entry| entry.digest != mr.last_digest);
-            manifest_history.skip(1);
-        }
-        let entries = manifest_history.take(mr.limit as usize).collect();
+        let limit = mr.limit as usize;
+
+        let entries = if !mr.last_digest.is_empty() {
+            manifest_history.truncate(limit);
+            manifest_history
+        } else {
+            manifest_history.into_iter().skip_while(|entry| entry.digest != mr.last_digest).skip(1).take(limit).collect()
+        };
 
         Ok(entries)
     }
 
     // Readiness check
     pub async fn is_ready(&self) -> ReadyStatus {
-        for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
-            match is_path_writable(path) {
-                Ok(true) => {}
-                Ok(false) => {
-                    return ReadyStatus {
-                        is_ready: false,
-                        message: format!("{} is not writable", path.to_string_lossy()),
-                    };
-                }
-                Err(error) => {
-                    return ReadyStatus {
-                        is_ready: false,
-                        message: format!("error: {error}"),
-                    }
-                }
-            }
-        }
-
-        // All paths writable
         ReadyStatus {
             is_ready: true,
             message: String::from("Ready"),
@@ -860,13 +829,6 @@ impl TrowServer {
     }
 
     pub async fn get_metrics(&self, _request: MetricsRequest) -> Result<MetricsResponse, Status> {
-        match metrics::gather_metrics(&self.blobs_path) {
-            Ok(metrics) => {
-                let reply = MetricsResponse { metrics };
-                Ok(reply)
-            }
-
-            Err(error) => Err(Status::Unavailable(error.to_string())),
-        }
+        Ok(MetricsResponse { metrics: String::new()})
     }
 }
