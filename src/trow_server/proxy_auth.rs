@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
+use aws_config::BehaviorVersion;
 use base64::engine::general_purpose;
 use base64::Engine as _;
 use lazy_static::lazy_static;
@@ -150,7 +151,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?
         .to_owned();
     let region = aws_types::region::Region::new(region);
-    let config = aws_config::from_env().region(region).load().await;
+    let config = aws_config::defaults(BehaviorVersion::v2023_11_09()).region(region).load().await;
     let ecr_clt = aws_sdk_ecr::Client::new(&config);
     let token_response = ecr_clt.get_authorization_token().send().await?;
     let token = token_response
@@ -164,7 +165,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
 
     // The token is base64(username:password). Here, username is "AWS".
     // To get the password, we trim "AWS:" from the decoded token.
-    let mut auth_str = general_purpose::STANDARD_NO_PAD.decode(token)?;
+    let mut auth_str = general_purpose::STANDARD.decode(token)?;
     auth_str.drain(0..4);
 
     String::from_utf8(auth_str).context("Could not convert ECR token to valid password")

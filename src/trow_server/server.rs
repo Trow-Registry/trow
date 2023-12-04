@@ -500,7 +500,7 @@ impl TrowServer {
             Err(e) => {
                 event!(
                     Level::ERROR,
-                    "Could not create client for proxied registry {}: {}",
+                    "Could not create client for proxied registry {}: {:?}",
                     proxy_cfg.host,
                     e
                 );
