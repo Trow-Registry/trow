@@ -9,7 +9,7 @@ use axum::response::{IntoResponse, Response};
 use axum::{body, headers};
 use base64::engine::general_purpose as base64_engine;
 use base64::Engine as _;
-use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
+use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{event, Level};
@@ -136,7 +136,7 @@ struct TokenClaim {
  * Create new jsonwebtoken.
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
-pub fn new(vbt: ValidBasicToken, config: &TrowConfig) -> Result<TrowToken, frank_jwt::Error> {
+pub fn new(vbt: ValidBasicToken, config: &TrowConfig) -> Result<TrowToken, jsonwebtoken::Error> {
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
@@ -156,7 +156,7 @@ pub fn new(vbt: ValidBasicToken, config: &TrowConfig) -> Result<TrowToken, frank
     let payload = serde_json::to_value(token_claim)?;
 
     //Use generated config here
-    let token = encode(header, &config.token_secret, &payload, Algorithm::HS256)?;
+    let token = encode(header, &payload, &config.token_secret)?;
 
     Ok(TrowToken {
         user: vbt.user,
@@ -211,12 +211,11 @@ where
         let token = authorization.token();
 
         // parse for bearer token
-        // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
+        // TODO: verify iat, nbf etc?
         let dec_token = match decode(
             token,
             &config.token_secret,
-            Algorithm::HS256,
-            &ValidationOptions::default(),
+            &Validation::default()
         ) {
             Ok((_, payload)) => payload,
             Err(_) => {

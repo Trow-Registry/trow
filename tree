@@ -1,0 +1,1041 @@
+trow v0.6.1 (/home/arthur/Documents/projects/trow)
+├── anyhow v1.0.75
+├── async-recursion v1.0.5 (proc-macro)
+│   ├── proc-macro2 v1.0.70
+│   │   └── unicode-ident v1.0.12
+│   ├── quote v1.0.33
+│   │   └── proc-macro2 v1.0.70 (*)
+│   └── syn v2.0.41
+│       ├── proc-macro2 v1.0.70 (*)
+│       ├── quote v1.0.33 (*)
+│       └── unicode-ident v1.0.12
+├── async-trait v0.1.74 (proc-macro)
+│   ├── proc-macro2 v1.0.70 (*)
+│   ├── quote v1.0.33 (*)
+│   └── syn v2.0.41 (*)
+├── aws-config v1.1.0
+│   ├── aws-credential-types v1.1.0
+│   │   ├── aws-smithy-async v1.1.0
+│   │   │   ├── futures-util v0.3.29
+│   │   │   │   ├── futures-channel v0.3.29
+│   │   │   │   │   ├── futures-core v0.3.29
+│   │   │   │   │   └── futures-sink v0.3.29
+│   │   │   │   ├── futures-core v0.3.29
+│   │   │   │   ├── futures-io v0.3.29
+│   │   │   │   ├── futures-macro v0.3.29 (proc-macro)
+│   │   │   │   │   ├── proc-macro2 v1.0.70 (*)
+│   │   │   │   │   ├── quote v1.0.33 (*)
+│   │   │   │   │   └── syn v2.0.41 (*)
+│   │   │   │   ├── futures-sink v0.3.29
+│   │   │   │   ├── futures-task v0.3.29
+│   │   │   │   ├── memchr v2.6.4
+│   │   │   │   ├── pin-project-lite v0.2.13
+│   │   │   │   ├── pin-utils v0.1.0
+│   │   │   │   └── slab v0.4.9
+│   │   │   │       [build-dependencies]
+│   │   │   │       └── autocfg v1.1.0
+│   │   │   ├── pin-project-lite v0.2.13
+│   │   │   └── tokio v1.35.0
+│   │   │       ├── bytes v1.5.0
+│   │   │       ├── libc v0.2.151
+│   │   │       ├── mio v0.8.10
+│   │   │       │   └── libc v0.2.151
+│   │   │       ├── num_cpus v1.16.0
+│   │   │       │   └── libc v0.2.151
+│   │   │       ├── pin-project-lite v0.2.13
+│   │   │       ├── signal-hook-registry v1.4.1
+│   │   │       │   └── libc v0.2.151
+│   │   │       ├── socket2 v0.5.5
+│   │   │       │   └── libc v0.2.151
+│   │   │       └── tokio-macros v2.2.0 (proc-macro)
+│   │   │           ├── proc-macro2 v1.0.70 (*)
+│   │   │           ├── quote v1.0.33 (*)
+│   │   │           └── syn v2.0.41 (*)
+│   │   ├── aws-smithy-runtime-api v1.1.0
+│   │   │   ├── aws-smithy-async v1.1.0 (*)
+│   │   │   ├── aws-smithy-types v1.1.0
+│   │   │   │   ├── base64-simd v0.8.0
+│   │   │   │   │   ├── outref v0.5.1
+│   │   │   │   │   └── vsimd v0.8.0
+│   │   │   │   ├── bytes v1.5.0
+│   │   │   │   ├── bytes-utils v0.1.4
+│   │   │   │   │   ├── bytes v1.5.0
+│   │   │   │   │   └── either v1.9.0
+│   │   │   │   ├── futures-core v0.3.29
+│   │   │   │   ├── http v0.2.11
+│   │   │   │   │   ├── bytes v1.5.0
+│   │   │   │   │   ├── fnv v1.0.7
+│   │   │   │   │   └── itoa v1.0.10
+│   │   │   │   ├── http-body v0.4.6
+│   │   │   │   │   ├── bytes v1.5.0
+│   │   │   │   │   ├── http v0.2.11 (*)
+│   │   │   │   │   └── pin-project-lite v0.2.13
+│   │   │   │   ├── itoa v1.0.10
+│   │   │   │   ├── num-integer v0.1.45
+│   │   │   │   │   └── num-traits v0.2.17
+│   │   │   │   │       [build-dependencies]
+│   │   │   │   │       └── autocfg v1.1.0
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── autocfg v1.1.0
+│   │   │   │   ├── pin-project-lite v0.2.13
+│   │   │   │   ├── pin-utils v0.1.0
+│   │   │   │   ├── ryu v1.0.16
+│   │   │   │   ├── time v0.3.30
+│   │   │   │   │   ├── deranged v0.3.10
+│   │   │   │   │   │   └── powerfmt v0.2.0
+│   │   │   │   │   ├── powerfmt v0.2.0
+│   │   │   │   │   └── time-core v0.1.2
+│   │   │   │   ├── tokio v1.35.0 (*)
+│   │   │   │   └── tokio-util v0.7.10
+│   │   │   │       ├── bytes v1.5.0
+│   │   │   │       ├── futures-core v0.3.29
+│   │   │   │       ├── futures-sink v0.3.29
+│   │   │   │       ├── pin-project-lite v0.2.13
+│   │   │   │       ├── tokio v1.35.0 (*)
+│   │   │   │       └── tracing v0.1.40
+│   │   │   │           ├── log v0.4.20
+│   │   │   │           │   └── value-bag v1.4.2
+│   │   │   │           ├── pin-project-lite v0.2.13
+│   │   │   │           ├── tracing-attributes v0.1.27 (proc-macro)
+│   │   │   │           │   ├── proc-macro2 v1.0.70 (*)
+│   │   │   │           │   ├── quote v1.0.33 (*)
+│   │   │   │           │   └── syn v2.0.41 (*)
+│   │   │   │           └── tracing-core v0.1.32
+│   │   │   │               └── once_cell v1.19.0
+│   │   │   ├── bytes v1.5.0
+│   │   │   ├── http v0.2.11 (*)
+│   │   │   ├── pin-project-lite v0.2.13
+│   │   │   ├── tokio v1.35.0 (*)
+│   │   │   ├── tracing v0.1.40 (*)
+│   │   │   └── zeroize v1.7.0
+│   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   └── zeroize v1.7.0
+│   ├── aws-http v0.61.0
+│   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   ├── aws-types v1.1.0
+│   │   │   ├── aws-credential-types v1.1.0 (*)
+│   │   │   ├── aws-smithy-async v1.1.0 (*)
+│   │   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   │   ├── http v0.2.11 (*)
+│   │   │   └── tracing v0.1.40 (*)
+│   │   │   [build-dependencies]
+│   │   │   └── rustc_version v0.4.0
+│   │   │       └── semver v1.0.20
+│   │   ├── bytes v1.5.0
+│   │   ├── http v0.2.11 (*)
+│   │   ├── http-body v0.4.6 (*)
+│   │   ├── pin-project-lite v0.2.13
+│   │   └── tracing v0.1.40 (*)
+│   ├── aws-runtime v1.1.0
+│   │   ├── aws-credential-types v1.1.0 (*)
+│   │   ├── aws-http v0.61.0 (*)
+│   │   ├── aws-sigv4 v1.1.0
+│   │   │   ├── aws-credential-types v1.1.0 (*)
+│   │   │   ├── aws-smithy-http v0.61.0
+│   │   │   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   │   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   │   │   ├── bytes v1.5.0
+│   │   │   │   ├── bytes-utils v0.1.4 (*)
+│   │   │   │   ├── futures-core v0.3.29
+│   │   │   │   ├── http v0.2.11 (*)
+│   │   │   │   ├── http-body v0.4.6 (*)
+│   │   │   │   ├── once_cell v1.19.0
+│   │   │   │   ├── percent-encoding v2.3.1
+│   │   │   │   ├── pin-project-lite v0.2.13
+│   │   │   │   ├── pin-utils v0.1.0
+│   │   │   │   └── tracing v0.1.40 (*)
+│   │   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   │   ├── bytes v1.5.0
+│   │   │   ├── form_urlencoded v1.2.1
+│   │   │   │   └── percent-encoding v2.3.1
+│   │   │   ├── hex v0.4.3
+│   │   │   ├── hmac v0.12.1
+│   │   │   │   └── digest v0.10.7
+│   │   │   │       ├── block-buffer v0.10.4
+│   │   │   │       │   └── generic-array v0.14.7
+│   │   │   │       │       └── typenum v1.17.0
+│   │   │   │       │       [build-dependencies]
+│   │   │   │       │       └── version_check v0.9.4
+│   │   │   │       ├── crypto-common v0.1.6
+│   │   │   │       │   ├── generic-array v0.14.7 (*)
+│   │   │   │       │   └── typenum v1.17.0
+│   │   │   │       └── subtle v2.5.0
+│   │   │   ├── http v0.2.11 (*)
+│   │   │   ├── once_cell v1.19.0
+│   │   │   ├── percent-encoding v2.3.1
+│   │   │   ├── sha2 v0.10.8
+│   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   ├── cpufeatures v0.2.11
+│   │   │   │   └── digest v0.10.7 (*)
+│   │   │   ├── time v0.3.30 (*)
+│   │   │   └── tracing v0.1.40 (*)
+│   │   ├── aws-smithy-async v1.1.0 (*)
+│   │   ├── aws-smithy-http v0.61.0 (*)
+│   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   ├── aws-types v1.1.0 (*)
+│   │   ├── fastrand v2.0.1
+│   │   ├── http v0.2.11 (*)
+│   │   ├── percent-encoding v2.3.1
+│   │   ├── tracing v0.1.40 (*)
+│   │   └── uuid v1.6.1
+│   │       ├── getrandom v0.2.11
+│   │       │   ├── cfg-if v1.0.0
+│   │       │   └── libc v0.2.151
+│   │       └── serde v1.0.193
+│   │           └── serde_derive v1.0.193 (proc-macro)
+│   │               ├── proc-macro2 v1.0.70 (*)
+│   │               ├── quote v1.0.33 (*)
+│   │               └── syn v2.0.41 (*)
+│   ├── aws-sdk-sso v1.5.0
+│   │   ├── aws-credential-types v1.1.0 (*)
+│   │   ├── aws-http v0.61.0 (*)
+│   │   ├── aws-runtime v1.1.0 (*)
+│   │   ├── aws-smithy-async v1.1.0 (*)
+│   │   ├── aws-smithy-http v0.61.0 (*)
+│   │   ├── aws-smithy-json v0.61.0
+│   │   │   └── aws-smithy-types v1.1.0 (*)
+│   │   ├── aws-smithy-runtime v1.1.0
+│   │   │   ├── aws-smithy-async v1.1.0 (*)
+│   │   │   ├── aws-smithy-http v0.61.0 (*)
+│   │   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   │   ├── bytes v1.5.0
+│   │   │   ├── fastrand v2.0.1
+│   │   │   ├── h2 v0.3.22
+│   │   │   │   ├── bytes v1.5.0
+│   │   │   │   ├── fnv v1.0.7
+│   │   │   │   ├── futures-core v0.3.29
+│   │   │   │   ├── futures-sink v0.3.29
+│   │   │   │   ├── futures-util v0.3.29 (*)
+│   │   │   │   ├── http v0.2.11 (*)
+│   │   │   │   ├── indexmap v2.1.0
+│   │   │   │   │   ├── equivalent v1.0.1
+│   │   │   │   │   └── hashbrown v0.14.3
+│   │   │   │   ├── slab v0.4.9 (*)
+│   │   │   │   ├── tokio v1.35.0 (*)
+│   │   │   │   ├── tokio-util v0.7.10 (*)
+│   │   │   │   └── tracing v0.1.40 (*)
+│   │   │   ├── http v0.2.11 (*)
+│   │   │   ├── http-body v0.4.6 (*)
+│   │   │   ├── hyper v0.14.27
+│   │   │   │   ├── bytes v1.5.0
+│   │   │   │   ├── futures-channel v0.3.29 (*)
+│   │   │   │   ├── futures-core v0.3.29
+│   │   │   │   ├── futures-util v0.3.29 (*)
+│   │   │   │   ├── h2 v0.3.22 (*)
+│   │   │   │   ├── http v0.2.11 (*)
+│   │   │   │   ├── http-body v0.4.6 (*)
+│   │   │   │   ├── httparse v1.8.0
+│   │   │   │   ├── httpdate v1.0.3
+│   │   │   │   ├── itoa v1.0.10
+│   │   │   │   ├── pin-project-lite v0.2.13
+│   │   │   │   ├── socket2 v0.4.10
+│   │   │   │   │   └── libc v0.2.151
+│   │   │   │   ├── tokio v1.35.0 (*)
+│   │   │   │   ├── tower-service v0.3.2
+│   │   │   │   ├── tracing v0.1.40 (*)
+│   │   │   │   └── want v0.3.1
+│   │   │   │       └── try-lock v0.2.5
+│   │   │   ├── hyper-rustls v0.24.2
+│   │   │   │   ├── futures-util v0.3.29 (*)
+│   │   │   │   ├── http v0.2.11 (*)
+│   │   │   │   ├── hyper v0.14.27 (*)
+│   │   │   │   ├── log v0.4.20 (*)
+│   │   │   │   ├── rustls v0.21.10
+│   │   │   │   │   ├── log v0.4.20 (*)
+│   │   │   │   │   ├── ring v0.17.7
+│   │   │   │   │   │   ├── getrandom v0.2.11 (*)
+│   │   │   │   │   │   ├── spin v0.9.8
+│   │   │   │   │   │   └── untrusted v0.9.0
+│   │   │   │   │   │   [build-dependencies]
+│   │   │   │   │   │   └── cc v1.0.83
+│   │   │   │   │   │       └── libc v0.2.151
+│   │   │   │   │   ├── rustls-webpki v0.101.7
+│   │   │   │   │   │   ├── ring v0.17.7 (*)
+│   │   │   │   │   │   └── untrusted v0.9.0
+│   │   │   │   │   └── sct v0.7.1
+│   │   │   │   │       ├── ring v0.17.7 (*)
+│   │   │   │   │       └── untrusted v0.9.0
+│   │   │   │   ├── rustls-native-certs v0.6.3
+│   │   │   │   │   ├── openssl-probe v0.1.5
+│   │   │   │   │   └── rustls-pemfile v1.0.4
+│   │   │   │   │       └── base64 v0.21.5
+│   │   │   │   ├── tokio v1.35.0 (*)
+│   │   │   │   └── tokio-rustls v0.24.1
+│   │   │   │       ├── rustls v0.21.10 (*)
+│   │   │   │       └── tokio v1.35.0 (*)
+│   │   │   ├── once_cell v1.19.0
+│   │   │   ├── pin-project-lite v0.2.13
+│   │   │   ├── pin-utils v0.1.0
+│   │   │   ├── rustls v0.21.10 (*)
+│   │   │   ├── tokio v1.35.0 (*)
+│   │   │   └── tracing v0.1.40 (*)
+│   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   ├── aws-types v1.1.0 (*)
+│   │   ├── bytes v1.5.0
+│   │   ├── http v0.2.11 (*)
+│   │   ├── once_cell v1.19.0
+│   │   ├── regex-lite v0.1.5
+│   │   └── tracing v0.1.40 (*)
+│   ├── aws-sdk-ssooidc v1.5.0
+│   │   ├── aws-credential-types v1.1.0 (*)
+│   │   ├── aws-http v0.61.0 (*)
+│   │   ├── aws-runtime v1.1.0 (*)
+│   │   ├── aws-smithy-async v1.1.0 (*)
+│   │   ├── aws-smithy-http v0.61.0 (*)
+│   │   ├── aws-smithy-json v0.61.0 (*)
+│   │   ├── aws-smithy-runtime v1.1.0 (*)
+│   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   ├── aws-types v1.1.0 (*)
+│   │   ├── bytes v1.5.0
+│   │   ├── http v0.2.11 (*)
+│   │   ├── once_cell v1.19.0
+│   │   ├── regex-lite v0.1.5
+│   │   └── tracing v0.1.40 (*)
+│   ├── aws-sdk-sts v1.5.0
+│   │   ├── aws-credential-types v1.1.0 (*)
+│   │   ├── aws-http v0.61.0 (*)
+│   │   ├── aws-runtime v1.1.0 (*)
+│   │   ├── aws-smithy-async v1.1.0 (*)
+│   │   ├── aws-smithy-http v0.61.0 (*)
+│   │   ├── aws-smithy-json v0.61.0 (*)
+│   │   ├── aws-smithy-query v0.61.0
+│   │   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   │   └── urlencoding v2.1.3
+│   │   ├── aws-smithy-runtime v1.1.0 (*)
+│   │   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   │   ├── aws-smithy-types v1.1.0 (*)
+│   │   ├── aws-smithy-xml v0.61.0
+│   │   │   └── xmlparser v0.13.6
+│   │   ├── aws-types v1.1.0 (*)
+│   │   ├── http v0.2.11 (*)
+│   │   ├── once_cell v1.19.0
+│   │   ├── regex-lite v0.1.5
+│   │   └── tracing v0.1.40 (*)
+│   ├── aws-smithy-async v1.1.0 (*)
+│   ├── aws-smithy-http v0.61.0 (*)
+│   ├── aws-smithy-json v0.61.0 (*)
+│   ├── aws-smithy-runtime v1.1.0 (*)
+│   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   ├── aws-smithy-types v1.1.0 (*)
+│   ├── aws-types v1.1.0 (*)
+│   ├── bytes v1.5.0
+│   ├── fastrand v2.0.1
+│   ├── hex v0.4.3
+│   ├── http v0.2.11 (*)
+│   ├── hyper v0.14.27 (*)
+│   ├── ring v0.17.7 (*)
+│   ├── time v0.3.30 (*)
+│   ├── tokio v1.35.0 (*)
+│   ├── tracing v0.1.40 (*)
+│   └── zeroize v1.7.0
+├── aws-sdk-ecr v1.5.0
+│   ├── aws-credential-types v1.1.0 (*)
+│   ├── aws-http v0.61.0 (*)
+│   ├── aws-runtime v1.1.0 (*)
+│   ├── aws-smithy-async v1.1.0 (*)
+│   ├── aws-smithy-http v0.61.0 (*)
+│   ├── aws-smithy-json v0.61.0 (*)
+│   ├── aws-smithy-runtime v1.1.0 (*)
+│   ├── aws-smithy-runtime-api v1.1.0 (*)
+│   ├── aws-smithy-types v1.1.0 (*)
+│   ├── aws-types v1.1.0 (*)
+│   ├── bytes v1.5.0
+│   ├── http v0.2.11 (*)
+│   ├── once_cell v1.19.0
+│   ├── regex-lite v0.1.5
+│   └── tracing v0.1.40 (*)
+├── aws-types v1.1.0 (*)
+├── axum v0.7.2
+│   ├── async-trait v0.1.74 (proc-macro) (*)
+│   ├── axum-core v0.4.1
+│   │   ├── async-trait v0.1.74 (proc-macro) (*)
+│   │   ├── bytes v1.5.0
+│   │   ├── futures-util v0.3.29 (*)
+│   │   ├── http v1.0.0
+│   │   │   ├── bytes v1.5.0
+│   │   │   ├── fnv v1.0.7
+│   │   │   └── itoa v1.0.10
+│   │   ├── http-body v1.0.0
+│   │   │   ├── bytes v1.5.0
+│   │   │   └── http v1.0.0 (*)
+│   │   ├── http-body-util v0.1.0
+│   │   │   ├── bytes v1.5.0
+│   │   │   ├── futures-util v0.3.29 (*)
+│   │   │   ├── http v1.0.0 (*)
+│   │   │   ├── http-body v1.0.0 (*)
+│   │   │   └── pin-project-lite v0.2.13
+│   │   ├── mime v0.3.17
+│   │   ├── pin-project-lite v0.2.13
+│   │   ├── sync_wrapper v0.1.2
+│   │   ├── tower-layer v0.3.2
+│   │   ├── tower-service v0.3.2
+│   │   └── tracing v0.1.40 (*)
+│   │   [build-dependencies]
+│   │   └── rustversion v1.0.14 (proc-macro)
+│   ├── bytes v1.5.0
+│   ├── futures-util v0.3.29 (*)
+│   ├── http v1.0.0 (*)
+│   ├── http-body v1.0.0 (*)
+│   ├── http-body-util v0.1.0 (*)
+│   ├── hyper v1.0.1
+│   │   ├── bytes v1.5.0
+│   │   ├── futures-channel v0.3.29 (*)
+│   │   ├── futures-util v0.3.29 (*)
+│   │   ├── h2 v0.4.0
+│   │   │   ├── bytes v1.5.0
+│   │   │   ├── fnv v1.0.7
+│   │   │   ├── futures-core v0.3.29
+│   │   │   ├── futures-sink v0.3.29
+│   │   │   ├── futures-util v0.3.29 (*)
+│   │   │   ├── http v1.0.0 (*)
+│   │   │   ├── indexmap v2.1.0 (*)
+│   │   │   ├── slab v0.4.9 (*)
+│   │   │   ├── tokio v1.35.0 (*)
+│   │   │   ├── tokio-util v0.7.10 (*)
+│   │   │   └── tracing v0.1.40 (*)
+│   │   ├── http v1.0.0 (*)
+│   │   ├── http-body v1.0.0 (*)
+│   │   ├── httparse v1.8.0
+│   │   ├── httpdate v1.0.3
+│   │   ├── itoa v1.0.10
+│   │   ├── pin-project-lite v0.2.13
+│   │   └── tokio v1.35.0 (*)
+│   ├── hyper-util v0.1.1
+│   │   ├── bytes v1.5.0
+│   │   ├── futures-channel v0.3.29 (*)
+│   │   ├── futures-util v0.3.29 (*)
+│   │   ├── http v1.0.0 (*)
+│   │   ├── http-body v1.0.0 (*)
+│   │   ├── hyper v1.0.1 (*)
+│   │   ├── pin-project-lite v0.2.13
+│   │   ├── socket2 v0.5.5 (*)
+│   │   ├── tokio v1.35.0 (*)
+│   │   ├── tower v0.4.13
+│   │   │   ├── futures-core v0.3.29
+│   │   │   ├── futures-util v0.3.29 (*)
+│   │   │   ├── pin-project v1.1.3
+│   │   │   │   └── pin-project-internal v1.1.3 (proc-macro)
+│   │   │   │       ├── proc-macro2 v1.0.70 (*)
+│   │   │   │       ├── quote v1.0.33 (*)
+│   │   │   │       └── syn v2.0.41 (*)
+│   │   │   ├── pin-project-lite v0.2.13
+│   │   │   ├── tokio v1.35.0 (*)
+│   │   │   ├── tokio-util v0.7.10 (*)
+│   │   │   ├── tower-layer v0.3.2
+│   │   │   ├── tower-service v0.3.2
+│   │   │   └── tracing v0.1.40 (*)
+│   │   ├── tower-service v0.3.2
+│   │   └── tracing v0.1.40 (*)
+│   ├── itoa v1.0.10
+│   ├── matchit v0.7.3
+│   ├── memchr v2.6.4
+│   ├── mime v0.3.17
+│   ├── percent-encoding v2.3.1
+│   ├── pin-project-lite v0.2.13
+│   ├── serde v1.0.193 (*)
+│   ├── serde_json v1.0.108
+│   │   ├── indexmap v2.1.0 (*)
+│   │   ├── itoa v1.0.10
+│   │   ├── ryu v1.0.16
+│   │   └── serde v1.0.193 (*)
+│   ├── serde_path_to_error v0.1.14
+│   │   ├── itoa v1.0.10
+│   │   └── serde v1.0.193 (*)
+│   ├── serde_urlencoded v0.7.1
+│   │   ├── form_urlencoded v1.2.1 (*)
+│   │   ├── itoa v1.0.10
+│   │   ├── ryu v1.0.16
+│   │   └── serde v1.0.193 (*)
+│   ├── sync_wrapper v0.1.2
+│   ├── tokio v1.35.0 (*)
+│   ├── tower v0.4.13 (*)
+│   ├── tower-layer v0.3.2
+│   ├── tower-service v0.3.2
+│   └── tracing v0.1.40 (*)
+│   [build-dependencies]
+│   └── rustversion v1.0.14 (proc-macro)
+├── axum-extra v0.9.0
+│   ├── axum v0.7.2 (*)
+│   ├── axum-core v0.4.1 (*)
+│   ├── bytes v1.5.0
+│   ├── futures-util v0.3.29 (*)
+│   ├── http v1.0.0 (*)
+│   ├── http-body v1.0.0 (*)
+│   ├── http-body-util v0.1.0 (*)
+│   ├── mime v0.3.17
+│   ├── pin-project-lite v0.2.13
+│   ├── serde v1.0.193 (*)
+│   ├── tower v0.4.13 (*)
+│   ├── tower-layer v0.3.2
+│   └── tower-service v0.3.2
+├── axum-server v0.5.1
+│   ├── arc-swap v1.6.0
+│   ├── bytes v1.5.0
+│   ├── futures-util v0.3.29 (*)
+│   ├── http v0.2.11 (*)
+│   ├── http-body v0.4.6 (*)
+│   ├── hyper v0.14.27 (*)
+│   ├── pin-project-lite v0.2.13
+│   ├── rustls v0.21.10 (*)
+│   ├── rustls-pemfile v1.0.4 (*)
+│   ├── tokio v1.35.0 (*)
+│   ├── tokio-rustls v0.24.1 (*)
+│   └── tower-service v0.3.2
+├── base64 v0.21.5
+├── bytes v1.5.0
+├── chrono v0.4.31
+│   ├── iana-time-zone v0.1.58
+│   ├── num-traits v0.2.17 (*)
+│   └── serde v1.0.193 (*)
+├── clap v4.4.11
+│   ├── clap_builder v4.4.11
+│   │   ├── anstream v0.6.5
+│   │   │   ├── anstyle v1.0.4
+│   │   │   ├── anstyle-parse v0.2.3
+│   │   │   │   └── utf8parse v0.2.1
+│   │   │   ├── anstyle-query v1.0.2
+│   │   │   ├── colorchoice v1.0.0
+│   │   │   └── utf8parse v0.2.1
+│   │   ├── anstyle v1.0.4
+│   │   ├── clap_lex v0.6.0
+│   │   └── strsim v0.10.0
+│   └── clap_derive v4.4.7 (proc-macro)
+│       ├── heck v0.4.1
+│       ├── proc-macro2 v1.0.70 (*)
+│       ├── quote v1.0.33 (*)
+│       └── syn v2.0.41 (*)
+├── const_format v0.2.32
+│   └── const_format_proc_macros v0.2.32 (proc-macro)
+│       ├── proc-macro2 v1.0.70 (*)
+│       ├── quote v1.0.33 (*)
+│       └── unicode-xid v0.2.4
+├── derive_more v0.99.17 (proc-macro)
+│   ├── convert_case v0.4.0
+│   ├── proc-macro2 v1.0.70 (*)
+│   ├── quote v1.0.33 (*)
+│   └── syn v1.0.109
+│       ├── proc-macro2 v1.0.70 (*)
+│       ├── quote v1.0.33 (*)
+│       └── unicode-ident v1.0.12
+│   [build-dependencies]
+│   └── rustc_version v0.4.0 (*)
+├── frank_jwt v3.1.3
+│   ├── base64 v0.13.1
+│   ├── openssl v0.10.61
+│   │   ├── bitflags v2.4.1
+│   │   ├── cfg-if v1.0.0
+│   │   ├── foreign-types v0.3.2
+│   │   │   └── foreign-types-shared v0.1.1
+│   │   ├── libc v0.2.151
+│   │   ├── once_cell v1.19.0
+│   │   ├── openssl-macros v0.1.1 (proc-macro)
+│   │   │   ├── proc-macro2 v1.0.70 (*)
+│   │   │   ├── quote v1.0.33 (*)
+│   │   │   └── syn v2.0.41 (*)
+│   │   └── openssl-sys v0.9.97
+│   │       └── libc v0.2.151
+│   │       [build-dependencies]
+│   │       ├── cc v1.0.83 (*)
+│   │       ├── pkg-config v0.3.27
+│   │       └── vcpkg v0.2.15
+│   ├── serde v1.0.193 (*)
+│   └── serde_json v1.0.108 (*)
+├── fs3 v0.5.0
+│   └── libc v0.2.151
+│   [build-dependencies]
+│   └── rustc_version v0.2.3
+│       └── semver v0.9.0
+│           └── semver-parser v0.7.0
+├── futures v0.3.29
+│   ├── futures-channel v0.3.29 (*)
+│   ├── futures-core v0.3.29
+│   ├── futures-executor v0.3.29
+│   │   ├── futures-core v0.3.29
+│   │   ├── futures-task v0.3.29
+│   │   └── futures-util v0.3.29 (*)
+│   ├── futures-io v0.3.29
+│   ├── futures-sink v0.3.29
+│   ├── futures-task v0.3.29
+│   └── futures-util v0.3.29 (*)
+├── hex v0.4.3
+├── hyper v1.0.1 (*)
+├── json-patch v1.2.0
+│   ├── serde v1.0.193 (*)
+│   ├── serde_json v1.0.108 (*)
+│   ├── thiserror v1.0.50
+│   │   └── thiserror-impl v1.0.50 (proc-macro)
+│   │       ├── proc-macro2 v1.0.70 (*)
+│   │       ├── quote v1.0.33 (*)
+│   │       └── syn v2.0.41 (*)
+│   └── treediff v4.0.2
+│       └── serde_json v1.0.108 (*)
+├── k8s-openapi v0.20.0
+│   ├── base64 v0.21.5
+│   ├── bytes v1.5.0
+│   ├── chrono v0.4.31 (*)
+│   ├── serde v1.0.193 (*)
+│   ├── serde-value v0.7.0
+│   │   ├── ordered-float v2.10.1
+│   │   │   └── num-traits v0.2.17 (*)
+│   │   └── serde v1.0.193 (*)
+│   └── serde_json v1.0.108 (*)
+├── kube v0.87.1
+│   ├── k8s-openapi v0.20.0 (*)
+│   ├── kube-client v0.87.1
+│   │   ├── base64 v0.21.5
+│   │   ├── bytes v1.5.0
+│   │   ├── chrono v0.4.31 (*)
+│   │   ├── either v1.9.0
+│   │   ├── futures v0.3.29 (*)
+│   │   ├── home v0.5.5
+│   │   ├── http v0.2.11 (*)
+│   │   ├── http-body v0.4.6 (*)
+│   │   ├── hyper v0.14.27 (*)
+│   │   ├── hyper-rustls v0.24.2 (*)
+│   │   ├── hyper-timeout v0.4.1
+│   │   │   ├── hyper v0.14.27 (*)
+│   │   │   ├── pin-project-lite v0.2.13
+│   │   │   ├── tokio v1.35.0 (*)
+│   │   │   └── tokio-io-timeout v1.2.0
+│   │   │       ├── pin-project-lite v0.2.13
+│   │   │       └── tokio v1.35.0 (*)
+│   │   ├── jsonpath_lib v0.3.0
+│   │   │   ├── log v0.4.20 (*)
+│   │   │   ├── serde v1.0.193 (*)
+│   │   │   └── serde_json v1.0.108 (*)
+│   │   ├── k8s-openapi v0.20.0 (*)
+│   │   ├── kube-core v0.87.1
+│   │   │   ├── chrono v0.4.31 (*)
+│   │   │   ├── form_urlencoded v1.2.1 (*)
+│   │   │   ├── http v0.2.11 (*)
+│   │   │   ├── json-patch v1.2.0 (*)
+│   │   │   ├── k8s-openapi v0.20.0 (*)
+│   │   │   ├── once_cell v1.19.0
+│   │   │   ├── serde v1.0.193 (*)
+│   │   │   ├── serde_json v1.0.108 (*)
+│   │   │   └── thiserror v1.0.50 (*)
+│   │   ├── pem v3.0.3
+│   │   │   └── base64 v0.21.5
+│   │   ├── pin-project v1.1.3 (*)
+│   │   ├── rustls v0.21.10 (*)
+│   │   ├── rustls-pemfile v1.0.4 (*)
+│   │   ├── secrecy v0.8.0
+│   │   │   ├── serde v1.0.193 (*)
+│   │   │   └── zeroize v1.7.0
+│   │   ├── serde v1.0.193 (*)
+│   │   ├── serde_json v1.0.108 (*)
+│   │   ├── serde_yaml v0.9.27
+│   │   │   ├── indexmap v2.1.0 (*)
+│   │   │   ├── itoa v1.0.10
+│   │   │   ├── ryu v1.0.16
+│   │   │   ├── serde v1.0.193 (*)
+│   │   │   └── unsafe-libyaml v0.2.9
+│   │   ├── thiserror v1.0.50 (*)
+│   │   ├── tokio v1.35.0 (*)
+│   │   ├── tokio-util v0.7.10 (*)
+│   │   ├── tower v0.4.13 (*)
+│   │   ├── tower-http v0.4.4
+│   │   │   ├── base64 v0.21.5
+│   │   │   ├── bitflags v2.4.1
+│   │   │   ├── bytes v1.5.0
+│   │   │   ├── futures-core v0.3.29
+│   │   │   ├── futures-util v0.3.29 (*)
+│   │   │   ├── http v0.2.11 (*)
+│   │   │   ├── http-body v0.4.6 (*)
+│   │   │   ├── http-range-header v0.3.1
+│   │   │   ├── mime v0.3.17
+│   │   │   ├── pin-project-lite v0.2.13
+│   │   │   ├── tower-layer v0.3.2
+│   │   │   ├── tower-service v0.3.2
+│   │   │   └── tracing v0.1.40 (*)
+│   │   └── tracing v0.1.40 (*)
+│   └── kube-core v0.87.1 (*)
+├── lazy_static v1.4.0
+├── object_store v0.8.0
+│   ├── async-trait v0.1.74 (proc-macro) (*)
+│   ├── bytes v1.5.0
+│   ├── chrono v0.4.31 (*)
+│   ├── futures v0.3.29 (*)
+│   ├── humantime v2.1.0
+│   ├── itertools v0.11.0
+│   │   └── either v1.9.0
+│   ├── parking_lot v0.12.1
+│   │   ├── lock_api v0.4.11
+│   │   │   └── scopeguard v1.2.0
+│   │   │   [build-dependencies]
+│   │   │   └── autocfg v1.1.0
+│   │   └── parking_lot_core v0.9.9
+│   │       ├── cfg-if v1.0.0
+│   │       ├── libc v0.2.151
+│   │       └── smallvec v1.11.2
+│   ├── percent-encoding v2.3.1
+│   ├── snafu v0.7.5
+│   │   ├── doc-comment v0.3.3
+│   │   └── snafu-derive v0.7.5 (proc-macro)
+│   │       ├── heck v0.4.1
+│   │       ├── proc-macro2 v1.0.70 (*)
+│   │       ├── quote v1.0.33 (*)
+│   │       └── syn v1.0.109 (*)
+│   ├── tokio v1.35.0 (*)
+│   ├── tracing v0.1.40 (*)
+│   ├── url v2.5.0
+│   │   ├── form_urlencoded v1.2.1 (*)
+│   │   ├── idna v0.5.0
+│   │   │   ├── unicode-bidi v0.3.14
+│   │   │   └── unicode-normalization v0.1.22
+│   │   │       └── tinyvec v1.6.0
+│   │   │           └── tinyvec_macros v0.1.1
+│   │   └── percent-encoding v2.3.1
+│   └── walkdir v2.4.0
+│       └── same-file v1.0.6
+├── paste v1.0.14 (proc-macro)
+├── prometheus v0.13.3
+│   ├── cfg-if v1.0.0
+│   ├── fnv v1.0.7
+│   ├── lazy_static v1.4.0
+│   ├── memchr v2.6.4
+│   ├── parking_lot v0.12.1 (*)
+│   ├── protobuf v2.28.0
+│   └── thiserror v1.0.50 (*)
+├── quoted-string v0.6.1
+├── regex v1.10.2
+│   ├── aho-corasick v1.1.2
+│   │   └── memchr v2.6.4
+│   ├── memchr v2.6.4
+│   ├── regex-automata v0.4.3
+│   │   ├── aho-corasick v1.1.2 (*)
+│   │   ├── memchr v2.6.4
+│   │   └── regex-syntax v0.8.2
+│   └── regex-syntax v0.8.2
+├── reqwest v0.11.22
+│   ├── async-compression v0.4.5
+│   │   ├── flate2 v1.0.28
+│   │   │   ├── crc32fast v1.3.2
+│   │   │   │   └── cfg-if v1.0.0
+│   │   │   └── miniz_oxide v0.7.1
+│   │   │       └── adler v1.0.2
+│   │   ├── futures-core v0.3.29
+│   │   ├── memchr v2.6.4
+│   │   ├── pin-project-lite v0.2.13
+│   │   └── tokio v1.35.0 (*)
+│   ├── base64 v0.21.5
+│   ├── bytes v1.5.0
+│   ├── encoding_rs v0.8.33
+│   │   └── cfg-if v1.0.0
+│   ├── futures-core v0.3.29
+│   ├── futures-util v0.3.29 (*)
+│   ├── h2 v0.3.22 (*)
+│   ├── http v0.2.11 (*)
+│   ├── http-body v0.4.6 (*)
+│   ├── hyper v0.14.27 (*)
+│   ├── hyper-rustls v0.24.2 (*)
+│   ├── hyper-tls v0.5.0
+│   │   ├── bytes v1.5.0
+│   │   ├── hyper v0.14.27 (*)
+│   │   ├── native-tls v0.2.11
+│   │   │   ├── log v0.4.20 (*)
+│   │   │   ├── openssl v0.10.61 (*)
+│   │   │   ├── openssl-probe v0.1.5
+│   │   │   └── openssl-sys v0.9.97 (*)
+│   │   ├── tokio v1.35.0 (*)
+│   │   └── tokio-native-tls v0.3.1
+│   │       ├── native-tls v0.2.11 (*)
+│   │       └── tokio v1.35.0 (*)
+│   ├── ipnet v2.9.0
+│   ├── log v0.4.20 (*)
+│   ├── mime v0.3.17
+│   ├── native-tls v0.2.11 (*)
+│   ├── once_cell v1.19.0
+│   ├── percent-encoding v2.3.1
+│   ├── pin-project-lite v0.2.13
+│   ├── rustls v0.21.10 (*)
+│   ├── rustls-pemfile v1.0.4 (*)
+│   ├── serde v1.0.193 (*)
+│   ├── serde_json v1.0.108 (*)
+│   ├── serde_urlencoded v0.7.1 (*)
+│   ├── tokio v1.35.0 (*)
+│   ├── tokio-native-tls v0.3.1 (*)
+│   ├── tokio-rustls v0.24.1 (*)
+│   ├── tokio-util v0.7.10 (*)
+│   ├── tower-service v0.3.2
+│   ├── url v2.5.0 (*)
+│   └── webpki-roots v0.25.3
+├── rust-argon2 v2.0.0
+│   ├── base64 v0.21.5
+│   ├── blake2b_simd v1.0.2
+│   │   ├── arrayref v0.3.7
+│   │   ├── arrayvec v0.7.4
+│   │   └── constant_time_eq v0.3.0
+│   └── constant_time_eq v0.3.0
+├── serde v1.0.193 (*)
+├── serde_derive v1.0.193 (proc-macro) (*)
+├── serde_json v1.0.108 (*)
+├── serde_yaml v0.9.27 (*)
+├── sha2 v0.10.8 (*)
+├── thiserror v1.0.50 (*)
+├── tokio v1.35.0 (*)
+├── tokio-util v0.7.10 (*)
+├── tower v0.4.13 (*)
+├── tower-http v0.5.0
+│   ├── bitflags v2.4.1
+│   ├── bytes v1.5.0
+│   ├── http v1.0.0 (*)
+│   ├── http-body v1.0.0 (*)
+│   ├── http-body-util v0.1.0 (*)
+│   ├── pin-project-lite v0.2.13
+│   ├── tower-layer v0.3.2
+│   └── tower-service v0.3.2
+├── tracing v0.1.40 (*)
+├── tracing-subscriber v0.3.18
+│   ├── matchers v0.1.0
+│   │   └── regex-automata v0.1.10
+│   │       └── regex-syntax v0.6.29
+│   ├── nu-ansi-term v0.46.0
+│   │   └── overload v0.1.1
+│   ├── once_cell v1.19.0
+│   ├── regex v1.10.2 (*)
+│   ├── sharded-slab v0.1.7
+│   │   └── lazy_static v1.4.0
+│   ├── smallvec v1.11.2
+│   ├── thread_local v1.1.7
+│   │   ├── cfg-if v1.0.0
+│   │   └── once_cell v1.19.0
+│   ├── tracing v0.1.40 (*)
+│   ├── tracing-core v0.1.32 (*)
+│   └── tracing-log v0.2.0
+│       ├── log v0.4.20 (*)
+│       ├── once_cell v1.19.0
+│       └── tracing-core v0.1.32 (*)
+└── uuid v1.6.1 (*)
+[dev-dependencies]
+├── assert_cmd v2.0.12
+│   ├── anstyle v1.0.4
+│   ├── bstr v1.8.0
+│   │   ├── memchr v2.6.4
+│   │   └── regex-automata v0.4.3 (*)
+│   ├── doc-comment v0.3.3
+│   ├── predicates v3.0.4
+│   │   ├── anstyle v1.0.4
+│   │   ├── difflib v0.4.0
+│   │   ├── float-cmp v0.9.0
+│   │   │   └── num-traits v0.2.17 (*)
+│   │   ├── itertools v0.11.0 (*)
+│   │   ├── normalize-line-endings v0.3.0
+│   │   ├── predicates-core v1.0.6
+│   │   └── regex v1.10.2 (*)
+│   ├── predicates-core v1.0.6
+│   ├── predicates-tree v1.0.9
+│   │   ├── predicates-core v1.0.6
+│   │   └── termtree v0.4.1
+│   └── wait-timeout v0.2.0
+│       └── libc v0.2.151
+├── environment v0.1.1
+├── fastrand v2.0.1
+├── httpmock v0.6.8
+│   ├── assert-json-diff v2.0.2
+│   │   ├── serde v1.0.193 (*)
+│   │   └── serde_json v1.0.108 (*)
+│   ├── async-object-pool v0.1.4
+│   │   └── async-std v1.12.0
+│   │       ├── async-channel v1.9.0
+│   │       │   ├── concurrent-queue v2.4.0
+│   │       │   │   └── crossbeam-utils v0.8.17
+│   │       │   │       └── cfg-if v1.0.0
+│   │       │   ├── event-listener v2.5.3
+│   │       │   └── futures-core v0.3.29
+│   │       ├── async-global-executor v2.4.1
+│   │       │   ├── async-channel v2.1.1
+│   │       │   │   ├── concurrent-queue v2.4.0 (*)
+│   │       │   │   ├── event-listener v4.0.0
+│   │       │   │   │   ├── concurrent-queue v2.4.0 (*)
+│   │       │   │   │   ├── parking v2.2.0
+│   │       │   │   │   └── pin-project-lite v0.2.13
+│   │       │   │   ├── event-listener-strategy v0.4.0
+│   │       │   │   │   ├── event-listener v4.0.0 (*)
+│   │       │   │   │   └── pin-project-lite v0.2.13
+│   │       │   │   ├── futures-core v0.3.29
+│   │       │   │   └── pin-project-lite v0.2.13
+│   │       │   ├── async-executor v1.8.0
+│   │       │   │   ├── async-lock v3.2.0
+│   │       │   │   │   ├── event-listener v4.0.0 (*)
+│   │       │   │   │   ├── event-listener-strategy v0.4.0 (*)
+│   │       │   │   │   └── pin-project-lite v0.2.13
+│   │       │   │   ├── async-task v4.5.0
+│   │       │   │   ├── concurrent-queue v2.4.0 (*)
+│   │       │   │   ├── fastrand v2.0.1
+│   │       │   │   ├── futures-lite v2.1.0
+│   │       │   │   │   ├── fastrand v2.0.1
+│   │       │   │   │   ├── futures-core v0.3.29
+│   │       │   │   │   ├── futures-io v0.3.29
+│   │       │   │   │   ├── parking v2.2.0
+│   │       │   │   │   └── pin-project-lite v0.2.13
+│   │       │   │   └── slab v0.4.9 (*)
+│   │       │   ├── async-io v2.2.2
+│   │       │   │   ├── async-lock v3.2.0 (*)
+│   │       │   │   ├── cfg-if v1.0.0
+│   │       │   │   ├── concurrent-queue v2.4.0 (*)
+│   │       │   │   ├── futures-io v0.3.29
+│   │       │   │   ├── futures-lite v2.1.0 (*)
+│   │       │   │   ├── parking v2.2.0
+│   │       │   │   ├── polling v3.3.1
+│   │       │   │   │   ├── cfg-if v1.0.0
+│   │       │   │   │   ├── rustix v0.38.28
+│   │       │   │   │   │   ├── bitflags v2.4.1
+│   │       │   │   │   │   └── linux-raw-sys v0.4.12
+│   │       │   │   │   └── tracing v0.1.40 (*)
+│   │       │   │   ├── rustix v0.38.28 (*)
+│   │       │   │   ├── slab v0.4.9 (*)
+│   │       │   │   └── tracing v0.1.40 (*)
+│   │       │   ├── async-lock v3.2.0 (*)
+│   │       │   ├── blocking v1.5.1
+│   │       │   │   ├── async-channel v2.1.1 (*)
+│   │       │   │   ├── async-lock v3.2.0 (*)
+│   │       │   │   ├── async-task v4.5.0
+│   │       │   │   ├── fastrand v2.0.1
+│   │       │   │   ├── futures-io v0.3.29
+│   │       │   │   ├── futures-lite v2.1.0 (*)
+│   │       │   │   ├── piper v0.2.1
+│   │       │   │   │   ├── atomic-waker v1.1.2
+│   │       │   │   │   ├── fastrand v2.0.1
+│   │       │   │   │   └── futures-io v0.3.29
+│   │       │   │   └── tracing v0.1.40 (*)
+│   │       │   ├── futures-lite v2.1.0 (*)
+│   │       │   └── once_cell v1.19.0
+│   │       ├── async-io v1.13.0
+│   │       │   ├── async-lock v2.8.0
+│   │       │   │   └── event-listener v2.5.3
+│   │       │   ├── cfg-if v1.0.0
+│   │       │   ├── concurrent-queue v2.4.0 (*)
+│   │       │   ├── futures-lite v1.13.0
+│   │       │   │   ├── fastrand v1.9.0
+│   │       │   │   ├── futures-core v0.3.29
+│   │       │   │   ├── futures-io v0.3.29
+│   │       │   │   ├── memchr v2.6.4
+│   │       │   │   ├── parking v2.2.0
+│   │       │   │   ├── pin-project-lite v0.2.13
+│   │       │   │   └── waker-fn v1.1.1
+│   │       │   ├── log v0.4.20 (*)
+│   │       │   ├── parking v2.2.0
+│   │       │   ├── polling v2.8.0
+│   │       │   │   ├── cfg-if v1.0.0
+│   │       │   │   ├── libc v0.2.151
+│   │       │   │   └── log v0.4.20 (*)
+│   │       │   │   [build-dependencies]
+│   │       │   │   └── autocfg v1.1.0
+│   │       │   ├── rustix v0.37.27
+│   │       │   │   ├── bitflags v1.3.2
+│   │       │   │   ├── io-lifetimes v1.0.11
+│   │       │   │   │   └── libc v0.2.151
+│   │       │   │   └── linux-raw-sys v0.3.8
+│   │       │   ├── slab v0.4.9 (*)
+│   │       │   ├── socket2 v0.4.10 (*)
+│   │       │   └── waker-fn v1.1.1
+│   │       │   [build-dependencies]
+│   │       │   └── autocfg v1.1.0
+│   │       ├── async-lock v2.8.0 (*)
+│   │       ├── async-process v1.8.1
+│   │       │   ├── async-io v1.13.0 (*)
+│   │       │   ├── async-lock v2.8.0 (*)
+│   │       │   ├── async-signal v0.2.5
+│   │       │   │   ├── async-io v2.2.2 (*)
+│   │       │   │   ├── cfg-if v1.0.0
+│   │       │   │   ├── futures-core v0.3.29
+│   │       │   │   ├── futures-io v0.3.29
+│   │       │   │   ├── rustix v0.38.28 (*)
+│   │       │   │   └── signal-hook-registry v1.4.1 (*)
+│   │       │   ├── cfg-if v1.0.0
+│   │       │   ├── event-listener v3.1.0
+│   │       │   │   ├── concurrent-queue v2.4.0 (*)
+│   │       │   │   ├── parking v2.2.0
+│   │       │   │   └── pin-project-lite v0.2.13
+│   │       │   ├── futures-lite v1.13.0 (*)
+│   │       │   └── rustix v0.38.28 (*)
+│   │       ├── crossbeam-utils v0.8.17 (*)
+│   │       ├── futures-core v0.3.29
+│   │       ├── futures-io v0.3.29
+│   │       ├── futures-lite v1.13.0 (*)
+│   │       ├── kv-log-macro v1.0.7
+│   │       │   └── log v0.4.20 (*)
+│   │       ├── log v0.4.20 (*)
+│   │       ├── memchr v2.6.4
+│   │       ├── once_cell v1.19.0
+│   │       ├── pin-project-lite v0.2.13
+│   │       ├── pin-utils v0.1.0
+│   │       └── slab v0.4.9 (*)
+│   ├── async-trait v0.1.74 (proc-macro) (*)
+│   ├── base64 v0.21.5
+│   ├── crossbeam-utils v0.8.17 (*)
+│   ├── form_urlencoded v1.2.1 (*)
+│   ├── futures-util v0.3.29 (*)
+│   ├── hyper v0.14.27 (*)
+│   ├── isahc v1.7.2
+│   │   ├── async-channel v1.9.0 (*)
+│   │   ├── castaway v0.1.2
+│   │   ├── crossbeam-utils v0.8.17 (*)
+│   │   ├── curl v0.4.44
+│   │   │   ├── curl-sys v0.4.70+curl-8.5.0
+│   │   │   │   ├── libc v0.2.151
+│   │   │   │   ├── libnghttp2-sys v0.1.8+1.55.1
+│   │   │   │   │   └── libc v0.2.151
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── cc v1.0.83 (*)
+│   │   │   │   ├── libz-sys v1.1.12
+│   │   │   │   │   └── libc v0.2.151
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   ├── cc v1.0.83 (*)
+│   │   │   │   │   ├── pkg-config v0.3.27
+│   │   │   │   │   └── vcpkg v0.2.15
+│   │   │   │   └── openssl-sys v0.9.97 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   ├── cc v1.0.83 (*)
+│   │   │   │   └── pkg-config v0.3.27
+│   │   │   ├── libc v0.2.151
+│   │   │   ├── openssl-probe v0.1.5
+│   │   │   ├── openssl-sys v0.9.97 (*)
+│   │   │   └── socket2 v0.4.10 (*)
+│   │   ├── curl-sys v0.4.70+curl-8.5.0 (*)
+│   │   ├── encoding_rs v0.8.33 (*)
+│   │   ├── event-listener v2.5.3
+│   │   ├── futures-lite v1.13.0 (*)
+│   │   ├── http v0.2.11 (*)
+│   │   ├── log v0.4.20 (*)
+│   │   ├── mime v0.3.17
+│   │   ├── once_cell v1.19.0
+│   │   ├── polling v2.8.0 (*)
+│   │   ├── slab v0.4.9 (*)
+│   │   ├── sluice v0.5.5
+│   │   │   ├── async-channel v1.9.0 (*)
+│   │   │   ├── futures-core v0.3.29
+│   │   │   └── futures-io v0.3.29
+│   │   ├── tracing v0.1.40 (*)
+│   │   ├── tracing-futures v0.2.5
+│   │   │   ├── pin-project v1.1.3 (*)
+│   │   │   └── tracing v0.1.40 (*)
+│   │   ├── url v2.5.0 (*)
+│   │   └── waker-fn v1.1.1
+│   ├── lazy_static v1.4.0
+│   ├── levenshtein v1.0.5
+│   ├── log v0.4.20 (*)
+│   ├── regex v1.10.2 (*)
+│   ├── serde v1.0.193 (*)
+│   ├── serde_json v1.0.108 (*)
+│   ├── serde_regex v1.1.0
+│   │   ├── regex v1.10.2 (*)
+│   │   └── serde v1.0.193 (*)
+│   ├── similar v2.3.0
+│   ├── tokio v1.35.0 (*)
+│   └── url v2.5.0 (*)
+├── libc v0.2.151
+├── predicates v3.0.4 (*)
+├── reqwest v0.11.22 (*)
+└── tempfile v3.8.1
+    ├── cfg-if v1.0.0
+    ├── fastrand v2.0.1
+    └── rustix v0.38.28 (*)

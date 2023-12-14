@@ -57,7 +57,7 @@ endpoint_fn_7_levels!(
 
 /*
 ---
-Monolithic Upload
+Monolithic/Complete Upload
 PUT /v2/<name>/blobs/uploads/<uuid>?digest=<digest>
 Content-Length: <size of layer>
 Content-Type: application/octet-stream

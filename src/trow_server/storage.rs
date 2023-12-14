@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fs::{self, DirEntry, File};
 use std::io::{BufRead, BufReader};
@@ -7,7 +8,7 @@ use std::sync::{Arc, RwLock};
 use std::{io, str};
 
 use crate::response::manifest_history;
-
+use walkdir::WalkDir;
 use super::errors::{DigestValidationError, ProxyError};
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
@@ -15,9 +16,9 @@ use bytes::Buf;
 use bytes::Bytes;
 use chrono::prelude::*;
 use futures::future::try_join_all;
+use futures::io::AsyncRead;
 use futures::stream::StreamExt;
 use futures::Stream;
-use object_store::{path, GetOptions, ObjectStore};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
 use tokio::io::AsyncWriteExt;
@@ -51,71 +52,168 @@ pub enum StorageBackendError {
     Internal,
 }
 
+static MANIFESTS_DIR: &str = "manifests";
+static BLOBS_DIR: &str = "blobs";
+static UPLOADS_DIR: &str = "scratch";
+
 #[derive(Clone, Debug)]
 pub struct TrowStorageBackend {
-    object_store: Arc<dyn ObjectStore>,
-    // TODO:
-    // - concurency locks for single server mode
-    // - concurency locks using raft ?
-    // - local cache for remote storage ?
+    path: PathBuf,
 }
 
 impl TrowStorageBackend {
-    pub fn new(url: String) -> Result<Self> {
-        let url = reqwest::Url::from_str(&url).unwrap();
-        let (store, path ) = object_store::parse_url(&url).unwrap();
-        Ok(Self {
-            object_store: Arc::from(store),
-        })
+    fn init_create_path(root: &Path, dir: &str) -> Result<()> {
+        let path = root.join(dir);
+        return match fs::create_dir_all(&path) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                event!(
+                    Level::ERROR,
+                    r#"
+                    Failed to create directory required by trow {:?}
+                    Please check the parent directory is writable by the trow user.
+                    {:?}"#,
+                    path,
+                    e
+                );
+                Err(e)
+            }
+        };
+        Ok(())
     }
 
-    pub fn get_object_store(&self) -> &dyn ObjectStore {
-        &*self.object_store
+    pub fn new(path: PathBuf) -> Result<Self> {
+        Self::init_create_path(&path, MANIFESTS_DIR)?;
+        Self::init_create_path(&path, BLOBS_DIR)?;
+        Self::init_create_path(&path, UPLOADS_DIR)?;
+
+        Ok(Self { path })
     }
 
-    async fn get_digest_from_manifest(&self, repo_name: &str, reference: &str) -> Result<String> {
-        let path = path::Path::from_iter(["manifests", repo_name, reference]);
-        let manifest_bytes = self.object_store.get(&path).await?.bytes().await?;
-        let manifest = std::str::from_utf8(&manifest_bytes)?;
-
-        let latest_digest_line = manifest
-            .lines()
+    async fn get_manifest_digest(&self, repo_name: &str, reference: &str) -> Result<String> {
+        let path = self
+            .path
+            .join(MANIFESTS_DIR)
+            .join(repo_name)
+            .join(reference);
+        let manifest_history_bytes = tokio::fs::read(&path).await?;
+        let latest_entry_bytes = manifest_history_bytes
+            .split(|b| b == b'\n')
             .last()
-            .ok_or_else(|| anyhow!("Empty manifest"))?;
-        // Each line is `{digest} {date}`
-        let latest_digest = latest_digest_line
-            .split(' ')
-            .next()
-            .ok_or_else(|| anyhow!("Invalid manifest line: `{}`", latest_digest_line))?;
+            .ok_or(anyhow!("Empty manifest history"))?;
+        let latest_entry: ManifestHistoryEntry = serde_json::from_slice(latest_digest_bytes)?;
 
-        Ok(latest_digest.to_string())
+        Ok(latest_digest.digest)
     }
 
-    async fn get_blob ()
+    async fn get_manifest(&self, repo_name: &str, reference: &str) -> Result<Manifest> {
+        let digest = if is_digest(reference) {
+            Cow::Borrowed(reference)
+        } else {
+            Cow::Owned(self.get_manifest_digest(repo_name, reference)?)
+        };
+        let path = self.path.join(BLOBS_DIR).join("sha256").join(digest);
+        let manifest_bytes = tokio::fs::read(&path).await?;
+        let manifest = Manifest::from_json(&manifest_bytes)?;
+        Ok(manifest)
+    }
 
-    pub async fn write_blob_stream<S>(&self, digest: &str, mut stream: S) -> Result<()>
+    pub async fn write_blob_stream<S>(&self, digest: &str, mut stream: S) -> Result<PathBuf>
     where
         S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
     {
-        let location = path::Path::from_iter(["blobs", digest]);
-        let (multipart_id, mut writer) = self.object_store.put_multipart(&location).await?;
+        let tmp_location = self.path.join(UPLOADS_DIR).join(digest);
+        let location = self.path.join(BLOBS_DIR).join(digest);
+        if location.exists() {
+            event!(Level::INFO, "Blob already exists");
+            return Ok(());
+        }
+        let mut tmp_file = tokio::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&tmp_location)
+            .await;
+
+        let tmp_file = match tmp_file {
+            // All good
+            Ok(tmpf) => tmpf,
+            // Special case: blob is being concurrently fetched
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                event!(Level::INFO, "Waiting for concurently fetched blob");
+                while tmp_file.exists() {
+                    // wait for download to be done (temp file to be moved)
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+                return Ok(location);
+            }
+            Err(e) => {
+                return Err(anyhow!("Could not open tmp file: {}", e));
+            }
+        };
+
+        let err_catcher = |e| {
+            drop(tmp_file);
+            fs::remove_file(tmp_location)
+                .map_err(|e| event!(Level::WARN, "Could not remove tmp file: {:?}", e));
+            return Err(anyhow!("Error downloading blob: {}", e));
+        };
 
         while let Some(chunk) = stream.next().await {
-            match chunk {
-                Ok(chunk) => {
-                    writer.write_all(&chunk).await?;
-                }
-                Err(e) => {
-                    let _err = self
-                        .object_store
-                        .abort_multipart(&location, &multipart_id)
-                        .await?;
-                    return Err(anyhow!("Error downloading blob: {}", e));
-                }
-            }
+            let chunk = chunk.unwrap_or_else(err_catcher);
+            tmp_file.write_all(&chunk).await.unwrap_or_else(err_catcher);
         }
-        writer.shutdown().await?;
-        Ok(())
+        tmp_file.flush().await.unwrap_or_else(err_catcher);
+        tokio::fs::rename(tmp_location, location).await.unwrap_or_else(err_catcher);
+        Ok(location)
+    }
+
+    pub async fn write_blob_part<S>(&self, digest: &str, mut stream: S) -> Result<PathBuf>
+    where
+        S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
+    {
+        let tmp_location = self.path.join(UPLOADS_DIR).join(digest);
+        let location = self.path.join(BLOBS_DIR).join(digest);
+        if location.exists() {
+            event!(Level::INFO, "Blob already exists");
+            return Ok(());
+        }
+        let mut tmp_file = tokio::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&tmp_location)
+            .await;
+
+        let tmp_file = match tmp_file {
+            // All good
+            Ok(tmpf) => tmpf,
+            // Special case: blob is being concurrently fetched
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                event!(Level::INFO, "Waiting for concurently fetched blob");
+                while tmp_file.exists() {
+                    // wait for download to be done (temp file to be moved)
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+                return Ok(location);
+            }
+            Err(e) => {
+                return Err(anyhow!("Could not open tmp file: {}", e));
+            }
+        };
+
+        let err_catcher = |e| {
+            drop(tmp_file);
+            fs::remove_file(tmp_location)
+                .map_err(|e| event!(Level::WARN, "Could not remove tmp file: {:?}", e));
+            return Err(anyhow!("Error downloading blob: {}", e));
+        };
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.unwrap_or_else(err_catcher);
+            tmp_file.write_all(&chunk).await.unwrap_or_else(err_catcher);
+        }
+        tmp_file.flush().await.unwrap_or_else(err_catcher);
+        tokio::fs::rename(tmp_location, location).await.unwrap_or_else(err_catcher);
+        Ok(location)
     }
 
     pub async fn write_image_manifest(
@@ -123,50 +221,26 @@ impl TrowStorageBackend {
         manifest: Bytes,
         repo_name: &str,
         tag: &str,
-    ) -> Result<()> {
+    ) -> Result<PathBuf> {
         let digest = digest::sha256_digest(manifest.as_ref().reader())?;
-
-        // write image manifest as a blob
-        let manifest_blob_loc = path::Path::from_iter(["blobs", "sha256", &digest]);
-        match self.object_store.head(&manifest_blob_loc).await {
-            Ok(_) => {
-                event!(Level::INFO, "Manifest already exists");
-            }
-            Err(object_store::Error::NotFound { .. }) => {
-                event!(Level::INFO, "Writing manifest");
-                self.object_store.put(&manifest_blob_loc, manifest).await?;
-            }
-            e @ Err(_) => {
-                e.context("Could not HEAD manifest blob")?;
-            }
-        }
+        let location = self.write_blob_stream(&digest, manifest).await?;
 
         // save link tag -> manifest
-        let manifest_history_loc = path::Path::from_iter(["manifests", repo_name, tag]);
-        let mut manifest_history: Vec<ManifestHistoryEntry> = {
-            let get_object = self.object_store.get(&manifest_history_loc).await;
-            match get_object {
-                Ok(get_result) => {
-                    let bytes = get_result.bytes().await?;
-                    serde_json::from_slice(&bytes).unwrap_or_else(|_| {
-                        event!(Level::WARN, "Could not parse manifest history");
-                        Vec::new()
-                    })
-                }
-                Err(object_store::Error::NotFound { .. }) => Vec::new(),
-                Err(e) => return Err(anyhow!(e).context("Could not GET manifest history file")),
-            }
-        };
-        manifest_history.push(ManifestHistoryEntry {
+        let entry = ManifestHistoryEntry {
             digest: digest.clone(),
             timestamp: Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
-        });
-        let manifest_history_bytes = Bytes::from(serde_json::to_vec(&manifest_history)?);
-        self.object_store
-            .put(&manifest_history_loc, manifest_history_bytes)
+        };
+        let entry_str = serde_json::to_string(&entry)?;
+        let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
+        let mut manifest_history_file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&manifest_history_loc)
             .await?;
+        manifest_history_file.write_all(entry_str).await?;
+        manifest_history_file.flush().await?;
 
-        Ok(())
+        Ok(location)
     }
 
     pub async fn get_manifest_history(
@@ -174,71 +248,50 @@ impl TrowStorageBackend {
         repo_name: &str,
         tag: &str,
     ) -> Result<Vec<ManifestHistoryEntry>> {
-        let manifest_history_loc = path::Path::from_iter(["manifests", repo_name, tag]);
-        let get_result = self
-            .object_store
-            .get(&manifest_history_loc)
-            .await
-            .context("Could not GET manifest history file")?;
-        let bytes = get_result.bytes().await?;
-        let history = serde_json::from_slice(&bytes).context("Could not parse manifest history")?;
+        let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
+        let history_raw = tokio::fs::read(manifest_history_loc).await.context("Could not read manifest history")?;
+        let history = serde_json::from_slice(&history_raw).context("Could not parse manifest history")?;
         Ok(history)
     }
 
-    pub async fn list_repos(&self) -> Result<Vec<String>> {
-        let manifest_dir = path::Path::from_iter(["manifests"]);
-        let repo_paths = self
-            .object_store
-            .list_with_delimiter(Some(&manifest_dir))
-            .await?
-            .common_prefixes;
+    // pub async fn list_repos(&self) -> Result<Vec<String>> {
+    //     let manifest_dir = self.path.join(MANIFESTS_DIR);
+    //     // let dirs = tokio::fs::read_dir(manifest_dir);
+    //     let manifests = WalkDir::new(manifest_dir).into_iter().filter_map(|entry| {
+    //         let entry = entry.ok()?;
 
-        let entries = repo_paths
-            .into_iter()
-            .map(|p| {
-                let p = p.to_string();
-                let (_, repo) = p.split_once('/').unwrap();
-                repo.to_owned()
-            })
-            .collect();
-
-        Ok(entries)
-    }
+    //         if entry.file_type().is_file() {
+    //             let path = entry.path();
+    //             let repo = path.strip_prefix(manifest_dir).ok()?;
+    //             Some(repo.to_string_lossy())
+    //         } else {
+    //             None
+    //         }
+    //     }).collect();
+    // }
 
     pub async fn list_repo_tags(&self, repo: &str) -> Result<Vec<String>> {
-        let mut manifests = Vec::new();
-        let repo_dir = path::Path::from_iter(["manifests", repo]);
-        let mut manifest_iter = self.object_store.list(Some(&repo_dir));
-        while let Some(manifest) = manifest_iter.next().await {
-            let manifest = manifest.context("Could not list manifest")?;
-            let path = String::from(manifest.location);
-            let invalid_manifest_path_err = || anyhow!("Invalid manifest path `{path}`");
-            let (_, tag) = path
-                .rsplit_once("/")
-                .ok_or_else(invalid_manifest_path_err)?;
-            manifests.push(tag.to_owned());
-        }
-        Ok(manifests)
+        let repo_manifest_dir = self.path.join(MANIFESTS_DIR).join(repo);
+        let tags = WalkDir::new(repo_manifest_dir).sort_by_file_name().into_iter().filter_map(|entry| {
+            let entry = entry.ok()?;
+            if entry.file_type().is_file() {
+                let path = entry.path();
+                let repo = path.strip_prefix(repo_manifest_dir).ok()?;
+                Some(repo.to_string_lossy())
+            } else {
+                None
+            }
+        }).collect();
+
+        Ok(tags)
+    }
+
+    pub async fn delete_blob(&self, digest: &str) -> Result<()> {
+        let blob_path = self.path.join(BLOBS_DIR).join(digest);
+        tokio::fs::remove_file(blob_path).await?;
+        Ok(())
     }
 }
-
-// pub fn get_catalog_path_for_blob(digest: &str) -> Result<PathBuf> {
-//     let mut iter = digest.split(':');
-//     let alg = iter
-//         .next()
-//         .ok_or_else(|| anyhow!("Digest '{digest}' did not contain alg component"))?;
-//     if !SUPPORTED_DIGESTS.contains(&alg) {
-//         return Err(anyhow!("Hash algorithm '{alg}' not supported"));
-//     }
-//     let val = iter
-//         .next()
-//         .ok_or_else(|| anyhow!("Digest '{digest}' did not contain value component"))?;
-//     if let Some(val) = iter.next() {
-//         return Err(anyhow!("Digest '{digest}' contains too many elements"));
-//     }
-
-//     Ok(PathBuf::from("blobs").join(alg).join(val))
-// }
 
 fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
     digest
@@ -250,34 +303,6 @@ fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
             }
         }
 }
-
-// /**
-//  * Checks a file matches the given digest.
-//  *
-//  * TODO: should be able to use range of hashes.
-//  * TODO: check if using a static for the hasher speeds things up.
-//  */
-// fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
-//     let f = File::open(file)?;
-//     let reader = BufReader::new(f);
-
-//     let calculated_digest = sha256_tag_digest(reader)?;
-
-//     if calculated_digest != digest {
-//         event!(
-//             Level::ERROR,
-//             "Upload did not match given digest. Was given {} but got {}",
-//             digest,
-//             calculated_digest
-//         );
-//         return Err(anyhow!(DigestValidationError {
-//             user_digest: digest.to_string(),
-//             actual_digest: calculated_digest,
-//         }));
-//     }
-
-//     Ok(())
-// }
 
 fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
     let file = File::open(path)?;
@@ -313,6 +338,4 @@ mod tests {
         let url = format!("file://{}", dir.path().to_str().unwrap());
         let store = TrowStorageBackend::new(url.to_string()).unwrap();
     }
-
-
 }

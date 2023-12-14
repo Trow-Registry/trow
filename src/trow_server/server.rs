@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::fs::{self, DirEntry, File};
-use std::io::{BufRead, BufReader};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::{io, str};
@@ -19,8 +19,6 @@ use tokio::time::Duration;
 use tracing::{event, Level};
 use uuid::Uuid;
 use object_store::ObjectStore;
-use tokio::io::AsyncWriteExt;
-use futures::stream::StreamExt;
 
 use super::api_types::*;
 use super::digest::sha256_tag_digest;
@@ -32,9 +30,6 @@ use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
 use super::storage::TrowStorageBackend;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
-static MANIFESTS_DIR: &str = "manifests";
-static BLOBS_DIR: &str = "blobs";
-static UPLOADS_DIR: &str = "scratch";
 
 static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
@@ -84,15 +79,10 @@ impl TrowServer {
         proxy_registry_config: Option<RegistryProxiesConfig>,
         image_validation_config: Option<ImageValidationConfig>,
     ) -> Result<Self> {
-        let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
-        let scratch_path = create_path(data_path, UPLOADS_DIR)?;
-        let blobs_path = create_path(data_path, BLOBS_DIR)?;
-
+        let storage = TrowStorageBackend::new(data_path)?;
         let svc = TrowServer {
             active_uploads: Arc::new(RwLock::new(HashSet::new())),
-            manifests_path,
-            blobs_path,
-            scratch_path,
+            storage,
             proxy_registry_config,
             image_validation_config,
         };
@@ -141,16 +131,6 @@ impl TrowServer {
         file.write_all(&contents).await?;
 
         Ok(())
-    }
-
-    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf> {
-        let digest = if is_digest(reference) {
-            reference.to_string()
-        } else {
-            self.get_digest_from_manifest(repo_name, reference)?
-        };
-
-        self.get_catalog_path_for_blob(&digest)
     }
 
     fn create_verified_manifest(
@@ -505,105 +485,29 @@ impl TrowServer {
         }
     }
 
-    pub async fn get_write_sync_for_blob(
-        &self,
-        br: UploadRef,
-    ) {
-        let upload = Upload {
-            repo_name: br.repo_name.clone(),
-            uuid: br.uuid.clone(),
-        };
-
-        // "We unwrap() the return value to assert that we are not expecting
-        // threads to ever fail while holding the lock."
-        let locked_set = self.active_uploads.read().unwrap();
-
-        let a = if locked_set.contains(&upload) {
-            drop(locked_set);
-            let path = self.get_upload_path_for_blob(&br.uuid);
-            Ok(WriteLocation {
-                path: path.to_string_lossy().to_string(),
-            })
-        } else {
-            Err(Status::FailedPrecondition(format!(
-                "No current upload matching {:?}",
-                br
-            )))
-        }
-
-        Ok(())
-    }
-
-    pub async fn get_write_location_for_blob(
-        &self,
-        br: UploadRef,
-    ) -> Result<WriteLocation, Status> {
-        let upload = Upload {
-            repo_name: br.repo_name.clone(),
-            uuid: br.uuid.clone(),
-        };
-
-        // Apparently unwrap() is correct here. From the docs:
-        // "We unwrap() the return value to assert that we are not expecting
-        // threads to ever fail while holding the lock."
-
-        let set = self.active_uploads.read().unwrap();
-        if set.contains(&upload) {
-            let path = self.get_upload_path_for_blob(&br.uuid);
-            Ok(WriteLocation {
-                path: path.to_string_lossy().to_string(),
-            })
-        } else {
-            Err(Status::FailedPrecondition(format!(
-                "No current upload matching {:?}",
-                br
-            )))
-        }
-    }
-
-    pub async fn get_read_location_for_blob(
-        &self,
-        br: BlobRef,
-    ) -> Result<BlobReadLocation, Status> {
-        metrics::TOTAL_BLOB_REQUESTS.inc();
-        let path = self
-            .get_catalog_path_for_blob(&br.digest)
-            .map_err(|e| Status::InvalidArgument(format!("Error parsing digest {:?}", e)))?;
-
-        if !path.exists() {
-            event!(Level::WARN, "Request for unknown blob: {:?}", path);
-            Err(Status::NotFound(format!("No blob found matching {:?}", br)))
-        } else {
-            Ok(BlobReadLocation {
-                path: path.to_string_lossy().to_string(),
-            })
-        }
-    }
-
     /**
      * TODO: check if blob referenced by manifests. If so, refuse to delete.
      */
     pub async fn delete_blob(&self, br: BlobRef) -> Result<BlobDeleted, Status> {
-        let path = self
-            .get_catalog_path_for_blob(&br.digest)
-            .map_err(|e| Status::InvalidArgument(format!("Error parsing digest {:?}", e)))?;
-        if !path.exists() {
-            event!(Level::WARN, "Request for unknown blob: {:?}", path);
-            Err(Status::NotFound(format!("No blob found matching {:?}", br)))
-        } else {
-            fs::remove_file(&path)
-                .map_err(|e| {
-                    event!(Level::ERROR, "Failed to delete blob {:?} {:?}", br, e);
-                    Status::Internal("Internal error deleting blob".to_owned())
-                })
-                .and(Ok(BlobDeleted {}))
+        if !is_digest(&br.digest) {
+            return Err(Status::InvalidArgument(format!(
+                "Invalid digest: {}",
+                br.digest
+            )));
+        }
+        match self.storage.delete_blob(&br.digest).await {
+            Ok(_) => Ok(BlobDeleted {}),
+            Err(e) => {
+                event!(Level::ERROR, "Failed to delete blob {:?} {:?}", br, e);
+                Err(Status::Internal("Internal error deleting blob".to_owned()))
+            }
         }
     }
 
     pub async fn delete_manifest(&self, mr: ManifestRef) -> Result<ManifestDeleted, Status> {
         if !is_digest(&mr.reference) {
             return Err(Status::InvalidArgument(format!(
-                "Manifests can only be deleted by digest. Got {}",
+                "Invalid digest: {}",
                 mr.reference
             )));
         }
@@ -667,12 +571,6 @@ impl TrowServer {
                 ))
             }
         }
-    }
-
-
-    async fn get_blob(&self, uuid: String) {
-        self.data_store.
-
     }
 
     /**
