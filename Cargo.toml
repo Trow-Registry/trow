@@ -10,11 +10,7 @@ sqlite = []
 [dependencies]
 futures = "0.3"
 axum = { version = "0.7.2", features = ["tracing"] }
-# Waiting for an axum-server release: https://github.com/programatik29/axum-server/issues/101
-axum-server = { git = "https://github.com/programatik29/axum-server.git", rev = "134725e", features = [
-    "tls-rustls",
-] }
-# axum-server = { version = "0.5", features = ["tls-rustls"] }
+axum-server = { version = "0.6", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.0", features = ["typed-header"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "normalize-path", "trace"] }
@@ -37,7 +33,7 @@ regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
 thiserror = "1.0"
-kube = { version = "0.87.1", features = ["admission"] }
+kube = { version = "0.87", features = ["admission"] }
 k8s-openapi = { version = "0.20.0", features = ["v1_26"] }
 json-patch = "1.0.0"
 tokio = { version = "1", features = ["macros"] }
