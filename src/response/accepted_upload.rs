@@ -21,7 +21,7 @@ impl IntoResponse for AcceptedUpload {
             .header("Docker-Content-Digest", self.digest().to_string())
             .header("Range", format!("{}-{}", left, right))
             .header("Content-Length", "0")
-            .body(body::Empty::new())
+            .body(body::Body::empty())
             .unwrap()
             .into_response()
     }

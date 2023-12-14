@@ -1,17 +1,17 @@
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use axum::body;
 use axum::extract::{FromRef, FromRequestParts};
-use axum::headers::HeaderMapExt;
 use axum::http::request::Parts;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::{body, headers};
+use axum_extra::headers;
 use base64::engine::general_purpose as base64_engine;
 use base64::Engine as _;
-use frank_jwt::{decode, encode, Algorithm, ValidationOptions};
+use headers::HeaderMapExt;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tracing::{event, Level};
 use uuid::Uuid;
 
@@ -136,7 +136,10 @@ struct TokenClaim {
  * Create new jsonwebtoken.
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
-pub fn new(vbt: ValidBasicToken, config: &TrowConfig) -> Result<TrowToken, frank_jwt::Error> {
+pub fn new(
+    vbt: ValidBasicToken,
+    config: &TrowConfig,
+) -> Result<TrowToken, jsonwebtoken::errors::Error> {
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
@@ -151,12 +154,14 @@ pub fn new(vbt: ValidBasicToken, config: &TrowConfig) -> Result<TrowToken, frank
         iat: current_time.as_secs(),
         jti: Uuid::new_v4().to_string(),
     };
-
-    let header = json!({});
     let payload = serde_json::to_value(token_claim)?;
 
     //Use generated config here
-    let token = encode(header, &config.token_secret, &payload, Algorithm::HS256)?;
+    let token = encode(
+        &Header::default(),
+        &payload,
+        &EncodingKey::from_base64_secret(&config.token_secret)?,
+    )?;
 
     Ok(TrowToken {
         user: vbt.user,
@@ -212,13 +217,15 @@ where
 
         // parse for bearer token
         // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
-        let dec_token = match decode(
+        let dec_token = match decode::<TokenClaim>(
             token,
-            &config.token_secret,
-            Algorithm::HS256,
-            &ValidationOptions::default(),
+            &DecodingKey::from_base64_secret(&config.token_secret).map_err(|e| {
+                event!(Level::WARN, "Failed to decode secret: {}", e);
+                Authenticate::new(base_url.clone())
+            })?,
+            &Validation::default(),
         ) {
-            Ok((_, payload)) => payload,
+            Ok(td) => td.claims,
             Err(_) => {
                 event!(Level::WARN, "Failed to decode user token");
                 return Err(Authenticate::new(base_url));
@@ -226,7 +233,7 @@ where
         };
 
         let trow_token = TrowToken {
-            user: dec_token["sub"].to_string(),
+            user: dec_token.sub,
             token: token.to_string(),
         };
 

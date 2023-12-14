@@ -8,7 +8,7 @@ impl IntoResponse for ManifestDeleted {
     fn into_response(self) -> Response {
         Response::builder()
             .status(StatusCode::ACCEPTED)
-            .body(body::Empty::new())
+            .body(body::Body::empty())
             .unwrap()
             .into_response()
     }

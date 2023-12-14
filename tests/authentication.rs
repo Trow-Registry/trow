@@ -77,7 +77,9 @@ mod authentication_tests {
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         //Test get redir header
         assert_eq!(
-            resp.headers().get(header::WWW_AUTHENTICATE).unwrap(),
+            resp.headers()
+                .get(reqwest::header::WWW_AUTHENTICATE)
+                .unwrap(),
             &format!(
                 "Bearer realm=\"{}/login\",service=\"trow_registry\",scope=\"push/pull\"",
                 TROW_ADDRESS

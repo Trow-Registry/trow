@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use axum::extract::{BodyStream, Path, Query, State};
+use axum::body::Body;
+use axum::extract::{Path, Query, State};
 use axum::http::header::HeaderMap;
 use tracing::{event, Level};
 
@@ -74,7 +75,7 @@ pub async fn put_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, String)>,
     Query(digest): Query<DigestQuery>,
-    chunk: BodyStream,
+    chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
     let digest = match digest.digest {
         Some(d) => d,
@@ -128,7 +129,7 @@ endpoint_fn_7_levels!(
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid],
         digest: Query<DigestQuery>,
-        chunk: BodyStream
+        chunk: Body
     ) -> Result<AcceptedUpload, Error>
 );
 
@@ -156,7 +157,7 @@ pub async fn patch_blob(
     info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, String)>,
-    chunk: BodyStream,
+    chunk: Body,
 ) -> Result<UploadInfo, Error> {
     match state
         .client
@@ -188,7 +189,7 @@ endpoint_fn_7_levels!(
         info: Option<ContentInfo>,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid],
-        chunk: BodyStream
+        chunk: Body
     ) -> Result<UploadInfo, Error>
 );
 
@@ -206,7 +207,7 @@ pub async fn post_blob_upload(
     headers: HeaderMap,
     Query(digest): Query<DigestQuery>,
     Path(repo_name): Path<String>,
-    data: BodyStream,
+    data: Body,
 ) -> Result<Upload, Error> {
     /*
         Ask the backend for a UUID.
@@ -256,7 +257,7 @@ endpoint_fn_7_levels!(
         headers: HeaderMap,
         digest: Query<DigestQuery>;
         path: [image_name],
-        data: BodyStream
+        data: Body
     ) -> Result<Upload, Error>
 );
 

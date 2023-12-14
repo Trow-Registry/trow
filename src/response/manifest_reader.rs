@@ -15,7 +15,7 @@ impl IntoResponse for ManifestReader {
             .header(header::CONTENT_TYPE, content_type)
             .header(header::CONTENT_LENGTH, size)
             .header("Docker-Content-Digest", digest)
-            .body(body::StreamBody::from(stream))
+            .body(body::Body::from_stream(stream))
             .unwrap()
             .into_response()
     }

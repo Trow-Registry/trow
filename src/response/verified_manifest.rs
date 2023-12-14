@@ -17,7 +17,7 @@ impl IntoResponse for VerifiedManifest {
             .header("Location", location)
             .header("Docker-Content-Digest", self.digest().to_string())
             .status(StatusCode::CREATED)
-            .body(body::Empty::new())
+            .body(body::Body::empty())
             .unwrap()
             .into_response()
     }

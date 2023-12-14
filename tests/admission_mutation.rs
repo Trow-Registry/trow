@@ -139,7 +139,7 @@ mod admission_mutation_tests {
 
         let resp = cl
             .post(&format!("{}/mutate-image", ORIGIN))
-            .header(header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(review.to_string())
             .send()
             .await

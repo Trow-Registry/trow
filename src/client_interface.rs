@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::io::SeekFrom;
 
 use anyhow::{anyhow, Result};
-use axum::extract::BodyStream;
+use axum::body::Body;
 use chrono::TimeZone;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
@@ -85,7 +85,7 @@ impl ManifestStorage for ClientInterface {
         &self,
         name: &str,
         tag: &str,
-        data: BodyStream,
+        data: Body,
     ) -> Result<Digest, StorageDriverError> {
         let repo = RepoName(name.to_string());
 
@@ -138,7 +138,7 @@ impl BlobStorage for ClientInterface {
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        mut data: BodyStream,
+        data: Body,
     ) -> Result<Stored, StorageDriverError> {
         let rn = RepoName(name.to_string());
         let uuid = Uuid(session_id.to_string());
@@ -168,6 +168,7 @@ impl BlobStorage for ClientInterface {
         }
 
         let mut chunk_size = 0;
+        let mut data = data.into_data_stream();
         while let Some(v) = data.next().await {
             match v {
                 Ok(v) => {
@@ -429,12 +430,12 @@ impl ClientInterface {
         &self,
         repo_name: &RepoName,
         reference: &str,
-        mut manifest: BodyStream,
+        manifest: Body,
     ) -> Result<types::VerifiedManifest, RegistryError> {
         let (mut sink_loc, uuid) = self
             .get_write_sink_for_manifest(repo_name, reference)
             .await?;
-
+        let mut manifest = manifest.into_data_stream();
         while let Some(v) = manifest.next().await {
             match v {
                 Err(e) => {

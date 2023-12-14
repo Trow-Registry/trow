@@ -15,7 +15,7 @@ impl IntoResponse for BlobReader {
             .header(header::CONTENT_TYPE, "application/octet-stream")
             .header(header::CONTENT_LENGTH, size)
             .header("Docker-Content-Digest", digest)
-            .body(body::StreamBody::new(stream))
+            .body(body::Body::from_stream(stream))
             .unwrap()
             .into_response()
     }

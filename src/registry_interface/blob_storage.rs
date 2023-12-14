@@ -1,4 +1,4 @@
-use axum::extract::BodyStream;
+use axum::body::Body;
 
 use super::digest::Digest;
 use super::{AsyncSeekRead, StorageDriverError};
@@ -86,7 +86,7 @@ pub trait BlobStorage {
         name: &str,
         session_id: &str,
         data_info: Option<ContentInfo>,
-        data: BodyStream,
+        data: Body,
     ) -> Result<Stored, StorageDriverError>;
 
     /// Finalises the upload of the given session_id.

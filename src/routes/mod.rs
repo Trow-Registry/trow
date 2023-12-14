@@ -11,14 +11,13 @@ use std::str;
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::body::{boxed, Body};
+use axum::body::{Body, HttpBody};
 use axum::extract::State;
 use axum::http::method::Method;
 use axum::http::{header, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post, put};
 use axum::Router;
-use hyper::body::HttpBody;
 use hyper::http::HeaderValue;
 use macros::route_7_levels;
 use tower::ServiceBuilder;
@@ -123,18 +122,17 @@ pub fn create_app(state: super::TrowServerState) -> Router {
                 "Docker-Distribution-API-Version",
                 HeaderValue::from_static("registry/2.0"),
             );
-            // ugly hack to work around the fact that axum returns not body for HEAD
+            // ugly hack to work around the fact that axum returns no body for HEAD
             if r.status() == StatusCode::NOT_FOUND {
                 let body = r.body_mut();
                 if let Some(0) = body.size_hint().upper() {
                     let err = Error::NotFound.to_string();
 
-                    *body = boxed(Body::from(err.clone()));
+                    *body = Body::from(err.clone());
                     r.headers_mut()
                         .insert(header::CONTENT_LENGTH, err.len().into());
                 }
             }
-
             r
         }),
     )
