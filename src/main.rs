@@ -54,7 +54,7 @@ struct Args {
 
     /// Set the username that can be used to access Trow (e.g. via docker login).
     ///
-    /// Must be used with `--password` or `--password-file`
+    /// Must be used with `-P` or `--password`
     #[arg(long, short = 'U', requires_if(ArgPredicate::IsPresent, "password"))]
     user: Option<String>,
 

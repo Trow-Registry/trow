@@ -151,7 +151,10 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?
         .to_owned();
     let region = aws_types::region::Region::new(region);
-    let config = aws_config::defaults(BehaviorVersion::v2023_11_09()).region(region).load().await;
+    let config = aws_config::defaults(BehaviorVersion::v2023_11_09())
+        .region(region)
+        .load()
+        .await;
     let ecr_clt = aws_sdk_ecr::Client::new(&config);
     let token_response = ecr_clt.get_authorization_token().send().await?;
     let token = token_response
