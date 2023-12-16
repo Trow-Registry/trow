@@ -240,22 +240,18 @@ async fn get_bearer_auth_token(
     bearer_param_map.remove("realm");
     event!(Level::DEBUG, "Realm is {}", realm);
     let mut request = cl.get(realm.as_str()).query(&bearer_param_map);
-
     if let Some(u) = &auth.username {
-        event!(
-            Level::INFO,
-            "Attempting proxy authentication with user {}",
-            u
-        );
+        event!(Level::INFO, "Attempting proxy authentication with user {u}");
         request = request.basic_auth(u, auth.password.as_ref());
     }
 
-    let resp = request
-        .send()
-        .await
-        .with_context(|| format!("Failed to send authenticate to {} request", realm))?;
+    let resp = request.send().await?;
     if !resp.status().is_success() {
-        return Err(anyhow!("Failed to authenticate to {}", realm));
+        return Err(anyhow!(
+            "Authentication {} failed (HTTP {})",
+            realm,
+            resp.status()
+        ));
     }
 
     let resp_json = resp
@@ -285,7 +281,7 @@ mod tests {
         let server = MockServer::start().await;
 
         let proxy_cfg = SingleRegistryProxyConfig {
-            host: format!("http://{}", server.address()),
+            host: server.uri(),
             alias: "toto".to_string(),
             username: None,
             password: None,
@@ -338,7 +334,7 @@ mod tests {
         let (server, cfg, image) = get_basic_setup().await;
         let response_auth_header = format!(
             "Bearer realm=\"{}/hell\", charset=\"UTF-8\",service=\"trow_registry\",scope=\"push/pull\"",
-            server.address()
+            server.uri()
         );
 
         Mock::given(method("HEAD"))
@@ -378,16 +374,17 @@ mod tests {
 
         let resp_authn_header = format!(
             "Bearer realm=\"{}/hive/impish\",oscillating=\"YES\", born=\"too-slow\",scope=\"repository:nvidia/cuda:pull,push\"",
-            server.address()
+            server.uri()
         );
-        Mock::given(method("HEAD"))
+        let mock_401 = Mock::given(method("HEAD"))
             .and(path("/v2/hello_world/manifests/latest"))
             .and(header_exists("Accept"))
             .respond_with(
                 ResponseTemplate::new(401).insert_header(AUTHN_HEADER, resp_authn_header.as_str()),
             )
             .expect(1)
-            .mount(&server)
+            .named("HEAD 401")
+            .mount_as_scoped(&server)
             .await;
 
         let token = "alleycat-token";
@@ -395,7 +392,7 @@ mod tests {
             "Basic {}",
             general_purpose::STANDARD_NO_PAD.encode("like-this:reign-of-the-septims")
         );
-        Mock::given(method("GET"))
+        let mock_get_bearer = Mock::given(method("GET"))
             .and(path("/hive/impish"))
             .and(query_param("oscillating", "YES"))
             .and(query_param("born", "too-slow"))
@@ -405,10 +402,17 @@ mod tests {
                 "token": token,
             })))
             .expect(1)
-            .mount(&server)
+            .named("GET bearer")
+            .mount_as_scoped(&server)
             .await;
 
-        let cl = ProxyClient::try_new(cfg, &image).await.unwrap();
-        assert!(matches!(cl.auth, HttpAuth::Bearer(tok) if tok == token));
+        let cl = ProxyClient::try_new(cfg, &image).await;
+        if let Err(e) = &cl {
+            println!("{:#}", e);
+        }
+
+        assert!(matches!(cl.unwrap().auth, HttpAuth::Bearer(tok) if tok == token));
+        drop(mock_401);
+        drop(mock_get_bearer);
     }
 }

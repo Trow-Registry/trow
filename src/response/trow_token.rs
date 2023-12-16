@@ -160,7 +160,7 @@ pub fn new(
     let token = encode(
         &Header::default(),
         &payload,
-        &EncodingKey::from_base64_secret(&config.token_secret)?,
+        &EncodingKey::from_secret(config.token_secret.as_bytes()),
     )?;
 
     Ok(TrowToken {

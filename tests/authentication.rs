@@ -8,11 +8,10 @@ mod authentication_tests {
     use std::time::Duration;
     use std::{fs, thread};
 
-    use axum::http::header;
     use base64::engine::general_purpose as base64_engine;
     use base64::Engine as _;
     use environment::Environment;
-    use reqwest::StatusCode;
+    use reqwest::{header, StatusCode};
 
     use crate::common;
 

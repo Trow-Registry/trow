@@ -972,7 +972,7 @@ impl TrowServer {
         let mut searching_for_digest = !mr.last_digest.is_empty(); //Looking for a digest iff it's not empty
 
         let mut sent = 0;
-        for line in reader.lines().flatten() {
+        for line in reader.lines().map_while(Result::ok) {
             let (digest, date) = match line.find(' ') {
                 Some(ind) => {
                     let (digest_str, date_str) = line.split_at(ind);

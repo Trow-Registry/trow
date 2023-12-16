@@ -6,7 +6,6 @@ pub mod macros;
 mod manifest;
 mod metrics;
 mod readiness;
-
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,6 +21,7 @@ use hyper::http::HeaderValue;
 use macros::route_7_levels;
 use tower::ServiceBuilder;
 use tower_http::{cors, trace};
+use tracing::{event, Level};
 
 use crate::response::errors::Error;
 use crate::response::html::HTML;
@@ -175,5 +175,12 @@ async fn login(
     auth_user: ValidBasicToken,
     State(state): State<Arc<TrowServerState>>,
 ) -> Result<TrowToken, Error> {
-    trow_token::new(auth_user, &state.config).map_err(|_| Error::InternalError)
+    let tok = trow_token::new(auth_user, &state.config);
+    match tok {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            event!(Level::ERROR, "Failed to create token: {:#}", e);
+            Err(Error::InternalError)
+        }
+    }
 }

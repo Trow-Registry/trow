@@ -9,7 +9,6 @@ mod admission_mutation_tests {
     use std::time::Duration;
 
     use environment::Environment;
-    use hyper::header;
     use json_patch::PatchOperation;
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
