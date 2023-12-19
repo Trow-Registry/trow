@@ -11,7 +11,7 @@ sqlite = []
 futures = "0.3"
 axum = { version = "0.7.2", features = ["tracing"] }
 # Waiting for an axum-server release: https://github.com/programatik29/axum-server/issues/101
-axum-server = { git = "https://github.com/programatik29/axum-server.git", rev = "e575e90", features = [
+axum-server = { git = "https://github.com/programatik29/axum-server.git", rev = "134725e", features = [
     "tls-rustls",
 ] }
 # axum-server = { version = "0.5", features = ["tls-rustls"] }

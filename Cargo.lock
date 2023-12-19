@@ -590,7 +590,7 @@ dependencies = [
 [[package]]
 name = "axum-server"
 version = "0.5.1"
-source = "git+https://github.com/programatik29/axum-server.git?rev=e575e90#e575e90d1fc796401d144f306648553909336700"
+source = "git+https://github.com/programatik29/axum-server.git?rev=134725e#134725e1bb7867f402e399010b8ccbe986a83fbe"
 dependencies = [
  "arc-swap",
  "bytes",
