@@ -30,7 +30,7 @@ impl IntoResponse for Authenticate {
                 ),
             )
             .header("Content-Type", "application/json")
-            .body(body::Empty::new())
+            .body(body::Body::empty())
             .unwrap()
             .into_response()
     }

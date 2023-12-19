@@ -69,7 +69,7 @@ mod no_cors_tests {
         headers.insert(ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS".parse().unwrap());
 
         let resp = cl
-            .request(hyper::Method::OPTIONS, &(TROW_ADDRESS.to_owned()))
+            .request(reqwest::Method::OPTIONS, &(TROW_ADDRESS.to_owned()))
             .headers(headers)
             .send()
             .await

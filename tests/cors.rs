@@ -77,7 +77,7 @@ mod cors_tests {
         );
 
         let resp = cl
-            .request(hyper::Method::OPTIONS, &(ORIGIN.to_owned()))
+            .request(reqwest::Method::OPTIONS, &(ORIGIN.to_owned()))
             .headers(headers)
             .send()
             .await

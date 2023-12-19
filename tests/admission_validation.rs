@@ -8,11 +8,10 @@ mod validation_tests {
     use std::thread;
     use std::time::Duration;
 
-    use axum::http::header;
     use environment::Environment;
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
-    use reqwest::StatusCode;
+    use reqwest::{header, StatusCode};
     use trow::trow_server::ImageValidationConfig;
 
     use crate::common;

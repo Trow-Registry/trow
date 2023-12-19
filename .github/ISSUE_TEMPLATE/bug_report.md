@@ -1,33 +1,40 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: ''
-labels: ''
-assignees: ''
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees:
+    - awoimbee
 
 ---
 
-**Describe the bug**
+### Describe the bug
+
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+### To Reproduce
+
 Please provide as much information as possible on how to trigger the issue. If we can recreate the issue, it is much more likely to be quickly addressed. Ideally, this would include details on how to recreate the problem using a fresh install on GKE or minikube. K8s clusters and installs tend to differ in unique ways, so if you can't provide recreation instructions please provide as many details on your configuration as possible.
 
-**Expected behavior**
+### Expected behavior
+
 A clear and concise description of what you expected to happen.
 
-**Output/Logs**
+### Output/Logs
+
 If applicable, please include CLI output or logs (if large please attach or put in gist/pastebin).
 Logs for Trow are normally obtained from Kubernetes e.g. `kubectl -n kube-public trow-deploy...`
 
-**Trow Info**
- - Version/Image Name (e.g. `trow-registry/trow:0.3`, can be obtained from `kubectl describe`)
+### Trow Info
 
-**Kubernetes**
- - Kubernetes distro/host (EKS, GKE, Kind, Minikube etc)
- - Kubernetes version (e.g. 1.19)
- - Container Runtime (e.g. Docker, can be found via `kubectl get nodes -o wide`)
+- Version/Image Name (e.g. `trow-registry/trow:0.3`, can be obtained from `kubectl describe`)
 
+### Kubernetes
 
-**Additional context**
+- Kubernetes distro/host (EKS, GKE, Kind, Minikube etc)
+- Kubernetes version (e.g. 1.28)
+- Container Runtime (e.g. containerd, can be found via `kubectl get nodes -o wide`)
+
+### Additional context
+
 Add any other context about the problem here.

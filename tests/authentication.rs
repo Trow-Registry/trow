@@ -8,11 +8,10 @@ mod authentication_tests {
     use std::time::Duration;
     use std::{fs, thread};
 
-    use axum::http::header;
     use base64::engine::general_purpose as base64_engine;
     use base64::Engine as _;
     use environment::Environment;
-    use reqwest::StatusCode;
+    use reqwest::{header, StatusCode};
 
     use crate::common;
 
@@ -77,7 +76,9 @@ mod authentication_tests {
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         //Test get redir header
         assert_eq!(
-            resp.headers().get(header::WWW_AUTHENTICATE).unwrap(),
+            resp.headers()
+                .get(reqwest::header::WWW_AUTHENTICATE)
+                .unwrap(),
             &format!(
                 "Bearer realm=\"{}/login\",service=\"trow_registry\",scope=\"push/pull\"",
                 TROW_ADDRESS

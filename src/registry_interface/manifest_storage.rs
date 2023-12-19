@@ -1,4 +1,4 @@
-use axum::extract::BodyStream;
+use axum::body::Body;
 use tokio::fs::File;
 use tracing::{event, Level};
 
@@ -76,7 +76,7 @@ pub trait ManifestStorage {
         &self,
         name: &str,
         tag: &str,
-        data: BodyStream,
+        data: Body,
     ) -> Result<Digest, StorageDriverError>;
 
     // Store a manifest via Writer trait for drivers which support it

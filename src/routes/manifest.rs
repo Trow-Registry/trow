@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use axum::extract::{BodyStream, Path, State};
-use axum::headers::HeaderMap;
+use axum::body::Body;
+use axum::extract::{Path, State};
+use axum_extra::headers::HeaderMap;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
@@ -64,7 +65,7 @@ pub async fn put_image_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo_name, reference)): Path<(String, String)>,
-    chunk: BodyStream,
+    chunk: Body,
 ) -> Result<VerifiedManifest, Error> {
     let base_url = get_base_url(&headers, &state.config);
 
@@ -90,7 +91,7 @@ endpoint_fn_7_levels!(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
         path: [image_name, reference],
-        chunk: BodyStream
+        chunk: Body
     ) -> Result<VerifiedManifest, Error>
 );
 

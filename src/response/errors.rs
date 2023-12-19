@@ -148,7 +148,7 @@ impl IntoResponse for Error {
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::CONTENT_LENGTH, json.len())
             .status(status)
-            .body(body::Full::from(json))
+            .body(body::Body::from(json))
             .unwrap()
             .into_response()
     }

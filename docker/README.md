@@ -3,8 +3,10 @@
 The easiest way to build Trow is via Dockerfile. From this directory, either run `build.sh` or run
 something similar to following:
 
-```
+```sh
 docker build -f Dockerfile -t trow ..
+# or
+podman build -f Dockerfile -t trow ..
 ```
 
 Note that the build context needs to be the root directory of the project (*not* the directory with
@@ -27,13 +29,13 @@ There are several ways to produce multiplatform builds with Docker:
 Our Dockerfile uses 3 (with Docker multiplatform support to assemble the final image). Assuming
 you're running on amd64, you can run the following:
 
-```
+```sh
 docker buildx build --pull --load -t trow:armv7 -f Dockerfile --platform linux/arm/v7 ../
 ```
 
 You can build a multi-platform image (or rather manifest pointing to multiple images) with:
 
-```
+```sh
 docker buildx build --pull --load -t trow:armv7 -f Dockerfile --platform linux/arm/v7,linux/arm64,linux/amd64 ../
 ```
 
@@ -50,4 +52,3 @@ be done for common platforms with `docker run --privileged --rm
 docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64` (also see [qus](https://github.com/dbhi/qus)
 for an alternative approach and explanation of what is happening here). Restart docker or create a
 new builder instance after doing this.
-

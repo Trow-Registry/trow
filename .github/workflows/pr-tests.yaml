@@ -24,9 +24,9 @@ jobs:
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Run Trow test suite
-        run: cargo test
+        run: RUST_LOG=info cargo test
       - name: Smoke test
-        run: cargo test -- --ignored
+        run: RUST_LOG=info cargo test -- --ignored
 
 
   build:

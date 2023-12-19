@@ -15,12 +15,10 @@ RUN --mount=type=bind,source=docker/platform.sh,target=/platform.sh \
 RUN rustup component add rustfmt
 RUN rustup target add $(cat /.platform)
 
-RUN dpkg --add-architecture $TARGETARCH
-
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && \
-    apt-get install -y unzip openssl protobuf-compiler libssl-dev:$TARGETARCH $(cat /.compiler)
+    apt-get install -y unzip openssl protobuf-compiler $(cat /.compiler)
 
 COPY Cargo.toml .
 COPY Cargo.lock .
@@ -39,7 +37,7 @@ RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
-    apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates
+    apt-get install -y --no-install-recommends openssl ca-certificates
 
 RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
 # keep this late for concurrency
