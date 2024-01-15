@@ -1,39 +1,25 @@
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::fs::{self, DirEntry, File};
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::sync::{Arc, RwLock};
 use std::{io, str};
+use futures::stream;
 
-use crate::response::manifest_history;
-use walkdir::WalkDir;
-use super::errors::{DigestValidationError, ProxyError};
+use crate::trow_server::server::is_digest;
 use anyhow::{anyhow, Context, Result};
-use async_recursion::async_recursion;
 use bytes::Buf;
 use bytes::Bytes;
 use chrono::prelude::*;
-use futures::future::try_join_all;
-use futures::io::AsyncRead;
 use futures::stream::StreamExt;
 use futures::Stream;
-use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::{self, Method};
+use reqwest;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
 use tracing::{event, Level};
-use uuid::Uuid;
+use walkdir::WalkDir;
 
 use super::api_types::*;
 use super::digest;
-use super::image::RemoteImage;
-use super::manifest::{manifest_media_type, FromJson, Manifest};
-use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
-use super::server::SUPPORTED_DIGESTS;
-use super::temporary_file::TemporaryFile;
-use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
+use super::manifest::Manifest;
 
 // Storage Driver Error
 #[derive(thiserror::Error, Debug)]
@@ -64,7 +50,7 @@ pub struct TrowStorageBackend {
 impl TrowStorageBackend {
     fn init_create_path(root: &Path, dir: &str) -> Result<()> {
         let path = root.join(dir);
-        return match fs::create_dir_all(&path) {
+        match fs::create_dir_all(&path) {
             Ok(_) => Ok(()),
             Err(e) => {
                 event!(
@@ -76,10 +62,9 @@ impl TrowStorageBackend {
                     path,
                     e
                 );
-                Err(e)
+                Err(e.into())
             }
-        };
-        Ok(())
+        }
     }
 
     pub fn new(path: PathBuf) -> Result<Self> {
@@ -98,23 +83,27 @@ impl TrowStorageBackend {
             .join(reference);
         let manifest_history_bytes = tokio::fs::read(&path).await?;
         let latest_entry_bytes = manifest_history_bytes
-            .split(|b| b == b'\n')
+            .split(|b| *b == b'\n')
             .last()
             .ok_or(anyhow!("Empty manifest history"))?;
-        let latest_entry: ManifestHistoryEntry = serde_json::from_slice(latest_digest_bytes)?;
+        let latest_entry: ManifestHistoryEntry = serde_json::from_slice(latest_entry_bytes)?;
 
-        Ok(latest_digest.digest)
+        Ok(latest_entry.digest)
     }
 
     async fn get_manifest(&self, repo_name: &str, reference: &str) -> Result<Manifest> {
         let digest = if is_digest(reference) {
             Cow::Borrowed(reference)
         } else {
-            Cow::Owned(self.get_manifest_digest(repo_name, reference)?)
+            Cow::Owned(self.get_manifest_digest(repo_name, reference).await?)
         };
-        let path = self.path.join(BLOBS_DIR).join("sha256").join(digest);
+        let path = self
+            .path
+            .join(BLOBS_DIR)
+            .join("sha256")
+            .join(digest.as_ref());
         let manifest_bytes = tokio::fs::read(&path).await?;
-        let manifest = Manifest::from_json(&manifest_bytes)?;
+        let manifest: Manifest = serde_json::from_slice(&manifest_bytes)?;
         Ok(manifest)
     }
 
@@ -126,21 +115,21 @@ impl TrowStorageBackend {
         let location = self.path.join(BLOBS_DIR).join(digest);
         if location.exists() {
             event!(Level::INFO, "Blob already exists");
-            return Ok(());
+            return Ok(location);
         }
-        let mut tmp_file = tokio::fs::OpenOptions::new()
+        let tmp_file = tokio::fs::OpenOptions::new()
             .create_new(true)
             .write(true)
             .open(&tmp_location)
             .await;
 
-        let tmp_file = match tmp_file {
+        let mut tmp_file = match tmp_file {
             // All good
             Ok(tmpf) => tmpf,
             // Special case: blob is being concurrently fetched
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 event!(Level::INFO, "Waiting for concurently fetched blob");
-                while tmp_file.exists() {
+                while tmp_location.exists() {
                     // wait for download to be done (temp file to be moved)
                     tokio::time::sleep(Duration::from_millis(200)).await;
                 }
@@ -151,19 +140,15 @@ impl TrowStorageBackend {
             }
         };
 
-        let err_catcher = |e| {
-            drop(tmp_file);
-            fs::remove_file(tmp_location)
-                .map_err(|e| event!(Level::WARN, "Could not remove tmp file: {:?}", e));
-            return Err(anyhow!("Error downloading blob: {}", e));
-        };
-
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.unwrap_or_else(err_catcher);
-            tmp_file.write_all(&chunk).await.unwrap_or_else(err_catcher);
+            let chunk = catch_err_tmp_file(chunk, &tmp_location)?;
+            catch_err_tmp_file(tmp_file.write_all(&chunk).await, &tmp_location)?;
         }
-        tmp_file.flush().await.unwrap_or_else(err_catcher);
-        tokio::fs::rename(tmp_location, location).await.unwrap_or_else(err_catcher);
+        catch_err_tmp_file(tmp_file.flush().await, &tmp_location)?;
+        catch_err_tmp_file(
+            tokio::fs::rename(&tmp_location, &location).await,
+            &tmp_location,
+        )?;
         Ok(location)
     }
 
@@ -175,21 +160,21 @@ impl TrowStorageBackend {
         let location = self.path.join(BLOBS_DIR).join(digest);
         if location.exists() {
             event!(Level::INFO, "Blob already exists");
-            return Ok(());
+            return Ok(location);
         }
-        let mut tmp_file = tokio::fs::OpenOptions::new()
+        let tmp_file = tokio::fs::OpenOptions::new()
             .create_new(true)
             .write(true)
             .open(&tmp_location)
             .await;
 
-        let tmp_file = match tmp_file {
+        let mut tmp_file = match tmp_file {
             // All good
             Ok(tmpf) => tmpf,
             // Special case: blob is being concurrently fetched
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 event!(Level::INFO, "Waiting for concurently fetched blob");
-                while tmp_file.exists() {
+                while tmp_location.exists() {
                     // wait for download to be done (temp file to be moved)
                     tokio::time::sleep(Duration::from_millis(200)).await;
                 }
@@ -200,19 +185,12 @@ impl TrowStorageBackend {
             }
         };
 
-        let err_catcher = |e| {
-            drop(tmp_file);
-            fs::remove_file(tmp_location)
-                .map_err(|e| event!(Level::WARN, "Could not remove tmp file: {:?}", e));
-            return Err(anyhow!("Error downloading blob: {}", e));
-        };
-
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.unwrap_or_else(err_catcher);
-            tmp_file.write_all(&chunk).await.unwrap_or_else(err_catcher);
+            let chunk = catch_err_tmp_file(chunk, &tmp_location)?;
+            catch_err_tmp_file(tmp_file.write_all(&chunk).await, &tmp_location)?;
         }
-        tmp_file.flush().await.unwrap_or_else(err_catcher);
-        tokio::fs::rename(tmp_location, location).await.unwrap_or_else(err_catcher);
+        catch_err_tmp_file(tmp_file.flush().await, &tmp_location)?;
+        catch_err_tmp_file(tokio::fs::rename(&tmp_location, &location).await, &tmp_location)?;
         Ok(location)
     }
 
@@ -223,7 +201,7 @@ impl TrowStorageBackend {
         tag: &str,
     ) -> Result<PathBuf> {
         let digest = digest::sha256_digest(manifest.as_ref().reader())?;
-        let location = self.write_blob_stream(&digest, manifest).await?;
+        let location = self.write_blob_stream(&digest, stream::once(Ok(manifest))).await?;
 
         // save link tag -> manifest
         let entry = ManifestHistoryEntry {
@@ -237,7 +215,7 @@ impl TrowStorageBackend {
             .append(true)
             .open(&manifest_history_loc)
             .await?;
-        manifest_history_file.write_all(entry_str).await?;
+        manifest_history_file.write_all(entry_str.as_bytes()).await?;
         manifest_history_file.flush().await?;
 
         Ok(location)
@@ -249,8 +227,11 @@ impl TrowStorageBackend {
         tag: &str,
     ) -> Result<Vec<ManifestHistoryEntry>> {
         let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
-        let history_raw = tokio::fs::read(manifest_history_loc).await.context("Could not read manifest history")?;
-        let history = serde_json::from_slice(&history_raw).context("Could not parse manifest history")?;
+        let history_raw = tokio::fs::read(manifest_history_loc)
+            .await
+            .context("Could not read manifest history")?;
+        let history =
+            serde_json::from_slice(&history_raw).context("Could not parse manifest history")?;
         Ok(history)
     }
 
@@ -272,16 +253,21 @@ impl TrowStorageBackend {
 
     pub async fn list_repo_tags(&self, repo: &str) -> Result<Vec<String>> {
         let repo_manifest_dir = self.path.join(MANIFESTS_DIR).join(repo);
-        let tags = WalkDir::new(repo_manifest_dir).sort_by_file_name().into_iter().filter_map(|entry| {
-            let entry = entry.ok()?;
-            if entry.file_type().is_file() {
-                let path = entry.path();
-                let repo = path.strip_prefix(repo_manifest_dir).ok()?;
-                Some(repo.to_string_lossy())
-            } else {
-                None
-            }
-        }).collect();
+        let rmd = &repo_manifest_dir;
+        let tags = WalkDir::new(rmd)
+            .sort_by_file_name()
+            .into_iter()
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                if entry.file_type().is_file() {
+                    let path = entry.path();
+                    let repo = path.strip_prefix(rmd).ok()?;
+                    Some(repo.to_string_lossy().into_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         Ok(tags)
     }
@@ -324,6 +310,23 @@ fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String> {
         .ok_or_else(|| anyhow!("Invalid manifest line: `{}`", latest_digest_line))?;
 
     Ok(latest_digest.to_string())
+}
+
+
+
+/// Transform any result into an anyhow Result & removes the tmp file
+fn catch_err_tmp_file<T, E: std::fmt::Display>(
+    result: Result<T, E>,
+    tmp_location: &Path,
+) -> Result<T> {
+    match result {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            fs::remove_file(tmp_location)
+                .map_err(|e| event!(Level::WARN, "Could not remove tmp file: {:?}", e));
+            return Err(anyhow!("Error downloading blob: {}", e));
+        }
+    }
 }
 
 #[cfg(test)]

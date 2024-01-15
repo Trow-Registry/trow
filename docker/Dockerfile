@@ -1,3 +1,4 @@
+#!/usr/bin/env docker build
 # syntax=docker/dockerfile:1.5
 
 #Note we build on host plaftform and cross-compile to target arch
