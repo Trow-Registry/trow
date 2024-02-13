@@ -39,6 +39,8 @@ pub struct SingleRegistryProxyConfig {
     pub host: String,
     pub username: Option<String>,
     pub password: Option<String>,
+    #[serde(default)]
+    pub ignore_repos: Vec<String>,
 }
 
 /// Wrapper around `reqwest::Client` that automagically handles authentication
@@ -285,6 +287,7 @@ mod tests {
             alias: "toto".to_string(),
             username: None,
             password: None,
+            ignore_repos: vec![],
         };
 
         let proxy_image = RemoteImage::new(&proxy_cfg.host, "hello_world".into(), "latest".into());

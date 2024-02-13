@@ -1,4 +1,4 @@
-{{- if (not (empty .Values.trow.validation.config)) -}}
+{{- if (not (empty .Values.trow.validationWebhook.config)) -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,6 +8,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   validation.yaml: |
-{{ .Values.trow.validation.config | toYaml | indent 4 }}
+{{ .Values.trow.validationWebhook.config | toYaml | indent 4 }}
 
 {{- end }}

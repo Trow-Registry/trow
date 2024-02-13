@@ -30,18 +30,21 @@ mod interface_tests {
                     host: "registry-1.docker.io".to_string(),
                     username: None,
                     password: None,
+                    ignore_repos: vec![],
                 },
                 SingleRegistryProxyConfig {
                     alias: "nvcr".to_string(),
                     host: "nvcr.io".to_string(),
                     username: None,
                     password: None,
+                    ignore_repos: vec![],
                 },
                 SingleRegistryProxyConfig {
                     alias: "quay".to_string(),
                     host: "quay.io".to_string(),
                     username: None,
                     password: None,
+                    ignore_repos: vec![],
                 },
             ],
         });

@@ -1,4 +1,4 @@
-{{- if or .Values.trow.validation.enableWebhook .Values.trow.proxyConfig.enableWebhook -}}
+{{- if or .Values.trow.validationWebhook.enable .Values.trow.proxyRegistries.webhook.enable -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -22,7 +22,7 @@ spec:
         app.kubernetes.io/component: admission-webhook
     spec:
       containers:
-      {{- if .Values.trow.validation.enableWebhook }}
+      {{- if .Values.trow.validationWebhook.enable }}
         - name: patch-validation
           image: {{ .Values.webhookPatch.image.image }}
           imagePullPolicy: {{ .Values.webhookPatch.image.pullPolicy }}
@@ -32,7 +32,7 @@ spec:
             - --namespace=$(POD_NAMESPACE)
             - --patch-mutating=false
             - --secret-name={{ include "trow.fullname" . }}-admission
-            - --patch-failure-policy={{ .Values.trow.validation.onWebhookFailure }}
+            - --patch-failure-policy={{ .Values.trow.validationWebhook.failurePolicy }}
           env:
             - name: POD_NAMESPACE
               valueFrom:
@@ -41,7 +41,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
       {{- end }}
-      {{- if .Values.trow.proxyConfig.enableWebhook }}
+      {{- if .Values.trow.proxyRegistries.webhook.enable }}
         - name: patch-mutation
           image: {{ .Values.webhookPatch.image.image }}
           imagePullPolicy: {{ .Values.webhookPatch.image.pullPolicy }}
@@ -51,7 +51,7 @@ spec:
             - --namespace=$(POD_NAMESPACE)
             - --patch-validating=false
             - --secret-name={{ include "trow.fullname" . }}-admission
-            - --patch-failure-policy={{ .Values.trow.proxyConfig.onWebhookFailure }}
+            - --patch-failure-policy={{ .Values.trow.proxyRegistries.webhook.failurePolicy }}
           env:
             - name: POD_NAMESPACE
               valueFrom:
