@@ -90,45 +90,49 @@ impl TrowServer {
         ar: AdmissionRequest,
     ) -> Result<AdmissionResponse, Status> {
         let mut patch_operations = Vec::<PatchOperation>::new();
-        let proxy_config = match self.proxy_registry_config.as_ref() {
-            Some(s) => s,
-            None => {
-                return Err(Status::Internal(
-                    "Proxy registry config not set, cannot mutate image references".to_owned(),
-                ))
-            }
-        };
-
+        let proxy_config = self.proxy_registry_config.as_ref().ok_or(Status::Internal(
+            "Proxy registry config not set, cannot mutate image references".to_owned(),
+        ))?;
         for (raw_image, image_path) in ar.images.iter().zip(ar.image_paths.iter()) {
             let image = match RemoteImage::try_from_str(raw_image) {
                 Ok(image) => image,
-                Err(_) => continue,
+                Err(e) => {
+                    event!(
+                        Level::WARN,
+                        "Could not parse image reference `{raw_image}` ({e})",
+                    );
+                    continue;
+                }
             };
 
-            for cfg in proxy_config.registries.iter() {
-                if image.get_host() == cfg.host {
+            let image_host = image.get_host();
+            let proxy_config = proxy_config
+                .registries
+                .iter()
+                .find(|cfg| cfg.host == image_host);
+            if let Some(proxy_config) = proxy_config {
+                let image_repo = image.get_repo();
+                let ignored = proxy_config
+                    .ignore_repos
+                    .iter()
+                    .any(|repo| image_repo == repo);
+                if !ignored {
                     event!(
                         Level::INFO,
                         "mutate_admission: proxying image {} to {}",
                         raw_image,
-                        cfg.alias
+                        proxy_config.alias
                     );
                     let im = RemoteImage::new(
                         &ar.host_name,
-                        format!("f/{}/{}", cfg.alias, image.get_repo()),
+                        format!("f/{}/{}", proxy_config.alias, image.get_repo()),
                         image.reference.clone(),
                     );
                     patch_operations.push(PatchOperation::Replace(ReplaceOperation {
                         path: image_path.clone(),
                         value: serde_json::Value::String(im.get_ref()),
                     }));
-                    break;
                 }
-                event!(
-                    Level::INFO,
-                    "mutate_admission: could not proxy image {}",
-                    raw_image
-                );
             }
         }
         let patch = Patch(patch_operations);

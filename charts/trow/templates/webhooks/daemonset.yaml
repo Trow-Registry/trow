@@ -1,4 +1,4 @@
-{{- if or .Values.trow.validation.enableWebhook .Values.trow.proxyConfig.enableWebhook }}
+{{- if or .Values.trow.validationWebhook.enable .Values.trow.proxyRegistries.webhook.enable }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -43,10 +43,10 @@ spec:
           - "--tls=/etc/trow/webhook-cert/cert,/etc/trow/webhook-cert/key"
           - "-n"
           - {{ .Values.trow.domain | quote }}
-          {{- if (not (empty .Values.trow.proxyConfig.config)) }}
+          {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
           - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
           {{- end }}
-          {{- if (not (empty .Values.trow.validation.config)) }}
+          {{- if (not (empty .Values.trow.validationWebhook.config)) }}
           - "--image-validation-config-file=/etc/trow/validation.yaml"
           {{- end }}
         env:
@@ -59,13 +59,13 @@ spec:
         - name: webhook-cert-translated
           mountPath: /etc/trow/webhook-cert
           readOnly: true
-      {{- if (not (empty .Values.trow.proxyConfig.config)) }}
+      {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
         - name: trow-proxy-cfg
           mountPath: /etc/trow/proxy-registries.yaml
           subPath: proxy-registries.yaml
           readOnly: true
       {{- end}}
-      {{- if (not (empty .Values.trow.validation.config)) }}
+      {{- if (not (empty .Values.trow.validationWebhook.config)) }}
         - name: trow-validation-cfg
           mountPath: /etc/trow/validation.yaml
           subPath: validation.yaml
@@ -77,12 +77,12 @@ spec:
             secretName: {{ include "trow.fullname" . }}-admission
         - name: webhook-cert-translated
           emptyDir: {}
-      {{- if (not (empty .Values.trow.proxyConfig.config)) }}
+      {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
         - name: trow-proxy-cfg
           secret:
             secretName: {{ include "trow.fullname" . }}-proxy-cfg
       {{- end }}
-      {{- if (not (empty .Values.trow.validation.config)) }}
+      {{- if (not (empty .Values.trow.validationWebhook.config)) }}
         - name: trow-validation-cfg
           configMap:
             name: {{ include "trow.fullname" . }}-validation-cfg

@@ -36,12 +36,14 @@ mod admission_mutation_tests {
                     host: "registry-1.docker.io".to_string(),
                     username: None,
                     password: None,
+                    ignore_repos: vec!["library/milk".to_string()],
                 },
                 SingleRegistryProxyConfig {
                     alias: "ecr".to_string(),
                     host: "1234.dkr.ecr.saturn-5.amazonaws.com".to_string(),
                     username: Some("AWS".to_string()),
                     password: None,
+                    ignore_repos: vec![],
                 },
             ],
         });
@@ -198,6 +200,22 @@ mod admission_mutation_tests {
             &client,
             "nginx:tag",
             Some(&format!("{HOST}/f/docker/library/nginx:tag")),
+        )
+        .await;
+
+        println!("Test ignore docker.io/library/milk");
+        test_request(
+            &client,
+            "docker.io/library/milk:tag",
+            None,
+        )
+        .await;
+
+        println!("Test ignore docker.io/library/milk");
+        test_request(
+            &client,
+            "milk:tagggged",
+            None,
         )
         .await;
 
