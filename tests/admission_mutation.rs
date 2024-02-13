@@ -204,20 +204,10 @@ mod admission_mutation_tests {
         .await;
 
         println!("Test ignore docker.io/library/milk");
-        test_request(
-            &client,
-            "docker.io/library/milk:tag",
-            None,
-        )
-        .await;
+        test_request(&client, "docker.io/library/milk:tag", None).await;
 
         println!("Test ignore docker.io/library/milk");
-        test_request(
-            &client,
-            "milk:tagggged",
-            None,
-        )
-        .await;
+        test_request(&client, "milk:tagggged", None).await;
 
         println!("Test ecr");
         test_request(
