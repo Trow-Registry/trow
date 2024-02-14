@@ -1,0 +1,5 @@
+[default]
+extend-ignore-re = [
+    # Usernames
+    "@[0-9a-zA-Z]+"
+]

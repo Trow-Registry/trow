@@ -45,7 +45,7 @@ trow:
       #     host: registry-1.docker.io
       #   - alias: ghcr
       #     host: ghcr.io
-      #     ignore_prefixes: ["ghcr.io/trow-registry/trow"]
+      #     ignore_repos: ["trow-registry/trow"]
   ## For more info on log levels see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html
   logLevel: info
 
