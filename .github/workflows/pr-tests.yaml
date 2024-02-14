@@ -147,4 +147,4 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Check spelling
-      uses: crate-ci/typos@v1.0.4
+      uses: crate-ci/typos@v1.18.2
