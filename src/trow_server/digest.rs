@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use anyhow::{Error, Result};
+use anyhow::{Context, Error, Result};
 // Crypto and crypto related imports
 use sha2::{Digest, Sha256};
 
@@ -13,7 +13,7 @@ fn digest<D: Digest + Default, R: Read>(reader: &mut R) -> Result<String> {
     loop {
         let n = match reader.read(&mut buffer) {
             Ok(n) => n,
-            Err(err) => return Err(Error::from(err)),
+            Err(err) => return Err(Error::from(err)).context("Could not compute digest"),
         };
         sh.update(&buffer[..n]);
         if n == 0 || n < BUFFER_SIZE {
@@ -23,7 +23,7 @@ fn digest<D: Digest + Default, R: Read>(reader: &mut R) -> Result<String> {
     Ok(hex::encode(sh.finalize()))
 }
 
-fn sha256_digest<R: Read>(mut reader: R) -> Result<String> {
+pub fn sha256_digest<R: Read>(mut reader: R) -> Result<String> {
     digest::<Sha256, _>(&mut reader)
 }
 

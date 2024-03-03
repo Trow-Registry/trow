@@ -93,7 +93,7 @@ fn sha256_digest<R: Read>(mut reader: R) -> Result<String> {
     digest::<Sha256, _>(&mut reader)
 }
 
-fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String> {
+pub fn sha256_tag_digest<R: Read>(mut reader: R) -> Result<String> {
     let digest = sha256_digest(&mut reader)?;
     Ok(format!("{}:{}", DigestAlgorithm::Sha256, digest))
 }

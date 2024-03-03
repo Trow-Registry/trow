@@ -1,5 +1,6 @@
 //! types for the trow <=> trow-server interface
 
+use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq)]
@@ -158,17 +159,10 @@ pub enum Status {
     Unavailable(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Timestamp {
-    pub seconds: i64,
-    pub nanos: i32,
-}
-
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct ManifestHistoryEntry {
     pub digest: String,
-
-    pub date: Option<Timestamp>,
+    pub date: DateTime<Utc>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
