@@ -1,9 +1,9 @@
 use std::collections::HashSet;
-use std::fs::{self, DirEntry, File};
-use std::io::{BufRead, BufReader};
+use std::fs::{self, File};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use std::str;
 use std::sync::{Arc, RwLock};
-use std::{io, str};
 
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
@@ -13,7 +13,6 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
-use tokio::time::Duration;
 use tracing::{event, Level};
 use uuid::Uuid;
 
@@ -22,10 +21,10 @@ use super::digest::sha256_tag_digest;
 use super::image::RemoteImage;
 use super::manifest::{manifest_media_type, FromJson, Manifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
-use super::temporary_file::TemporaryFile;
+use super::storage::{is_path_writable, TrowStorageBackend};
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
 
-static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
+pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 static MANIFESTS_DIR: &str = "manifests";
 static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
@@ -46,9 +45,12 @@ static DIGEST_HEADER: &str = "Docker-Content-Digest";
 #[derive(Clone, Debug)]
 pub struct TrowServer {
     active_uploads: Arc<RwLock<HashSet<Upload>>>,
+    pub storage: TrowStorageBackend,
+    // deprecated
     manifests_path: PathBuf,
     blobs_path: PathBuf,
     scratch_path: PathBuf,
+
     pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
 }
@@ -111,52 +113,6 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
     Ok(dir_path)
 }
 
-fn does_manifest_match_digest(manifest: &DirEntry, digest: &str) -> bool {
-    digest
-        == match get_digest_from_manifest_path(manifest.path()) {
-            Ok(test_digest) => test_digest,
-            Err(e) => {
-                event!(Level::WARN, "Failure reading repo {:?}", e);
-                "NO_MATCH".to_string()
-            }
-        }
-}
-
-struct RepoIterator {
-    paths: Vec<Result<DirEntry, std::io::Error>>,
-}
-
-impl RepoIterator {
-    fn new(base_dir: &Path) -> Result<RepoIterator> {
-        let paths = fs::read_dir(base_dir)?.collect();
-        Ok(RepoIterator { paths })
-    }
-}
-
-impl Iterator for RepoIterator {
-    type Item = DirEntry;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.paths.pop() {
-            None => None,
-            Some(res_path) => match res_path {
-                Err(e) => {
-                    event!(Level::WARN, "Error iterating over repos {:?}", e);
-                    self.next()
-                }
-                Ok(path) => {
-                    if path.file_type().unwrap().is_dir() {
-                        let new_paths = fs::read_dir(path.path()).unwrap();
-                        self.paths.extend(new_paths);
-                        self.next()
-                    } else {
-                        Some(path)
-                    }
-                }
-            },
-        }
-    }
-}
-
 /**
  * Checks a file matches the given digest.
  *
@@ -195,28 +151,6 @@ pub fn is_digest(maybe_digest: &str) -> bool {
     false
 }
 
-fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
-    let file = File::open(path)?;
-    let metadata = file.metadata()?;
-    let permissions = metadata.permissions();
-    Ok(!permissions.readonly())
-}
-
-fn get_digest_from_manifest_path<P: AsRef<Path>>(path: P) -> Result<String> {
-    let manifest = fs::read_to_string(path)?;
-    let latest_digest_line = manifest
-        .lines()
-        .last()
-        .ok_or_else(|| anyhow!("Empty manifest"))?;
-    // Each line is `{digest} {date}`
-    let latest_digest = latest_digest_line
-        .split(' ')
-        .next()
-        .ok_or_else(|| anyhow!("Invalid manifest line: `{}`", latest_digest_line))?;
-
-    Ok(latest_digest.to_string())
-}
-
 impl TrowServer {
     pub fn new(
         data_path: &str,
@@ -234,6 +168,7 @@ impl TrowServer {
             scratch_path,
             proxy_registry_config,
             image_validation_config,
+            storage: TrowStorageBackend::new(data_path.into())?,
         };
         Ok(svc)
     }
@@ -257,10 +192,6 @@ impl TrowServer {
         Ok(self.blobs_path.join(alg).join(val))
     }
 
-    fn get_digest_from_manifest(&self, repo_name: &str, reference: &str) -> Result<String> {
-        get_digest_from_manifest_path(self.manifests_path.join(repo_name).join(reference))
-    }
-
     async fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<()> {
         // Tag files should contain list of digests with timestamp
         // Last line should always be the current digest
@@ -281,11 +212,13 @@ impl TrowServer {
         Ok(())
     }
 
-    fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf> {
+    async fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf> {
         let digest = if is_digest(reference) {
             reference.to_string()
         } else {
-            self.get_digest_from_manifest(repo_name, reference)?
+            self.storage
+                .get_manifest_digest(repo_name, reference)
+                .await?
         };
 
         self.get_catalog_path_for_blob(&digest)
@@ -361,30 +294,17 @@ impl TrowServer {
             event!(Level::DEBUG, "Already have blob {}", digest);
             return Ok(());
         }
-        let path = self.scratch_path.join(digest);
-        let mut file = match TemporaryFile::open_for_writing(path.clone()).await? {
-            Some(f) => f,
-            None => {
-                event!(
-                    Level::DEBUG,
-                    "Waiting for concurrently fetched blob {}",
-                    digest
-                );
-                while path.exists() {
-                    // wait for download to be done (temp file to be moved)
-                    // TODO: use notify crate instead
-                    tokio::time::sleep(Duration::from_millis(200)).await;
-                }
-                return Ok(());
-            }
-        };
-
         let addr = format!("{}/blobs/{}", remote_image.get_base_uri(), digest);
         event!(Level::INFO, "Downloading blob {}", addr);
-        let resp = cl.authenticated_request(Method::GET, &addr).send().await?;
-
-        file.write_stream(resp.bytes_stream()).await?;
-        self.save_blob(file.path(), digest)?;
+        let resp = cl
+            .authenticated_request(Method::GET, &addr)
+            .send()
+            .await
+            .context("GET blob failed")?;
+        self.storage
+            .write_blob_stream(digest, resp.bytes_stream())
+            .await
+            .context("Failed to write blob")?;
         Ok(())
     }
 
@@ -413,14 +333,7 @@ impl TrowServer {
                 resp.status()
             ));
         }
-
-        let mut buf =
-            TemporaryFile::open_for_writing(self.scratch_path.join(Uuid::new_v4().to_string()))
-                .await?
-                .unwrap();
         let bytes = resp.bytes().await?;
-        buf.write_all(&bytes).await?;
-
         let mani: Manifest = serde_json::from_slice(&bytes)?;
         match mani {
             Manifest::List(_) => {
@@ -446,14 +359,8 @@ impl TrowServer {
                 try_join_all(futures).await?;
             }
         }
-
-        //Save out manifest
-        let f = File::open(buf.path())?;
-        let reader = BufReader::new(f);
-        let calculated_digest = sha256_tag_digest(reader)?;
-
-        self.save_blob(buf.path(), &calculated_digest)?;
-        self.save_tag(&calculated_digest, local_repo_name, &remote_image.reference)
+        self.storage
+            .write_image_manifest(bytes, local_repo_name, &remote_image.reference, false)
             .await?;
 
         Ok(())
@@ -513,7 +420,9 @@ impl TrowServer {
             (Some(remote_image.reference.clone()), None)
         } else {
             let local_digest = self
-                .get_digest_from_manifest(&repo_name, &remote_image.reference)
+                .storage
+                .get_manifest_digest(&repo_name, &remote_image.reference)
+                .await
                 .ok();
             let mut latest_digest = match &try_cl {
                 Some(cl) => self.get_digest_from_header(cl, &remote_image).await,
@@ -601,13 +510,14 @@ impl TrowServer {
             drop(reference);
             if self.proxy_registry_config.as_ref().unwrap().offline {
                 let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
-                self.get_path_for_manifest(&repo_name, &remote_image.reference)?
+                self.get_path_for_manifest(&repo_name, &remote_image.reference)
+                    .await?
             } else {
                 let digest = self.download_remote_image(remote_image, proxy_cfg).await?;
                 self.get_catalog_path_for_blob(&digest)?
             }
         } else {
-            self.get_path_for_manifest(&repo_name, &reference)?
+            self.get_path_for_manifest(&repo_name, &reference).await?
         };
 
         let vm = self.create_verified_manifest(&path, do_verification)?;
@@ -652,6 +562,14 @@ impl TrowServer {
 
         true
     }
+}
+
+pub fn is_writable_repo(repo_name: &str) -> bool {
+    if repo_name.starts_with(PROXY_DIR) {
+        return false;
+    }
+
+    true
 }
 
 // Registry
@@ -725,68 +643,25 @@ impl TrowServer {
      * TODO: check if blob referenced by manifests. If so, refuse to delete.
      */
     pub async fn delete_blob(&self, br: BlobRef) -> Result<BlobDeleted, Status> {
-        let path = self
-            .get_catalog_path_for_blob(&br.digest)
-            .map_err(|e| Status::InvalidArgument(format!("Error parsing digest {:?}", e)))?;
-        if !path.exists() {
-            event!(Level::WARN, "Request for unknown blob: {:?}", path);
-            Err(Status::NotFound(format!("No blob found matching {:?}", br)))
-        } else {
-            fs::remove_file(&path)
-                .map_err(|e| {
-                    event!(Level::ERROR, "Failed to delete blob {:?} {:?}", br, e);
-                    Status::Internal("Internal error deleting blob".to_owned())
-                })
-                .and(Ok(BlobDeleted {}))
-        }
-    }
-
-    pub async fn delete_manifest(&self, mr: ManifestRef) -> Result<ManifestDeleted, Status> {
-        if !is_digest(&mr.reference) {
+        if !is_digest(&br.digest) {
             return Err(Status::InvalidArgument(format!(
-                "Manifests can only be deleted by digest. Got {}",
-                mr.reference
+                "Invalid digest: {}",
+                br.digest
             )));
         }
-        let digest = mr.reference;
-        //For the repo, go through all tags and see if they reference the digest. Delete them.
-        //Can only delete manifest if no other tags in any repo reference it
-
-        let ri = RepoIterator::new(&self.manifests_path.join(&mr.repo_name)).map_err(|e| {
-            event!(Level::ERROR, "Problem reading manifest catalog {:?}", e);
-            Status::FailedPrecondition("Repository not found".to_owned())
-        })?;
-
-        //TODO: error if no manifest matches?
-        ri.filter(|de| does_manifest_match_digest(de, &digest))
-            .for_each(|man| match fs::remove_file(man.path()) {
-                Ok(_) => (),
-                Err(e) => event!(Level::DEBUG, "Failed to delete manifest {:?} {:?}", &man, e),
-            });
-
-        Ok(ManifestDeleted {})
+        match self.storage.delete_blob(&br.digest).await {
+            Ok(_) => Ok(BlobDeleted {}),
+            Err(e) => {
+                event!(Level::ERROR, "Failed to delete blob {:?} {:?}", br, e);
+                Err(Status::Internal("Internal error deleting blob".to_owned()))
+            }
+        }
     }
 
-    pub async fn get_write_details_for_manifest(
-        &self,
-        mr: ManifestRef,
-    ) -> Result<ManifestWriteDetails, Status> {
-        let repo_name = mr.repo_name;
-        if self.is_writable_repo(&repo_name) {
-            //Give the manifest a UUID and save it to the uploads dir
-            let uuid = Uuid::new_v4().to_string();
-
-            let manifest_path = self.get_upload_path_for_blob(&uuid);
-            Ok(ManifestWriteDetails {
-                path: manifest_path.to_string_lossy().to_string(),
-                uuid,
-            })
-        } else {
-            Err(Status::InvalidArgument(format!(
-                "Repository {} is not writable",
-                repo_name
-            )))
-        }
+    pub async fn delete_manifest(&self, _mr: ManifestRef) -> Result<ManifestDeleted, Status> {
+        // event!(Level::ERROR, "Manifest deletion requested but not handled !");
+        unimplemented!("Manifest deletion not yet implemented")
+        // Ok(ManifestDeleted {})
     }
 
     pub async fn get_read_location_for_manifest(
@@ -876,71 +751,54 @@ impl TrowServer {
     }
 
     pub async fn get_catalog(&self, cr: CatalogRequest) -> Result<Vec<CatalogEntry>, Status> {
+        let mut manifests = self
+            .storage
+            .list_repos()
+            .await
+            .map_err(|e| Status::Internal(format!("Internal error streaming catalog: {e}")))?;
         let limit = cr.limit as usize;
-
-        let catalog: HashSet<String> = RepoIterator::new(&self.manifests_path)
-            .map_err(|e| {
-                event!(Level::ERROR, "Error accessing catalog {:?}", e);
-                Status::Internal("Internal error streaming catalog".to_owned())
-            })?
-            .map(|de| de.path())
-            .filter_map(|p| p.parent().map(|p| p.to_path_buf()))
-            .filter_map(|r| {
-                r.strip_prefix(&self.manifests_path)
-                    .ok()
-                    .map(|p| p.to_path_buf())
-            })
-            .map(|p| p.to_string_lossy().to_string())
-            .collect();
-        let partial_catalog: Vec<String> = if cr.last_repo.is_empty() {
-            catalog.into_iter().take(limit).collect()
+        let manifests = if !cr.last_repo.is_empty() {
+            manifests.truncate(limit);
+            manifests
         } else {
-            catalog
+            manifests
                 .into_iter()
-                .skip_while(|t| t != &cr.last_repo)
+                .skip_while(|m| *m != cr.last_repo)
                 .skip(1)
                 .take(limit)
                 .collect()
         };
 
-        Ok(partial_catalog
+        Ok(manifests
             .into_iter()
             .map(|repo_name| CatalogEntry { repo_name })
             .collect())
     }
 
     pub async fn list_tags(&self, ltr: ListTagsRequest) -> Result<Vec<Tag>, Status> {
-        let mut path = PathBuf::from(&self.manifests_path);
-
-        let limit = ltr.limit as usize;
-        path.push(&ltr.repo_name);
-
-        let mut catalog: Vec<String> = RepoIterator::new(&path)
+        let mut tags = self
+            .storage
+            .list_repo_tags(&ltr.repo_name)
+            .await
             .map_err(|e| {
-                event!(Level::ERROR, "Error accessing catalog {:?}", e);
+                event!(Level::ERROR, "Error listing catalog repo tags {:?}", e);
                 Status::Internal("Internal error streaming catalog".to_owned())
-            })?
-            .map(|de| de.path().file_name().unwrap().to_string_lossy().to_string())
-            .collect();
-        catalog.sort();
+            })?;
+        tags.sort();
+        let limit = ltr.limit as usize;
 
         let partial_catalog: Vec<String> = if ltr.last_tag.is_empty() {
-            catalog.into_iter().take(limit).collect()
+            tags.truncate(limit);
+            tags
         } else {
-            catalog
-                .into_iter()
+            tags.into_iter()
                 .skip_while(|t| t != &ltr.last_tag)
                 .skip(1)
                 .take(limit)
                 .collect()
         };
 
-        Ok(partial_catalog
-            .into_iter()
-            .map(|tag| Tag {
-                tag: tag.to_string(),
-            })
-            .collect())
+        Ok(partial_catalog.into_iter().map(|tag| Tag { tag }).collect())
     }
 
     pub async fn get_manifest_history(
@@ -953,68 +811,27 @@ impl TrowServer {
             ));
         }
 
-        let manifest_path = self.manifests_path.join(&mr.repo_name).join(&mr.tag);
+        let mut manifest_history = self
+            .storage
+            .get_manifest_history(&mr.repo_name, &mr.tag)
+            .await
+            .map_err(|e| {
+                event!(Level::ERROR, "Error listing manifest history: {e}");
+                Status::Internal("Could not list manifest history".to_owned())
+            })?;
 
-        let file = File::open(&manifest_path);
-
-        if file.is_err() {
-            return Err(Status::NotFound(format!(
-                "Could not find the requested manifest at: {}",
-                &manifest_path.to_str().unwrap()
-            )));
-        }
-
-        // It's safe to unwrap here
-        let reader = BufReader::new(file.unwrap());
-
-        let mut entries = Vec::new();
-
-        let mut searching_for_digest = !mr.last_digest.is_empty(); //Looking for a digest iff it's not empty
-
-        let mut sent = 0;
-        for line in reader.lines().map_while(Result::ok) {
-            let (digest, date) = match line.find(' ') {
-                Some(ind) => {
-                    let (digest_str, date_str) = line.split_at(ind);
-
-                    if searching_for_digest {
-                        if digest_str == mr.last_digest {
-                            searching_for_digest = false;
-                        }
-                        //Remember we want digest following matched digest
-                        continue;
-                    }
-
-                    let dt_r = DateTime::parse_from_rfc3339(date_str.trim());
-
-                    let ts = if let Ok(dt) = dt_r {
-                        Some(Timestamp {
-                            seconds: dt.timestamp(),
-                            nanos: dt.timestamp_subsec_nanos() as i32,
-                        })
-                    } else {
-                        event!(Level::WARN, "Failed to parse timestamp {}", date_str);
-                        None
-                    };
-                    (digest_str, ts)
-                }
-                None => {
-                    event!(Level::WARN, "No timestamp found in manifest");
-                    (line.as_ref(), None)
-                }
-            };
-
-            let entry = ManifestHistoryEntry {
-                digest: digest.to_string(),
-                date,
-            };
-            entries.push(entry);
-
-            sent += 1;
-            if sent >= mr.limit {
-                break;
-            }
-        }
+        let limit = mr.limit as usize;
+        let entries = if mr.last_digest.is_empty() {
+            manifest_history.truncate(limit);
+            manifest_history
+        } else {
+            manifest_history
+                .into_iter()
+                .skip_while(|entry| entry.digest != mr.last_digest)
+                .skip(1)
+                .take(limit)
+                .collect()
+        };
 
         Ok(entries)
     }

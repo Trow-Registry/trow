@@ -1,9 +1,8 @@
-use std::convert::TryInto;
 use std::io::SeekFrom;
 
 use anyhow::{anyhow, Result};
 use axum::body::Body;
-use chrono::TimeZone;
+use bytes::Buf;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
@@ -12,7 +11,7 @@ use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tracing::{event, Level};
 use trow_server::api_types::{
     BlobRef, CatalogRequest, CompleteRequest, ListTagsRequest, ManifestHistoryRequest, ManifestRef,
-    MetricsRequest, MetricsResponse, UploadRef, UploadRequest, VerifyManifestRequest,
+    MetricsRequest, MetricsResponse, UploadRef, UploadRequest,
 };
 use trow_server::TrowServer;
 
@@ -432,61 +431,25 @@ impl ClientInterface {
         reference: &str,
         manifest: Body,
     ) -> Result<types::VerifiedManifest, RegistryError> {
-        let (mut sink_loc, uuid) = self
-            .get_write_sink_for_manifest(repo_name, reference)
-            .await?;
-        let mut manifest = manifest.into_data_stream();
-        while let Some(v) = manifest.next().await {
-            match v {
-                Err(e) => {
-                    event!(Level::ERROR, "Could not read manifest: {e}");
-                    return Err(RegistryError::Internal);
-                }
-                Ok(bytes) => match sink_loc.write_all(&bytes).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        event!(Level::ERROR, "Could not write manifest: {e}");
-                        return Err(RegistryError::Internal);
-                    }
-                },
-            }
-        }
-        sink_loc.flush().await.unwrap();
+        let man_bytes = axum::body::to_bytes(
+            manifest,
+            1024 * 1024 * 2, // 2MiB
+        )
+        .await
+        .map_err(|_| RegistryError::Internal)?;
 
-        self.verify_manifest(repo_name, reference, &uuid).await
-    }
-
-    async fn get_write_sink_for_manifest(
-        &self,
-        repo_name: &RepoName,
-        reference: &str,
-    ) -> Result<(impl AsyncWrite, String), RegistryError> {
-        event!(
-            Level::INFO,
-            "Getting write location for manifest in repo {} with ref {}",
-            repo_name,
-            reference
-        );
-        let mr = ManifestRef {
-            reference: reference.to_owned(),
-            repo_name: repo_name.0.clone(),
-        };
-
-        let resp = self
-            .trow_server
-            .get_write_details_for_manifest(mr)
-            .await
-            .map_err(|_| RegistryError::InvalidName)?;
-
-        //For the moment we know it's a file location
-        //Manifests don't append; just overwrite
-        let file = tokio::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(resp.path)
+        self.trow_server
+            .storage
+            .write_image_manifest(man_bytes.clone(), &repo_name.0, reference, true)
             .await
             .map_err(|_| RegistryError::Internal)?;
-        Ok((file, resp.uuid))
+
+        Ok(VerifiedManifest::new(
+            None,
+            repo_name.clone(),
+            digest::parse(&digest::sha256_tag_digest(man_bytes.reader()).unwrap()).unwrap(),
+            reference.to_string(),
+        ))
     }
 
     async fn get_reader_for_manifest(
@@ -538,19 +501,7 @@ impl ClientInterface {
         let mut history = ManifestHistory::new(format!("{}:{}", repo_name, reference));
 
         for entry in stream {
-            let ts = if let Some(date) = entry.date {
-                chrono::Utc
-                    .timestamp_opt(date.seconds, date.nanos.try_into().unwrap())
-                    .earliest()
-                    .unwrap()
-            } else {
-                event!(
-                    Level::WARN,
-                    "Manifest digest stored without timestamp. Using Epoch."
-                );
-                chrono::Utc.timestamp_opt(0, 0).earliest().unwrap()
-            };
-            history.insert(entry.digest, ts);
+            history.insert(entry.digest, entry.date);
         }
 
         Ok(history)
@@ -598,41 +549,6 @@ impl ClientInterface {
 
         self.trow_server.delete_blob(br).await?;
         Ok(BlobDeleted {})
-    }
-
-    async fn verify_manifest(
-        &self,
-        repo_name: &RepoName,
-        reference: &str,
-        uuid: &str,
-    ) -> Result<types::VerifiedManifest, RegistryError> {
-        event!(
-            Level::INFO,
-            "Verifying manifest {} in {} uuid {}",
-            reference,
-            repo_name,
-            uuid
-        );
-        let vmr = VerifyManifestRequest {
-            manifest: Some(ManifestRef {
-                reference: reference.to_owned(),
-                repo_name: repo_name.0.clone(),
-            }),
-            uuid: uuid.to_string(),
-        };
-
-        let resp = self
-            .trow_server
-            .verify_manifest(vmr)
-            .await
-            .map_err(|e| match e {
-                Status::InvalidArgument(_) => RegistryError::InvalidManifest,
-                _ => RegistryError::Internal,
-            })?;
-
-        let digest = digest::parse(&resp.digest).map_err(|_| RegistryError::InvalidManifest)?;
-        let vm = VerifiedManifest::new(None, repo_name.clone(), digest, reference.to_string());
-        Ok(vm)
     }
 
     async fn delete_by_manifest(

@@ -18,7 +18,7 @@ pub struct TemporaryFile {
 
 impl TemporaryFile {
     /// Returns `Ok(None)` if the file already exists.
-    pub async fn open_for_writing(path: PathBuf) -> io::Result<Option<TemporaryFile>> {
+    pub async fn open_for_writing(path: PathBuf) -> io::Result<TemporaryFile> {
         let res = fs::OpenOptions::new()
             .create_new(true)
             .write(true)
@@ -26,14 +26,9 @@ impl TemporaryFile {
             .await;
         let file = match res {
             Ok(f) => f,
-            Err(e) => match e.kind() {
-                std::io::ErrorKind::AlreadyExists => {
-                    return Ok(None);
-                }
-                _ => return Err(e),
-            },
+            Err(e) => return Err(e),
         };
-        Ok(Some(TemporaryFile { file, path }))
+        Ok(TemporaryFile { file, path })
     }
 
     pub async fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
@@ -41,12 +36,13 @@ impl TemporaryFile {
         self.file.flush().await
     }
 
-    pub async fn write_stream<S>(&mut self, mut stream: S) -> Result<()>
+    pub async fn write_stream<S, E>(&mut self, mut stream: S) -> io::Result<()>
     where
-        S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
+        S: Stream<Item = Result<Bytes, E>> + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
     {
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
+            let chunk = chunk.map_err(|e| io::Error::new(io::ErrorKind::UnexpectedEof, e))?;
             self.file.write_all(&chunk).await?;
         }
         self.file.flush().await?;
@@ -55,6 +51,10 @@ impl TemporaryFile {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub async fn rename(self, new_path: &Path) -> io::Result<()> {
+        tokio::fs::rename(&self.path, new_path).await
     }
 }
 
@@ -75,15 +75,14 @@ mod test {
     async fn test_temporary_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.txt");
-        let mut file = TemporaryFile::open_for_writing(path.clone())
-            .await
-            .unwrap()
-            .unwrap();
+        let mut file = TemporaryFile::open_for_writing(path.clone()).await.unwrap();
         assert!(
             TemporaryFile::open_for_writing(path.clone())
                 .await
+                .err()
                 .unwrap()
-                .is_none(),
+                .kind()
+                == io::ErrorKind::AlreadyExists,
             "The same file cannot be opened for writing twice !"
         );
         file.write_all(b"hello").await.unwrap();
@@ -130,7 +129,6 @@ mod test {
 
         let mut file = TemporaryFile::open_for_writing(file_path.clone())
             .await
-            .unwrap()
             .unwrap();
         file.write_all(DUMMY_DATA).await.unwrap();
         assert_eq!(fs::read(file.path()).await.unwrap(), DUMMY_DATA);
@@ -138,10 +136,11 @@ mod test {
 
         let mut file = TemporaryFile::open_for_writing(file_path.clone())
             .await
-            .unwrap()
             .unwrap();
         let dummy_stream = futures::stream::iter(DUMMY_DATA.chunks(4).map(|b| Ok(Bytes::from(b))));
-        file.write_stream(dummy_stream).await.unwrap();
+        file.write_stream::<_, reqwest::Error>(dummy_stream)
+            .await
+            .unwrap();
         assert_eq!(fs::read(file.path()).await.unwrap(), DUMMY_DATA);
         drop(file);
     }
