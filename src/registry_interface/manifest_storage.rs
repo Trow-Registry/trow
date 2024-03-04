@@ -1,13 +1,12 @@
 use axum::body::Body;
-use tokio::fs::File;
-use tracing::{event, Level};
+use bytes::Bytes;
 
-use super::{AsyncSeekRead, Digest, DigestAlgorithm, StorageDriverError};
+use super::{Digest, DigestAlgorithm, StorageDriverError};
 
 pub struct ManifestReader {
     content_type: String,
     digest: Digest,
-    reader: File,
+    contents: Bytes,
     size: u64,
 }
 
@@ -15,25 +14,19 @@ impl ManifestReader {
     pub async fn new(
         content_type: String,
         digest: Digest,
-        reader: File,
+        contents: Bytes,
     ) -> Result<Self, StorageDriverError> {
-        let size = match reader.metadata().await {
-            Ok(meta) => meta.len(),
-            Err(e) => {
-                event!(Level::ERROR, "Could not get manifest file size: {}", e);
-                return Err(StorageDriverError::Internal);
-            }
-        };
+        let size = contents.len() as u64;
         Ok(Self {
             content_type,
             digest,
-            reader,
+            contents,
             size,
         })
     }
 
-    pub fn get_reader(self) -> impl AsyncSeekRead {
-        self.reader
+    pub fn get_contents(self) -> Bytes {
+        self.contents
     }
 
     pub fn content_type(&self) -> &str {

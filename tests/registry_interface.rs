@@ -11,8 +11,9 @@ mod interface_tests {
 
     use environment::Environment;
     use reqwest::StatusCode;
+    use trow::registry_interface::digest;
     use trow::trow_server::api_types::{HealthStatus, ReadyStatus};
-    use trow::trow_server::{digest, manifest};
+    use trow::trow_server::manifest;
     use trow::types::{RepoCatalog, TagList};
 
     use crate::common;
@@ -108,7 +109,7 @@ mod interface_tests {
                 .unwrap();
             assert_eq!(actual_size, format!("{}", s));
         }
-        let mani: manifest::ManifestV2 = resp.json().await.unwrap();
+        let mani: manifest::OCIManifestV2 = resp.json().await.unwrap();
 
         assert_eq!(mani.schema_version, 2);
     }
@@ -183,7 +184,7 @@ mod interface_tests {
 
         //used by oci_manifest_test
         let config = "{}\n".as_bytes();
-        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let digest = digest::sha256_digest(BufReader::new(config)).unwrap();
         let loc = &format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
             ORIGIN, name, uuid, digest
@@ -202,7 +203,7 @@ mod interface_tests {
 
     async fn upload_with_post(cl: &reqwest::Client, name: &str) {
         let config = "{ }\n".as_bytes();
-        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let digest = digest::sha256_digest(BufReader::new(config)).unwrap();
         let resp = cl
             .post(&format!(
                 "{}/v2/{}/blobs/uploads/?digest={}",
@@ -225,7 +226,7 @@ mod interface_tests {
     async fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::sha256_digest(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -246,8 +247,8 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
-        digest
+        let digest = digest::sha256_digest(BufReader::new(manifest.as_bytes())).unwrap();
+        digest.to_string()
     }
 
     async fn push_manifest_list(
@@ -285,8 +286,8 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
-        digest
+        let digest = digest::sha256_digest(BufReader::new(manifest.as_bytes())).unwrap();
+        digest.to_string()
     }
 
     async fn push_oci_manifest_with_foreign_blob(
@@ -296,7 +297,7 @@ mod interface_tests {
     ) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::sha256_digest(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -326,8 +327,8 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
-        digest
+        let digest = digest::sha256_digest(BufReader::new(manifest.as_bytes())).unwrap();
+        digest.to_string()
     }
 
     async fn delete_manifest(cl: &reqwest::Client, name: &str, digest: &str) {
@@ -365,7 +366,7 @@ mod interface_tests {
     async fn delete_config_blob(cl: &reqwest::Client, name: &str) {
         //Deletes blob uploaded in config test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::sha256_digest(BufReader::new(config)).unwrap();
         let resp = cl
             .delete(&format!("{}/v2/{}/blobs/{}", ORIGIN, name, config_digest))
             .send()

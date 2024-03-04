@@ -17,12 +17,12 @@ use tracing::{event, Level};
 use uuid::Uuid;
 
 use super::api_types::*;
-use super::digest::sha256_tag_digest;
 use super::image::RemoteImage;
-use super::manifest::{manifest_media_type, FromJson, Manifest};
+use super::manifest::{manifest_media_type, Manifest, OCIManifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
 use super::storage::{is_path_writable, TrowStorageBackend};
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
+use crate::registry_interface::digest::sha256_digest;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 static MANIFESTS_DIR: &str = "manifests";
@@ -123,9 +123,10 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
     let f = File::open(file)?;
     let reader = BufReader::new(f);
 
-    let calculated_digest = sha256_tag_digest(reader)?;
+    let calculated_digest = sha256_digest(reader)?;
+    let str_calc_digest = calculated_digest.to_string();
 
-    if calculated_digest != digest {
+    if str_calc_digest != digest {
         event!(
             Level::ERROR,
             "Upload did not match given digest. Was given {} but got {}",
@@ -134,7 +135,7 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
         );
         return Err(anyhow!(DigestValidationError {
             user_digest: digest.to_string(),
-            actual_digest: calculated_digest,
+            actual_digest: str_calc_digest,
         }));
     }
 
@@ -230,27 +231,20 @@ impl TrowServer {
         verify_assets_exist: bool,
     ) -> Result<VerifiedManifest> {
         let manifest_bytes = std::fs::read(manifest_path)?;
-        let manifest_json: serde_json::Value =
-            serde_json::from_slice(&manifest_bytes).context("not valid json")?;
-        let manifest = Manifest::from_json(&manifest_json).context("not a valid manifest")?;
+        let manifest = Manifest::from_vec(manifest_bytes.clone()).context("Invalid manifest")?;
 
         if verify_assets_exist {
-            for digest in manifest.get_local_asset_digests() {
-                let path = self.get_catalog_path_for_blob(digest)?;
-
+            let digests = manifest.get_local_asset_digests()?;
+            for d in digests {
+                let path = self.get_catalog_path_for_blob(&d.to_string())?;
                 if !path.exists() {
-                    return Err(anyhow!("Failed to find artifact with digest {}", digest));
+                    return Err(anyhow!("Failed to find artifact with digest {}", d));
                 }
             }
         }
-
-        // Calculate the digest: sha256:...
-        let reader = BufReader::new(manifest_bytes.as_slice());
-        let digest = sha256_tag_digest(reader)?;
-
         // For performance, could generate only if verification is on, otherwise copy from somewhere
         Ok(VerifiedManifest {
-            digest,
+            digest: manifest.digest().to_string(),
             content_type: manifest.get_media_type(),
         })
     }
@@ -334,11 +328,11 @@ impl TrowServer {
             ));
         }
         let bytes = resp.bytes().await?;
-        let mani: Manifest = serde_json::from_slice(&bytes)?;
-        match mani {
-            Manifest::List(_) => {
+        let mani = Manifest::from_bytes(bytes)?;
+        match mani.parsed() {
+            OCIManifest::List(_) => {
                 let images_to_dl = mani
-                    .get_local_asset_digests()
+                    .get_local_asset_digests()?
                     .into_iter()
                     .map(|digest| {
                         let mut image = remote_image.clone();
@@ -351,16 +345,21 @@ impl TrowServer {
                     .map(|img| self.download_manifest_and_layers(cl, img, local_repo_name));
                 try_join_all(futures).await?;
             }
-            Manifest::V2(_) => {
-                let futures = mani
-                    .get_local_asset_digests()
+            OCIManifest::V2(_) => {
+                let digests: Vec<_> = mani
+                    .get_local_asset_digests()?
                     .into_iter()
-                    .map(|digest| self.download_blob(cl, remote_image, digest));
+                    .map(|d| d.to_string())
+                    .collect();
+
+                let futures = digests
+                    .iter()
+                    .map(|digest| self.download_blob(cl, remote_image, digest.as_str()));
                 try_join_all(futures).await?;
             }
         }
         self.storage
-            .write_image_manifest(bytes, local_repo_name, &remote_image.reference, false)
+            .write_image_manifest(mani.raw(), local_repo_name, &remote_image.reference, false)
             .await?;
 
         Ok(())
@@ -459,7 +458,8 @@ impl TrowServer {
                         .await
                     {
                         Ok(_) if !ref_is_digest => match self
-                            .save_tag(&digest, &repo_name, &remote_image.reference)
+                            .storage
+                            .write_tag(&repo_name, &remote_image.reference, &digest)
                             .await
                         {
                             Ok(_) => return Ok(digest),
@@ -680,44 +680,6 @@ impl TrowServer {
                 event!(Level::WARN, "Internal error with manifest: {:?}", e);
                 Err(Status::Internal(
                     "Internal error finding manifest".to_owned(),
-                ))
-            }
-        }
-    }
-
-    /**
-     * Take uploaded manifest (which should be uuid in uploads), check it, put in catalog and
-     * by blob digest
-     */
-    pub async fn verify_manifest(
-        &self,
-        req: VerifyManifestRequest,
-    ) -> Result<VerifiedManifest, Status> {
-        let mr = req.manifest.unwrap(); // Pissed off that the manifest is optional!
-        let uploaded_manifest = self.get_upload_path_for_blob(&req.uuid);
-
-        match self.create_verified_manifest(&uploaded_manifest, true) {
-            Ok(vm) => {
-                // copy manifest to blobs and add tag
-                let digest = vm.digest.clone();
-                self.save_blob(&uploaded_manifest, &digest)
-                    .and(self.save_tag(&digest, &mr.repo_name, &mr.reference).await)
-                    .map(|_| vm)
-                    .map_err(|e| {
-                        event!(
-                            Level::ERROR,
-                            "Failure cataloguing manifest {}/{} {:?}",
-                            &mr.repo_name,
-                            &mr.reference,
-                            e
-                        );
-                        Status::Internal("Internal error copying manifest".to_owned())
-                    })
-            }
-            Err(e) => {
-                event!(Level::ERROR, "Error verifying manifest: {:?}", e);
-                Err(Status::InvalidArgument(
-                    "Failed to verify manifest".to_owned(),
                 ))
             }
         }

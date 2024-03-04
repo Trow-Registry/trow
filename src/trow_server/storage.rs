@@ -17,9 +17,9 @@ use tracing::{event, Level};
 use walkdir::WalkDir;
 
 use super::api_types::*;
-use super::manifest::{FromJson, Manifest};
+use super::manifest::{Manifest, ManifestError};
 use super::server::SUPPORTED_DIGESTS;
-use crate::trow_server::digest;
+use crate::registry_interface::digest::sha256_digest;
 use crate::trow_server::temporary_file::TemporaryFile;
 
 // Storage Driver Error
@@ -28,7 +28,9 @@ pub enum StorageBackendError {
     #[error("the name `{0}` is not valid")]
     InvalidName(String),
     #[error("Manifest is not valid ({0:?})")]
-    InvalidManifest(Option<String>),
+    InvalidManifest(#[from] ManifestError),
+    #[error("Blob not found:{0}")]
+    BlobNotFound(PathBuf),
     #[error("Digest did not match content")]
     InvalidDigest,
     #[error("Unsupported Operation")]
@@ -134,17 +136,7 @@ impl TrowStorageBackend {
             .join("sha256")
             .join(digest.as_ref());
         let manifest_bytes = tokio::fs::read(&path).await?;
-        let manifest_json: serde_json::Value =
-            serde_json::from_slice(&manifest_bytes).map_err(|e| {
-                StorageBackendError::Internal(Cow::Owned(format!(
-                    "Manifest is not valid JSON: {e}"
-                )))
-            })?;
-        let manifest = Manifest::from_json(&manifest_json).map_err(|e| {
-            StorageBackendError::Internal(Cow::Owned(format!(
-                "Manifest does not respect schema: {e}"
-            )))
-        })?;
+        let manifest = Manifest::from_vec(manifest_bytes)?;
         Ok(manifest)
     }
 
@@ -261,6 +253,32 @@ impl TrowStorageBackend {
         Ok(tmp_location)
     }
 
+    pub async fn write_tag(
+        &self,
+        repo_name: &str,
+        tag: &str,
+        digest: &str,
+    ) -> Result<(), StorageBackendError> {
+        let entry = ManifestHistoryEntry {
+            digest: digest.to_string(),
+            date: Utc::now(),
+        };
+        let mut entry_str = serde_json::to_vec(&entry).map_err(|_| {
+            StorageBackendError::Internal(Cow::Borrowed("Invalid manifest tag entry"))
+        })?;
+        entry_str.push(b'\n');
+        let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
+        tokio::fs::create_dir_all(manifest_history_loc.parent().unwrap()).await?;
+        let mut manifest_history_file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&manifest_history_loc)
+            .await?;
+        manifest_history_file.write_all(&entry_str).await?;
+        manifest_history_file.flush().await?;
+        Ok(())
+    }
+
     pub async fn write_image_manifest(
         &self,
         manifest: Bytes,
@@ -268,38 +286,32 @@ impl TrowStorageBackend {
         tag: &str,
         verify: bool,
     ) -> Result<PathBuf, StorageBackendError> {
-        let digest = digest::sha256_tag_digest(manifest.as_ref().reader()).map_err(|e| {
+        let digest = sha256_digest(manifest.as_ref().reader()).map_err(|e| {
             StorageBackendError::Internal(Cow::Owned(format!(
                 "Could not calculate digest of manifest: {e}"
             )))
         })?;
         if verify {
-            let manifest: Manifest = serde_json::from_slice(&manifest)
-                .map_err(|_| StorageBackendError::InvalidManifest(None))?;
-            for digest in manifest.get_local_asset_digests() {
-                let (alg, hash) = is_digest2(digest).ok_or_else(|| {
-                    StorageBackendError::InvalidManifest(Some(format!(
-                        "Invalid digest in manifest: {}",
-                        digest
-                    )))
-                })?;
-                let blob_path = self.path.join(BLOBS_DIR).join(alg).join(hash);
+            let manifest = Manifest::from_bytes(manifest.clone())?;
+            for digest in manifest.get_local_asset_digests()? {
+                let blob_path = self
+                    .path
+                    .join(BLOBS_DIR)
+                    .join(digest.algo.to_string())
+                    .join(digest.hash);
                 if !blob_path.exists() {
-                    return Err(StorageBackendError::InvalidManifest(Some(format!(
-                        "Blob not found: {:?}",
-                        blob_path
-                    ))));
+                    return Err(StorageBackendError::BlobNotFound(blob_path));
                 }
             }
         }
         let manifest_stream = bytes_to_stream(manifest);
         let location = self
-            .write_blob_stream(&digest, pin!(manifest_stream))
+            .write_blob_stream(&digest.to_string(), pin!(manifest_stream))
             .await?;
 
         // save link tag -> manifest
         let entry = ManifestHistoryEntry {
-            digest: digest.clone(),
+            digest: digest.to_string(),
             date: Utc::now(),
         };
         let mut entry_str = serde_json::to_vec(&entry).map_err(|_| {
@@ -449,7 +461,7 @@ mod tests {
     #[tokio::test]
     async fn trow_storage_backend_write_image_manifest() {
         let store = TrowStorageBackend::new(tempdir().unwrap().into_path()).unwrap();
-        let mut manifest = Manifest::V2(manifest::ManifestV2 {
+        let mut manifest = manifest::OCIManifest::V2(manifest::OCIManifestV2 {
             schema_version: 2,
             media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_string()),
             config: manifest::Object {
@@ -467,7 +479,7 @@ mod tests {
         fs::remove_file(location).unwrap();
         // Now let's test verification
         match manifest {
-            Manifest::V2(ref mut m) => {
+            manifest::OCIManifest::V2(ref mut m) => {
                 m.layers.push(manifest::Object {
                     media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_string(),
                     size: Some(7027),

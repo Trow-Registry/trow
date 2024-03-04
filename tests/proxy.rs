@@ -85,7 +85,7 @@ mod interface_tests {
         }
     }
 
-    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> manifest::Manifest {
+    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> manifest::OCIManifest {
         //Might need accept headers here
         let resp = cl
             .get(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
@@ -123,7 +123,7 @@ mod interface_tests {
         };
 
         let layers = vec![layer];
-        let mani = manifest::ManifestV2 {
+        let mani = manifest::OCIManifestV2 {
             schema_version: 2,
             media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
             config,

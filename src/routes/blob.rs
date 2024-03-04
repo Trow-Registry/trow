@@ -4,6 +4,7 @@ use anyhow::Result;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::header::HeaderMap;
+use digest::Digest;
 use tracing::{event, Level};
 
 use super::macros::endpoint_fn_7_levels;
@@ -31,7 +32,7 @@ pub async fn get_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((one, digest)): Path<(String, String)>,
 ) -> Result<BlobReader, Error> {
-    let digest = match digest::parse(&digest) {
+    let digest = match Digest::try_from_str(&digest) {
         Ok(d) => d,
         Err(e) => {
             event!(Level::ERROR, "Error parsing digest: {}", e);
@@ -100,7 +101,7 @@ pub async fn put_blob(
         }
     };
 
-    let digest_obj = digest::parse(&digest).map_err(|_| Error::DigestInvalid)?;
+    let digest_obj = Digest::try_from_str(&digest).map_err(|_| Error::DigestInvalid)?;
     state
         .client
         .complete_and_verify_blob_upload(&repo, &uuid, &digest_obj)
@@ -273,7 +274,7 @@ pub async fn delete_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((one, digest)): Path<(String, String)>,
 ) -> Result<BlobDeleted, Error> {
-    let digest = digest::parse(&digest).map_err(|_| Error::DigestInvalid)?;
+    let digest = Digest::try_from_str(&digest).map_err(|_| Error::DigestInvalid)?;
     state
         .client
         .delete_blob(&one, &digest)
