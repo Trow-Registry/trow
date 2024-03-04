@@ -3,7 +3,8 @@ use std::process::Child;
 
 use reqwest::StatusCode;
 use serde::Serialize;
-use trow::trow_server::{digest, manifest};
+use trow::registry_interface::digest::sha256_digest;
+use trow::trow_server::manifest;
 
 /* None of these are dead code, they are called from tests */
 #[allow(dead_code)]
@@ -63,7 +64,7 @@ pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, 
     let range = resp.headers().get(RANGE_HEADER).unwrap().to_str().unwrap();
     assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
 
-    let digest = digest::sha256_tag_digest(BufReader::new(blob.as_slice())).unwrap();
+    let digest = sha256_digest(BufReader::new(blob.as_slice())).unwrap();
     let resp = cl
         .put(&format!(
             "{}/v2/{}/blobs/uploads/{}?digest={}",
@@ -87,7 +88,7 @@ pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, 
         .unwrap()
         .to_str()
         .unwrap();
-    assert_eq!(digest, digest_header);
+    assert_eq!(digest.to_string(), digest_header);
     assert_eq!(blob, resp.bytes().await.unwrap());
 
     //Upload manifest
@@ -95,15 +96,15 @@ pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, 
     let config = manifest::Object {
         media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
         size: Some(blob.len() as u64),
-        digest: digest.clone(),
+        digest: digest.to_string(),
     };
     let layer = manifest::Object {
         media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_owned(),
         size: Some(blob.len() as u64),
-        digest: digest.clone(),
+        digest: digest.to_string(),
     };
     let layers = vec![layer];
-    let mani = manifest::ManifestV2 {
+    let mani = manifest::OCIManifestV2 {
         schema_version: 2,
         media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
         config,

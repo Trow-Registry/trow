@@ -12,7 +12,7 @@ mod interface_tests {
 
     use environment::Environment;
     use reqwest::StatusCode;
-    use trow::trow_server::digest;
+    use trow::registry_interface::digest;
 
     use crate::common;
 
@@ -62,7 +62,7 @@ mod interface_tests {
 
     async fn upload_config(cl: &reqwest::Client) {
         let config = "{}\n".as_bytes();
-        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let digest = digest::sha256_digest(BufReader::new(config)).unwrap();
         let resp = cl
             .post(&format!(
                 "{}/v2/{}/blobs/uploads/?digest={}",
@@ -78,7 +78,7 @@ mod interface_tests {
     async fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob earlier
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::sha256_digest(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
         let ran_size = fastrand::u32(0..=u32::MAX);
@@ -113,7 +113,9 @@ mod interface_tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
-        digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap()
+        digest::sha256_digest(BufReader::new(manifest.as_bytes()))
+            .unwrap()
+            .to_string()
     }
 
     async fn get_history(

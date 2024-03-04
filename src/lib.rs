@@ -5,7 +5,7 @@ pub mod response;
 mod routes;
 pub mod types;
 
-mod registry_interface;
+pub mod registry_interface;
 pub mod trow_server;
 #[cfg(feature = "sqlite")]
 mod users;

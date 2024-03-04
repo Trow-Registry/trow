@@ -1,6 +1,5 @@
 mod admission;
 pub mod api_types;
-pub mod digest;
 mod image;
 pub mod manifest;
 mod metrics;

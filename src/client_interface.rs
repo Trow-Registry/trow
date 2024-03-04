@@ -16,7 +16,7 @@ use trow_server::api_types::{
 use trow_server::TrowServer;
 
 use crate::registry_interface::blob_storage::Stored;
-use crate::registry_interface::digest::{self, Digest, DigestAlgorithm};
+use crate::registry_interface::digest::{sha256_digest, Digest, DigestAlgorithm};
 use crate::registry_interface::{
     AdmissionValidation, BlobReader, BlobStorage, CatalogOperations, ContentInfo, ManifestHistory,
     ManifestReader, ManifestStorage, Metrics, MetricsError, StorageDriverError,
@@ -71,13 +71,22 @@ impl ManifestStorage for ClientInterface {
         name: &str,
         tag: &str,
     ) -> Result<ManifestReader, StorageDriverError> {
-        let rn = RepoName(name.to_string());
-        let mr = self.get_reader_for_manifest(&rn, tag).await.map_err(|e| {
-            event!(Level::WARN, "Error getting manifest: {}", e);
-            StorageDriverError::Internal
-        })?;
-
-        Ok(mr)
+        let _rn = RepoName(name.to_string());
+        let man = self
+            .trow_server
+            .storage
+            .get_manifest(name, tag)
+            .await
+            .map_err(|e| {
+                event!(Level::WARN, "Error getting manifest: {}", e);
+                StorageDriverError::Internal
+            })?;
+        Ok(ManifestReader::new(
+            man.get_media_type(),
+            man.digest().clone(),
+            man.raw().clone(),
+        )
+        .await?)
     }
 
     async fn store_manifest<'a>(
@@ -447,7 +456,7 @@ impl ClientInterface {
         Ok(VerifiedManifest::new(
             None,
             repo_name.clone(),
-            digest::parse(&digest::sha256_tag_digest(man_bytes.reader()).unwrap()).unwrap(),
+            sha256_digest(man_bytes.reader()).unwrap(),
             reference.to_string(),
         ))
     }
@@ -463,17 +472,23 @@ impl ClientInterface {
             repo_name,
             reference
         );
-        let mr = ManifestRef {
-            reference: reference.to_owned(),
-            repo_name: repo_name.0.clone(),
-        };
-        let resp = self.trow_server.get_read_location_for_manifest(mr).await?;
 
-        //For the moment we know it's a file location
-        let file = tokio::fs::File::open(resp.path).await?;
-        let digest = digest::parse(&resp.digest)?;
-        let mr = ManifestReader::new(resp.content_type, digest, file).await?;
-        Ok(mr)
+        let man = self
+            .trow_server
+            .storage
+            .get_manifest(&repo_name.0, reference)
+            .await
+            .map_err(|e| {
+                event!(Level::WARN, "Error getting manifest: {}", e);
+                StorageDriverError::Internal
+            })?;
+
+        Ok(ManifestReader::new(
+            man.get_media_type(),
+            man.digest().clone(),
+            man.raw().clone(),
+        )
+        .await?)
     }
 
     async fn get_manifest_history(

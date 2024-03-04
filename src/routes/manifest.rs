@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{Path, State};
 use axum_extra::headers::HeaderMap;
+use digest::Digest;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
@@ -105,7 +106,7 @@ pub async fn delete_image_manifest(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, String)>,
 ) -> Result<ManifestDeleted, Error> {
-    let digest = digest::parse(&digest).map_err(|_| Error::Unsupported)?;
+    let digest = Digest::try_from_str(&digest).map_err(|_| Error::Unsupported)?;
     match state.client.delete_manifest(&repo, &digest).await {
         Ok(_) => Ok(ManifestDeleted {}),
         Err(StorageDriverError::Unsupported) => Err(Error::Unsupported),
