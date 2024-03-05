@@ -196,7 +196,7 @@ impl Manifest {
         };
         Ok(digests
             .into_iter()
-            .map(|d| Digest::try_from_str(d))
+            .map(Digest::try_from_str)
             .collect::<Result<Vec<Digest>, DigestError>>()?)
     }
 

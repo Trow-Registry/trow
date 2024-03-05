@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures::stream::Stream;
 use futures::StreamExt;
 use tokio::fs::{self, File};
-use tokio::io::{self, AsyncWriteExt};
+use tokio::io::{self, AsyncSeekExt, AsyncWriteExt};
 
 /// Designed for downloading files. The [`Drop`] implementation makes sure that
 /// the underlying file is deleted in case of an error.
@@ -17,18 +17,20 @@ pub struct TemporaryFile {
 }
 
 impl TemporaryFile {
-    /// Returns `Ok(None)` if the file already exists.
-    pub async fn open_for_writing(path: PathBuf) -> io::Result<TemporaryFile> {
-        let res = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&path)
-            .await;
-        let file = match res {
-            Ok(f) => f,
-            Err(e) => return Err(e),
+    pub async fn new(path: PathBuf, append: bool) -> io::Result<Self> {
+        let mut open_opt = fs::OpenOptions::new();
+        if append {
+            open_opt.append(true)
+        } else {
+            open_opt.write(true)
         };
+        let file = open_opt.open(&path).await?;
+
         Ok(TemporaryFile { file, path })
+    }
+
+    pub async fn seek_pos(&mut self) -> u64 {
+        self.file.seek(io::SeekFrom::Current(0)).await.unwrap()
     }
 
     pub async fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
@@ -36,17 +38,20 @@ impl TemporaryFile {
         self.file.flush().await
     }
 
-    pub async fn write_stream<S, E>(&mut self, mut stream: S) -> io::Result<()>
+    /// Returns the number of bytes written
+    pub async fn write_stream<S, E>(&mut self, mut stream: S) -> io::Result<usize>
     where
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
+        let mut len = 0;
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|e| io::Error::new(io::ErrorKind::UnexpectedEof, e))?;
+            len += chunk.len();
             self.file.write_all(&chunk).await?;
         }
         self.file.flush().await?;
-        Ok(())
+        Ok(len)
     }
 
     pub fn path(&self) -> &Path {
@@ -75,9 +80,9 @@ mod test {
     async fn test_temporary_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.txt");
-        let mut file = TemporaryFile::open_for_writing(path.clone()).await.unwrap();
+        let mut file = TemporaryFile::new(path.clone(), false).await.unwrap();
         assert!(
-            TemporaryFile::open_for_writing(path.clone())
+            TemporaryFile::new(path.clone(), false)
                 .await
                 .err()
                 .unwrap()
@@ -127,16 +132,12 @@ mod test {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test.txt");
 
-        let mut file = TemporaryFile::open_for_writing(file_path.clone())
-            .await
-            .unwrap();
+        let mut file = TemporaryFile::new(file_path.clone(), false).await.unwrap();
         file.write_all(DUMMY_DATA).await.unwrap();
         assert_eq!(fs::read(file.path()).await.unwrap(), DUMMY_DATA);
         drop(file);
 
-        let mut file = TemporaryFile::open_for_writing(file_path.clone())
-            .await
-            .unwrap();
+        let mut file = TemporaryFile::new(file_path.clone(), false).await.unwrap();
         let dummy_stream = futures::stream::iter(DUMMY_DATA.chunks(4).map(|b| Ok(Bytes::from(b))));
         file.write_stream::<_, reqwest::Error>(dummy_stream)
             .await
