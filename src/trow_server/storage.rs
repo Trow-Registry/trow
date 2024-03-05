@@ -10,8 +10,8 @@ use anyhow::Result;
 use bytes::{Buf, Bytes};
 use chrono::prelude::*;
 use futures::stream::StreamExt;
-use futures::Stream;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use futures::{Stream, TryFutureExt};
+use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
 use tracing::{event, Level};
 use walkdir::WalkDir;
@@ -161,7 +161,7 @@ impl TrowStorageBackend {
             return Ok(location);
         }
         tokio::fs::create_dir_all(location.parent().unwrap()).await?;
-        let mut tmp_file = match TemporaryFile::open_for_writing(tmp_location.clone()).await {
+        let mut tmp_file = match TemporaryFile::new(tmp_location.clone(), false).await {
             // All good
             Ok(tmpf) => tmpf,
             // Special case: blob is being concurrently fetched
@@ -184,73 +184,48 @@ impl TrowStorageBackend {
     }
 
     /// Writes part of a blob to disk.
+    /// Upload then needs to be "completed"
     pub async fn write_blob_part_stream<S>(
         &self,
         upload_id: &str,
-        mut stream: S,
+        stream: S,
         range: Option<Range<u64>>,
-    ) -> Result<PathBuf, WriteBlobRangeError>
+    ) -> Result<(), WriteBlobRangeError>
     where
         S: Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
     {
-        // invalid range
-        // does not exist
-        // could not read stream
-
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id);
-        let mut open_options = tokio::fs::OpenOptions::new();
-        open_options.write(true);
-        if range.is_none() || range.as_ref().unwrap().start == 0 {
-            open_options.create_new(true);
+        let mut append = false;
+        if matches!(&range, Some(r) if r.start > 0) {
+            append = true;
         }
+        let mut tmp_file = TemporaryFile::new(tmp_location, append)
+            .await
+            .map_err(|e| {
+                event!(Level::ERROR, "Could not open tmp file: {}", e);
+                match e.kind() {
+                    io::ErrorKind::NotFound => WriteBlobRangeError::NotFound,
+                    io::ErrorKind::AlreadyExists => WriteBlobRangeError::InvalidContentRange,
+                    _ => WriteBlobRangeError::Internal,
+                }
+            })?;
+        let range_len = range.as_ref().map(|r| r.end - r.start);
 
-        let mut tmp_file = open_options.open(&tmp_location).await.map_err(|e| {
-            event!(Level::ERROR, "Could not open tmp file: {}", e);
-            match e.kind() {
-                io::ErrorKind::NotFound => WriteBlobRangeError::NotFound,
-                io::ErrorKind::AlreadyExists => WriteBlobRangeError::InvalidContentRange,
-                _ => WriteBlobRangeError::Internal,
-            }
-        })?;
-        let range_start_len = match &range {
-            None => None,
-            Some(r) => Some((r.start, r.end - r.start)),
-        };
-
-        fn err_catcher(err: impl std::error::Error, tmp_location: &Path) -> WriteBlobRangeError {
-            let res = fs::remove_file(tmp_location);
-            if let Err(e) = res {
-                event!(Level::WARN, "Could not remove tmp file: {:?}", e);
-            }
-            event!(Level::INFO, "Could not write blob stream: {:?}", err);
-            WriteBlobRangeError::Internal
-        }
         if let Some(range) = &range {
-            tmp_file
-                .seek(io::SeekFrom::Start(range.start))
-                .await
-                .map_err(|e| err_catcher(e, &tmp_location))?;
-        }
-        let mut stream_size = 0;
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| err_catcher(e, &tmp_location))?;
-            stream_size += chunk.len();
-            if range_start_len.is_some() && stream_size > range_start_len.unwrap().1 as usize {
+            if range.start != tmp_file.seek_pos().await {
                 return Err(WriteBlobRangeError::InvalidContentRange);
             }
-            tmp_file
-                .write_all(&chunk)
-                .await
-                .map_err(|e| err_catcher(e, &tmp_location))?;
         }
-        if stream_size != range_start_len.unwrap().1 as usize {
+        let bytes_written = tmp_file
+            .write_stream(stream)
+            .await
+            .map_err(|_e| WriteBlobRangeError::Internal)? as u64;
+
+        if matches!(range_len, Some(len) if len != bytes_written) {
             return Err(WriteBlobRangeError::InvalidContentRange);
         }
-        tmp_file
-            .flush()
-            .await
-            .map_err(|e| err_catcher(e, &tmp_location))?;
-        Ok(tmp_location)
+
+        Ok(())
     }
 
     pub async fn write_tag(
