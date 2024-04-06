@@ -5,7 +5,7 @@ pub mod manifest;
 mod metrics;
 mod proxy_auth;
 mod server;
-mod storage;
+pub mod storage;
 mod temporary_file;
 
 pub use admission::ImageValidationConfig;

@@ -73,7 +73,8 @@ pub async fn get_manifest_history(
         .get_history(&name, &reference, Some(&last_digest), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
-    Ok(mh)
+
+    Ok(ManifestHistory::new(format!("{name}:{reference}"), mh))
 }
 
 endpoint_fn_7_levels!(

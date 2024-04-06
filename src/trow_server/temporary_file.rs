@@ -17,20 +17,19 @@ pub struct TemporaryFile {
 }
 
 impl TemporaryFile {
-    pub async fn new(path: PathBuf, append: bool) -> io::Result<Self> {
+    pub async fn new(path: PathBuf) -> io::Result<Self> {
         let mut open_opt = fs::OpenOptions::new();
-        if append {
-            open_opt.append(true)
-        } else {
-            open_opt.write(true)
-        };
-        let file = open_opt.open(&path).await?;
+        let file = open_opt.create(true).write(true).open(&path).await?;
 
         Ok(TemporaryFile { file, path })
     }
 
-    pub async fn seek_pos(&mut self) -> u64 {
-        self.file.seek(io::SeekFrom::Current(0)).await.unwrap()
+    pub async fn append(path: PathBuf) -> io::Result<(Self, u64)> {
+        let mut open_opt = fs::OpenOptions::new();
+        let mut file = open_opt.append(true).open(&path).await?;
+        let seek_pos = file.seek(io::SeekFrom::Current(0)).await.unwrap();
+
+        Ok((TemporaryFile { file, path }, seek_pos))
     }
 
     pub async fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
@@ -61,6 +60,10 @@ impl TemporaryFile {
     pub async fn rename(self, new_path: &Path) -> io::Result<()> {
         tokio::fs::rename(&self.path, new_path).await
     }
+
+    pub async fn leak(mut self) {
+        self.path = PathBuf::new();
+    }
 }
 
 /// Special drop to ensure that the file is removed
@@ -80,13 +83,9 @@ mod test {
     async fn test_temporary_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.txt");
-        let mut file = TemporaryFile::new(path.clone(), false).await.unwrap();
+        let mut file = TemporaryFile::new(path.clone()).await.unwrap();
         assert!(
-            TemporaryFile::new(path.clone(), false)
-                .await
-                .err()
-                .unwrap()
-                .kind()
+            TemporaryFile::new(path.clone()).await.err().unwrap().kind()
                 == io::ErrorKind::AlreadyExists,
             "The same file cannot be opened for writing twice !"
         );
@@ -132,12 +131,12 @@ mod test {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test.txt");
 
-        let mut file = TemporaryFile::new(file_path.clone(), false).await.unwrap();
+        let mut file = TemporaryFile::new(file_path.clone()).await.unwrap();
         file.write_all(DUMMY_DATA).await.unwrap();
         assert_eq!(fs::read(file.path()).await.unwrap(), DUMMY_DATA);
         drop(file);
 
-        let mut file = TemporaryFile::new(file_path.clone(), false).await.unwrap();
+        let mut file = TemporaryFile::new(file_path.clone()).await.unwrap();
         let dummy_stream = futures::stream::iter(DUMMY_DATA.chunks(4).map(|b| Ok(Bytes::from(b))));
         file.write_stream::<_, reqwest::Error>(dummy_stream)
             .await

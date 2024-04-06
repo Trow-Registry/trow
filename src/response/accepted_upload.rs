@@ -33,7 +33,7 @@ mod test {
     use axum::response::IntoResponse;
 
     use crate::registry_interface::{Digest, DigestAlgorithm};
-    use crate::types::{AcceptedUpload, RepoName, Uuid};
+    use crate::types::{AcceptedUpload, Uuid};
 
     #[tokio::test]
     async fn test_resp() {
@@ -44,7 +44,7 @@ mod test {
                 hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
                     .to_string(),
             },
-            RepoName("moredhel/test".to_owned()),
+            "moredhel/test".to_owned(),
             Uuid("whatever".to_owned()),
             (0, 0),
         );

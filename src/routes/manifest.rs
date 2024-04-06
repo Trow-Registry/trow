@@ -10,7 +10,7 @@ use crate::registry_interface::{digest, ManifestReader, ManifestStorage, Storage
 use crate::response::errors::Error;
 use crate::response::get_base_url;
 use crate::response::trow_token::TrowToken;
-use crate::types::{ManifestDeleted, RepoName, VerifiedManifest};
+use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::TrowServerState;
 
 /*
@@ -77,7 +77,7 @@ pub async fn put_image_manifest(
     {
         Ok(digest) => Ok(VerifiedManifest::new(
             Some(base_url),
-            RepoName(repo_name),
+            (repo_name),
             digest,
             reference,
         )),

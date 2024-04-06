@@ -39,17 +39,13 @@ pub struct HistoryEntry {
 
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ManifestHistory {
-    #[serde(rename = "image")]
-    tag: String,
+    image: String,
     history: Vec<HistoryEntry>,
 }
 
 impl ManifestHistory {
-    pub fn new(tag: String) -> ManifestHistory {
-        ManifestHistory {
-            tag,
-            history: Vec::new(),
-        }
+    pub fn new(image: String, history: Vec<HistoryEntry>) -> ManifestHistory {
+        ManifestHistory { image, history }
     }
 
     pub fn insert(&mut self, digest: String, date: DateTime<Utc>) {

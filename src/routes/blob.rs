@@ -13,7 +13,9 @@ use crate::response::errors::Error;
 use crate::response::get_base_url;
 use crate::response::trow_token::TrowToken;
 use crate::response::upload_info::UploadInfo;
-use crate::types::{AcceptedUpload, BlobDeleted, DigestQuery, RepoName, Upload, Uuid};
+use crate::trow_server::api_types::Status;
+use crate::trow_server::storage::StorageBackendError;
+use crate::types::{AcceptedUpload, BlobDeleted, DigestQuery, Upload, Uuid};
 use crate::TrowServerState;
 
 /*
@@ -31,7 +33,7 @@ pub async fn get_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((one, digest)): Path<(String, String)>,
-) -> Result<BlobReader, Error> {
+) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
     let digest = match Digest::try_from_str(&digest) {
         Ok(d) => d,
         Err(e) => {
@@ -54,7 +56,7 @@ endpoint_fn_7_levels!(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
         path: [image_name, digest]
-    ) -> Result<BlobReader, Error>
+    ) -> Result<BlobReader<impl futures::AsyncRead>, Error>
 );
 
 /*
@@ -65,11 +67,9 @@ Content-Length: <size of layer>
 Content-Type: application/octet-stream
 
 <Layer Binary Data>
- */
-
-/**
- * Completes the upload.
- */
+---
+Completes the upload.
+*/
 pub async fn put_blob(
     headers: HeaderMap,
     _auth_user: TrowToken,
@@ -117,7 +117,7 @@ pub async fn put_blob(
     Ok(AcceptedUpload::new(
         get_base_url(&headers, &state.config),
         digest_obj,
-        RepoName(repo),
+        repo,
         Uuid(uuid),
         (0, (size as u32).saturating_sub(1)), // Note first byte is 0
     ))
@@ -166,7 +166,7 @@ pub async fn patch_blob(
         .await
     {
         Ok(stored) => {
-            let repo_name = RepoName(repo);
+            let repo_name = (repo);
             let uuid = Uuid(uuid);
             Ok(UploadInfo::new(
                 get_base_url(&headers, &state.config),
@@ -210,22 +210,13 @@ pub async fn post_blob_upload(
     Path(repo_name): Path<String>,
     data: Body,
 ) -> Result<Upload, Error> {
-    /*
-        Ask the backend for a UUID.
-
-        We should also need to do some checking that the user is allowed
-        to upload first.
-
-        If using a true UUID it is possible for the frontend to generate
-        and tell the backend what the UUID is. This is a potential
-        optimisation, but is arguably less flexible.
-    */
     let uuid = state
         .client
-        .start_blob_upload(&repo_name)
+        .storage
+        .request_blob_upload(&repo_name)
         .await
         .map_err(|e| match e {
-            StorageDriverError::InvalidName(n) => Error::NameInvalid(n),
+            StorageBackendError::InvalidName(n) => Error::NameInvalid(n),
             _ => Error::InternalError,
         })?;
 
@@ -246,7 +237,7 @@ pub async fn post_blob_upload(
     Ok(Upload::Info(UploadInfo::new(
         get_base_url(&headers, &state.config),
         Uuid(uuid),
-        RepoName(repo_name.clone()),
+        (repo_name.clone()),
         (0, 0),
     )))
 }

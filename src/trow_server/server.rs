@@ -7,14 +7,21 @@ use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
-use chrono::prelude::*;
+use axum::body::Body;
+use bytes::Buf;
 use futures::future::try_join_all;
+use futures::AsyncRead;
+use k8s_openapi::api::core::v1::Pod;
+use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 use tracing::{event, Level};
-use uuid::Uuid;
+use trow_server::api_types::{
+    BlobRef, CatalogRequest, CompleteRequest, ListTagsRequest, ManifestHistoryRequest, ManifestRef,
+    MetricsRequest, MetricsResponse,
+};
 
 use super::api_types::*;
 use super::image::RemoteImage;
@@ -22,14 +29,24 @@ use super::manifest::{manifest_media_type, Manifest, OCIManifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
 use super::storage::{is_path_writable, TrowStorageBackend};
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
-use crate::registry_interface::digest::sha256_digest;
+use crate::registry_interface::blob_storage::Stored;
+use crate::registry_interface::catalog_operations::HistoryEntry;
+use crate::registry_interface::digest::{sha256_digest, Digest, DigestAlgorithm};
+use crate::registry_interface::{
+    AdmissionValidation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory,
+    ManifestReader, ManifestStorage, Metrics, MetricsError, StorageDriverError,
+};
+use crate::trow_server;
+use crate::trow_server::api_types::{HealthStatus, ReadyStatus, Status};
+use crate::trow_server::storage::WriteBlobRangeError;
+use crate::types::{self, *};
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 static MANIFESTS_DIR: &str = "manifests";
 static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
 
-static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
+pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
@@ -59,6 +76,18 @@ pub struct TrowServer {
 struct Upload {
     repo_name: String,
     uuid: String,
+}
+
+// TODO: Each function should have it's own enum of the errors it can return
+// There must be a standard pattern for this somewhere...
+#[derive(Debug, Error)]
+pub enum RegistryError {
+    #[error("Invalid repository or tag")]
+    InvalidName,
+    #[error("Invalid manifest")]
+    InvalidManifest,
+    #[error("Internal registry error")]
+    Internal,
 }
 
 #[derive(Error, Debug)]
@@ -153,6 +182,402 @@ pub fn is_digest(maybe_digest: &str) -> bool {
 }
 
 impl TrowServer {
+    pub async fn get_manifest(
+        &self,
+        name: &str,
+        tag: &str,
+    ) -> Result<ManifestReader, StorageDriverError> {
+        let _rn = (name.to_string());
+        let man = self.storage.get_manifest(name, tag).await.map_err(|e| {
+            event!(Level::WARN, "Error getting manifest: {}", e);
+            StorageDriverError::Internal
+        })?;
+        Ok(ManifestReader::new(
+            man.get_media_type(),
+            man.digest().clone(),
+            man.raw().clone(),
+        )
+        .await?)
+    }
+
+    pub async fn store_manifest<'a>(
+        &self,
+        name: &str,
+        tag: &str,
+        data: Body,
+    ) -> Result<Digest, StorageDriverError> {
+        let repo = (name.to_string());
+
+        match self.upload_manifest(&repo, tag, data).await {
+            Ok(vm) => Ok(vm.digest().clone()),
+            Err(RegistryError::InvalidName) => {
+                Err(StorageDriverError::InvalidName(format!("{}:{}", name, tag)))
+            }
+            Err(RegistryError::InvalidManifest) => Err(StorageDriverError::InvalidManifest),
+            Err(_) => Err(StorageDriverError::Internal),
+        }
+    }
+
+    pub async fn delete_manifest(
+        &self,
+        name: &str,
+        digest: &Digest,
+    ) -> Result<(), StorageDriverError> {
+        unimplemented!("Manifest deletion not yet implemented");
+    }
+
+    async fn has_manifest(&self, _name: &str, _algo: &DigestAlgorithm, _reference: &str) -> bool {
+        todo!()
+    }
+
+    pub async fn get_blob(
+        &self,
+        name: &str,
+        digest: &Digest,
+    ) -> Result<BlobReader<impl AsyncRead>, StorageDriverError> {
+        let rn = (name.to_string());
+        let br = self.get_reader_for_blob(&rn, digest).await.map_err(|e| {
+            event!(Level::WARN, "Error getting blob: {}", e);
+            StorageDriverError::Internal
+        })?;
+
+        Ok(br)
+    }
+
+    pub async fn store_blob_chunk<'a>(
+        &self,
+        name: &str,
+        upload_uuid: &str,
+        data_info: Option<ContentInfo>,
+        data: Body,
+    ) -> Result<Stored, StorageDriverError> {
+        // TODO: check that content length matches the body
+        self.storage
+            .write_blob_part_stream(
+                upload_uuid,
+                data.into_data_stream(),
+                data_info.map(|d| d.range.0..d.range.1),
+            )
+            .await
+            .map_err(|e| match e {
+                WriteBlobRangeError::NotFound => {
+                    StorageDriverError::InvalidName(format!("{} {}", name, upload_uuid))
+                }
+                WriteBlobRangeError::InvalidContentRange => StorageDriverError::InvalidContentRange,
+                _ => StorageDriverError::Internal,
+            })?;
+
+        Ok(Stored {
+            total_stored: 0,
+            chunk: 0,
+        })
+    }
+
+    pub async fn complete_and_verify_blob_upload(
+        &self,
+        name: &str,
+        session_id: &str,
+        digest: &Digest,
+    ) -> Result<(), StorageDriverError> {
+        self.complete_upload(name, session_id, digest)
+            .await
+            .map_err(|e| match e {
+                Status::InvalidArgument(_) => StorageDriverError::InvalidDigest,
+                _ => StorageDriverError::Internal,
+            })?;
+        Ok(())
+    }
+
+    // pub async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
+    //     event!(
+    //         Level::INFO,
+    //         "Attempting to delete blob {} in {}",
+    //         digest,
+    //         name
+    //     );
+    //     let rn = (name.to_string());
+
+    //     self.delete_blob_local(&rn, digest)
+    //         .await
+    //         .map_err(|_| StorageDriverError::InvalidDigest)?;
+    //     Ok(())
+    // }
+
+    async fn status_blob_upload(
+        &self,
+        _name: &str,
+        _session_id: &str,
+    ) -> crate::registry_interface::UploadInfo {
+        todo!()
+    }
+
+    async fn cancel_blob_upload(
+        &self,
+        _name: &str,
+        _session_id: &str,
+    ) -> Result<(), StorageDriverError> {
+        todo!()
+    }
+
+    async fn has_blob(&self, _name: &str, _digest: &Digest) -> bool {
+        todo!()
+    }
+
+    // async fn get_catalog(
+    //     &self,
+    //     start_value: Option<&str>,
+    //     num_results: Option<u32>,
+    // ) -> Result<Vec<String>, StorageDriverError> {
+    //     let num_results = num_results.unwrap_or(u32::MAX);
+    //     let start_value = start_value.unwrap_or_default();
+
+    //     self.get_catalog_part(num_results, start_value)
+    //         .await
+    //         .map_err(|_| StorageDriverError::Internal)
+    //         .map(|rc| rc.raw())
+    // }
+
+    pub async fn get_tags(
+        &self,
+        repo: &str,
+        start_value: Option<&str>,
+        num_results: Option<u32>,
+    ) -> Result<Vec<String>, StorageDriverError> {
+        let num_results = num_results.unwrap_or(u32::MAX);
+        let start_value = start_value.unwrap_or_default();
+
+        self.list_tags(repo, num_results, start_value)
+            .await
+            .map_err(|_| StorageDriverError::Internal)
+    }
+
+    pub async fn get_history(
+        &self,
+        repo: &str,
+        name: &str,
+        start_value: Option<&str>,
+        num_results: Option<u32>,
+    ) -> Result<Vec<HistoryEntry>, StorageDriverError> {
+        let num_results = num_results.unwrap_or(u32::MAX);
+        let start_value = start_value.unwrap_or_default();
+
+        self.get_manifest_history(repo, name, num_results, start_value)
+            .await
+            .map_err(|_| StorageDriverError::Internal)
+    }
+
+    // async fn validate_admission(
+    //     &self,
+    //     admission_req: &AdmissionRequest<Pod>,
+    //     host_name: &str,
+    // ) -> AdmissionResponse {
+    //     self.validate_admission_internal(admission_req, host_name)
+    //         .await
+    //         .unwrap_or_else(|e| {
+    //             AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
+    //         })
+    // }
+
+    // async fn mutate_admission(
+    //     &self,
+    //     admission_req: &AdmissionRequest<Pod>,
+    //     host_name: &str,
+    // ) -> AdmissionResponse {
+    //     self.mutate_admission_internal(admission_req, host_name)
+    //         .await
+    //         .unwrap_or_else(|e| {
+    //             AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
+    //         })
+    // }
+
+    // async fn is_healthy(&self) -> bool {
+    //     self.is_healthy().await.is_healthy
+    // }
+
+    // async fn is_ready(&self) -> bool {
+    //     self.is_ready().await.is_ready
+    // }
+
+    // async fn get_metrics(
+    //     &self,
+    // ) -> Result<MetricsResponse, crate::registry_interface::MetricsError> {
+    //     self.get_metrics().await.map_err(|_| MetricsError::Internal)
+    // }
+
+    // async fn complete_upload(
+    //     &self,
+    //     repo_name: &str,
+    //     uuid: &str,
+    //     digest: &Digest,
+    // ) -> Result<(), Status> {
+    //     event!(
+    //         Level::INFO,
+    //         "Complete Upload called for repository {} with upload id {} digest {}",
+    //         repo_name,
+    //         uuid,
+    //         digest
+    //     );
+
+    //     let req = CompleteRequest {
+    //         repo_name: repo_name.to_string(),
+    //         uuid: uuid.to_string(),
+    //         user_digest: digest.to_string(),
+    //     };
+
+    //     self.trow_server.complete_upload(req).await?;
+
+    //     Ok(())
+    // }
+
+    async fn upload_manifest(
+        &self,
+        repo_name: &String,
+        reference: &str,
+        manifest: Body,
+    ) -> Result<types::VerifiedManifest, RegistryError> {
+        let man_bytes = axum::body::to_bytes(
+            manifest,
+            1024 * 1024 * 2, // 2MiB
+        )
+        .await
+        .map_err(|_| RegistryError::Internal)?;
+
+        self.storage
+            .write_image_manifest(man_bytes.clone(), &repo_name, reference, true)
+            .await
+            .map_err(|_| RegistryError::Internal)?;
+
+        Ok(VerifiedManifest::new(
+            None,
+            repo_name.clone(),
+            sha256_digest(man_bytes.reader()).unwrap(),
+            reference.to_string(),
+        ))
+    }
+
+    async fn get_reader_for_manifest(
+        &self,
+        repo_name: &String,
+        reference: &str,
+    ) -> Result<ManifestReader> {
+        event!(
+            Level::DEBUG,
+            "Getting read location for {} with ref {}",
+            repo_name,
+            reference
+        );
+
+        let man = self
+            .storage
+            .get_manifest(&repo_name, reference)
+            .await
+            .map_err(|e| {
+                event!(Level::WARN, "Error getting manifest: {}", e);
+                StorageDriverError::Internal
+            })?;
+
+        Ok(ManifestReader::new(
+            man.get_media_type(),
+            man.digest().clone(),
+            man.raw().clone(),
+        )
+        .await?)
+    }
+
+    // async fn get_manifest_history(
+    //     &self,
+    //     repo_name: &str,
+    //     reference: &str,
+    //     limit: u32,
+    //     last_digest: &str,
+    // ) -> Result<ManifestHistory> {
+    //     event!(
+    //         Level::INFO,
+    //         "Getting manifest history for repo {} ref {} limit {} last_digest {}",
+    //         repo_name,
+    //         reference,
+    //         limit,
+    //         last_digest
+    //     );
+    //     let mr = ManifestHistoryRequest {
+    //         tag: reference.to_owned(),
+    //         repo_name: repo_name.to_string(),
+    //         limit,
+    //         last_digest: last_digest.to_owned(),
+    //     };
+    //     let stream = self.trow_server.get_manifest_history(mr).await?;
+    //     let mut history = ManifestHistory::new(format!("{}:{}", repo_name, reference));
+
+    //     for entry in stream {
+    //         history.insert(entry.digest, entry.date);
+    //     }
+
+    //     Ok(history)
+    // }
+
+    async fn get_reader_for_blob(
+        &self,
+        repo_name: &String,
+        digest: &Digest,
+    ) -> Result<BlobReader<impl AsyncRead>> {
+        event!(
+            Level::DEBUG,
+            "Getting read location for blob {} in {}",
+            digest,
+            repo_name
+        );
+        let _br = BlobRef {
+            digest: digest.to_string(),
+            repo_name: repo_name.clone(),
+        };
+        let stream = self.storage.get_blob_stream(&repo_name, digest).await?;
+
+        let reader = BlobReader::new(digest.clone(), stream).await;
+        Ok(reader)
+    }
+
+    // async fn delete_blob_local(
+    //     &self,
+    //     repo_name: &String,
+    //     digest: &Digest,
+    // ) -> Result<BlobDeleted> {
+    //     event!(
+    //         Level::INFO,
+    //         "Attempting to delete blob {} in {}",
+    //         digest,
+    //         repo_name
+    //     );
+    //     let br = BlobRef {
+    //         digest: digest.to_string(),
+    //         repo_name: repo_name.0.clone(),
+    //     };
+
+    //     self.trow_server.delete_blob(br).await?;
+    //     Ok(BlobDeleted {})
+    // }
+
+    async fn delete_by_manifest(
+        &self,
+        repo_name: &String,
+        digest: &Digest,
+    ) -> Result<ManifestDeleted, Status> {
+        event!(
+            Level::INFO,
+            "Attempting to delete manifest {} in {}",
+            digest,
+            repo_name
+        );
+        let mr = ManifestRef {
+            reference: digest.to_string(),
+            repo_name: repo_name.clone(),
+        };
+
+        self.delete_manifest(mr).await?;
+        Ok(ManifestDeleted {})
+    }
+}
+
+impl TrowServer {
     pub fn new(
         data_path: &str,
         proxy_registry_config: Option<RegistryProxiesConfig>,
@@ -191,62 +616,6 @@ impl TrowServer {
             .ok_or_else(|| anyhow!("Digest {} did not contain value component", digest))?;
         assert_eq!(None, iter.next());
         Ok(self.blobs_path.join(alg).join(val))
-    }
-
-    async fn save_tag(&self, digest: &str, repo_name: &str, tag: &str) -> Result<()> {
-        // Tag files should contain list of digests with timestamp
-        // Last line should always be the current digest
-
-        let repo_dir = self.manifests_path.join(repo_name);
-        fs::create_dir_all(&repo_dir)?;
-
-        let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
-        let contents = format!("{} {}\n", digest, ts).into_bytes();
-
-        let mut file = tokio::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&repo_dir.join(tag))
-            .await?;
-        file.write_all(&contents).await?;
-
-        Ok(())
-    }
-
-    async fn get_path_for_manifest(&self, repo_name: &str, reference: &str) -> Result<PathBuf> {
-        let digest = if is_digest(reference) {
-            reference.to_string()
-        } else {
-            self.storage
-                .get_manifest_digest(repo_name, reference)
-                .await?
-        };
-
-        self.get_catalog_path_for_blob(&digest)
-    }
-
-    fn create_verified_manifest(
-        &self,
-        manifest_path: &PathBuf,
-        verify_assets_exist: bool,
-    ) -> Result<VerifiedManifest> {
-        let manifest_bytes = std::fs::read(manifest_path)?;
-        let manifest = Manifest::from_vec(manifest_bytes.clone()).context("Invalid manifest")?;
-
-        if verify_assets_exist {
-            let digests = manifest.get_local_asset_digests()?;
-            for d in digests {
-                let path = self.get_catalog_path_for_blob(&d.to_string())?;
-                if !path.exists() {
-                    return Err(anyhow!("Failed to find artifact with digest {}", d));
-                }
-            }
-        }
-        // For performance, could generate only if verification is on, otherwise copy from somewhere
-        Ok(VerifiedManifest {
-            digest: manifest.digest().to_string(),
-            content_type: manifest.get_media_type(),
-        })
     }
 
     /**
@@ -296,7 +665,7 @@ impl TrowServer {
             .await
             .context("GET blob failed")?;
         self.storage
-            .write_blob_stream(digest, resp.bytes_stream())
+            .write_blob_stream(digest, resp.bytes_stream(), true)
             .await
             .context("Failed to write blob")?;
         Ok(())
@@ -554,142 +923,49 @@ impl TrowServer {
         res?;
         Ok(())
     }
-
-    fn is_writable_repo(&self, repo_name: &str) -> bool {
-        if repo_name.starts_with(PROXY_DIR) {
-            return false;
-        }
-
-        true
-    }
-}
-
-pub fn is_writable_repo(repo_name: &str) -> bool {
-    if repo_name.starts_with(PROXY_DIR) {
-        return false;
-    }
-
-    true
 }
 
 // Registry
 impl TrowServer {
-    pub async fn request_upload(&self, ur: UploadRequest) -> Result<UploadDetails, Status> {
-        let repo_name = ur.repo_name;
-        if self.is_writable_repo(&repo_name) {
-            let uuid = Uuid::new_v4().to_string();
-            let reply = UploadDetails { uuid: uuid.clone() };
-            let upload = Upload { repo_name, uuid };
-            {
-                self.active_uploads.write().unwrap().insert(upload);
-                event!(Level::DEBUG, "Upload Table: {:?}", self.active_uploads);
-            }
-            Ok(reply)
-        } else {
-            Err(Status::InvalidArgument(format!(
-                "Repository {} is not writable",
-                repo_name
-            )))
-        }
-    }
-
-    pub async fn get_write_location_for_blob(
-        &self,
-        br: UploadRef,
-    ) -> Result<WriteLocation, Status> {
-        let upload = Upload {
-            repo_name: br.repo_name.clone(),
-            uuid: br.uuid.clone(),
-        };
-
-        // Apparently unwrap() is correct here. From the docs:
-        // "We unwrap() the return value to assert that we are not expecting
-        // threads to ever fail while holding the lock."
-
-        let set = self.active_uploads.read().unwrap();
-        if set.contains(&upload) {
-            let path = self.get_upload_path_for_blob(&br.uuid);
-            Ok(WriteLocation {
-                path: path.to_string_lossy().to_string(),
-            })
-        } else {
-            Err(Status::FailedPrecondition(format!(
-                "No current upload matching {:?}",
-                br
-            )))
-        }
-    }
-
-    pub async fn get_read_location_for_blob(
-        &self,
-        br: BlobRef,
-    ) -> Result<BlobReadLocation, Status> {
-        metrics::TOTAL_BLOB_REQUESTS.inc();
-        let path = self
-            .get_catalog_path_for_blob(&br.digest)
-            .map_err(|e| Status::InvalidArgument(format!("Error parsing digest {:?}", e)))?;
-
-        if !path.exists() {
-            event!(Level::WARN, "Request for unknown blob: {:?}", path);
-            Err(Status::NotFound(format!("No blob found matching {:?}", br)))
-        } else {
-            Ok(BlobReadLocation {
-                path: path.to_string_lossy().to_string(),
-            })
-        }
-    }
-
     /**
      * TODO: check if blob referenced by manifests. If so, refuse to delete.
      */
-    pub async fn delete_blob(&self, br: BlobRef) -> Result<BlobDeleted, Status> {
-        if !is_digest(&br.digest) {
+    pub async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<BlobDeleted, Status> {
+        if !is_digest(digest) {
             return Err(Status::InvalidArgument(format!(
                 "Invalid digest: {}",
-                br.digest
+                digest
             )));
         }
-        match self.storage.delete_blob(&br.digest).await {
+        match self.storage.delete_blob(digest).await {
             Ok(_) => Ok(BlobDeleted {}),
             Err(e) => {
-                event!(Level::ERROR, "Failed to delete blob {:?} {:?}", br, e);
+                event!(
+                    Level::ERROR,
+                    "Failed to delete blob {} {:?} {:?}",
+                    name,
+                    digest,
+                    e
+                );
                 Err(Status::Internal("Internal error deleting blob".to_owned()))
             }
         }
     }
 
-    pub async fn delete_manifest(&self, _mr: ManifestRef) -> Result<ManifestDeleted, Status> {
-        // event!(Level::ERROR, "Manifest deletion requested but not handled !");
-        unimplemented!("Manifest deletion not yet implemented")
-        // Ok(ManifestDeleted {})
-    }
+    // pub async fn delete_manifest(&self, _mr: ManifestRef) -> Result<ManifestDeleted, Status> {
+    //     // event!(Level::ERROR, "Manifest deletion requested but not handled !");
+    //     unimplemented!("Manifest deletion not yet implemented")
+    //     // Ok(ManifestDeleted {})
+    // }
 
-    pub async fn get_read_location_for_manifest(
+    pub async fn complete_upload(
         &self,
-        mr: ManifestRef,
-    ) -> Result<ManifestReadLocation, Status> {
-        //Don't actually need to verify here; could set to false
-
-        metrics::TOTAL_MANIFEST_REQUESTS.inc();
-        match self
-            .create_manifest_read_location(mr.repo_name, mr.reference, true)
-            .await
-        {
-            Ok(vm) => Ok(vm),
-            Err(e) => {
-                event!(Level::WARN, "Internal error with manifest: {:?}", e);
-                Err(Status::Internal(
-                    "Internal error finding manifest".to_owned(),
-                ))
-            }
-        }
-    }
-
-    pub async fn complete_upload(&self, cr: CompleteRequest) -> Result<CompletedUpload, Status> {
-        let ret = match self.validate_and_save_blob(&cr.user_digest, &cr.uuid) {
-            Ok(_) => Ok(CompletedUpload {
-                digest: cr.user_digest.clone(),
-            }),
+        repo_name: &str,
+        uuid: &str,
+        digest: &Digest,
+    ) -> Result<(), Status> {
+        let ret = match self.validate_and_save_blob(digest, uuid) {
+            Ok(_) => Ok(()),
             Err(e) => match e.downcast::<DigestValidationError>() {
                 Ok(v_e) => Err(Status::InvalidArgument(v_e.to_string())),
                 Err(e) => {
@@ -701,8 +977,8 @@ impl TrowServer {
 
         //delete uuid from uploads tracking
         let upload = Upload {
-            repo_name: cr.repo_name.clone(),
-            uuid: cr.uuid,
+            repo_name: repo_name.to_string(),
+            uuid: uuid.to_string(),
         };
 
         let mut set = self.active_uploads.write().unwrap();
@@ -712,62 +988,67 @@ impl TrowServer {
         ret
     }
 
-    pub async fn get_catalog(&self, cr: CatalogRequest) -> Result<Vec<CatalogEntry>, Status> {
+    pub async fn get_catalog(
+        &self,
+        start_value: Option<&str>,
+        num_results: Option<u32>,
+    ) -> Result<Vec<String>, Status> {
         let mut manifests = self
             .storage
             .list_repos()
             .await
             .map_err(|e| Status::Internal(format!("Internal error streaming catalog: {e}")))?;
-        let limit = cr.limit as usize;
-        let manifests = if !cr.last_repo.is_empty() {
-            manifests.truncate(limit);
-            manifests
-        } else {
+        let limit = num_results.unwrap_or(u32::MAX) as usize;
+        let manifests = if let Some(repo) = start_value {
             manifests
                 .into_iter()
-                .skip_while(|m| *m != cr.last_repo)
+                .skip_while(|m| *m != repo)
                 .skip(1)
                 .take(limit)
                 .collect()
+        } else {
+            manifests.truncate(limit);
+            manifests
         };
 
-        Ok(manifests
-            .into_iter()
-            .map(|repo_name| CatalogEntry { repo_name })
-            .collect())
+        Ok(manifests)
     }
 
-    pub async fn list_tags(&self, ltr: ListTagsRequest) -> Result<Vec<Tag>, Status> {
-        let mut tags = self
-            .storage
-            .list_repo_tags(&ltr.repo_name)
-            .await
-            .map_err(|e| {
-                event!(Level::ERROR, "Error listing catalog repo tags {:?}", e);
-                Status::Internal("Internal error streaming catalog".to_owned())
-            })?;
+    pub async fn list_tags(
+        &self,
+        repo_name: &str,
+        limit: u32,
+        last_tag: &str,
+    ) -> Result<Vec<String>, Status> {
+        let mut tags = self.storage.list_repo_tags(repo_name).await.map_err(|e| {
+            event!(Level::ERROR, "Error listing catalog repo tags {:?}", e);
+            Status::Internal("Internal error streaming catalog".to_owned())
+        })?;
         tags.sort();
-        let limit = ltr.limit as usize;
+        let limit = limit as usize;
 
-        let partial_catalog: Vec<String> = if ltr.last_tag.is_empty() {
+        let partial_catalog: Vec<String> = if last_tag.is_empty() {
             tags.truncate(limit);
             tags
         } else {
             tags.into_iter()
-                .skip_while(|t| t != &ltr.last_tag)
+                .skip_while(|t| t != last_tag)
                 .skip(1)
                 .take(limit)
                 .collect()
         };
 
-        Ok(partial_catalog.into_iter().map(|tag| Tag { tag }).collect())
+        Ok(partial_catalog)
     }
 
     pub async fn get_manifest_history(
         &self,
-        mr: ManifestHistoryRequest,
-    ) -> Result<Vec<ManifestHistoryEntry>, Status> {
-        if is_digest(&mr.tag) {
+        repo_name: &str,
+        reference: &str,
+        limit: u32,
+        last_digest: &str,
+    ) -> Result<Vec<HistoryEntry>, Status> {
+        if is_digest(reference) {
             return Err(Status::InvalidArgument(
                 "Require valid tag (not digest) to search for history".to_owned(),
             ));
@@ -775,21 +1056,21 @@ impl TrowServer {
 
         let mut manifest_history = self
             .storage
-            .get_manifest_history(&mr.repo_name, &mr.tag)
+            .get_manifest_history(repo_name, reference)
             .await
             .map_err(|e| {
                 event!(Level::ERROR, "Error listing manifest history: {e}");
                 Status::Internal("Could not list manifest history".to_owned())
             })?;
 
-        let limit = mr.limit as usize;
-        let entries = if mr.last_digest.is_empty() {
+        let limit = limit as usize;
+        let entries = if last_digest.is_empty() {
             manifest_history.truncate(limit);
             manifest_history
         } else {
             manifest_history
                 .into_iter()
-                .skip_while(|entry| entry.digest != mr.last_digest)
+                .skip_while(|entry| entry.digest != last_digest)
                 .skip(1)
                 .take(limit)
                 .collect()
@@ -799,40 +1080,35 @@ impl TrowServer {
     }
 
     // Readiness check
-    pub async fn is_ready(&self) -> ReadyStatus {
+    pub async fn is_ready(&self) -> bool {
         for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
             match is_path_writable(path) {
                 Ok(true) => {}
                 Ok(false) => {
-                    return ReadyStatus {
-                        is_ready: false,
-                        message: format!("{} is not writable", path.to_string_lossy()),
-                    };
+                    event!(Level::WARN, "{} is not writable", path.to_string_lossy());
+                    return false;
                 }
                 Err(error) => {
-                    return ReadyStatus {
-                        is_ready: false,
-                        message: format!("error: {error}"),
-                    }
+                    event!(
+                        Level::WARN,
+                        "Error checking path {}: {}",
+                        path.to_string_lossy(),
+                        error
+                    );
+                    return false;
                 }
             }
         }
 
         // All paths writable
-        ReadyStatus {
-            is_ready: true,
-            message: String::from("Ready"),
-        }
+        true
     }
 
-    pub async fn is_healthy(&self) -> HealthStatus {
-        HealthStatus {
-            is_healthy: true,
-            message: String::from("Healthy"),
-        }
+    pub async fn is_healthy(&self) -> bool {
+        true
     }
 
-    pub async fn get_metrics(&self, _request: MetricsRequest) -> Result<MetricsResponse, Status> {
+    pub async fn get_metrics(&self) -> Result<MetricsResponse, Status> {
         match metrics::gather_metrics(&self.blobs_path) {
             Ok(metrics) => {
                 let reply = MetricsResponse { metrics };

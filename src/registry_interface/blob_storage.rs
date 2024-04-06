@@ -1,7 +1,9 @@
 use axum::body::Body;
+use futures::AsyncRead;
 
 use super::digest::Digest;
-use super::{AsyncSeekRead, StorageDriverError};
+use super::StorageDriverError;
+use crate::types::BoundedStream;
 
 pub struct ContentInfo {
     pub length: u64,
@@ -16,9 +18,9 @@ pub struct UploadInfo {
     size: u32,
 }
 
-pub struct BlobReader {
+pub struct BlobReader<S: AsyncRead + ?Sized + Send> {
     digest: Digest,
-    reader: tokio::fs::File,
+    reader: Box<S>,
     size: u64,
 }
 pub struct Stored {
@@ -26,17 +28,17 @@ pub struct Stored {
     pub chunk: u64,
 }
 
-impl BlobReader {
-    pub async fn new(digest: Digest, file: tokio::fs::File) -> Self {
-        let file_size = file.metadata().await.unwrap().len();
+impl<S: futures::AsyncRead + Send> BlobReader<S> {
+    pub async fn new(digest: Digest, file: BoundedStream<S>) -> Self {
+        let file_size = file.size() as u64;
         Self {
             digest,
-            reader: file,
+            reader: Box::new(file.reader()),
             size: file_size,
         }
     }
 
-    pub fn get_reader(self) -> impl AsyncSeekRead {
+    pub fn get_reader(self) -> Box<S> {
         self.reader
     }
 
@@ -54,16 +56,15 @@ pub trait BlobStorage {
     /// Retrieve the blob from the registry identified by digest.
     /// A HEAD request can also be issued to this endpoint to obtain resource information without receiving all data.
     /// GET: /v2/<name>/blobs/<digest>
-    async fn get_blob(&self, name: &str, digest: &Digest)
-        -> Result<BlobReader, StorageDriverError>;
+    async fn get_blob(
+        &self,
+        name: &str,
+        digest: &Digest,
+    ) -> Result<BlobReader<dyn AsyncRead + Send>, StorageDriverError>;
 
     /// Delete the blob identified by name and digest
     /// DELETE: /v2/<name>/blobs/<digest>
     async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError>;
-
-    /// Requests to start a resumable upload for the given repository.
-    /// Returns a session identifier for the upload.
-    async fn start_blob_upload(&self, name: &str) -> Result<String, StorageDriverError>;
 
     /// Retrieve status of upload identified by session_id.
     /// The primary purpose of this endpoint is to resolve the current status of a resumable upload.

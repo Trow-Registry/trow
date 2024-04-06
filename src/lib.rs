@@ -1,5 +1,3 @@
-mod client_interface;
-
 pub mod response;
 #[allow(clippy::too_many_arguments)]
 mod routes;
@@ -18,7 +16,6 @@ use std::{env, fs};
 use anyhow::{anyhow, Context, Result};
 use axum::extract::FromRef;
 use axum_server::tls_rustls::RustlsConfig;
-use client_interface::ClientInterface;
 use thiserror::Error;
 use tracing::{event, Level};
 use trow_server::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
@@ -37,7 +34,7 @@ pub struct NetAddr {
 
 #[derive(Debug)]
 pub struct TrowServerState {
-    pub client: ClientInterface,
+    pub client: TrowServer,
     pub config: TrowConfig,
 }
 
@@ -203,7 +200,7 @@ impl TrowBuilder {
 
         let server_state = TrowServerState {
             config: self.config.clone(),
-            client: build_handlers(trow_server)?,
+            client: trow_server,
         };
 
         let app = routes::create_app(server_state);
@@ -265,9 +262,4 @@ async fn shutdown_signal(handle: axum_server::Handle) {
     println!("signal received, starting graceful shutdown");
     // Signal the server to shutdown using Handle.
     handle.graceful_shutdown(Some(Duration::from_secs(30)));
-}
-
-pub fn build_handlers(ts: TrowServer) -> Result<ClientInterface> {
-    //TODO this function is useless currently
-    ClientInterface::new(ts)
 }
