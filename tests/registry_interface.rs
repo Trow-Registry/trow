@@ -324,7 +324,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(&format!("v2/{}/manifests/{}", name, tag))
+                Request::put(&format!("/v2/{}/manifests/{}", name, tag))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -355,7 +355,7 @@ mod interface_tests {
             .clone()
             .oneshot(
                 Request::delete(&format!(
-                    "v2/{}/manifests/{}",
+                    "/v2/{}/manifests/{}",
                     name, "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
                 ))
                 .body(Body::empty())

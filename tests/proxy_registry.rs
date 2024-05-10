@@ -76,7 +76,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::post(format!("v2/{name}/blobs/uploads/"))
+                Request::post(format!("/v2/{name}/blobs/uploads/"))
                     .body(Body::empty())
                     .unwrap(),
             )
