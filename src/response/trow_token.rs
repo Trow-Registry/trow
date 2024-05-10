@@ -2,7 +2,7 @@ use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::body;
-use axum::extract::{FromRef, FromRequestParts};
+use axum::extract::{FromRef, FromRequestParts, Host};
 use axum::http::request::Parts;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -14,9 +14,9 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 use uuid::Uuid;
+use axum::RequestPartsExt;
 
 use super::authenticate::Authenticate;
-use super::get_base_url;
 use crate::{TrowConfig, UserConfig};
 
 const TOKEN_DURATION: u64 = 3600;
@@ -193,9 +193,12 @@ where
 {
     type Rejection = Authenticate;
 
-    async fn from_request_parts(req: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
         let config = &TrowConfig::from_ref(config);
-        let base_url = get_base_url(&req.headers, config);
+        let base_url = match parts.extract::<Option<Host>>().await.unwrap() {
+            Some(Host(host)) => host,
+            None => String::new()
+        };
 
         if config.user.is_none() {
             //Authentication is not configured
@@ -206,7 +209,7 @@ where
             };
             return Ok(no_auth_token);
         }
-        let authorization = match req
+        let authorization = match parts
             .headers
             .typed_get::<headers::Authorization<headers::authorization::Bearer>>()
         {

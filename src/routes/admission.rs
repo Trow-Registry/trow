@@ -6,7 +6,6 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 use kube::core::DynamicObject;
 
-use crate::registry_interface::admission::AdmissionValidation;
 use crate::TrowServerState;
 
 pub async fn validate_image(

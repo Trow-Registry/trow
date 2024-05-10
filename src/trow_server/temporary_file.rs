@@ -19,14 +19,14 @@ pub struct TemporaryFile {
 impl TemporaryFile {
     pub async fn new(path: PathBuf) -> io::Result<Self> {
         let mut open_opt = fs::OpenOptions::new();
-        let file = open_opt.create(true).write(true).open(&path).await?;
+        let file = open_opt.create_new(true).write(true).open(&path).await?;
 
         Ok(TemporaryFile { file, path })
     }
 
     pub async fn append(path: PathBuf) -> io::Result<(Self, u64)> {
         let mut open_opt = fs::OpenOptions::new();
-        let mut file = open_opt.append(true).open(&path).await?;
+        let mut file = open_opt.append(true).create(true).open(&path).await?;
         let seek_pos = file.seek(io::SeekFrom::Current(0)).await.unwrap();
 
         Ok((TemporaryFile { file, path }, seek_pos))
@@ -61,7 +61,7 @@ impl TemporaryFile {
         tokio::fs::rename(&self.path, new_path).await
     }
 
-    pub async fn leak(mut self) {
+    pub fn untrack(mut self) {
         self.path = PathBuf::new();
     }
 }

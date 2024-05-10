@@ -2,18 +2,16 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::body::Body;
-use axum::extract::{Path, Query, State};
-use axum::http::header::HeaderMap;
+use axum::extract::{Host, Path, Query, State};
 use digest::Digest;
 use tracing::{event, Level};
 
+use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry_interface::{digest, BlobReader, BlobStorage, ContentInfo, StorageDriverError};
+use crate::registry_interface::{digest, BlobReader, ContentInfo, StorageDriverError};
 use crate::response::errors::Error;
-use crate::response::get_base_url;
 use crate::response::trow_token::TrowToken;
 use crate::response::upload_info::UploadInfo;
-use crate::trow_server::api_types::Status;
 use crate::trow_server::storage::StorageBackendError;
 use crate::types::{AcceptedUpload, BlobDeleted, DigestQuery, Upload, Uuid};
 use crate::TrowServerState;
@@ -34,7 +32,7 @@ pub async fn get_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((one, digest)): Path<(String, String)>,
 ) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
-    let digest = match Digest::try_from_str(&digest) {
+    let digest = match Digest::try_from_raw(&digest) {
         Ok(d) => d,
         Err(e) => {
             event!(Level::ERROR, "Error parsing digest: {}", e);
@@ -71,10 +69,10 @@ Content-Type: application/octet-stream
 Completes the upload.
 */
 pub async fn put_blob(
-    headers: HeaderMap,
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, String)>,
+    AlwaysHost(host): AlwaysHost,
     Query(digest): Query<DigestQuery>,
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
@@ -101,7 +99,7 @@ pub async fn put_blob(
         }
     };
 
-    let digest_obj = Digest::try_from_str(&digest).map_err(|_| Error::DigestInvalid)?;
+    let digest_obj = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
     state
         .client
         .complete_and_verify_blob_upload(&repo, &uuid, &digest_obj)
@@ -115,7 +113,7 @@ pub async fn put_blob(
         })?;
 
     Ok(AcceptedUpload::new(
-        get_base_url(&headers, &state.config),
+        host,
         digest_obj,
         repo,
         Uuid(uuid),
@@ -125,10 +123,10 @@ pub async fn put_blob(
 
 endpoint_fn_7_levels!(
     put_blob(
-        headers: HeaderMap,
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid],
+        host: AlwaysHost,
         digest: Query<DigestQuery>,
         chunk: Body
     ) -> Result<AcceptedUpload, Error>
@@ -153,11 +151,11 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 
 */
 pub async fn patch_blob(
-    headers: HeaderMap,
     _auth_user: TrowToken,
     info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, String)>,
+    Host(host): Host,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
     match state
@@ -166,10 +164,10 @@ pub async fn patch_blob(
         .await
     {
         Ok(stored) => {
-            let repo_name = (repo);
+            let repo_name = repo;
             let uuid = Uuid(uuid);
             Ok(UploadInfo::new(
-                get_base_url(&headers, &state.config),
+                host,
                 uuid,
                 repo_name,
                 (0, (stored.total_stored as u32).saturating_sub(1)), // First byte is 0
@@ -185,11 +183,11 @@ pub async fn patch_blob(
 
 endpoint_fn_7_levels!(
     patch_blob(
-        headers: HeaderMap,
         auth_user: TrowToken,
         info: Option<ContentInfo>,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid],
+        host: Host,
         chunk: Body
     ) -> Result<UploadInfo, Error>
 );
@@ -205,7 +203,7 @@ endpoint_fn_7_levels!(
 pub async fn post_blob_upload(
     auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    headers: HeaderMap,
+    host: AlwaysHost,
     Query(digest): Query<DigestQuery>,
     Path(repo_name): Path<String>,
     data: Body,
@@ -223,10 +221,10 @@ pub async fn post_blob_upload(
     if digest.digest.is_some() {
         // Have a monolithic upload with data
         return put_blob(
-            headers,
             auth_user,
             State(state),
             Path((repo_name, uuid)),
+            host,
             Query(digest),
             data,
         )
@@ -235,9 +233,9 @@ pub async fn post_blob_upload(
     }
 
     Ok(Upload::Info(UploadInfo::new(
-        get_base_url(&headers, &state.config),
+        host.0,
         Uuid(uuid),
-        (repo_name.clone()),
+        repo_name.clone(),
         (0, 0),
     )))
 }
@@ -246,7 +244,7 @@ endpoint_fn_7_levels!(
     post_blob_upload(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>,
-        headers: HeaderMap,
+        host: AlwaysHost,
         digest: Query<DigestQuery>;
         path: [image_name],
         data: Body
@@ -265,7 +263,7 @@ pub async fn delete_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((one, digest)): Path<(String, String)>,
 ) -> Result<BlobDeleted, Error> {
-    let digest = Digest::try_from_str(&digest).map_err(|_| Error::DigestInvalid)?;
+    let digest = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
     state
         .client
         .delete_blob(&one, &digest)

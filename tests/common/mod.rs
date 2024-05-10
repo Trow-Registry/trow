@@ -1,9 +1,16 @@
-use std::io::{BufReader, Write};
+use std::io::{BufReader, Read, Write};
 use std::process::Child;
 
+use axum::body::Body;
+use axum::Router;
+use http_body_util::BodyExt;
+use hyper::body::Buf;
+use hyper::{Request, Response};
 use reqwest::StatusCode;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
-use trow::registry_interface::digest::sha256_digest;
+use tower::ServiceExt;
+use trow::registry_interface::digest::Digest;
 use trow::trow_server::manifest;
 
 /* None of these are dead code, they are called from tests */
@@ -37,10 +44,51 @@ pub fn kill_gracefully(child: &Child) {
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, tag: &str) {
+pub async fn response_body_read(resp: Response<Body>) -> Vec<u8> {
+    let mut buf = Vec::new();
+    resp.into_body()
+        .collect()
+        .await
+        .unwrap()
+        .aggregate()
+        .reader()
+        .read_to_end(&mut buf)
+        .unwrap();
+    buf
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub async fn response_body_string(resp: Response<Body>) -> String {
+    let vec = response_body_read(resp).await;
+    String::from_utf8(vec).unwrap()
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {
+    let reader = resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .aggregate()
+        .reader();
+    serde_json::from_reader(reader).unwrap()
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
+    use crate::common;
+
     let resp = cl
-        .post(&format!("{}/v2/{}/blobs/uploads/", trow_address, name))
-        .send()
+        .clone()
+        .oneshot(
+            Request::post(&format!("/v2/{}/blobs/uploads/", name))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .expect("Error uploading layer");
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
@@ -55,30 +103,41 @@ pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, 
     //Upload file. Start uploading blob with patch then digest with put
     let blob = gen_rand_blob(100);
     let resp = cl
-        .patch(location)
-        .body(blob.clone())
-        .send()
+        .clone()
+        .oneshot(
+            Request::patch(location)
+                .body(Body::from(blob.clone()))
+                .unwrap(),
+        )
         .await
         .expect("Failed to send patch request");
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
     let range = resp.headers().get(RANGE_HEADER).unwrap().to_str().unwrap();
     assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
 
-    let digest = sha256_digest(BufReader::new(blob.as_slice())).unwrap();
+    let digest = Digest::try_sha256(BufReader::new(blob.as_slice())).unwrap();
     let resp = cl
-        .put(&format!(
-            "{}/v2/{}/blobs/uploads/{}?digest={}",
-            trow_address, name, uuid, digest
-        ))
-        .send()
+        .clone()
+        .oneshot(
+            Request::put(&format!(
+                "/v2/{}/blobs/uploads/{}?digest={}",
+                name, uuid, digest
+            ))
+            .body(Body::empty())
+            .unwrap(),
+        )
         .await
-        .unwrap();
+        .expect("Failed to send put request");
     assert_eq!(resp.status(), StatusCode::CREATED);
 
     //Finally get it back again
     let resp = cl
-        .get(&format!("{}/v2/{}/blobs/{}", trow_address, name, digest))
-        .send()
+        .clone()
+        .oneshot(
+            Request::get(&format!("/v2/{}/blobs/{}", name, digest))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -89,7 +148,8 @@ pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, 
         .to_str()
         .unwrap();
     assert_eq!(digest.to_string(), digest_header);
-    assert_eq!(blob, resp.bytes().await.unwrap());
+    let body = common::response_body_read(resp).await;
+    assert_eq!(blob, body);
 
     //Upload manifest
     //For time being use same blob for config and layer
@@ -110,8 +170,16 @@ pub async fn upload_layer(cl: &reqwest::Client, trow_address: &str, name: &str, 
         config,
         layers,
     };
-    let manifest_addr = format!("{}/v2/{}/manifests/{}", trow_address, name, tag);
-    let resp = cl.put(&manifest_addr).json(&mani).send().await.unwrap();
+    let manifest_addr = format!("/v2/{}/manifests/{}", name, tag);
+    let resp = cl
+        .clone()
+        .oneshot(
+            Request::put(&manifest_addr)
+                .body(Body::from(serde_json::to_vec(&mani).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();
     assert_eq!(&location, &manifest_addr);

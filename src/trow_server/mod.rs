@@ -8,24 +8,26 @@ mod server;
 pub mod storage;
 mod temporary_file;
 
+use std::path::PathBuf;
+
 pub use admission::ImageValidationConfig;
 use anyhow::Result;
 pub use proxy_auth::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 pub use server::TrowServer;
 
 pub struct TrowServerBuilder {
-    data_path: String,
+    data_path: PathBuf,
     proxy_registry_config: Option<RegistryProxiesConfig>,
     image_validation_config: Option<ImageValidationConfig>,
 }
 
 pub fn build_server(
-    data_path: &str,
+    data_path: PathBuf,
     proxy_registry_config: Option<RegistryProxiesConfig>,
     image_validation_config: Option<ImageValidationConfig>,
 ) -> TrowServerBuilder {
     TrowServerBuilder {
-        data_path: data_path.to_string(),
+        data_path,
         proxy_registry_config,
         image_validation_config,
     }
@@ -34,7 +36,7 @@ pub fn build_server(
 impl TrowServerBuilder {
     pub fn get_server(self) -> Result<TrowServer> {
         TrowServer::new(
-            &self.data_path,
+            self.data_path,
             self.proxy_registry_config,
             self.image_validation_config,
         )

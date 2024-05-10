@@ -1,11 +1,9 @@
-use anyhow::Result;
 use json_patch::{Patch, PatchOperation, ReplaceOperation};
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use super::api_types::{IntAdmissionRequest, IntAdmissionResponse, Status};
 use super::image::RemoteImage;
 use super::TrowServer;
 
@@ -90,7 +88,7 @@ impl TrowServer {
             Some(pod) => pod,
             None => return resp.deny("No pod in pod admission request"),
         };
-        let (images, _) = extract_images(&pod);
+        let (images, _) = extract_images(pod);
 
         let mut valid = true;
         let mut reasons = Vec::new();
@@ -108,7 +106,7 @@ impl TrowServer {
         if valid {
             resp
         } else {
-            resp.deny(&reasons.join("; "))
+            resp.deny(reasons.join("; "))
         }
     }
 
@@ -135,7 +133,7 @@ impl TrowServer {
                 return resp;
             }
         };
-        let (images, image_paths) = extract_images(&pod);
+        let (images, image_paths) = extract_images(pod);
         let mut patch_operations = Vec::<PatchOperation>::new();
         for (raw_image, image_path) in images.iter().zip(image_paths.iter()) {
             let image = match RemoteImage::try_from_str(raw_image) {

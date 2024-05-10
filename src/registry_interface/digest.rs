@@ -5,7 +5,7 @@ use std::{fmt, io};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as ShaDigest, Sha256, Sha512};
+use sha2::{Digest as ShaDigest, Sha256};
 use thiserror::Error;
 
 // Buffer size for SHA2 hashing
@@ -46,9 +46,15 @@ impl std::str::FromStr for DigestAlgorithm {
 
 impl std::fmt::Display for DigestAlgorithm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl DigestAlgorithm {
+    pub fn as_str(&self) -> &'static str {
         match self {
-            DigestAlgorithm::Sha256 => write!(f, "sha256"),
-            DigestAlgorithm::Sha512 => write!(f, "sha512"),
+            DigestAlgorithm::Sha256 => "sha256",
+            DigestAlgorithm::Sha512 => "sha512",
         }
     }
 }
@@ -67,7 +73,7 @@ impl fmt::Display for Digest {
 }
 
 impl Digest {
-    pub fn try_from_str(digest_str: &str) -> Result<Digest, DigestError> {
+    pub fn try_from_raw(digest_str: &str) -> Result<Digest, DigestError> {
         let algo_digest = digest_str
             .split(':')
             .map(String::from)
@@ -107,6 +113,18 @@ impl Digest {
             hash,
         })
     }
+
+    pub fn algo_str(&self) -> &'static str {
+        self.algo.as_str()
+    }
+
+    pub fn try_sha256<R: Read>(mut reader: R) -> io::Result<Self> {
+        let d = digest::<Sha256, _>(&mut reader)?;
+        Ok(Self {
+            algo: DigestAlgorithm::Sha256,
+            hash: d,
+        })
+    }
 }
 
 fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> io::Result<String> {
@@ -128,23 +146,15 @@ pub fn sha256_digest<R: Read>(mut reader: R) -> io::Result<Digest> {
     })
 }
 
-pub fn sha512_digest<R: Read>(mut reader: R) -> io::Result<Digest> {
-    let hash = digest::<Sha512, _>(&mut reader)?;
-    Ok(Digest {
-        algo: DigestAlgorithm::Sha512,
-        hash,
-    })
-}
-
 #[cfg(test)]
 mod test {
     use std::io::BufReader;
 
-    use crate::registry_interface::digest::{sha256_digest, Digest, DigestAlgorithm};
+    use crate::registry_interface::digest::{Digest, DigestAlgorithm};
 
     #[test]
     fn sha256_digest_test() {
-        let result = sha256_digest(BufReader::new("hello world".as_bytes())).unwrap();
+        let result = Digest::try_sha256(BufReader::new("hello world".as_bytes())).unwrap();
         assert_eq!(
             result,
             Digest {
@@ -157,7 +167,7 @@ mod test {
 
     #[test]
     fn sha256_digest_empty_test() {
-        let result = sha256_digest(BufReader::new("".as_bytes())).unwrap();
+        let result = Digest::try_sha256(BufReader::new("".as_bytes())).unwrap();
         assert_eq!(
             result,
             Digest {
@@ -170,7 +180,7 @@ mod test {
 
     #[test]
     fn sha256_digest_brown_fox_test() {
-        let result = sha256_digest(BufReader::new(
+        let result = Digest::try_sha256(BufReader::new(
             "the quick brown fox jumps over the lazy dog".as_bytes(),
         ))
         .unwrap();

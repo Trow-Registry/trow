@@ -16,10 +16,9 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{event, Level};
 use walkdir::WalkDir;
 
-use super::api_types::*;
 use super::manifest::{Manifest, ManifestError};
 use super::server::{PROXY_DIR, SUPPORTED_DIGESTS};
-use crate::registry_interface::digest::sha256_digest;
+use crate::registry_interface::catalog_operations::HistoryEntry;
 use crate::registry_interface::Digest;
 use crate::trow_server::temporary_file::TemporaryFile;
 use crate::types::BoundedStream;
@@ -108,7 +107,7 @@ impl TrowStorageBackend {
         &self,
         repo_name: &str,
         tag: &str,
-    ) -> Result<String, StorageBackendError> {
+    ) -> Result<Digest, StorageBackendError> {
         let path = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
         let manifest_history_bytes = tokio::fs::read(&path).await?;
         let latest_entry_bytes = manifest_history_bytes.split(|b| *b == b'\n').last().ok_or(
@@ -119,7 +118,7 @@ impl TrowStorageBackend {
                 StorageBackendError::Internal(Cow::Owned(format!("Invalid manifest entry: {e}")))
             })?;
 
-        Ok(latest_entry.digest)
+        Ok(Digest::try_from_raw(&latest_entry.digest).unwrap())
     }
 
     pub async fn get_manifest(
@@ -128,15 +127,15 @@ impl TrowStorageBackend {
         reference: &str,
     ) -> Result<Manifest, StorageBackendError> {
         let digest = if is_digest(reference) {
-            Cow::Borrowed(reference)
+            Digest::try_from_raw(reference).unwrap()
         } else {
-            Cow::Owned(self.get_manifest_digest(repo_name, reference).await?)
+            self.get_manifest_digest(repo_name, reference).await?
         };
         let path = self
             .path
             .join(BLOBS_DIR)
-            .join("sha256")
-            .join(digest.as_ref());
+            .join(digest.algo_str())
+            .join(&digest.hash);
         let manifest_bytes = tokio::fs::read(&path).await?;
         let manifest = Manifest::from_vec(manifest_bytes)?;
         Ok(manifest)
@@ -150,7 +149,7 @@ impl TrowStorageBackend {
         let path = self
             .path
             .join(BLOBS_DIR)
-            .join(digest.algo.to_string())
+            .join(digest.algo_str())
             .join(&digest.hash);
         let file = tokio::fs::File::open(&path).await.map_err(|e| {
             event!(Level::ERROR, "Could not open blob: {}", e);
@@ -162,7 +161,7 @@ impl TrowStorageBackend {
 
     pub async fn write_blob_stream<'a, S, E>(
         &'a self,
-        raw_digest: &str,
+        digest: &Digest,
         stream: S,
         verify: bool,
     ) -> Result<PathBuf, StorageBackendError>
@@ -170,15 +169,11 @@ impl TrowStorageBackend {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        let digest = match Digest::try_from_str(raw_digest) {
-            Ok(d) => d,
-            Err(_) => return Err(StorageBackendError::InvalidDigest),
-        };
-        let tmp_location = self.path.join(UPLOADS_DIR).join(raw_digest);
+        let tmp_location = self.path.join(UPLOADS_DIR).join(digest.to_string());
         let location = self
             .path
             .join(BLOBS_DIR)
-            .join(digest.algo.to_string())
+            .join(digest.algo_str())
             .join(&digest.hash);
         if location.exists() {
             event!(Level::INFO, "Blob already exists");
@@ -207,12 +202,12 @@ impl TrowStorageBackend {
             let reader = std::fs::File::open(tmp_file.path()).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!("Could not open tmp file: {e}")))
             })?;
-            let tmp_digest = sha256_digest(reader).map_err(|e| {
+            let tmp_digest = Digest::try_sha256(reader).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!(
                     "Could not calculate digest of blob: {e}"
                 )))
             })?;
-            if tmp_digest != digest {
+            if &tmp_digest != digest {
                 return Err(StorageBackendError::InvalidDigest);
             }
         }
@@ -274,7 +269,35 @@ impl TrowStorageBackend {
         if matches!(range_len, Some(len) if len != bytes_written) {
             return Err(WriteBlobRangeError::InvalidContentRange);
         }
+        tmp_file.untrack();
 
+        Ok(())
+    }
+
+    pub async fn complete_blob_write(
+        &self,
+        upload_id: &str,
+        user_digest: &Digest,
+    ) -> Result<(), StorageBackendError> {
+        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id);
+        let final_location = self
+            .path
+            .join(BLOBS_DIR)
+            .join(user_digest.algo_str())
+            .join(&user_digest.hash);
+        let f = File::open(&tmp_location)?; // ERRRR
+        let calculated_digest = Digest::try_sha256(f)?;
+        if &calculated_digest != user_digest {
+            event!(
+                Level::ERROR,
+                "Upload did not match given digest. Was given {} but got {}",
+                user_digest,
+                calculated_digest
+            );
+            return Err(StorageBackendError::InvalidDigest);
+        }
+        std::fs::create_dir_all(final_location.parent().unwrap()).unwrap();
+        std::fs::rename(tmp_location, final_location).expect("Error moving blob to final location");
         Ok(())
     }
 
@@ -282,7 +305,7 @@ impl TrowStorageBackend {
         &self,
         repo_name: &str,
         tag: &str,
-        digest: &str,
+        digest: &Digest,
     ) -> Result<(), StorageBackendError> {
         let entry = HistoryEntry {
             digest: digest.to_string(),
@@ -311,7 +334,7 @@ impl TrowStorageBackend {
         tag: &str,
         verify: bool,
     ) -> Result<PathBuf, StorageBackendError> {
-        let digest = sha256_digest(manifest.as_ref().reader()).map_err(|e| {
+        let digest = Digest::try_sha256(manifest.as_ref().reader()).map_err(|e| {
             StorageBackendError::Internal(Cow::Owned(format!(
                 "Could not calculate digest of manifest: {e}"
             )))
@@ -322,8 +345,8 @@ impl TrowStorageBackend {
                 let blob_path = self
                     .path
                     .join(BLOBS_DIR)
-                    .join(digest.algo.to_string())
-                    .join(digest.hash);
+                    .join(digest.algo_str())
+                    .join(&digest.hash);
                 if !blob_path.exists() {
                     return Err(StorageBackendError::BlobNotFound(blob_path));
                 }
@@ -331,7 +354,7 @@ impl TrowStorageBackend {
         }
         let manifest_stream = bytes_to_stream(manifest);
         let location = self
-            .write_blob_stream(&digest.to_string(), pin!(manifest_stream), true)
+            .write_blob_stream(&digest, pin!(manifest_stream), true)
             .await?;
 
         // save link tag -> manifest
@@ -415,8 +438,12 @@ impl TrowStorageBackend {
         Ok(tags)
     }
 
-    pub async fn delete_blob(&self, digest: &str) -> Result<()> {
-        let blob_path = self.path.join(BLOBS_DIR).join(digest);
+    pub async fn delete_blob(&self, digest: &Digest) -> Result<()> {
+        let blob_path = self
+            .path
+            .join(BLOBS_DIR)
+            .join(digest.algo_str())
+            .join(&digest.hash);
         tokio::fs::remove_file(blob_path).await?;
         Ok(())
     }
@@ -479,8 +506,9 @@ mod tests {
     async fn trow_storage_backend_write_blob_stream() {
         let store = TrowStorageBackend::new(tempdir().unwrap().into_path()).unwrap();
         let stream = pin!(bytes_to_stream(Bytes::from("test")));
+        let digest = Digest::try_from_raw("sha256:1234").unwrap();
         let location = store
-            .write_blob_stream("sha256:1234", stream, false)
+            .write_blob_stream(&digest, stream, false)
             .await
             .unwrap();
         assert!(location.exists());
@@ -515,8 +543,9 @@ mod tests {
                     digest: "sha256:3b4e5a".to_string(),
                 });
                 let stream = pin!(bytes_to_stream(Bytes::from("test")));
+                let digest = Digest::try_from_raw("sha256:3b4e5a").unwrap();
                 store
-                    .write_blob_stream("sha256:3b4e5a", stream, false)
+                    .write_blob_stream(&digest, stream, false)
                     .await
                     .unwrap();
             }
@@ -548,7 +577,7 @@ mod tests {
             .get_manifest_digest("zozo/image", "latest")
             .await
             .unwrap();
-        assert!(digest == "sha256:1234");
+        assert!(digest.to_string() == "sha256:1234");
     }
 
     #[tokio::test]

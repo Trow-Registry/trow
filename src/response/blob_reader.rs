@@ -3,7 +3,7 @@ use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use futures::AsyncRead;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::registry_interface::BlobReader;
 

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use thiserror::Error;
 
-use crate::registry_interface::digest::{sha256_digest, Digest, DigestError};
+use crate::registry_interface::digest::{Digest, DigestError};
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self>
@@ -36,7 +36,7 @@ impl Manifest {
     }
     pub fn from_bytes(bytes: Bytes) -> Result<Self, ManifestError> {
         let parsed = serde_json::from_slice(&bytes).map_err(|_| ManifestError::DeserializeError)?;
-        let digest = sha256_digest(bytes.clone().reader()).unwrap();
+        let digest = Digest::try_sha256(bytes.clone().reader()).unwrap();
         Ok(Self {
             raw: bytes,
             parsed,
@@ -196,7 +196,7 @@ impl Manifest {
         };
         Ok(digests
             .into_iter()
-            .map(Digest::try_from_str)
+            .map(Digest::try_from_raw)
             .collect::<Result<Vec<Digest>, DigestError>>()?)
     }
 
@@ -220,7 +220,7 @@ mod test {
     use serde_json::{self, Value};
 
     use super::{FromJson, Manifest, OCIManifest};
-    use crate::registry_interface::digest::sha256_digest;
+    use crate::registry_interface::Digest;
 
     #[test]
     fn valid_v2_2() {
@@ -363,7 +363,7 @@ mod test {
     #[test]
     fn valid_oci() {
         let config = "{}\n".as_bytes();
-        let config_digest = sha256_digest(BufReader::new(config)).unwrap();
+        let config_digest = Digest::try_sha256(BufReader::new(config)).unwrap();
         let data = format!(
             r#"{{ "config": {{ "digest": "{}",
                              "mediaType": "application/vnd.oci.image.config.v1+json",

@@ -5,7 +5,7 @@ use axum::extract::{Path, Query, State};
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
-use crate::registry_interface::{CatalogOperations, ManifestHistory};
+use crate::registry_interface::ManifestHistory;
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{RepoCatalog, TagList};

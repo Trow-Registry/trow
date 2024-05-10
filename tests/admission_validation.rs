@@ -4,30 +4,24 @@ mod common;
 #[cfg(test)]
 mod validation_tests {
     use std::collections::HashMap;
-    use std::process::{Child, Command};
-    use std::thread;
-    use std::time::Duration;
 
-    use environment::Environment;
+    use axum::body::Body;
+    use axum::Router;
+    use hyper::Request;
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
     use reqwest::{header, StatusCode};
+    use tower::ServiceExt;
     use trow::trow_server::ImageValidationConfig;
 
     use crate::common;
 
-    const PORT: &str = "39366";
     const HOST: &str = "127.0.0.1:39366";
-    const ORIGIN: &str = "http://127.0.0.1:39366";
-
-    struct TrowInstance {
-        pid: Child,
-    }
 
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
-    async fn start_trow() -> TrowInstance {
-        let config_file = common::get_file(ImageValidationConfig {
+    async fn start_trow() -> Router {
+        let config_file = ImageValidationConfig {
             default: "Deny".to_string(),
             allow: vec![
                 "registry-1.docker.io".to_string(),
@@ -38,47 +32,16 @@ mod validation_tests {
                 "k8s.gcr.io".to_string(),
             ],
             deny: vec!["localhost:8000/secret/".to_string()],
-        });
+        };
 
-        let mut child = Command::new("cargo")
-            .arg("run")
-            .env_clear()
-            .envs(Environment::inherit().compile())
-            .arg("--")
-            .arg("--name")
-            .arg(HOST)
-            .arg("--port")
-            .arg(PORT)
-            .arg("--image-validation-config-file")
-            .arg(config_file.path())
-            .spawn()
-            .expect("failed to start");
-
-        let mut timeout = 600;
-
-        let client = reqwest::Client::new();
-
-        let mut response = client.get(ORIGIN).send().await;
-        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
-            thread::sleep(Duration::from_millis(100));
-            response = client.get(ORIGIN).send().await;
-            timeout -= 1;
-        }
-        if timeout == 0 {
-            child.kill().unwrap();
-            panic!("Failed to start Trow",);
-        }
-        TrowInstance { pid: child }
-    }
-
-    impl Drop for TrowInstance {
-        fn drop(&mut self) {
-            common::kill_gracefully(&self.pid);
-        }
+        let mut trow_builder = trow::TrowConfig::new();
+        trow_builder.service_name = HOST.to_string();
+        trow_builder.image_validation_config = Some(config_file);
+        trow_builder.build_app().await.unwrap()
     }
 
     /* Uses a copy of an actual AdmissionReview to test. */
-    async fn validate_example(cl: &reqwest::Client) {
+    async fn validate_example(cl: &Router) {
         let review = r#"{
   "kind": "AdmissionReview",
   "apiVersion": "admission.k8s.io/v1beta1",
@@ -192,16 +155,18 @@ mod validation_tests {
 }"#;
 
         let resp = cl
-            .post(&format!("{}/validate-image", ORIGIN))
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(review)
-            .send()
+            .clone()
+            .oneshot(
+                Request::post("/validate-image")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(review))
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
-
-        let mut val = resp.json::<serde_json::Value>().await.unwrap();
+        let mut val: serde_json::Value = common::response_body_json(resp).await;
         // Fixes "missing field" (which is bollocks)
         val["response"]["auditAnnotations"] =
             serde_json::to_value(HashMap::<String, String>::new()).unwrap();
@@ -213,7 +178,7 @@ mod validation_tests {
         assert_eq!(response.result.message, "unknown_registry.io/nginx: Image is neither explicitly allowed nor denied (using default behavior)");
     }
 
-    async fn test_image(cl: &reqwest::Client, image_string: &str, is_allowed: bool) {
+    async fn test_image(cl: &Router, image_string: &str, is_allowed: bool) {
         let review = serde_json::json!({
             "kind": "AdmissionReview",
             "apiVersion": "admission.k8s.io/v1beta1",
@@ -264,16 +229,18 @@ mod validation_tests {
         .to_string();
 
         let resp = cl
-            .post(&format!("{}/validate-image", ORIGIN))
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(review)
-            .send()
+            .clone()
+            .oneshot(
+                Request::post("/validate-image")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(review))
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
-
-        let mut val = resp.json::<serde_json::Value>().await.unwrap();
+        let mut val: serde_json::Value = common::response_body_json(resp).await;
         // Fixes "missing field" (which is bollocks)
         val["response"]["auditAnnotations"] =
             serde_json::to_value(HashMap::<String, String>::new()).unwrap();
@@ -289,28 +256,24 @@ mod validation_tests {
 
     #[tokio::test]
     async fn test_runner() {
-        let client = reqwest::Client::new();
-
-        //Had issues with stopping and starting trow causing test fails.
-        //It might be possible to improve things with a thread_local
-        let _trow = start_trow().await;
-        validate_example(&client).await;
+        let trow = start_trow().await;
+        validate_example(&trow).await;
 
         // explicitly allowed
-        test_image(&client, "trow.test/am/test:tag", true).await;
-        test_image(&client, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true).await;
-        test_image(&client, "docker.io/amouat/myimage:test", true).await;
-        test_image(&client, "localhost:8000/hello/world", true).await;
+        test_image(&trow, "trow.test/am/test:tag", true).await;
+        test_image(&trow, "k8s.gcr.io/metrics-server-amd64:v0.2.1", true).await;
+        test_image(&trow, "docker.io/amouat/myimage:test", true).await;
+        test_image(&trow, "localhost:8000/hello/world", true).await;
 
         // explicitly denied
-        test_image(&client, "localhost:8000/secret/shine-box", false).await;
+        test_image(&trow, "localhost:8000/secret/shine-box", false).await;
 
         // default denied
-        test_image(&client, "virus.land.cc/not/suspect", false).await;
+        test_image(&trow, "virus.land.cc/not/suspect", false).await;
 
         // invalid image ref
         // Some very weird refs are actually technically valid, like `example.com` !
-        test_image(&client, "hello human", false).await;
-        test_image(&client, "docker.io/voyager@jasper-byrne", false).await;
+        test_image(&trow, "hello human", false).await;
+        test_image(&trow, "docker.io/voyager@jasper-byrne", false).await;
     }
 }

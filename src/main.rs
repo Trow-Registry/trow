@@ -1,11 +1,16 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::net::{IpAddr, SocketAddr};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
+use anyhow::anyhow;
+use axum::Router;
+use axum_server::tls_rustls::RustlsConfig;
 use clap::builder::ArgPredicate;
 use clap::Parser;
-use trow::TrowBuilder;
+use tracing::{event, Level};
+use trow::{TlsConfig, TrowConfig};
 
 #[derive(Parser, Debug)]
 #[command(name = "Trow")]
@@ -82,24 +87,15 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
-
     let addr = SocketAddr::new(args.host, args.port);
     let host_name = args.name.unwrap_or(addr.to_string());
 
-    let mut builder = TrowBuilder::new(
-        args.data_dir.clone(),
-        addr,
-        host_name,
-        args.dry_run,
-        args.cors,
-    );
-    if let Some(tls) = args.tls {
-        if tls.len() != 2 {
-            eprintln!("tls must be a pair of paths, cert then key (got: {tls:?})");
-            std::process::exit(1);
-        }
-        builder.with_tls(tls[0].clone(), tls[1].clone());
-    }
+    let mut builder = TrowConfig::new();
+    builder.data_dir = PathBuf::from_str(args.data_dir.as_str()).expect("Invalid data path");
+    builder.service_name = host_name;
+    builder.dry_run = args.dry_run;
+    builder.cors = args.cors.clone();
+
     if let Some(user) = args.user {
         let mut pass = args.password.unwrap();
         if pass.starts_with("file://") {
@@ -117,7 +113,7 @@ async fn main() {
                 }
             }
         }
-        builder.with_user(user, pass);
+        builder.with_user(user, &pass);
     }
 
     if let Some(config_file) = args.proxy_registry_config_file {
@@ -132,9 +128,86 @@ async fn main() {
             std::process::exit(1);
         }
     }
+    builder.uses_tls = args.tls.is_some(); // that's pretty bad :(
 
-    builder.start().await.unwrap_or_else(|e| {
+    let app = builder
+        .build_app()
+        .await
+        .expect("Failed to create trow server");
+
+    let tls = match args.tls {
+        Some(tls) => {
+            if tls.len() != 2 {
+                eprintln!("tls must be a pair of paths, cert then key (got: {tls:?})");
+                std::process::exit(1);
+            }
+            Some(TlsConfig::new(tls[0].clone(), tls[1].clone()))
+        }
+        None => None,
+    };
+
+    serve_app(app, addr, tls).await.unwrap_or_else(|e| {
         eprintln!("Error launching Trow:\n\n{}", e);
         std::process::exit(1);
     });
+}
+
+async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> anyhow::Result<()> {
+    async fn shutdown_signal(handle: axum_server::Handle) {
+        use std::time::Duration;
+
+        use tokio::signal;
+
+        let ctrl_c = async {
+            signal::ctrl_c()
+                .await
+                .expect("failed to install Ctrl+C handler");
+        };
+
+        #[cfg(unix)]
+        let terminate = async {
+            signal::unix::signal(signal::unix::SignalKind::terminate())
+                .expect("failed to install signal handler")
+                .recv()
+                .await;
+        };
+
+        #[cfg(not(unix))]
+        let terminate = std::future::pending::<()>();
+
+        tokio::select! {
+            _ = ctrl_c => {},
+            _ = terminate => {},
+        }
+
+        println!("signal received, starting graceful shutdown");
+        // Signal the server to shutdown using Handle.
+        handle.graceful_shutdown(Some(Duration::from_secs(30)));
+    }
+
+    // Listen for termination signal
+    let handle = axum_server::Handle::new();
+    tokio::spawn(shutdown_signal(handle.clone()));
+
+    event!(Level::INFO, "Starting server on {}", addr);
+    if let Some(ref tls) = tls {
+        if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
+            return Err(anyhow!(
+                "Could not find TLS certificate and key at {} and {}",
+                tls.cert_file,
+                tls.key_file
+            ));
+        }
+        let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file).await?;
+        axum_server::bind_rustls(addr, config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        axum_server::bind(addr)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await?;
+    };
+    Ok(())
 }

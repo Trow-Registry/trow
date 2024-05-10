@@ -1,9 +1,7 @@
-use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::str;
-use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
@@ -11,33 +9,25 @@ use axum::body::Body;
 use bytes::Buf;
 use futures::future::try_join_all;
 use futures::AsyncRead;
-use k8s_openapi::api::core::v1::Pod;
-use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
 use thiserror::Error;
-use tokio::io::AsyncWriteExt;
 use tracing::{event, Level};
-use trow_server::api_types::{
-    BlobRef, CatalogRequest, CompleteRequest, ListTagsRequest, ManifestHistoryRequest, ManifestRef,
-    MetricsRequest, MetricsResponse,
-};
+use trow_server::api_types::{BlobRef, MetricsResponse};
 
-use super::api_types::*;
 use super::image::RemoteImage;
 use super::manifest::{manifest_media_type, Manifest, OCIManifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
-use super::storage::{is_path_writable, TrowStorageBackend};
+use super::storage::{is_path_writable, StorageBackendError, TrowStorageBackend};
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
 use crate::registry_interface::blob_storage::Stored;
 use crate::registry_interface::catalog_operations::HistoryEntry;
-use crate::registry_interface::digest::{sha256_digest, Digest, DigestAlgorithm};
+use crate::registry_interface::digest::{Digest, DigestAlgorithm};
 use crate::registry_interface::{
-    AdmissionValidation, BlobReader, CatalogOperations, ContentInfo, ManifestHistory,
-    ManifestReader, ManifestStorage, Metrics, MetricsError, StorageDriverError,
+    BlobReader, ContentInfo, ManifestReader, StorageDriverError,
 };
 use crate::trow_server;
-use crate::trow_server::api_types::{HealthStatus, ReadyStatus, Status};
+use crate::trow_server::api_types::Status;
 use crate::trow_server::storage::WriteBlobRangeError;
 use crate::types::{self, *};
 
@@ -51,7 +41,6 @@ static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 /* Struct implementing callbacks for the Frontend
  *
- * _active_uploads_: a HashSet of all uuids that are currently being tracked
  * _manifests_path_: path to where the manifests are
  * _layers_path_: path to where blobs are stored
  * _scratch_path_: path to temporary storage for uploads
@@ -61,7 +50,6 @@ static DIGEST_HEADER: &str = "Docker-Content-Digest";
  */
 #[derive(Clone, Debug)]
 pub struct TrowServer {
-    active_uploads: Arc<RwLock<HashSet<Upload>>>,
     pub storage: TrowStorageBackend,
     // deprecated
     manifests_path: PathBuf,
@@ -119,8 +107,7 @@ pub fn create_accept_header() -> HeaderMap {
     headers
 }
 
-fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
-    let data_path = Path::new(data_path);
+fn create_path(data_path: &Path, dir: &str) -> Result<PathBuf, std::io::Error> {
     let dir_path = data_path.join(dir);
     if !dir_path.exists() {
         return match fs::create_dir_all(&dir_path) {
@@ -148,14 +135,13 @@ fn create_path(data_path: &str, dir: &str) -> Result<PathBuf, std::io::Error> {
  * TODO: should be able to use range of hashes.
  * TODO: check if using a static for the hasher speeds things up.
  */
-fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
+fn validate_digest(file: &PathBuf, digest: &Digest) -> Result<()> {
     let f = File::open(file)?;
     let reader = BufReader::new(f);
 
-    let calculated_digest = sha256_digest(reader)?;
-    let str_calc_digest = calculated_digest.to_string();
+    let calculated_digest = Digest::try_sha256(reader)?;
 
-    if str_calc_digest != digest {
+    if calculated_digest != *digest {
         event!(
             Level::ERROR,
             "Upload did not match given digest. Was given {} but got {}",
@@ -164,7 +150,7 @@ fn validate_digest(file: &PathBuf, digest: &str) -> Result<()> {
         );
         return Err(anyhow!(DigestValidationError {
             user_digest: digest.to_string(),
-            actual_digest: str_calc_digest,
+            actual_digest: calculated_digest.to_string(),
         }));
     }
 
@@ -187,17 +173,34 @@ impl TrowServer {
         name: &str,
         tag: &str,
     ) -> Result<ManifestReader, StorageDriverError> {
-        let _rn = (name.to_string());
+        let _rn = name.to_string();
+// heeeeeeeeeeeeeeeeeeeeeeeeeeeere
+        if name.starts_with("f/") {
+            let (image, cfg) = match self.get_remote_image_and_cfg(name, tag) {
+                Some(image) => image,
+                None =>  {
+                    return Err(StorageDriverError::InvalidName(format!("No proxy config found for {name}:{tag}")));
+                }
+            };
+            match self.download_remote_image(image, cfg).await {
+                Ok(_digest) => (),
+                Err(e) => {
+                    event!(Level::ERROR, "Could not download remote image: {e:?}");
+                    return Err(StorageDriverError::Internal);
+                }
+            };
+        }
+
         let man = self.storage.get_manifest(name, tag).await.map_err(|e| {
             event!(Level::WARN, "Error getting manifest: {}", e);
             StorageDriverError::Internal
         })?;
-        Ok(ManifestReader::new(
+        ManifestReader::new(
             man.get_media_type(),
             man.digest().clone(),
             man.raw().clone(),
         )
-        .await?)
+        .await
     }
 
     pub async fn store_manifest<'a>(
@@ -206,7 +209,7 @@ impl TrowServer {
         tag: &str,
         data: Body,
     ) -> Result<Digest, StorageDriverError> {
-        let repo = (name.to_string());
+        let repo = name.to_string();
 
         match self.upload_manifest(&repo, tag, data).await {
             Ok(vm) => Ok(vm.digest().clone()),
@@ -220,8 +223,8 @@ impl TrowServer {
 
     pub async fn delete_manifest(
         &self,
-        name: &str,
-        digest: &Digest,
+        _name: &str,
+        _digest: &Digest,
     ) -> Result<(), StorageDriverError> {
         unimplemented!("Manifest deletion not yet implemented");
     }
@@ -235,7 +238,7 @@ impl TrowServer {
         name: &str,
         digest: &Digest,
     ) -> Result<BlobReader<impl AsyncRead>, StorageDriverError> {
-        let rn = (name.to_string());
+        let rn = name.to_string();
         let br = self.get_reader_for_blob(&rn, digest).await.map_err(|e| {
             event!(Level::WARN, "Error getting blob: {}", e);
             StorageDriverError::Internal
@@ -275,15 +278,17 @@ impl TrowServer {
 
     pub async fn complete_and_verify_blob_upload(
         &self,
-        name: &str,
+        _repo_name: &str,
         session_id: &str,
         digest: &Digest,
     ) -> Result<(), StorageDriverError> {
-        self.complete_upload(name, session_id, digest)
-            .await
+        self.storage.complete_blob_write(session_id, digest).await
             .map_err(|e| match e {
-                Status::InvalidArgument(_) => StorageDriverError::InvalidDigest,
-                _ => StorageDriverError::Internal,
+                StorageBackendError::InvalidDigest => StorageDriverError::InvalidDigest,
+                e => {
+                    event!(Level::ERROR, "Could not complete upload: {}", e);
+                    StorageDriverError::Internal
+                }
             })?;
         Ok(())
     }
@@ -303,25 +308,6 @@ impl TrowServer {
     //     Ok(())
     // }
 
-    async fn status_blob_upload(
-        &self,
-        _name: &str,
-        _session_id: &str,
-    ) -> crate::registry_interface::UploadInfo {
-        todo!()
-    }
-
-    async fn cancel_blob_upload(
-        &self,
-        _name: &str,
-        _session_id: &str,
-    ) -> Result<(), StorageDriverError> {
-        todo!()
-    }
-
-    async fn has_blob(&self, _name: &str, _digest: &Digest) -> bool {
-        todo!()
-    }
 
     // async fn get_catalog(
     //     &self,
@@ -443,14 +429,14 @@ impl TrowServer {
         .map_err(|_| RegistryError::Internal)?;
 
         self.storage
-            .write_image_manifest(man_bytes.clone(), &repo_name, reference, true)
+            .write_image_manifest(man_bytes.clone(), repo_name, reference, true)
             .await
             .map_err(|_| RegistryError::Internal)?;
 
         Ok(VerifiedManifest::new(
             None,
             repo_name.clone(),
-            sha256_digest(man_bytes.reader()).unwrap(),
+            Digest::try_sha256(man_bytes.reader()).unwrap(),
             reference.to_string(),
         ))
     }
@@ -469,7 +455,7 @@ impl TrowServer {
 
         let man = self
             .storage
-            .get_manifest(&repo_name, reference)
+            .get_manifest(repo_name, reference)
             .await
             .map_err(|e| {
                 event!(Level::WARN, "Error getting manifest: {}", e);
@@ -530,65 +516,26 @@ impl TrowServer {
             digest: digest.to_string(),
             repo_name: repo_name.clone(),
         };
-        let stream = self.storage.get_blob_stream(&repo_name, digest).await?;
+        let stream = self.storage.get_blob_stream(repo_name, digest).await?;
 
         let reader = BlobReader::new(digest.clone(), stream).await;
         Ok(reader)
     }
-
-    // async fn delete_blob_local(
-    //     &self,
-    //     repo_name: &String,
-    //     digest: &Digest,
-    // ) -> Result<BlobDeleted> {
-    //     event!(
-    //         Level::INFO,
-    //         "Attempting to delete blob {} in {}",
-    //         digest,
-    //         repo_name
-    //     );
-    //     let br = BlobRef {
-    //         digest: digest.to_string(),
-    //         repo_name: repo_name.0.clone(),
-    //     };
-
-    //     self.trow_server.delete_blob(br).await?;
-    //     Ok(BlobDeleted {})
-    // }
-
-    async fn delete_by_manifest(
-        &self,
-        repo_name: &String,
-        digest: &Digest,
-    ) -> Result<ManifestDeleted, Status> {
-        event!(
-            Level::INFO,
-            "Attempting to delete manifest {} in {}",
-            digest,
-            repo_name
-        );
-        let mr = ManifestRef {
-            reference: digest.to_string(),
-            repo_name: repo_name.clone(),
-        };
-
-        self.delete_manifest(mr).await?;
-        Ok(ManifestDeleted {})
-    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TrowServer {
     pub fn new(
-        data_path: &str,
+        data_path: PathBuf,
         proxy_registry_config: Option<RegistryProxiesConfig>,
         image_validation_config: Option<ImageValidationConfig>,
     ) -> Result<Self> {
-        let manifests_path = create_path(data_path, MANIFESTS_DIR)?;
-        let scratch_path = create_path(data_path, UPLOADS_DIR)?;
-        let blobs_path = create_path(data_path, BLOBS_DIR)?;
+        let manifests_path = create_path(&data_path, MANIFESTS_DIR)?;
+        let scratch_path = create_path(&data_path, UPLOADS_DIR)?;
+        let blobs_path = create_path(&data_path, BLOBS_DIR)?;
 
         let svc = TrowServer {
-            active_uploads: Arc::new(RwLock::new(HashSet::new())),
             manifests_path,
             blobs_path,
             scratch_path,
@@ -603,19 +550,8 @@ impl TrowServer {
         self.scratch_path.join(uuid)
     }
 
-    fn get_catalog_path_for_blob(&self, digest: &str) -> Result<PathBuf> {
-        let mut iter = digest.split(':');
-        let alg = iter
-            .next()
-            .ok_or_else(|| anyhow!("Digest {} did not contain alg component", digest))?;
-        if !SUPPORTED_DIGESTS.contains(&alg) {
-            return Err(anyhow!("Hash algorithm {} not supported", alg));
-        }
-        let val = iter
-            .next()
-            .ok_or_else(|| anyhow!("Digest {} did not contain value component", digest))?;
-        assert_eq!(None, iter.next());
-        Ok(self.blobs_path.join(alg).join(val))
+    fn get_catalog_path_for_blob(&self, digest: &Digest) -> Result<PathBuf> {
+        Ok(self.blobs_path.join(digest.algo_str()).join(&digest.hash))
     }
 
     /**
@@ -651,7 +587,7 @@ impl TrowServer {
         &self,
         cl: &ProxyClient,
         remote_image: &RemoteImage,
-        digest: &str,
+        digest: &Digest,
     ) -> Result<()> {
         if self.get_catalog_path_for_blob(digest)?.exists() {
             event!(Level::DEBUG, "Already have blob {}", digest);
@@ -715,15 +651,11 @@ impl TrowServer {
                 try_join_all(futures).await?;
             }
             OCIManifest::V2(_) => {
-                let digests: Vec<_> = mani
-                    .get_local_asset_digests()?
-                    .into_iter()
-                    .map(|d| d.to_string())
-                    .collect();
+                let digests: Vec<_> = mani.get_local_asset_digests()?;
 
                 let futures = digests
                     .iter()
-                    .map(|digest| self.download_blob(cl, remote_image, digest.as_str()));
+                    .map(|digest| self.download_blob(cl, remote_image, digest));
                 try_join_all(futures).await?;
             }
         }
@@ -738,14 +670,13 @@ impl TrowServer {
         &self,
         cl: &ProxyClient,
         image: &RemoteImage,
-    ) -> Option<String> {
+    ) -> Option<Digest> {
         let resp = cl
             .authenticated_request(Method::HEAD, &image.get_manifest_url())
             .headers(create_accept_header())
             .send()
             .await;
-
-        match resp {
+        match resp.as_ref().map(|r| r.headers().get(DIGEST_HEADER)) {
             Err(e) => {
                 event!(
                     Level::ERROR,
@@ -754,10 +685,18 @@ impl TrowServer {
                 );
                 None
             }
-            Ok(resp) => resp.headers().get(DIGEST_HEADER).map(|digest| {
-                let digest = format!("{:?}", digest);
-                digest.trim_matches('"').to_string()
-            }),
+            Ok(None) => {
+                event!(
+                    Level::ERROR,
+                    "Remote registry didn't send header {DIGEST_HEADER}",
+                );
+                None
+            }
+            Ok(Some(header)) => {
+                let digest_str = header.to_str().unwrap();
+                let digest = Digest::try_from_raw(digest_str).unwrap();
+                Some(digest)
+            }
         }
     }
 
@@ -766,7 +705,7 @@ impl TrowServer {
         &self,
         remote_image: RemoteImage,
         proxy_cfg: SingleRegistryProxyConfig,
-    ) -> Result<String> {
+    ) -> Result<Digest> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
 
@@ -782,33 +721,59 @@ impl TrowServer {
                 None
             }
         };
-        let ref_is_digest = is_digest(&remote_image.reference);
-
-        let (local_digest, latest_digest) = if ref_is_digest {
-            (Some(remote_image.reference.clone()), None)
-        } else {
-            let local_digest = self
-                .storage
-                .get_manifest_digest(&repo_name, &remote_image.reference)
-                .await
-                .ok();
-            let mut latest_digest = match &try_cl {
-                Some(cl) => self.get_digest_from_header(cl, &remote_image).await,
-                _ => None,
-            };
-            if latest_digest == local_digest {
-                if local_digest.is_none() {
-                    anyhow::bail!(
-                        "Could not fetch digest for {}:{}",
-                        repo_name,
-                        remote_image.reference
-                    );
+        let remote_img_ref_digest = Digest::try_from_raw(&remote_image.reference);
+        let (local_digest, latest_digest) = match remote_img_ref_digest {
+            Ok(digest) => (Some(digest), None),
+            Err(_) => {
+                let local_digest = self
+                    .storage
+                    .get_manifest_digest(&repo_name, &remote_image.reference)
+                    .await
+                    .ok();
+                let mut latest_digest = match &try_cl {
+                    Some(cl) => self.get_digest_from_header(cl, &remote_image).await,
+                    _ => None,
+                };
+                if latest_digest == local_digest {
+                    if local_digest.is_none() {
+                        anyhow::bail!(
+                            "Could not fetch digest for {}:{}",
+                            repo_name,
+                            remote_image.reference
+                        );
+                    }
+                    // if both are the same, no need to try to pull
+                    latest_digest = None;
                 }
-                // if both are the same, no need to try to pull
-                latest_digest = None;
+                (local_digest, latest_digest)
             }
-            (local_digest, latest_digest)
         };
+
+        // let (local_digest, latest_digest) = if ref_is_digest {
+        //     (Some(remote_image.reference.clone()), None)
+        // } else {
+        //     let local_digest = self
+        //         .storage
+        //         .get_manifest_digest(&repo_name, &remote_image.reference)
+        //         .await
+        //         .ok();
+        //     let mut latest_digest = match &try_cl {
+        //         Some(cl) => self.get_digest_from_header(cl, &remote_image).await,
+        //         _ => None,
+        //     };
+        //     if latest_digest == local_digest {
+        //         if local_digest.is_none() {
+        //             anyhow::bail!(
+        //                 "Could not fetch digest for {}:{}",
+        //                 repo_name,
+        //                 remote_image.reference
+        //             );
+        //         }
+        //         // if both are the same, no need to try to pull
+        //         latest_digest = None;
+        //     }
+        //     (local_digest, latest_digest)
+        // };
 
         let digests = [latest_digest, local_digest].into_iter().flatten();
 
@@ -826,7 +791,7 @@ impl TrowServer {
                         )
                         .await
                     {
-                        Ok(_) if !ref_is_digest => match self
+                        Ok(_) if !is_digest(&remote_image.reference) => match self
                             .storage
                             .write_tag(&repo_name, &remote_image.reference, &digest)
                             .await
@@ -858,71 +823,44 @@ impl TrowServer {
         ))
     }
 
-    async fn create_manifest_read_location(
-        &self,
-        repo_name: String,
-        reference: String,
-        do_verification: bool,
-    ) -> Result<ManifestReadLocation> {
-        let path = if let Some((remote_image, proxy_cfg)) =
-            self.get_remote_image_and_cfg(&repo_name, &reference)
-        {
-            event!(
-                Level::INFO,
-                "Request for proxied repo {}:{} maps to {}",
-                repo_name,
-                reference,
-                remote_image
-            );
-            // These are not up to date and should not be used !
-            drop(repo_name);
-            drop(reference);
-            if self.proxy_registry_config.as_ref().unwrap().offline {
-                let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
-                self.get_path_for_manifest(&repo_name, &remote_image.reference)
-                    .await?
-            } else {
-                let digest = self.download_remote_image(remote_image, proxy_cfg).await?;
-                self.get_catalog_path_for_blob(&digest)?
-            }
-        } else {
-            self.get_path_for_manifest(&repo_name, &reference).await?
-        };
+    // async fn create_manifest_read_location(
+    //     &self,
+    //     repo_name: String,
+    //     reference: String,
+    //     do_verification: bool,
+    // ) -> Result<ManifestReadLocation> {
+    //     let path = if let Some((remote_image, proxy_cfg)) =
+    //         self.get_remote_image_and_cfg(&repo_name, &reference)
+    //     {
+    //         event!(
+    //             Level::INFO,
+    //             "Request for proxied repo {}:{} maps to {}",
+    //             repo_name,
+    //             reference,
+    //             remote_image
+    //         );
+    //         // These are not up to date and should not be used !
+    //         drop(repo_name);
+    //         drop(reference);
+    //         if self.proxy_registry_config.as_ref().unwrap().offline {
+    //             let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
+    //             self.get_path_for_manifest(&repo_name, &remote_image.reference)
+    //                 .await?
+    //         } else {
+    //             let digest = self.download_remote_image(remote_image, proxy_cfg).await?;
+    //             self.get_catalog_path_for_blob(&digest)?
+    //         }
+    //     } else {
+    //         self.get_path_for_manifest(&repo_name, &reference).await?
+    //     };
 
-        let vm = self.create_verified_manifest(&path, do_verification)?;
-        Ok(ManifestReadLocation {
-            content_type: vm.content_type.to_owned(),
-            digest: vm.digest,
-            path: path.to_string_lossy().to_string(),
-        })
-    }
-
-    /// Moves blob from scratch to blob catalog
-    fn save_blob(&self, scratch_path: &Path, digest: &str) -> Result<()> {
-        let digest_path = self.get_catalog_path_for_blob(digest)?;
-        let repo_path = digest_path
-            .parent()
-            .ok_or_else(|| anyhow!("Error finding repository path"))?;
-
-        if !repo_path.exists() {
-            fs::create_dir_all(repo_path)?;
-        }
-        fs::rename(scratch_path, &digest_path)?;
-        Ok(())
-    }
-
-    fn validate_and_save_blob(&self, user_digest: &str, uuid: &str) -> Result<()> {
-        event!(Level::DEBUG, "Saving blob {}", user_digest);
-
-        let scratch_path = self.get_upload_path_for_blob(uuid);
-        let res = match validate_digest(&scratch_path, user_digest) {
-            Ok(_) => self.save_blob(&scratch_path, user_digest),
-            Err(e) => Err(e),
-        };
-
-        res?;
-        Ok(())
-    }
+    //     let vm = self.create_verified_manifest(&path, do_verification)?;
+    //     Ok(ManifestReadLocation {
+    //         content_type: vm.content_type.to_owned(),
+    //         digest: vm.digest,
+    //         path: path.to_string_lossy().to_string(),
+    //     })
+    // }
 }
 
 // Registry
@@ -931,12 +869,12 @@ impl TrowServer {
      * TODO: check if blob referenced by manifests. If so, refuse to delete.
      */
     pub async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<BlobDeleted, Status> {
-        if !is_digest(digest) {
-            return Err(Status::InvalidArgument(format!(
-                "Invalid digest: {}",
-                digest
-            )));
-        }
+        // if !is_digest(digest) {
+        //     return Err(Status::InvalidArgument(format!(
+        //         "Invalid digest: {}",
+        //         digest
+        //     )));
+        // }
         match self.storage.delete_blob(digest).await {
             Ok(_) => Ok(BlobDeleted {}),
             Err(e) => {
@@ -964,27 +902,19 @@ impl TrowServer {
         uuid: &str,
         digest: &Digest,
     ) -> Result<(), Status> {
-        let ret = match self.validate_and_save_blob(digest, uuid) {
+        let ret = match self.storage.complete_blob_write(uuid, digest).await {
             Ok(_) => Ok(()),
-            Err(e) => match e.downcast::<DigestValidationError>() {
-                Ok(v_e) => Err(Status::InvalidArgument(v_e.to_string())),
-                Err(e) => {
-                    event!(Level::WARN, "Failure when saving layer: {:?}", e);
-                    Err(Status::Internal("Internal error saving layer".to_owned()))
-                }
+            Err(StorageBackendError::InvalidDigest) => {
+                Err(Status::InvalidArgument("Digest does not match".to_owned()))
             },
+            Err(e) => Err(Status::Internal(format!("{e:?}")))
         };
 
         //delete uuid from uploads tracking
-        let upload = Upload {
+        let _upload = Upload {
             repo_name: repo_name.to_string(),
             uuid: uuid.to_string(),
         };
-
-        let mut set = self.active_uploads.write().unwrap();
-        if !set.remove(&upload) {
-            event!(Level::WARN, "Upload {:?} not found when deleting", upload);
-        }
         ret
     }
 

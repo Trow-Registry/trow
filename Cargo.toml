@@ -71,3 +71,5 @@ libc = "0.2"
 tempfile = "3"
 wiremock = "0.6.0"
 fastrand = "2.0.1"
+http-body-util = "0.1.1"
+tracing-test = {version="0.2", features = ["no-env-filter"]}
