@@ -28,7 +28,7 @@ mod authentication_tests {
         let data_dir = tmp_dir.as_path_untracked();
 
         let trow = start_trow(data_dir).await;
-        let fake_trow_address = "http://example.com";
+        let fake_trow_address = "example.com";
 
         let resp = trow
             .clone()
@@ -47,7 +47,7 @@ mod authentication_tests {
                 .get(reqwest::header::WWW_AUTHENTICATE)
                 .unwrap(),
             &format!(
-                "Bearer realm=\"{fake_trow_address}/login\",service=\"trow_registry\",scope=\"push/pull\"",
+                "Bearer realm=\"http://{fake_trow_address}/login\",service=\"trow_registry\",scope=\"push/pull\"",
             )
         );
     }

@@ -1,7 +1,7 @@
 mod admission;
 mod blob;
 mod catalog;
-mod extracts;
+pub mod extracts;
 mod health;
 pub mod macros;
 mod manifest;
@@ -95,9 +95,21 @@ pub fn create_app(state: super::TrowServerState) -> Router {
                     path = req.uri().path(),
                 )
             })
-            .on_response(|_: &_, duration: Duration, _span: &tracing::Span| {
-                tracing::info!("done in {:?}", duration)
-            }),
+            .on_response(
+                |body: &Response<Body>, duration: Duration, _span: &tracing::Span| {
+                    let size = body.size_hint();
+                    let size_str = humansize::format_size(
+                        size.upper().unwrap_or(size.lower()),
+                        humansize::BINARY.space_after_value(false),
+                    );
+                    tracing::info!(
+                        "{:?} {}ms {}",
+                        body.status(),
+                        duration.as_millis(),
+                        size_str
+                    );
+                },
+            ),
     );
 
     if let Some(domains) = &state.config.cors {

@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use super::{Digest, StorageDriverError};
+use super::Digest;
 
 pub struct ManifestReader {
     content_type: String,
@@ -10,18 +10,14 @@ pub struct ManifestReader {
 }
 
 impl ManifestReader {
-    pub async fn new(
-        content_type: String,
-        digest: Digest,
-        contents: Bytes,
-    ) -> Result<Self, StorageDriverError> {
+    pub async fn new(content_type: String, digest: Digest, contents: Bytes) -> Self {
         let size = contents.len() as u64;
-        Ok(Self {
+        Self {
             content_type,
             digest,
             contents,
             size,
-        })
+        }
     }
 
     pub fn get_contents(self) -> Bytes {

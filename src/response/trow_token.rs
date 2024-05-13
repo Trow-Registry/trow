@@ -1,7 +1,7 @@
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use axum::extract::{FromRef, FromRequestParts, Host};
+use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -16,6 +16,7 @@ use tracing::{event, Level};
 use uuid::Uuid;
 
 use super::authenticate::Authenticate;
+use crate::routes::extracts::AlwaysHost;
 use crate::{TrowConfig, UserConfig};
 
 const TOKEN_DURATION: u64 = 3600;
@@ -192,10 +193,14 @@ where
 {
     type Rejection = Authenticate;
 
-    async fn from_request_parts(parts: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
-        let config = &TrowConfig::from_ref(config);
-        let base_url = match parts.extract::<Option<Host>>().await.unwrap() {
-            Some(Host(host)) => host,
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let config = TrowConfig::from_ref(state);
+        let base_url = match parts
+            .extract_with_state::<Option<AlwaysHost>, _>(state)
+            .await
+            .unwrap()
+        {
+            Some(AlwaysHost(host)) => host,
             None => String::new(),
         };
 

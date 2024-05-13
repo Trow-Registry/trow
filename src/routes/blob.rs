@@ -193,12 +193,14 @@ endpoint_fn_7_levels!(
 );
 
 /*
- Starting point for an uploading a new image or new version of an image.
+POST /v2/<name>/blobs/uploads/?digest=<digest>
 
- We respond with details of location and UUID to upload to with patch/put.
+Starting point for an uploading a new image or new version of an image.
 
- No data is being transferred _unless_ the request ends with "?digest".
- In this case the whole blob is attached.
+We respond with details of location and UUID to upload to with patch/put.
+
+No data is being transferred _unless_ the request ends with "?digest".
+In this case the whole blob is attached.
 */
 pub async fn post_blob_upload(
     auth_user: TrowToken,

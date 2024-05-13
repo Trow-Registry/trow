@@ -92,25 +92,19 @@ pub fn is_digest(maybe_digest: &str) -> bool {
 }
 
 impl TrowServer {
-    pub async fn get_manifest(
-        &self,
-        name: &str,
-        tag: &str,
-    ) -> Result<ManifestReader, StorageDriverError> {
+    pub async fn get_manifest(&self, name: &str, tag: &str) -> Result<ManifestReader> {
         let get_manifest = if name.starts_with("f/") {
             let (image, cfg) = match self.get_remote_image_and_cfg(name, tag) {
                 Some(image) => image,
                 None => {
-                    return Err(StorageDriverError::InvalidName(format!(
-                        "No proxy config found for {name}:{tag}"
-                    )));
+                    return Err(anyhow!("No proxy config found for {name}:{tag}"));
                 }
             };
             let digest = match self.download_remote_image(&image, &cfg).await {
                 Ok(d) => d,
                 Err(e) => {
                     event!(Level::ERROR, "Could not download remote image: {e:?}");
-                    return Err(StorageDriverError::Internal);
+                    return Err(anyhow!("Could not download remote image: {e:?}"));
                 }
             };
             self.storage
@@ -124,12 +118,12 @@ impl TrowServer {
             event!(Level::WARN, "Error getting manifest: {}", e);
             StorageDriverError::Internal
         })?;
-        ManifestReader::new(
+        Ok(ManifestReader::new(
             man.get_media_type(),
             man.digest().clone(),
             man.raw().clone(),
         )
-        .await
+        .await)
     }
 
     pub async fn store_manifest<'a>(
