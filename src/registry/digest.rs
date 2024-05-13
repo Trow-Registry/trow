@@ -5,11 +5,12 @@ use std::{fmt, io};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use sha2::digest::OutputSizeUser;
 use sha2::{Digest as ShaDigest, Sha256};
 use thiserror::Error;
 
 // Buffer size for SHA2 hashing
-const BUFFER_SIZE: usize = 1024;
+const BUFFER_SIZE: usize = 1024 * 1024;
 
 // These regex are used to do a simple validation of the tag fields
 lazy_static! {
@@ -118,24 +119,30 @@ impl Digest {
         self.algo.as_str()
     }
 
-    pub fn try_sha256<R: Read>(mut reader: R) -> io::Result<Self> {
-        let d = digest::<Sha256, _>(&mut reader)?;
-        Ok(Self {
-            algo: DigestAlgorithm::Sha256,
-            hash: d,
-        })
+    pub fn digest_sha256<R: Read>(mut reader: R) -> io::Result<Digest> {
+        Self::digest::<Sha256, _>(&mut reader)
     }
-}
 
-fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> io::Result<String> {
-    let mut sh = D::default();
-    let mut buffer = [0u8; BUFFER_SIZE];
-    let mut n = BUFFER_SIZE;
-    while n == BUFFER_SIZE {
-        n = reader.read(&mut buffer)?;
-        sh.update(&buffer[..n]);
+    #[allow(clippy::self_named_constructors)]
+    pub fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> io::Result<Digest> {
+        let mut digest = D::default();
+        let mut buffer = [0u8; BUFFER_SIZE];
+        let mut n = BUFFER_SIZE;
+        while n == BUFFER_SIZE {
+            n = reader.read(&mut buffer)?;
+            digest.update(&buffer[..n]);
+        }
+        let hash = hex::encode(digest.finalize());
+        let algo = match <D as OutputSizeUser>::output_size() {
+            32 => Ok(DigestAlgorithm::Sha256),
+            64 => Ok(DigestAlgorithm::Sha512),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid digest size",
+            )),
+        }?;
+        Ok(Self { algo, hash })
     }
-    Ok(hex::encode(sh.finalize()))
 }
 
 #[cfg(test)]
@@ -146,7 +153,7 @@ mod test {
 
     #[test]
     fn sha256_digest_test() {
-        let result = Digest::try_sha256(BufReader::new("hello world".as_bytes())).unwrap();
+        let result = Digest::digest_sha256(BufReader::new("hello world".as_bytes())).unwrap();
         assert_eq!(
             result,
             Digest {
@@ -159,7 +166,7 @@ mod test {
 
     #[test]
     fn sha256_digest_empty_test() {
-        let result = Digest::try_sha256(BufReader::new("".as_bytes())).unwrap();
+        let result = Digest::digest_sha256(BufReader::new("".as_bytes())).unwrap();
         assert_eq!(
             result,
             Digest {
@@ -172,7 +179,7 @@ mod test {
 
     #[test]
     fn sha256_digest_brown_fox_test() {
-        let result = Digest::try_sha256(BufReader::new(
+        let result = Digest::digest_sha256(BufReader::new(
             "the quick brown fox jumps over the lazy dog".as_bytes(),
         ))
         .unwrap();

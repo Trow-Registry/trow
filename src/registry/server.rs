@@ -159,7 +159,7 @@ impl TrowServer {
                 StorageDriverError::Internal
             })?;
 
-        Ok(Digest::try_sha256(man_bytes.reader()).unwrap())
+        Ok(Digest::digest_sha256(man_bytes.reader()).unwrap())
     }
 
     pub async fn delete_manifest(

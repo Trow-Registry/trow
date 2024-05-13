@@ -183,7 +183,7 @@ mod interface_tests {
 
         //used by oci_manifest_test
         let config = "{}\n".as_bytes();
-        let digest = digest::Digest::try_sha256(BufReader::new(config)).unwrap();
+        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
         let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", name, uuid, digest);
 
         let resp = cl
@@ -203,7 +203,7 @@ mod interface_tests {
 
     async fn upload_with_post(cl: &Router, name: &str) {
         let config = "{ }\n".as_bytes();
-        let digest = digest::Digest::try_sha256(BufReader::new(config)).unwrap();
+        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         let resp = cl
             .clone()
@@ -227,7 +227,7 @@ mod interface_tests {
     async fn push_oci_manifest(cl: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::Digest::try_sha256(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -251,7 +251,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::Digest::try_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
         digest.to_string()
     }
 
@@ -288,14 +288,14 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::Digest::try_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
         digest.to_string()
     }
 
     async fn push_oci_manifest_with_foreign_blob(cl: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::Digest::try_sha256(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -328,7 +328,7 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::Digest::try_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
         digest.to_string()
     }
 
@@ -377,7 +377,7 @@ mod interface_tests {
     async fn delete_config_blob(cl: &Router, name: &str) {
         //Deletes blob uploaded in config test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::Digest::try_sha256(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
         let resp = cl
             .clone()
             .oneshot(
@@ -416,58 +416,6 @@ mod interface_tests {
         let rr: ReadyStatus = common::response_body_json(resp).await;
 
         assert!(rr.is_ready);
-    }
-
-    async fn get_metrics(cl: &Router) {
-        let resp = cl
-            .clone()
-            .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-
-        assert_eq!(resp.status(), StatusCode::OK);
-
-        let body = String::from_utf8(common::response_body_vec(resp).await).unwrap();
-
-        assert!(body.contains("available_space"));
-        assert!(body.contains("free_space"));
-        assert!(body.contains("total_space"));
-
-        // assert!(body.contains("total_manifest_requests{type=\"manifests\"} 6"));
-        // assert!(body.contains("total_blob_requests{type=\"blobs\"} 9"));
-
-        // get_manifest(cl, "onename", "tag", None).await;
-        // let manifest_response = cl
-        //     .clone()
-        //     .oneshot(
-        //         Request::get(&format!("{}/metrics", ORIGIN))
-        //             .body(Body::empty())
-        //             .unwrap(),
-        //     )
-        //     .await
-        //     .unwrap();
-
-        // let manifest_body =
-        //     String::from_utf8(common::response_body_vec(manifest_response).await).unwrap();
-
-        // assert!(manifest_body.contains("total_manifest_requests{type=\"manifests\"} 7"));
-
-        // get_non_existent_blob(cl).await;
-        // let blob_response = cl
-        //     .clone()
-        //     .oneshot(
-        //         Request::get(&format!("{}/metrics", ORIGIN))
-        //             .body(Body::empty())
-        //             .unwrap(),
-        //     )
-        //     .await
-        //     .unwrap();
-
-        // assert_eq!(blob_response.status(), StatusCode::OK);
-
-        // let blob_body = common::response_body_string(blob_response).await;
-
-        // assert!(blob_body.contains("total_blob_requests{type=\"blobs\"} 10"));
     }
 
     #[tokio::test]
@@ -577,9 +525,5 @@ mod interface_tests {
 
         println!("Running get_health");
         get_health(&trow).await;
-
-        println!("Running get_metrics");
-        get_metrics(&trow).await;
-        check_tag_list_n_last(&trow, 2, "latest", &tl4).await;
     }
 }

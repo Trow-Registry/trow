@@ -30,7 +30,7 @@ mod interface_tests {
 
     async fn upload_config(trow: &Router) {
         let config = "{}\n".as_bytes();
-        let digest = digest::Digest::try_sha256(BufReader::new(config)).unwrap();
+        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
         let req = Request::post(format!("/v2/config/blobs/uploads/?digest={digest}"))
             .body(Body::from(config))
             .unwrap();
@@ -46,7 +46,7 @@ mod interface_tests {
     async fn push_random_foreign_manifest(trow: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob earlier
         let config = "{}\n".as_bytes();
-        let config_digest = digest::Digest::try_sha256(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
         let ran_size = fastrand::u32(0..=u32::MAX);
@@ -84,7 +84,7 @@ mod interface_tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
-        digest::Digest::try_sha256(BufReader::new(manifest.as_bytes()))
+        digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes()))
             .unwrap()
             .to_string()
     }

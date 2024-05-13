@@ -108,7 +108,7 @@ pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
     let range = resp.headers().get(RANGE_HEADER).unwrap().to_str().unwrap();
     assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
 
-    let digest = Digest::try_sha256(BufReader::new(blob.as_slice())).unwrap();
+    let digest = Digest::digest_sha256(BufReader::new(blob.as_slice())).unwrap();
     let resp = cl
         .clone()
         .oneshot(

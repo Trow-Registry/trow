@@ -1,7 +1,6 @@
 use core::ops::Range;
 use std::borrow::Cow;
-use std::fs::{self, File};
-use std::io::{BufRead, Write};
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::pin::pin;
 use std::{io, str};
@@ -9,6 +8,7 @@ use std::{io, str};
 use bytes::{Buf, Bytes};
 use chrono::prelude::*;
 use futures::{AsyncReadExt, Stream};
+use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -78,7 +78,7 @@ pub struct TrowStorageBackend {
 impl TrowStorageBackend {
     fn init_create_path(root: &Path, dir: &str) -> Result<(), StorageBackendError> {
         let path = root.join(dir);
-        match fs::create_dir_all(&path) {
+        match std::fs::create_dir_all(&path) {
             Ok(_) => Ok(()),
             Err(e) => {
                 event!(
@@ -211,7 +211,7 @@ impl TrowStorageBackend {
             let reader = std::fs::File::open(tmp_file.path()).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!("Could not open tmp file: {e}")))
             })?;
-            let tmp_digest = Digest::try_sha256(reader).map_err(|e| {
+            let tmp_digest = Digest::digest_sha256(reader).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!(
                     "Could not calculate digest of blob: {e}"
                 )))
@@ -300,8 +300,8 @@ impl TrowStorageBackend {
             .join(BLOBS_DIR)
             .join(user_digest.algo_str())
             .join(&user_digest.hash);
-        let f = File::open(&tmp_location)?; // ERRRR
-        let calculated_digest = Digest::try_sha256(f)?;
+        let f = std::fs::File::open(&tmp_location)?;
+        let calculated_digest = Digest::digest_sha256(f)?;
         if &calculated_digest != user_digest {
             event!(
                 Level::ERROR,
@@ -311,8 +311,12 @@ impl TrowStorageBackend {
             );
             return Err(StorageBackendError::InvalidDigest);
         }
-        std::fs::create_dir_all(final_location.parent().unwrap()).unwrap();
-        std::fs::rename(tmp_location, final_location).expect("Error moving blob to final location");
+        fs::create_dir_all(final_location.parent().unwrap())
+            .await
+            .unwrap();
+        fs::rename(tmp_location, final_location)
+            .await
+            .expect("Error moving blob to final location");
         Ok(())
     }
 
@@ -351,7 +355,7 @@ impl TrowStorageBackend {
         verify_assets: bool,
     ) -> Result<PathBuf, StorageBackendError> {
         event!(Level::DEBUG, "Write image manifest {repo_name}:{tag}");
-        let mani_digest = Digest::try_sha256(manifest.as_ref().reader()).map_err(|e| {
+        let mani_digest = Digest::digest_sha256(manifest.as_ref().reader()).map_err(|e| {
             StorageBackendError::Internal(Cow::Owned(format!(
                 "Could not calculate digest of manifest: {e}"
             )))
@@ -490,15 +494,15 @@ impl TrowStorageBackend {
 
     pub async fn is_ready(&self) -> Result<(), StorageBackendError> {
         let path = self.path.join("fs-ready");
-        let mut file = File::open(path)?;
-        let size = file.write(b"Hello World")?;
+        let mut file = tokio::fs::File::create(path).await?;
+        let size = file.write(b"Hello World").await?;
         if size != 11 {
             return Err(StorageBackendError::Internal(
                 "Could not write to file".into(),
             ));
         }
-        file.flush()?;
-        let metadata = file.metadata()?;
+        file.flush().await?;
+        let metadata = file.metadata().await?;
         let permissions = metadata.permissions();
         if permissions.readonly() {
             // impossible ?
@@ -506,6 +510,7 @@ impl TrowStorageBackend {
                 "Read only file system".into(),
             ));
         }
+
         Ok(())
     }
 }
@@ -541,8 +546,6 @@ fn is_proxy_repo(repo_name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
     use super::*;
     use crate::registry::manifest;
 
@@ -587,7 +590,7 @@ mod tests {
             .write_image_manifest(Bytes::from(manifest_bytes), "zozo/image", "latest", false)
             .await
             .unwrap();
-        fs::remove_file(location).unwrap();
+        fs::remove_file(location).await.unwrap();
         // Now let's test verification
         match manifest {
             manifest::OCIManifest::V2(ref mut m) => {
@@ -618,15 +621,16 @@ mod tests {
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
 
         let fd = store.path.join("manifests").join("zozo").join("image");
-        fs::create_dir_all(&fd).unwrap();
-        let mut file = File::create(fd.join("latest")).unwrap();
+        fs::create_dir_all(&fd).await.unwrap();
+        let mut file = fs::File::create(fd.join("latest")).await.unwrap();
         let entry = HistoryEntry {
             digest: "sha256:1234".to_string(),
             date: Utc::now(),
         };
         file.write_all(serde_json::to_string(&entry).unwrap().as_bytes())
+            .await
             .unwrap();
-        file.flush().unwrap();
+        file.flush().await.unwrap();
 
         let digest = store
             .get_manifest_digest("zozo/image", "latest")
@@ -641,13 +645,14 @@ mod tests {
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
 
         let fd = store.path.join("manifests").join("zozo").join("image");
-        fs::create_dir_all(&fd).unwrap();
-        let mut file = File::create(fd.join("latest")).unwrap();
+        fs::create_dir_all(&fd).await.unwrap();
+        let mut file = fs::File::create(fd.join("latest")).await.unwrap();
         let entry = HistoryEntry {
             digest: "sha256:1234".to_string(),
             date: Utc::now(),
         };
         file.write_all(&serde_json::to_vec(&entry).unwrap())
+            .await
             .unwrap();
         drop(file);
         // file.flush().unwrap();

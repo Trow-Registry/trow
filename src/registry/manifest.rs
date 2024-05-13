@@ -30,7 +30,7 @@ impl Manifest {
     }
     pub fn from_bytes(bytes: Bytes) -> Result<Self, ManifestError> {
         let parsed = serde_json::from_slice(&bytes).map_err(|_| ManifestError::DeserializeError)?;
-        let digest = Digest::try_sha256(bytes.clone().reader()).unwrap();
+        let digest = Digest::digest_sha256(bytes.clone().reader()).unwrap();
         Ok(Self {
             raw: bytes,
             parsed,
