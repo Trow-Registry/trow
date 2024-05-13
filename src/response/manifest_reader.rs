@@ -2,7 +2,7 @@ use axum::body;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 
-use crate::registry_interface::ManifestReader;
+use crate::registry::ManifestReader;
 
 impl IntoResponse for ManifestReader {
     fn into_response(self) -> Response {

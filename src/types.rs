@@ -4,7 +4,7 @@ use derive_more::Display;
 use futures::AsyncRead;
 use serde::{Deserialize, Serialize};
 
-use crate::registry_interface::Digest;
+use crate::registry::Digest;
 
 // TODO: Kill this file. Move types and methods to where they're used.
 

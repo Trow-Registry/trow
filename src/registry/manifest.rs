@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use thiserror::Error;
 
-use crate::registry_interface::digest::{Digest, DigestError};
+use crate::registry::digest::{Digest, DigestError};
 
 pub trait FromJson {
     fn from_json(raw: &Value) -> Result<Self>
@@ -220,7 +220,7 @@ mod test {
     use serde_json::{self, Value};
 
     use super::{FromJson, Manifest, OCIManifest};
-    use crate::registry_interface::Digest;
+    use crate::registry::Digest;
 
     #[test]
     fn valid_v2_2() {

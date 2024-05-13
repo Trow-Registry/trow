@@ -15,7 +15,7 @@ mod interface_tests {
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
     use tracing_test::traced_test;
-    use trow::registry_interface::digest;
+    use trow::registry::digest;
 
     use crate::common::{self, response_body_vec};
 

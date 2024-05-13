@@ -142,7 +142,7 @@ fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> io::Result<String>
 mod test {
     use std::io::BufReader;
 
-    use crate::registry_interface::digest::{Digest, DigestAlgorithm};
+    use crate::registry::digest::{Digest, DigestAlgorithm};
 
     #[test]
     fn sha256_digest_test() {

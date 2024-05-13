@@ -5,7 +5,7 @@ mod common;
 mod cli {
     use predicates::prelude::*;
     use test_temp_dir::test_temp_dir;
-    use trow::trow_server::{
+    use trow::registry::{
         ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig,
     };
 

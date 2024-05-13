@@ -11,20 +11,20 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
 use thiserror::Error;
 use tracing::{event, Level};
-use trow_server::api_types::MetricsResponse;
+use registry::api_types::MetricsResponse;
 
 use super::image::RemoteImage;
 use super::manifest::{manifest_media_type, Manifest, OCIManifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
 use super::storage::{is_path_writable, StorageBackendError, TrowStorageBackend};
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
-use crate::registry_interface::blob_storage::Stored;
-use crate::registry_interface::catalog_operations::HistoryEntry;
-use crate::registry_interface::digest::Digest;
-use crate::registry_interface::{BlobReader, ContentInfo, ManifestReader, StorageDriverError};
-use crate::trow_server;
-use crate::trow_server::api_types::Status;
-use crate::trow_server::storage::WriteBlobRangeError;
+use crate::registry::blob_storage::Stored;
+use crate::registry::catalog_operations::HistoryEntry;
+use crate::registry::digest::Digest;
+use crate::registry::{BlobReader, ContentInfo, ManifestReader, StorageDriverError};
+use crate::registry;
+use crate::registry::api_types::Status;
+use crate::registry::storage::WriteBlobRangeError;
 use crate::types::*;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
@@ -274,35 +274,6 @@ impl TrowServer {
         Ok(())
     }
 
-    // pub async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<(), StorageDriverError> {
-    //     event!(
-    //         Level::INFO,
-    //         "Attempting to delete blob {} in {}",
-    //         digest,
-    //         name
-    //     );
-    //     let rn = (name.to_string());
-
-    //     self.delete_blob_local(&rn, digest)
-    //         .await
-    //         .map_err(|_| StorageDriverError::InvalidDigest)?;
-    //     Ok(())
-    // }
-
-    // async fn get_catalog(
-    //     &self,
-    //     start_value: Option<&str>,
-    //     num_results: Option<u32>,
-    // ) -> Result<Vec<String>, StorageDriverError> {
-    //     let num_results = num_results.unwrap_or(u32::MAX);
-    //     let start_value = start_value.unwrap_or_default();
-
-    //     self.get_catalog_part(num_results, start_value)
-    //         .await
-    //         .map_err(|_| StorageDriverError::Internal)
-    //         .map(|rc| rc.raw())
-    // }
-
     pub async fn get_tags(
         &self,
         repo: &str,
@@ -331,103 +302,7 @@ impl TrowServer {
             .await
             .map_err(|_| StorageDriverError::Internal)
     }
-
-    // async fn validate_admission(
-    //     &self,
-    //     admission_req: &AdmissionRequest<Pod>,
-    //     host_name: &str,
-    // ) -> AdmissionResponse {
-    //     self.validate_admission_internal(admission_req, host_name)
-    //         .await
-    //         .unwrap_or_else(|e| {
-    //             AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
-    //         })
-    // }
-
-    // async fn mutate_admission(
-    //     &self,
-    //     admission_req: &AdmissionRequest<Pod>,
-    //     host_name: &str,
-    // ) -> AdmissionResponse {
-    //     self.mutate_admission_internal(admission_req, host_name)
-    //         .await
-    //         .unwrap_or_else(|e| {
-    //             AdmissionResponse::from(admission_req).deny(format!("Internal error: {}", e))
-    //         })
-    // }
-
-    // async fn is_healthy(&self) -> bool {
-    //     self.is_healthy().await.is_healthy
-    // }
-
-    // async fn is_ready(&self) -> bool {
-    //     self.is_ready().await.is_ready
-    // }
-
-    // async fn get_metrics(
-    //     &self,
-    // ) -> Result<MetricsResponse, crate::registry_interface::MetricsError> {
-    //     self.get_metrics().await.map_err(|_| MetricsError::Internal)
-    // }
-
-    // async fn complete_upload(
-    //     &self,
-    //     repo_name: &str,
-    //     uuid: &str,
-    //     digest: &Digest,
-    // ) -> Result<(), Status> {
-    //     event!(
-    //         Level::INFO,
-    //         "Complete Upload called for repository {} with upload id {} digest {}",
-    //         repo_name,
-    //         uuid,
-    //         digest
-    //     );
-
-    //     let req = CompleteRequest {
-    //         repo_name: repo_name.to_string(),
-    //         uuid: uuid.to_string(),
-    //         user_digest: digest.to_string(),
-    //     };
-
-    //     self.trow_server.complete_upload(req).await?;
-
-    //     Ok(())
-    // }
-
-    // async fn get_manifest_history(
-    //     &self,
-    //     repo_name: &str,
-    //     reference: &str,
-    //     limit: u32,
-    //     last_digest: &str,
-    // ) -> Result<ManifestHistory> {
-    //     event!(
-    //         Level::INFO,
-    //         "Getting manifest history for repo {} ref {} limit {} last_digest {}",
-    //         repo_name,
-    //         reference,
-    //         limit,
-    //         last_digest
-    //     );
-    //     let mr = ManifestHistoryRequest {
-    //         tag: reference.to_owned(),
-    //         repo_name: repo_name.to_string(),
-    //         limit,
-    //         last_digest: last_digest.to_owned(),
-    //     };
-    //     let stream = self.trow_server.get_manifest_history(mr).await?;
-    //     let mut history = ManifestHistory::new(format!("{}:{}", repo_name, reference));
-
-    //     for entry in stream {
-    //         history.insert(entry.digest, entry.date);
-    //     }
-
-    //     Ok(history)
-    // }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TrowServer {
     pub fn new(

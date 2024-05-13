@@ -12,7 +12,7 @@ mod interface_tests {
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
-    use trow::trow_server::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::registry::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
 

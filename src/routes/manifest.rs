@@ -6,7 +6,7 @@ use digest::Digest;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry_interface::{digest, ManifestReader, StorageDriverError};
+use crate::registry::{digest, ManifestReader, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};

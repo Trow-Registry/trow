@@ -13,7 +13,7 @@ mod admission_mutation_tests {
     use kube::core::admission::AdmissionReview;
     use reqwest::StatusCode;
     use tower::ServiceExt;
-    use trow::trow_server::{RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::registry::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
 

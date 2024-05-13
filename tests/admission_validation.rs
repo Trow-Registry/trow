@@ -12,7 +12,7 @@ mod validation_tests {
     use kube::core::admission::AdmissionReview;
     use reqwest::{header, StatusCode};
     use tower::ServiceExt;
-    use trow::trow_server::ImageValidationConfig;
+    use trow::registry::ImageValidationConfig;
 
     use crate::common;
 

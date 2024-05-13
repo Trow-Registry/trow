@@ -3,8 +3,7 @@ pub mod response;
 mod routes;
 pub mod types;
 
-pub mod registry_interface;
-pub mod trow_server;
+pub mod registry;
 #[cfg(feature = "sqlite")]
 mod users;
 
@@ -17,7 +16,7 @@ use anyhow::{Context, Result};
 use axum::extract::FromRef;
 use axum::Router;
 use thiserror::Error;
-use trow_server::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
+use registry::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
 use uuid::Uuid;
 
 //TODO: Make this take a cause or description
@@ -164,16 +163,16 @@ impl TrowConfig {
             std::process::exit(0);
         }
 
-        let ts_builder = trow_server::build_server(
+        let ts_builder = registry::build_server(
             self.data_dir.clone(),
             self.proxy_registry_config.clone(),
             self.image_validation_config.clone(),
         );
-        let trow_server = ts_builder.get_server()?;
+        let registry = ts_builder.get_server()?;
 
         let server_state = TrowServerState {
             config: self.clone(),
-            client: trow_server,
+            client: registry,
         };
         Ok(routes::create_app(server_state))
     }

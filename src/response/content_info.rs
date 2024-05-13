@@ -3,7 +3,7 @@ use axum::http::request::Parts;
 use axum::http::StatusCode;
 use tracing::{event, Level};
 
-use crate::registry_interface::blob_storage::ContentInfo;
+use crate::registry::blob_storage::ContentInfo;
 use crate::response::errors::Error;
 
 /**

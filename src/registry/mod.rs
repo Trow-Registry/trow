@@ -1,19 +1,33 @@
-pub use admission::AdmissionValidation;
+mod admission;
+pub mod api_types;
+mod image;
+pub mod manifest;
+mod metrics;
+mod proxy_auth;
+mod server;
+pub mod storage;
+mod temporary_file;
+
+use std::path::PathBuf;
+
+pub use admission::ImageValidationConfig;
+use anyhow::Result;
+pub use proxy_auth::{RegistryProxiesConfig, SingleRegistryProxyConfig};
+pub use server::TrowServer;
+
+
 pub use blob_storage::{BlobReader, BlobStorage, ContentInfo, UploadInfo};
 pub use catalog_operations::{CatalogOperations, ManifestHistory};
 pub use digest::{Digest, DigestAlgorithm};
 pub use manifest_storage::{ManifestReader, ManifestStorage};
-pub use metrics::{Metrics, MetricsError};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncSeek};
 
-pub mod admission;
 pub mod blob_storage;
 pub mod catalog_operations;
 #[allow(dead_code)]
 pub mod digest;
 pub mod manifest_storage;
-pub mod metrics;
 
 // Storage Driver Error
 #[derive(Error, Debug)]
@@ -47,4 +61,32 @@ pub trait RegistryStorage: ManifestStorage + BlobStorage + CatalogOperations {
     /// in memory and then passing the full data, the driver can process single chunks
     /// individually. This significantly decrease the memory usage of the registry
     fn support_streaming(&self) -> bool;
+}
+
+pub struct TrowServerBuilder {
+    data_path: PathBuf,
+    proxy_registry_config: Option<RegistryProxiesConfig>,
+    image_validation_config: Option<ImageValidationConfig>,
+}
+
+pub fn build_server(
+    data_path: PathBuf,
+    proxy_registry_config: Option<RegistryProxiesConfig>,
+    image_validation_config: Option<ImageValidationConfig>,
+) -> TrowServerBuilder {
+    TrowServerBuilder {
+        data_path,
+        proxy_registry_config,
+        image_validation_config,
+    }
+}
+
+impl TrowServerBuilder {
+    pub fn get_server(self) -> Result<TrowServer> {
+        TrowServer::new(
+            self.data_path,
+            self.proxy_registry_config,
+            self.image_validation_config,
+        )
+    }
 }

@@ -17,10 +17,10 @@ use walkdir::WalkDir;
 
 use super::manifest::{Manifest, ManifestError};
 use super::server::{PROXY_DIR, SUPPORTED_DIGESTS};
-use crate::registry_interface::blob_storage::Stored;
-use crate::registry_interface::catalog_operations::HistoryEntry;
-use crate::registry_interface::Digest;
-use crate::trow_server::temporary_file::TemporaryFile;
+use crate::registry::blob_storage::Stored;
+use crate::registry::catalog_operations::HistoryEntry;
+use crate::registry::Digest;
+use crate::registry::temporary_file::TemporaryFile;
 use crate::types::BoundedStream;
 
 // Storage Driver Error
@@ -530,7 +530,7 @@ mod tests {
     use std::io::Write;
 
     use super::*;
-    use crate::trow_server::manifest;
+    use crate::registry::manifest;
 
     #[test]
     fn trow_storage_backend_new() {

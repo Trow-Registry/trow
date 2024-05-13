@@ -5,7 +5,7 @@ use futures::AsyncRead;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
-use crate::registry_interface::BlobReader;
+use crate::registry::BlobReader;
 
 impl<S: AsyncRead + Send + 'static> IntoResponse for BlobReader<S> {
     fn into_response(self) -> Response {

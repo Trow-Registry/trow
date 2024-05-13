@@ -4,7 +4,7 @@ use anyhow::Result;
 use axum::extract::State;
 
 use crate::response::errors::Error;
-use crate::trow_server::api_types::MetricsResponse;
+use crate::registry::api_types::MetricsResponse;
 use crate::TrowServerState;
 
 /*

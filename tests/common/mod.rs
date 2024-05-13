@@ -12,8 +12,8 @@ use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tower::ServiceExt;
-use trow::registry_interface::digest::Digest;
-use trow::trow_server::manifest;
+use trow::registry::digest::Digest;
+use trow::registry::manifest;
 
 /* None of these are dead code, they are called from tests */
 #[allow(dead_code)]

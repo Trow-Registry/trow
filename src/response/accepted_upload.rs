@@ -32,7 +32,7 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::registry_interface::{Digest, DigestAlgorithm};
+    use crate::registry::{Digest, DigestAlgorithm};
     use crate::types::{AcceptedUpload, Uuid};
 
     #[tokio::test]
