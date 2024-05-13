@@ -12,6 +12,6 @@ use crate::TrowServerState;
 pub async fn healthz(State(state): State<Arc<TrowServerState>>) -> HealthStatus {
     HealthStatus {
         message: "".to_string(),
-        is_healthy: state.client.is_healthy().await,
+        is_healthy: state.registry.is_healthy().await,
     }
 }

@@ -5,7 +5,6 @@ mod extracts;
 mod health;
 pub mod macros;
 mod manifest;
-mod metrics;
 mod readiness;
 
 use std::str;
@@ -38,7 +37,6 @@ pub fn create_app(state: super::TrowServerState) -> Router {
         .route("/validate-image", post(admission::validate_image))
         .route("/mutate-image", post(admission::mutate_image))
         .route("/healthz", get(health::healthz))
-        .route("/metrics", get(metrics::metrics))
         .route("/readiness", get(readiness::readiness));
 
     // blob

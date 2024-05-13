@@ -1,7 +1,7 @@
 use core::ops::Range;
 use std::borrow::Cow;
 use std::fs::{self, File};
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::pin::pin;
 use std::{io, str};
@@ -194,7 +194,7 @@ impl TrowStorageBackend {
             Ok(tmpf) => tmpf,
             // Special case: blob is being concurrently fetched
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                event!(Level::INFO, "Waiting for concurently fetched blob");
+                event!(Level::INFO, "Waiting for concurrently fetched blob");
                 while tmp_location.exists() {
                     // wait for download to be done (temp file to be moved)
                     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -487,13 +487,27 @@ impl TrowStorageBackend {
         }
         Ok(())
     }
-}
 
-pub fn is_path_writable(path: &PathBuf) -> io::Result<bool> {
-    let file = File::open(path)?;
-    let metadata = file.metadata()?;
-    let permissions = metadata.permissions();
-    Ok(!permissions.readonly())
+    pub async fn is_ready(&self) -> Result<(), StorageBackendError> {
+        let path = self.path.join("fs-ready");
+        let mut file = File::open(path)?;
+        let size = file.write(b"Hello World")?;
+        if size != 11 {
+            return Err(StorageBackendError::Internal(
+                "Could not write to file".into(),
+            ));
+        }
+        file.flush()?;
+        let metadata = file.metadata()?;
+        let permissions = metadata.permissions();
+        if permissions.readonly() {
+            // impossible ?
+            return Err(StorageBackendError::Internal(
+                "Read only file system".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 pub fn is_digest(maybe_digest: &str) -> bool {

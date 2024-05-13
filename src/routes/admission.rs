@@ -18,7 +18,7 @@ pub async fn validate_image(
         Err(e) => {
             AdmissionResponse::invalid(format!("Invalid admission request: {:#}", e)).into_review()
         }
-        Ok(req) => state.client.validate_admission(&req).await.into_review(),
+        Ok(req) => state.registry.validate_admission(&req).await.into_review(),
     })
 }
 
@@ -33,7 +33,7 @@ pub async fn mutate_image(
             AdmissionResponse::invalid(format!("Invalid admission request: {:#}", e)).into_review()
         }
         Ok(req) => state
-            .client
+            .registry
             .mutate_admission(&req, &state.config.service_name)
             .await
             .into_review(),

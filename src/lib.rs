@@ -32,7 +32,7 @@ pub struct NetAddr {
 
 #[derive(Debug)]
 pub struct TrowServerState {
-    pub client: TrowServer,
+    pub registry: TrowServer,
     pub config: TrowConfig,
 }
 
@@ -172,7 +172,7 @@ impl TrowConfig {
 
         let server_state = TrowServerState {
             config: self.clone(),
-            client: registry,
+            registry,
         };
         Ok(routes::create_app(server_state))
     }

@@ -26,7 +26,7 @@ pub async fn get_catalog(
     let last_repo = query.last.clone().unwrap_or_default();
 
     let cat = state
-        .client
+        .registry
         .get_catalog(Some(&last_repo), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
@@ -44,7 +44,7 @@ pub async fn list_tags(
     let last_tag = query.last.clone().unwrap_or_default();
 
     let tags = state
-        .client
+        .registry
         .get_tags(&repo_name, Some(&last_tag), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
@@ -69,7 +69,7 @@ pub async fn get_manifest_history(
     let last_digest = query.last.clone().unwrap_or_default();
 
     let mh = state
-        .client
+        .registry
         .get_history(&name, &reference, Some(&last_digest), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;

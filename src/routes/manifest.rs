@@ -38,7 +38,7 @@ pub async fn get_manifest(
     Path((name, reference)): Path<(String, String)>,
 ) -> Result<ManifestReader, Error> {
     state
-        .client
+        .registry
         .get_manifest(&name, &reference)
         .await
         .map_err(|_| Error::ManifestUnknown(reference))
@@ -68,7 +68,7 @@ pub async fn put_image_manifest(
     chunk: Body,
 ) -> Result<VerifiedManifest, Error> {
     match state
-        .client
+        .registry
         .store_manifest(&repo_name, &reference, chunk)
         .await
     {
@@ -104,7 +104,7 @@ pub async fn delete_image_manifest(
     Path((repo, digest)): Path<(String, String)>,
 ) -> Result<ManifestDeleted, Error> {
     let digest = Digest::try_from_raw(&digest).map_err(|_| Error::Unsupported)?;
-    match state.client.delete_manifest(&repo, &digest).await {
+    match state.registry.delete_manifest(&repo, &digest).await {
         Ok(_) => Ok(ManifestDeleted {}),
         Err(StorageDriverError::Unsupported) => Err(Error::Unsupported),
         Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestUnknown(repo)),

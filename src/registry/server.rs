@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
-use std::{fs, str};
+use std::path::PathBuf;
+use std::str;
 
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
@@ -7,7 +7,6 @@ use axum::body::Body;
 use bytes::Buf;
 use futures::future::try_join_all;
 use futures::AsyncRead;
-use registry::api_types::MetricsResponse;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
 use thiserror::Error;
@@ -16,9 +15,8 @@ use tracing::{event, Level};
 use super::image::RemoteImage;
 use super::manifest::{manifest_media_type, Manifest, OCIManifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
-use super::storage::{is_path_writable, StorageBackendError, TrowStorageBackend};
-use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
-use crate::registry;
+use super::storage::{StorageBackendError, TrowStorageBackend};
+use super::{ImageValidationConfig, RegistryProxiesConfig};
 use crate::registry::api_types::Status;
 use crate::registry::blob_storage::Stored;
 use crate::registry::catalog_operations::HistoryEntry;
@@ -28,9 +26,6 @@ use crate::registry::{BlobReader, ContentInfo, ManifestReader, StorageDriverErro
 use crate::types::*;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
-static MANIFESTS_DIR: &str = "manifests";
-static BLOBS_DIR: &str = "blobs";
-static UPLOADS_DIR: &str = "scratch";
 
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
@@ -47,11 +42,6 @@ static DIGEST_HEADER: &str = "Docker-Content-Digest";
 #[derive(Clone, Debug)]
 pub struct TrowServer {
     pub storage: TrowStorageBackend,
-    // deprecated
-    manifests_path: PathBuf,
-    blobs_path: PathBuf,
-    scratch_path: PathBuf,
-
     pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
 }
@@ -89,28 +79,6 @@ pub fn create_accept_header() -> HeaderMap {
         HeaderValue::from_str(&ACCEPT.join(", ")).unwrap(),
     );
     headers
-}
-
-fn create_path(data_path: &Path, dir: &str) -> Result<PathBuf, std::io::Error> {
-    let dir_path = data_path.join(dir);
-    if !dir_path.exists() {
-        return match fs::create_dir_all(&dir_path) {
-            Ok(_) => Ok(dir_path),
-            Err(e) => {
-                event!(
-                    Level::ERROR,
-                    r#"
-                Failed to create directory required by trow {:?}
-                Please check the parent directory is writable by the trow user.
-                {:?}"#,
-                    dir_path,
-                    e
-                );
-                Err(e)
-            }
-        };
-    };
-    Ok(dir_path)
 }
 
 pub fn is_digest(maybe_digest: &str) -> bool {
@@ -310,23 +278,12 @@ impl TrowServer {
         proxy_registry_config: Option<RegistryProxiesConfig>,
         image_validation_config: Option<ImageValidationConfig>,
     ) -> Result<Self> {
-        let manifests_path = create_path(&data_path, MANIFESTS_DIR)?;
-        let scratch_path = create_path(&data_path, UPLOADS_DIR)?;
-        let blobs_path = create_path(&data_path, BLOBS_DIR)?;
-
-        let svc = TrowServer {
-            manifests_path,
-            blobs_path,
-            scratch_path,
+        let svc = Self {
             proxy_registry_config,
             image_validation_config,
             storage: TrowStorageBackend::new(data_path)?,
         };
         Ok(svc)
-    }
-
-    fn get_catalog_path_for_blob(&self, digest: &Digest) -> Result<PathBuf> {
-        Ok(self.blobs_path.join(digest.algo_str()).join(&digest.hash))
     }
 
     /**
@@ -529,7 +486,11 @@ impl TrowServer {
 
         let manifest_digests = [latest_digest, local_digest].into_iter().flatten();
         for mani_digest in manifest_digests {
-            let have_manifest = self.get_catalog_path_for_blob(&mani_digest)?.exists();
+            let have_manifest = self
+                .storage
+                .get_blob_stream("(fixme: none)", &mani_digest)
+                .await
+                .is_ok();
             if have_manifest {
                 return Ok(mani_digest);
             }
@@ -762,41 +723,16 @@ impl TrowServer {
 
     // Readiness check
     pub async fn is_ready(&self) -> bool {
-        for path in &[&self.scratch_path, &self.manifests_path, &self.blobs_path] {
-            match is_path_writable(path) {
-                Ok(true) => {}
-                Ok(false) => {
-                    event!(Level::WARN, "{} is not writable", path.to_string_lossy());
-                    return false;
-                }
-                Err(error) => {
-                    event!(
-                        Level::WARN,
-                        "Error checking path {}: {}",
-                        path.to_string_lossy(),
-                        error
-                    );
-                    return false;
-                }
+        match self.storage.is_ready().await {
+            Ok(()) => true,
+            Err(e) => {
+                event!(Level::ERROR, "Storage backend not ready: {e}");
+                false
             }
         }
-
-        // All paths writable
-        true
     }
 
     pub async fn is_healthy(&self) -> bool {
         true
-    }
-
-    pub async fn get_metrics(&self) -> Result<MetricsResponse, Status> {
-        match metrics::gather_metrics(&self.blobs_path) {
-            Ok(metrics) => {
-                let reply = MetricsResponse { metrics };
-                Ok(reply)
-            }
-
-            Err(error) => Err(Status::Unavailable(error.to_string())),
-        }
     }
 }

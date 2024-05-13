@@ -12,6 +12,6 @@ use crate::TrowServerState;
 pub async fn readiness(State(state): State<Arc<TrowServerState>>) -> ReadyStatus {
     ReadyStatus {
         message: "".to_string(),
-        is_ready: state.client.is_ready().await,
+        is_ready: state.registry.is_ready().await,
     }
 }

@@ -2,7 +2,6 @@ mod admission;
 pub mod api_types;
 mod image;
 pub mod manifest;
-mod metrics;
 mod proxy_auth;
 mod server;
 pub mod storage;

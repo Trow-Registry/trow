@@ -40,7 +40,7 @@ pub async fn get_blob(
         }
     };
 
-    match state.client.get_blob(&one, &digest).await {
+    match state.registry.get_blob(&one, &digest).await {
         Ok(r) => Ok(r),
         Err(e) => {
             event!(Level::ERROR, "Error getting blob: {}", e);
@@ -82,7 +82,7 @@ pub async fn put_blob(
     };
 
     let size = match state
-        .client
+        .registry
         .store_blob_chunk(&repo, &uuid, None, chunk)
         .await
     {
@@ -101,7 +101,7 @@ pub async fn put_blob(
 
     let digest_obj = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
     state
-        .client
+        .registry
         .complete_and_verify_blob_upload(&repo, &uuid, &digest_obj)
         .await
         .map_err(|e| match e {
@@ -159,7 +159,7 @@ pub async fn patch_blob(
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
     match state
-        .client
+        .registry
         .store_blob_chunk(&repo, &uuid, info, chunk)
         .await
     {
@@ -209,7 +209,7 @@ pub async fn post_blob_upload(
     data: Body,
 ) -> Result<Upload, Error> {
     let uuid = state
-        .client
+        .registry
         .storage
         .request_blob_upload(&repo_name)
         .await
@@ -265,7 +265,7 @@ pub async fn delete_blob(
 ) -> Result<BlobDeleted, Error> {
     let digest = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
     state
-        .client
+        .registry
         .delete_blob(&one, &digest)
         .await
         .map_err(|_| Error::NotFound)?;
