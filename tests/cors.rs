@@ -12,7 +12,7 @@ mod cors_tests {
     use hyper::Request;
     use reqwest::header::HeaderMap;
     use reqwest::{header, StatusCode};
-    use tempfile::TempDir;
+    use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 
     const HOST: &str = "127.0.0.1:39368";
@@ -31,8 +31,10 @@ mod cors_tests {
 
     #[tokio::test]
     async fn test_cors_preflight() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
 
         let mut headers = HeaderMap::new();
 
@@ -79,8 +81,10 @@ mod cors_tests {
 
     #[tokio::test]
     async fn test_cors_method_get() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
 
         let resp = trow
             .clone()
@@ -110,8 +114,10 @@ mod cors_tests {
 
     #[tokio::test]
     async fn test_cors_headers_authorization() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
 
         let bytes = base64_engine::STANDARD.encode(b"authtest:authpass");
         let resp = trow

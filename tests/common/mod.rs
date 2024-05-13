@@ -1,4 +1,6 @@
+use std::fs::File;
 use std::io::{BufReader, Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::Child;
 
 use axum::body::Body;
@@ -6,6 +8,7 @@ use axum::Router;
 use http_body_util::BodyExt;
 use hyper::body::Buf;
 use hyper::{Request, Response};
+use rand::Rng;
 use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -188,11 +191,13 @@ pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
 #[cfg(test)]
 #[allow(dead_code)]
 /// Returns a temporary file filled with `contents`
-pub fn get_file<T: Serialize>(contents: T) -> tempfile::NamedTempFile {
-    let mut file = tempfile::NamedTempFile::new().unwrap();
+pub fn get_file<T: Serialize>(dir: &Path, contents: T) -> PathBuf {
+    let rnum: u16 = rand::thread_rng().gen();
+    let path = dir.join(rnum.to_string());
+    let mut file = File::create(&path).unwrap();
     file.write_all(serde_yaml::to_string(&contents).unwrap().as_bytes())
         .unwrap();
     file.flush().unwrap();
 
-    file
+    path
 }

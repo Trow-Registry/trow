@@ -56,7 +56,7 @@ impl ProxyClient {
         proxy_image: &RemoteImage,
     ) -> Result<Self> {
         let base_client = reqwest::ClientBuilder::new()
-            .connect_timeout(Duration::from_millis(1000))
+            // .connect_timeout(Duration::from_millis(1000))
             .build()?;
 
         let authn_header = get_www_authenticate_header(&base_client, proxy_image).await?;
@@ -189,7 +189,7 @@ async fn get_www_authenticate_header(
         .await
         .map_err(|e| {
             anyhow!(
-                "Could not fetch www-authenticate header from {} (failed with: {})",
+                "Could not fetch www-authenticate header from {} (failed with: {:?})",
                 &image.get_manifest_url(),
                 e
             )

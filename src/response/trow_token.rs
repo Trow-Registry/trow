@@ -1,11 +1,11 @@
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use axum::body;
 use axum::extract::{FromRef, FromRequestParts, Host};
 use axum::http::request::Parts;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
+use axum::{body, RequestPartsExt};
 use axum_extra::headers;
 use base64::engine::general_purpose as base64_engine;
 use base64::Engine as _;
@@ -14,7 +14,6 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 use uuid::Uuid;
-use axum::RequestPartsExt;
 
 use super::authenticate::Authenticate;
 use crate::{TrowConfig, UserConfig};
@@ -197,7 +196,7 @@ where
         let config = &TrowConfig::from_ref(config);
         let base_url = match parts.extract::<Option<Host>>().await.unwrap() {
             Some(Host(host)) => host,
-            None => String::new()
+            None => String::new(),
         };
 
         if config.user.is_none() {

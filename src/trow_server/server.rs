@@ -1,6 +1,5 @@
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::str;
+use std::{fs, str};
 
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
@@ -139,10 +138,10 @@ pub fn is_digest(maybe_digest: &str) -> bool {
 impl TrowServer {
     pub async fn get_manifest(
         &self,
-        name: &str,
-        tag: &str,
+        mut name: &str,
+        mut tag: &str,
     ) -> Result<ManifestReader, StorageDriverError> {
-        if name.starts_with("f/") {
+        let get_manifest = if name.starts_with("f/") {
             let (image, cfg) = match self.get_remote_image_and_cfg(name, tag) {
                 Some(image) => image,
                 None => {
@@ -151,16 +150,21 @@ impl TrowServer {
                     )));
                 }
             };
-            match self.download_remote_image(image, cfg).await {
-                Ok(_digest) => (),
+            let digest = match self.download_remote_image(&image, &cfg).await {
+                Ok(d) => d,
                 Err(e) => {
                     event!(Level::ERROR, "Could not download remote image: {e:?}");
                     return Err(StorageDriverError::Internal);
                 }
             };
-        }
+            self.storage
+                .get_manifest("(fixme: none)", &digest.to_string())
+                .await
+        } else {
+            self.storage.get_manifest(name, tag).await
+        };
 
-        let man = self.storage.get_manifest(name, tag).await.map_err(|e| {
+        let man = get_manifest.map_err(|e| {
             event!(Level::WARN, "Error getting manifest: {}", e);
             StorageDriverError::Internal
         })?;
@@ -204,10 +208,18 @@ impl TrowServer {
 
     pub async fn delete_manifest(
         &self,
-        _name: &str,
-        _digest: &Digest,
+        repo_name: &str,
+        digest: &Digest,
     ) -> Result<(), StorageDriverError> {
-        unimplemented!("Manifest deletion not yet implemented");
+        event!(Level::WARN, "Manifest deletion is not correctly handled !");
+
+        self.storage
+            .delete_manifest(repo_name, digest)
+            .await
+            .map_err(|e| {
+                event!(Level::ERROR, "Failed to delete manifest: {e}");
+                StorageDriverError::Internal
+            })
     }
 
     pub async fn get_blob(
@@ -252,12 +264,7 @@ impl TrowServer {
                 }
                 WriteBlobRangeError::InvalidContentRange => StorageDriverError::InvalidContentRange,
                 _ => StorageDriverError::Internal,
-            })?;
-
-        Ok(Stored {
-            total_stored: 0,
-            chunk: 0,
-        })
+            })
     }
 
     pub async fn complete_and_verify_blob_upload(
@@ -450,7 +457,7 @@ impl TrowServer {
             scratch_path,
             proxy_registry_config,
             image_validation_config,
-            storage: TrowStorageBackend::new(data_path.into())?,
+            storage: TrowStorageBackend::new(data_path)?,
         };
         Ok(svc)
     }
@@ -613,8 +620,8 @@ impl TrowServer {
     /// returns the downloaded digest
     async fn download_remote_image(
         &self,
-        remote_image: RemoteImage,
-        proxy_cfg: SingleRegistryProxyConfig,
+        remote_image: &RemoteImage,
+        proxy_cfg: &SingleRegistryProxyConfig,
     ) -> Result<Digest> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
@@ -633,14 +640,16 @@ impl TrowServer {
         };
         let remote_img_ref_digest = Digest::try_from_raw(&remote_image.reference);
         let (local_digest, latest_digest) = match remote_img_ref_digest {
+            // The ref is a digest, no need to map tg to digest
             Ok(digest) => (Some(digest), None),
+            // The ref is a tag, let's search for the digest
             Err(_) => {
                 let local_digest = self
                     .storage
                     .get_manifest_digest(&repo_name, &remote_image.reference)
                     .await
                     .ok();
-                let mut latest_digest = match &try_cl {
+                let latest_digest = match &try_cl {
                     Some(cl) => self.get_digest_from_header(cl, &remote_image).await,
                     _ => None,
                 };
@@ -652,80 +661,50 @@ impl TrowServer {
                             remote_image.reference
                         );
                     }
-                    // if both are the same, no need to try to pull
-                    latest_digest = None;
                 }
                 (local_digest, latest_digest)
             }
         };
 
-        // let (local_digest, latest_digest) = if ref_is_digest {
-        //     (Some(remote_image.reference.clone()), None)
-        // } else {
-        //     let local_digest = self
-        //         .storage
-        //         .get_manifest_digest(&repo_name, &remote_image.reference)
-        //         .await
-        //         .ok();
-        //     let mut latest_digest = match &try_cl {
-        //         Some(cl) => self.get_digest_from_header(cl, &remote_image).await,
-        //         _ => None,
-        //     };
-        //     if latest_digest == local_digest {
-        //         if local_digest.is_none() {
-        //             anyhow::bail!(
-        //                 "Could not fetch digest for {}:{}",
-        //                 repo_name,
-        //                 remote_image.reference
-        //             );
-        //         }
-        //         // if both are the same, no need to try to pull
-        //         latest_digest = None;
-        //     }
-        //     (local_digest, latest_digest)
-        // };
-
-        let digests = [latest_digest, local_digest].into_iter().flatten();
-
-        for digest in digests {
-            // if let Some(latest_digest) = latest_digest {
-            let have_manifest = self.get_catalog_path_for_blob(&digest)?.exists();
-            match have_manifest {
-                true => return Ok(digest),
-                false if try_cl.is_some() => {
-                    match self
-                        .download_manifest_and_layers(
-                            try_cl.as_ref().unwrap(),
-                            &remote_image,
-                            &repo_name,
-                        )
-                        .await
-                    {
-                        Ok(_) if !is_digest(&remote_image.reference) => match self
-                            .storage
-                            .write_tag(&repo_name, &remote_image.reference, &digest)
-                            .await
-                        {
-                            Ok(_) => return Ok(digest),
-                            Err(e) => {
-                                event!(
-                                    Level::DEBUG,
-                                    "Internal error updating tag for proxied image ({})",
-                                    e
-                                )
-                            }
-                        },
-                        Ok(_) => return Ok(digest),
-                        Err(e) => event!(Level::WARN, "Failed to download proxied image: {}", e),
-                    };
-                }
-                false => event!(
+        let manifest_digests = [latest_digest, local_digest].into_iter().flatten();
+        for mani_digest in manifest_digests {
+            let have_manifest = self.get_catalog_path_for_blob(&mani_digest)?.exists();
+            if have_manifest {
+                return Ok(mani_digest);
+            }
+            if try_cl.is_none() {
+                event!(
                     Level::WARN,
                     "Missing manifest for proxied image, proxy client not available"
-                ),
+                );
+            }
+            if let Some(cl) = &try_cl {
+                let img_ref_as_digest = Digest::try_from_raw(&remote_image.reference);
+                let manifest_download = self
+                    .download_manifest_and_layers(cl, &remote_image, &repo_name)
+                    .await;
+                match (manifest_download, img_ref_as_digest) {
+                    (Err(e), _) => {
+                        event!(Level::WARN, "Failed to download proxied image: {}", e)
+                    }
+                    (Ok(()), Err(_)) => {
+                        let write_tag = self
+                            .storage
+                            .write_tag(&repo_name, &remote_image.reference, &mani_digest)
+                            .await;
+                        match write_tag {
+                            Ok(_) => return Ok(mani_digest),
+                            Err(e) => event!(
+                                Level::DEBUG,
+                                "Internal error updating tag for proxied image ({})",
+                                e
+                            ),
+                        }
+                    }
+                    (Ok(()), Ok(_)) => return Ok(mani_digest),
+                }
             }
         }
-
         Err(anyhow!(
             "Could not fetch manifest for proxied image {}:{}",
             repo_name,
@@ -839,16 +818,17 @@ impl TrowServer {
             .await
             .map_err(|e| Status::Internal(format!("Internal error streaming catalog: {e}")))?;
         let limit = num_results.unwrap_or(u32::MAX) as usize;
-        let manifests = if let Some(repo) = start_value {
-            manifests
+        let manifests = match start_value {
+            Some(repo) if repo != "" => manifests
                 .into_iter()
                 .skip_while(|m| *m != repo)
                 .skip(1)
                 .take(limit)
-                .collect()
-        } else {
-            manifests.truncate(limit);
-            manifests
+                .collect(),
+            _ => {
+                manifests.truncate(limit);
+                manifests
+            }
         };
 
         Ok(manifests)

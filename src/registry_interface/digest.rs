@@ -138,14 +138,6 @@ fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> io::Result<String>
     Ok(hex::encode(sh.finalize()))
 }
 
-pub fn sha256_digest<R: Read>(mut reader: R) -> io::Result<Digest> {
-    let hash = digest::<Sha256, _>(&mut reader)?;
-    Ok(Digest {
-        algo: DigestAlgorithm::Sha256,
-        hash,
-    })
-}
-
 #[cfg(test)]
 mod test {
     use std::io::BufReader;

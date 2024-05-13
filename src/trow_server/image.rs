@@ -27,17 +27,20 @@ const fn get_image_ref_regex() -> &'static str {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RemoteImage {
-    scheme: &'static str,  // `http` or `https`
-    host: String,          // Including port, docker.io by default
-    repo: String,          // Between host and : including any /s
-    pub reference: String, // Tag or digest, `latest` by default
+    /// `http` or `https`
+    scheme: &'static str,
+    /// Including port, docker.io by default
+    host: String,
+    repo: String,
+    /// Tag or digest, `latest` by default
+    pub reference: String,
 }
 
 impl std::default::Default for RemoteImage {
     fn default() -> Self {
         RemoteImage {
             scheme: "https",
-            host: "(none)".to_string(),
+            host: "registry-1.docker.io".to_string(),
             repo: "(none)".to_string(),
             reference: "latest".to_string(),
         }

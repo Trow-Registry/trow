@@ -14,9 +14,8 @@ mod no_cors_tests {
         ACCESS_CONTROL_REQUEST_METHOD, ORIGIN,
     };
     use reqwest::StatusCode;
-    use tempfile::TempDir;
+    use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
-
 
     const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
 
@@ -52,8 +51,10 @@ mod no_cors_tests {
 
     #[tokio::test]
     async fn test_runner() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
 
         println!("Running test_preflight()");
         test_preflight(&trow).await;

@@ -75,14 +75,17 @@ impl Drop for TemporaryFile {
 
 #[cfg(test)]
 mod test {
-    use tempfile::tempdir;
+    use std::time::Duration;
+
+    use futures::future::try_join_all;
+    use test_temp_dir::test_temp_dir;
 
     use super::*;
 
     #[tokio::test]
     async fn test_temporary_file() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("test.txt");
+        let dir = test_temp_dir!();
+        let path = dir.subdir_untracked("test.txt");
         let mut file = TemporaryFile::new(path.clone()).await.unwrap();
         assert!(
             TemporaryFile::new(path.clone()).await.err().unwrap().kind()
@@ -95,27 +98,26 @@ mod test {
         assert!(!path.exists(), "File should have been deleted");
     }
 
-    /*
     #[tokio::test]
     async fn test_temporary_file_async_cancellation() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("test.txt");
+        let tmp_dir = test_temp_dir!();
+        let tmp_path = tmp_dir.as_path_untracked();
+        let path = tmp_path.join("test.txt");
 
         let futures = (0..2).map(|_| {
             async {
-                let mut file = match TemporaryFile::open_for_writing(path.clone()).await.unwrap() {
-                    Some(f) => f,
-                    None => return Err(()) as Result<(), ()>,
+                let mut file = match TemporaryFile::new(path.clone()).await {
+                    Ok(f) => f,
+                    Err(_) => return Err(()) as Result<(), ()>,
                 };
                 file.write_all(b"hello").await.unwrap();
                 // Sleep to ensure that the future stay active long enough to be cancelled
-                sleep(Duration::from_millis(500)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
                 // Ensure `file` isn't dropped before the sleep
                 drop(file);
                 unreachable!();
             }
         });
-
         let res = try_join_all(futures).await;
         assert!(
             res.is_err(),
@@ -123,13 +125,13 @@ mod test {
         );
         assert!(!path.exists(), "File should have been deleted");
     }
-    */
 
     #[tokio::test]
     async fn test_write() {
         const DUMMY_DATA: &[u8] = b"0123456789ABCDEF";
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("test.txt");
+        let tmp_dir = test_temp_dir!();
+        let tmp_path = tmp_dir.as_path_untracked();
+        let file_path = tmp_path.join("test.txt");
 
         let mut file = TemporaryFile::new(file_path.clone()).await.unwrap();
         file.write_all(DUMMY_DATA).await.unwrap();

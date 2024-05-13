@@ -9,7 +9,7 @@ use std::{io, str};
 use anyhow::Result;
 use bytes::{Buf, Bytes};
 use chrono::prelude::*;
-use futures::Stream;
+use futures::{AsyncReadExt, Stream};
 use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -18,6 +18,7 @@ use walkdir::WalkDir;
 
 use super::manifest::{Manifest, ManifestError};
 use super::server::{PROXY_DIR, SUPPORTED_DIGESTS};
+use crate::registry_interface::blob_storage::Stored;
 use crate::registry_interface::catalog_operations::HistoryEntry;
 use crate::registry_interface::Digest;
 use crate::trow_server::temporary_file::TemporaryFile;
@@ -103,18 +104,24 @@ impl TrowStorageBackend {
         Ok(Self { path })
     }
 
+    // TODO: replace this by DB
     pub async fn get_manifest_digest(
         &self,
         repo_name: &str,
         tag: &str,
     ) -> Result<Digest, StorageBackendError> {
+        event!(Level::DEBUG, "Get manifest digest {repo_name}:{tag}");
         let path = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
         let manifest_history_bytes = tokio::fs::read(&path).await?;
-        let latest_entry_bytes = manifest_history_bytes.split(|b| *b == b'\n').last().ok_or(
-            StorageBackendError::Internal(Cow::Borrowed("Empty manifest history")),
-        )?;
+        let latest_entry_bytes =
+            manifest_history_bytes
+                .lines()
+                .last()
+                .ok_or(StorageBackendError::Internal(Cow::Borrowed(
+                    "Empty manifest history",
+                )))??;
         let latest_entry: HistoryEntry =
-            serde_json::from_slice(latest_entry_bytes).map_err(|e| {
+            serde_json::from_str(&latest_entry_bytes).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!("Invalid manifest entry: {e}")))
             })?;
 
@@ -126,17 +133,18 @@ impl TrowStorageBackend {
         repo_name: &str,
         reference: &str,
     ) -> Result<Manifest, StorageBackendError> {
-        let digest = if is_digest(reference) {
-            Digest::try_from_raw(reference).unwrap()
-        } else {
-            self.get_manifest_digest(repo_name, reference).await?
+        event!(Level::DEBUG, "Get manifest {repo_name}:{reference}");
+        let digest = match Digest::try_from_raw(reference) {
+            Ok(d) => d,
+            Err(_) => self.get_manifest_digest(repo_name, reference).await?,
         };
-        let path = self
-            .path
-            .join(BLOBS_DIR)
-            .join(digest.algo_str())
-            .join(&digest.hash);
-        let manifest_bytes = tokio::fs::read(&path).await?;
+        let manifest_stream = self.get_blob_stream(repo_name, &digest).await?;
+        let mut manifest_bytes = Vec::new();
+        manifest_stream
+            .reader()
+            .read_to_end(&mut manifest_bytes)
+            .await?;
+        // let manifest_bytes = tokio::fs::read(&path).await?;
         let manifest = Manifest::from_vec(manifest_bytes)?;
         Ok(manifest)
     }
@@ -146,6 +154,7 @@ impl TrowStorageBackend {
         _repo_name: &str,
         digest: &Digest,
     ) -> Result<BoundedStream<impl futures::AsyncRead>, StorageBackendError> {
+        event!(Level::DEBUG, "Get blob {_repo_name}:{digest}");
         let path = self
             .path
             .join(BLOBS_DIR)
@@ -169,6 +178,7 @@ impl TrowStorageBackend {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
+        event!(Level::DEBUG, "Write blob {digest}");
         let tmp_location = self.path.join(UPLOADS_DIR).join(digest.to_string());
         let location = self
             .path
@@ -222,6 +232,7 @@ impl TrowStorageBackend {
         &self,
         repo_name: &str,
     ) -> Result<String, StorageBackendError> {
+        event!(Level::DEBUG, "Request blob upload for {repo_name}");
         if is_proxy_repo(repo_name) {
             return Err(StorageBackendError::InvalidName(
                 "Name reserved for proxied repos".into(),
@@ -240,11 +251,12 @@ impl TrowStorageBackend {
         upload_id: &str,
         stream: S,
         range: Option<Range<u64>>,
-    ) -> Result<(), WriteBlobRangeError>
+    ) -> Result<Stored, WriteBlobRangeError>
     where
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
+        event!(Level::DEBUG, "Write blob part {upload_id} ({range:?})");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id);
         let (mut tmp_file, seek_pos) = TemporaryFile::append(tmp_location).await.map_err(|e| {
             event!(Level::ERROR, "Could not open tmp file: {}", e);
@@ -271,7 +283,10 @@ impl TrowStorageBackend {
         }
         tmp_file.untrack();
 
-        Ok(())
+        Ok(Stored {
+            total_stored: bytes_written + seek_pos,
+            chunk: bytes_written,
+        })
     }
 
     pub async fn complete_blob_write(
@@ -279,6 +294,7 @@ impl TrowStorageBackend {
         upload_id: &str,
         user_digest: &Digest,
     ) -> Result<(), StorageBackendError> {
+        event!(Level::DEBUG, "Complete blob write {upload_id}");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id);
         let final_location = self
             .path
@@ -307,6 +323,7 @@ impl TrowStorageBackend {
         tag: &str,
         digest: &Digest,
     ) -> Result<(), StorageBackendError> {
+        event!(Level::DEBUG, "Write tag {repo_name}:{tag}");
         let entry = HistoryEntry {
             digest: digest.to_string(),
             date: Utc::now(),
@@ -332,14 +349,15 @@ impl TrowStorageBackend {
         manifest: Bytes,
         repo_name: &str,
         tag: &str,
-        verify: bool,
+        verify_assets: bool,
     ) -> Result<PathBuf, StorageBackendError> {
-        let digest = Digest::try_sha256(manifest.as_ref().reader()).map_err(|e| {
+        event!(Level::DEBUG, "Write image manifest {repo_name}:{tag}");
+        let mani_digest = Digest::try_sha256(manifest.as_ref().reader()).map_err(|e| {
             StorageBackendError::Internal(Cow::Owned(format!(
                 "Could not calculate digest of manifest: {e}"
             )))
         })?;
-        if verify {
+        if verify_assets {
             let manifest = Manifest::from_bytes(manifest.clone())?;
             for digest in manifest.get_local_asset_digests()? {
                 let blob_path = self
@@ -353,28 +371,15 @@ impl TrowStorageBackend {
             }
         }
         let manifest_stream = bytes_to_stream(manifest);
+        if tag.starts_with("sha") {
+            assert_eq!(mani_digest.to_string(), tag);
+        }
         let location = self
-            .write_blob_stream(&digest, pin!(manifest_stream), true)
+            .write_blob_stream(&mani_digest, pin!(manifest_stream), true)
             .await?;
 
         // save link tag -> manifest
-        let entry = HistoryEntry {
-            digest: digest.to_string(),
-            date: Utc::now(),
-        };
-        let mut entry_str = serde_json::to_vec(&entry).map_err(|_| {
-            StorageBackendError::Internal(Cow::Borrowed("Invalid manifest tag entry"))
-        })?;
-        entry_str.push(b'\n');
-        let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
-        tokio::fs::create_dir_all(manifest_history_loc.parent().unwrap()).await?;
-        let mut manifest_history_file = tokio::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&manifest_history_loc)
-            .await?;
-        manifest_history_file.write_all(&entry_str).await?;
-        manifest_history_file.flush().await?;
+        self.write_tag(repo_name, tag, &mani_digest).await?;
 
         Ok(location)
     }
@@ -401,19 +406,24 @@ impl TrowStorageBackend {
         let manifest_dir = self.path.join(MANIFESTS_DIR);
         // let dirs = tokio::fs::read_dir(manifest_dir);
         let manifests = WalkDir::new(&manifest_dir)
+            .sort_by_file_name()
             .into_iter()
             .filter_map(|entry| {
                 let entry = entry.ok()?;
-
                 if entry.file_type().is_file() {
                     let path = entry.path();
-                    let repo = path.strip_prefix(&manifest_dir).ok()?;
+                    let repo = path.parent()?.strip_prefix(&manifest_dir).ok()?;
                     Some(repo.to_string_lossy().to_string())
                 } else {
                     None
                 }
             })
-            .collect();
+            .fold(Vec::new(), |mut acc, e| {
+                if acc.last() != Some(&e) {
+                    acc.push(e);
+                }
+                acc
+            });
 
         Ok(manifests)
     }
@@ -445,6 +455,33 @@ impl TrowStorageBackend {
             .join(digest.algo_str())
             .join(&digest.hash);
         tokio::fs::remove_file(blob_path).await?;
+        Ok(())
+    }
+
+    pub async fn delete_manifest(&self, repo_name: &str, digest: &Digest) -> Result<()> {
+        let path = self
+            .path
+            .join(BLOBS_DIR)
+            .join(digest.algo_str())
+            .join(&digest.hash);
+        if let Err(e) = tokio::fs::remove_file(path).await {
+            event!(Level::WARN, "Could not delete manifest file: {}", e);
+        }
+        let tags = self.list_repo_tags(repo_name).await?;
+        for t in tags {
+            let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(t);
+            let history_raw = tokio::fs::read(&manifest_history_loc).await?;
+            let old_history = String::from_utf8(history_raw).unwrap();
+            let new_history: String = old_history
+                .lines()
+                .filter(|l| !l.contains(&digest.to_string()))
+                .collect();
+            if new_history.is_empty() {
+                tokio::fs::remove_file(&manifest_history_loc).await?;
+            } else if new_history.len() != old_history.len() {
+                tokio::fs::write(&manifest_history_loc, new_history).await?;
+            }
+        }
         Ok(())
     }
 }
@@ -489,22 +526,21 @@ fn is_proxy_repo(repo_name: &str) -> bool {
 mod tests {
     use std::io::Write;
 
-    use tempfile::tempdir;
-
     use super::*;
     use crate::trow_server::manifest;
 
     #[test]
     fn trow_storage_backend_new() {
-        let dir = tempdir().unwrap();
-        let store = TrowStorageBackend::new(dir.into_path()).unwrap();
+        let dir = test_temp_dir::test_temp_dir!();
+        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         assert!(store.path.join("blobs").exists());
         assert!(store.path.join("manifests").exists());
     }
 
     #[tokio::test]
     async fn trow_storage_backend_write_blob_stream() {
-        let store = TrowStorageBackend::new(tempdir().unwrap().into_path()).unwrap();
+        let dir = test_temp_dir::test_temp_dir!();
+        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         let stream = pin!(bytes_to_stream(Bytes::from("test")));
         let digest = Digest::try_from_raw("sha256:1234").unwrap();
         let location = store
@@ -517,7 +553,8 @@ mod tests {
 
     #[tokio::test]
     async fn trow_storage_backend_write_image_manifest() {
-        let store = TrowStorageBackend::new(tempdir().unwrap().into_path()).unwrap();
+        let dir = test_temp_dir::test_temp_dir!();
+        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         let mut manifest = manifest::OCIManifest::V2(manifest::OCIManifestV2 {
             schema_version: 2,
             media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_string()),
@@ -560,7 +597,8 @@ mod tests {
 
     #[tokio::test]
     async fn trow_storage_backend_get_manifest_digest() {
-        let store = TrowStorageBackend::new(tempdir().unwrap().into_path()).unwrap();
+        let dir = test_temp_dir::test_temp_dir!();
+        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
 
         let fd = store.path.join("manifests").join("zozo").join("image");
         fs::create_dir_all(&fd).unwrap();
@@ -582,7 +620,8 @@ mod tests {
 
     #[tokio::test]
     async fn trow_storage_backend_get_manifest_history() {
-        let store = TrowStorageBackend::new(tempdir().unwrap().into_path()).unwrap();
+        let dir = test_temp_dir::test_temp_dir!();
+        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
 
         let fd = store.path.join("manifests").join("zozo").join("image");
         fs::create_dir_all(&fd).unwrap();

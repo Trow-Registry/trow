@@ -3,15 +3,14 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
-    use std::path::Path;
     use std::fs;
+    use std::path::Path;
 
     use axum::body::Body;
     use axum::Router;
-
     use hyper::Request;
     use reqwest::StatusCode;
-    use tempfile::TempDir;
+    use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
     use trow::trow_server::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
@@ -119,8 +118,10 @@ mod interface_tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_manifest_proxy_docker() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         get_manifest(&trow, "f/docker/amouat/trow", "latest").await;
         get_manifest(&trow, "f/docker/amouat/trow", "latest").await;
     }
@@ -128,8 +129,10 @@ mod interface_tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_manifest_proxy_nvcr() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
         get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
     }
@@ -137,8 +140,10 @@ mod interface_tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_manifest_proxy_partial_cache() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         // This should use same alpine image as base (so partially cached)
         get_manifest(&trow, "f/docker/library/alpine", "3.13.4").await;
         get_manifest(&trow, "f/docker/library/nginx", "1.20.0-alpine").await;
@@ -147,20 +152,26 @@ mod interface_tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_manifest_proxy_docker_library() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         // Special case: docker/library
         // check that it works and that manifests are written in the correct location
         get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
-        assert!(!Path::new("./data/manifests/f/docker/alpine/3.13.4").exists());
-        assert!(Path::new("./data/manifests/f/docker/library/alpine/3.13.4").exists());
+        assert!(!data_dir.join("./manifests/f/docker/alpine/3.13.4").exists());
+        assert!(data_dir
+            .join("./manifests/f/docker/library/alpine/3.13.4")
+            .exists());
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_manifest_proxy_multiplatform() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         //Download an amd64 manifest, then the multi platform version of the same manifest
         get_manifest(
             &trow,
@@ -174,8 +185,10 @@ mod interface_tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_manifest_proxy_no_auth() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         // test a registry that doesn't require auth
         get_manifest(&trow, "f/quay/openshifttest/scratch", "latest").await;
     }
@@ -183,14 +196,16 @@ mod interface_tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_manifest_proxy_update_latest_tag() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         // Check that tags get updated to point to latest digest
         {
             let man_3_13 = get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
             fs::copy(
-                "./data/manifests/f/docker/library/alpine/3.13.4",
-                "./data/manifests/f/docker/library/alpine/latest",
+                data_dir.join("./manifests/f/docker/library/alpine/3.13.4"),
+                data_dir.join("./manifests/f/docker/library/alpine/latest"),
             )
             .unwrap();
             let man_latest = get_manifest(&trow, "f/docker/library/alpine", "latest").await;
@@ -205,8 +220,10 @@ mod interface_tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_upload_manifest_nonwritable_repo() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         //test writing manifest to proxy dir isn't allowed
         upload_to_nonwritable_repo(&trow, "f/failthis").await;
     }

@@ -155,7 +155,7 @@ pub async fn patch_blob(
     info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, String)>,
-    Host(host): Host,
+    AlwaysHost(host): AlwaysHost,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
     match state
@@ -187,7 +187,7 @@ endpoint_fn_7_levels!(
         info: Option<ContentInfo>,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid],
-        host: Host,
+        host: AlwaysHost,
         chunk: Body
     ) -> Result<UploadInfo, Error>
 );

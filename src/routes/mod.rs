@@ -1,12 +1,12 @@
 mod admission;
 mod blob;
 mod catalog;
+mod extracts;
 mod health;
 pub mod macros;
 mod manifest;
 mod metrics;
 mod readiness;
-mod extracts;
 
 use std::str;
 use std::sync::Arc;

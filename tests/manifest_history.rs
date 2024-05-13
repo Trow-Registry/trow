@@ -12,10 +12,10 @@ mod interface_tests {
     use axum::Router;
     use hyper::Request;
     use reqwest::StatusCode;
-    use tempfile::TempDir;
+    use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
-    use trow::registry_interface::digest;
     use tracing_test::traced_test;
+    use trow::registry_interface::digest;
 
     use crate::common::{self, response_body_read};
 
@@ -35,7 +35,12 @@ mod interface_tests {
             .body(Body::from(config))
             .unwrap();
         let resp = trow.clone().oneshot(req).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED, "request failed: {}", common::response_body_string(resp).await);
+        assert_eq!(
+            resp.status(),
+            StatusCode::CREATED,
+            "request failed: {}",
+            common::response_body_string(resp).await
+        );
     }
 
     async fn push_random_foreign_manifest(trow: &Router, name: &str, tag: &str) -> String {
@@ -127,8 +132,10 @@ mod interface_tests {
     #[tokio::test]
     #[traced_test]
     async fn manifest_test() {
-        let data_dir = TempDir::new().unwrap();
-        let trow = start_trow(data_dir.path()).await;
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await;
         upload_config(&trow).await;
 
         // Following is intentionally interleaved to add delays

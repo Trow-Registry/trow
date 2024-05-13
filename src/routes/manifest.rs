@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::{ Path, State};
+use axum::extract::{Path, State};
 use digest::Digest;
 
 use super::extracts::AlwaysHost;

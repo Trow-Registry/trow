@@ -37,9 +37,9 @@ regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
 thiserror = "1.0"
-kube = { version = "0.89.0", features = ["admission"] }
-k8s-openapi = { version = "0.21.0", features = ["v1_26"] }
-json-patch = "1.0.0"
+kube = { version = "0.91.0", features = ["admission"] }
+k8s-openapi = { version = "0.22.0", features = ["v1_26"] }
+json-patch = "1"
 tokio = { version = "1", features = ["macros"] }
 tokio-util = { version = "0.7.8", features = ["codec", "compat"] }
 hyper = "1.0"
@@ -61,15 +61,15 @@ aws-sdk-ecr = "1.5.0"
 const_format = "0.2.24"
 async-trait = "0.1.74"
 walkdir = "2.0"
-
+rand = "0.8"
 
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.0"
 environment = "^0.1"
 libc = "0.2"
-tempfile = "3"
 wiremock = "0.6.0"
 fastrand = "2.0.1"
 http-body-util = "0.1.1"
 tracing-test = {version="0.2", features = ["no-env-filter"]}
+test-temp-dir = "0.2.1"

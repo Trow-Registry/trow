@@ -4,25 +4,29 @@ mod common;
 #[cfg(test)]
 mod authentication_tests {
 
+    use std::path::Path;
+
     use axum::body::Body;
     use axum::Router;
     use base64::engine::general_purpose as base64_engine;
     use base64::Engine as _;
     use hyper::Request;
     use reqwest::{header, StatusCode};
-    use tempfile::TempDir;
+    use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 
-    async fn start_trow(data_dir: TempDir) -> Router {
+    async fn start_trow(data_dir: &Path) -> Router {
         let mut trow_builder = trow::TrowConfig::new();
-        trow_builder.data_dir = data_dir.path().to_owned();
+        trow_builder.data_dir = data_dir.to_owned();
         trow_builder.with_user("authtest".to_owned(), "authpass");
         trow_builder.build_app().await.unwrap()
     }
 
     #[tokio::test]
     async fn test_auth_redir() {
-        let data_dir = TempDir::new().unwrap();
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
         let trow = start_trow(data_dir).await;
         let fake_trow_address = "http://example.com";
 
@@ -49,7 +53,9 @@ mod authentication_tests {
     }
     #[tokio::test]
     async fn test_login() {
-        let data_dir = TempDir::new().unwrap();
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
         let trow = start_trow(data_dir).await;
 
         let bytes = base64_engine::STANDARD.encode(b"authtest:authpass");
@@ -80,7 +86,9 @@ mod authentication_tests {
 
     #[tokio::test]
     async fn test_login_fail() {
-        let data_dir = TempDir::new().unwrap();
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
         let trow = start_trow(data_dir).await;
 
         let resp = trow
