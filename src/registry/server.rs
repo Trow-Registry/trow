@@ -7,24 +7,24 @@ use axum::body::Body;
 use bytes::Buf;
 use futures::future::try_join_all;
 use futures::AsyncRead;
+use registry::api_types::MetricsResponse;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{self, Method};
 use thiserror::Error;
 use tracing::{event, Level};
-use registry::api_types::MetricsResponse;
 
 use super::image::RemoteImage;
 use super::manifest::{manifest_media_type, Manifest, OCIManifest};
 use super::proxy_auth::{ProxyClient, SingleRegistryProxyConfig};
 use super::storage::{is_path_writable, StorageBackendError, TrowStorageBackend};
 use super::{metrics, ImageValidationConfig, RegistryProxiesConfig};
+use crate::registry;
+use crate::registry::api_types::Status;
 use crate::registry::blob_storage::Stored;
 use crate::registry::catalog_operations::HistoryEntry;
 use crate::registry::digest::Digest;
-use crate::registry::{BlobReader, ContentInfo, ManifestReader, StorageDriverError};
-use crate::registry;
-use crate::registry::api_types::Status;
 use crate::registry::storage::WriteBlobRangeError;
+use crate::registry::{BlobReader, ContentInfo, ManifestReader, StorageDriverError};
 use crate::types::*;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];

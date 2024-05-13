@@ -8,11 +8,11 @@ use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
+use crate::registry::storage::StorageBackendError;
 use crate::registry::{digest, BlobReader, ContentInfo, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::response::upload_info::UploadInfo;
-use crate::registry::storage::StorageBackendError;
 use crate::types::{AcceptedUpload, BlobDeleted, DigestQuery, Upload, Uuid};
 use crate::TrowServerState;
 

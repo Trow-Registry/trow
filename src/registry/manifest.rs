@@ -1,16 +1,10 @@
 use anyhow::Result;
 use bytes::{Buf, Bytes};
 use serde::{Deserialize, Serialize};
-use serde_json::{self, Value};
+use serde_json;
 use thiserror::Error;
 
 use crate::registry::digest::{Digest, DigestError};
-
-pub trait FromJson {
-    fn from_json(raw: &Value) -> Result<Self>
-    where
-        Self: std::marker::Sized;
-}
 
 #[derive(thiserror::Error, Debug)]
 pub enum ManifestError {
@@ -128,48 +122,6 @@ pub mod manifest_media_type {
     pub const DEFAULT: &str = OCI_V1;
 }
 
-fn schema_2(raw: &Value) -> Result<OCIManifest> {
-    // According to the spec, manifests don't have to have a mediaType (?!).
-    // Assume V2 if not present.
-    let mt = raw["mediaType"]
-        .as_str()
-        .unwrap_or(manifest_media_type::DEFAULT);
-
-    match mt {
-        manifest_media_type::DOCKER_V2 | manifest_media_type::OCI_V1 => {
-            Ok(OCIManifest::V2(serde_json::from_value(raw.clone())?))
-        }
-
-        manifest_media_type::DOCKER_LIST | manifest_media_type::OCI_INDEX => {
-            Ok(OCIManifest::List(serde_json::from_value(raw.clone())?))
-        }
-
-        unknown => Err(InvalidManifest {
-            err: format!("Media Type {} is not supported.", unknown),
-        }
-        .into()),
-    }
-}
-
-impl FromJson for OCIManifest {
-    fn from_json(raw: &Value) -> Result<Self> {
-        let schema_version = raw["schemaVersion"].as_u64().ok_or(InvalidManifest {
-            err: "schemaVersion is required".to_owned(),
-        })?;
-        match schema_version {
-            1 => Err(InvalidManifest {
-                err: "Manifest Schema version 1 is not supported. Please update.".to_owned(),
-            }
-            .into()),
-            2 => schema_2(raw),
-            n => Err(InvalidManifest {
-                err: format!("Unsupported version: {}", n),
-            }
-            .into()),
-        }
-    }
-}
-
 impl Manifest {
     /// Returns a Vector of the digests of all assets referenced in the Manifest
     /// With the exception of digests for "foreign blobs"
@@ -215,12 +167,7 @@ impl Manifest {
 
 #[cfg(test)]
 mod test {
-    use std::io::BufReader;
-
-    use serde_json::{self, Value};
-
-    use super::{FromJson, Manifest, OCIManifest};
-    use crate::registry::Digest;
+    use super::{Manifest, OCIManifest};
 
     #[test]
     fn valid_v2_2() {
@@ -358,58 +305,5 @@ mod test {
         assert!(digests_str.contains(
             &"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526".to_string()
         ));
-    }
-
-    #[test]
-    fn valid_oci() {
-        let config = "{}\n".as_bytes();
-        let config_digest = Digest::try_sha256(BufReader::new(config)).unwrap();
-        let data = format!(
-            r#"{{ "config": {{ "digest": "{}",
-                             "mediaType": "application/vnd.oci.image.config.v1+json",
-                             "size": {} }},
-                 "mediaType": "application/vnd.oci.image.manifest.v1+json",
-                 "layers": [], "schemaVersion": 2 }}"#,
-            config_digest,
-            config.len()
-        );
-
-        let v: Value = serde_json::from_str(&data).unwrap();
-        assert!(OCIManifest::from_json(&v).is_ok());
-    }
-
-    #[test]
-    fn valid_manifest_list() {
-        let data = r#"{
-                    "schemaVersion": 2,
-                    "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
-                    "manifests": [
-                      {
-                        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-                        "size": 7143,
-                        "digest": "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-                        "platform": {
-                          "architecture": "ppc64le",
-                          "os": "linux"
-                        }
-                      },
-                      {
-                        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-                        "size": 7682,
-                        "digest": "sha256:5b0bcabd1ed22e9fb1310cf6c2dec7cdef19f0ad69efa1f392e94a4333501270",
-                        "platform": {
-                          "architecture": "amd64",
-                          "os": "linux",
-                          "features": [
-                            "sse4"
-                          ]
-                        }
-                      }
-                    ]
-                  }
-                  "#;
-
-        let v: Value = serde_json::from_str(data).unwrap();
-        assert!(OCIManifest::from_json(&v).is_ok());
     }
 }

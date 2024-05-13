@@ -13,9 +13,8 @@ mod interface_tests {
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
-    use trow::registry::digest;
     use trow::registry::api_types::{HealthStatus, ReadyStatus};
-    use trow::registry::manifest;
+    use trow::registry::{digest, manifest};
     use trow::types::{RepoCatalog, TagList};
 
     use crate::common;

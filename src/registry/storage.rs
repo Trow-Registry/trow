@@ -19,8 +19,8 @@ use super::manifest::{Manifest, ManifestError};
 use super::server::{PROXY_DIR, SUPPORTED_DIGESTS};
 use crate::registry::blob_storage::Stored;
 use crate::registry::catalog_operations::HistoryEntry;
-use crate::registry::Digest;
 use crate::registry::temporary_file::TemporaryFile;
+use crate::registry::Digest;
 use crate::types::BoundedStream;
 
 // Storage Driver Error

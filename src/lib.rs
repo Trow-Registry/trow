@@ -15,8 +15,8 @@ use std::{env, fs};
 use anyhow::{Context, Result};
 use axum::extract::FromRef;
 use axum::Router;
-use thiserror::Error;
 use registry::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
+use thiserror::Error;
 use uuid::Uuid;
 
 //TODO: Make this take a cause or description

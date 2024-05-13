@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::extract::State;
 
-use crate::response::errors::Error;
 use crate::registry::api_types::MetricsResponse;
+use crate::response::errors::Error;
 use crate::TrowServerState;
 
 /*
