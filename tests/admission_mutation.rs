@@ -110,7 +110,7 @@ mod admission_mutation_tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = common::response_body_read(resp).await;
+        let body = common::response_body_vec(resp).await;
         let mut val = serde_json::from_slice::<serde_json::Value>(&body).unwrap();
         // Fixes "missing field" (which is bollocks)
         val["response"]["auditAnnotations"] =

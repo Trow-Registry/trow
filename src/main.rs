@@ -94,7 +94,7 @@ async fn main() {
     builder.data_dir = PathBuf::from_str(args.data_dir.as_str()).expect("Invalid data path");
     builder.service_name = host_name;
     builder.dry_run = args.dry_run;
-    builder.cors = args.cors.clone();
+    builder.cors.clone_from(&args.cors);
 
     if let Some(user) = args.user {
         let mut pass = args.password.unwrap();

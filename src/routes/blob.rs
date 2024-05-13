@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::body::Body;
-use axum::extract::{Host, Path, Query, State};
+use axum::extract::{Path, Query, State};
 use digest::Digest;
 use tracing::{event, Level};
 

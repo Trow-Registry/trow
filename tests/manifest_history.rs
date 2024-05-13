@@ -17,13 +17,13 @@ mod interface_tests {
     use tracing_test::traced_test;
     use trow::registry_interface::digest;
 
-    use crate::common::{self, response_body_read};
+    use crate::common::{self, response_body_vec};
 
     const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
 
     async fn start_trow(data_dir: &Path) -> Router {
         let mut trow_builder = trow::TrowConfig::new();
-        trow_builder.data_dir = data_dir.to_owned();
+        data_dir.clone_into(&mut trow_builder.data_dir);
         trow_builder.service_name = TROW_ADDRESS.to_string();
         trow_builder.build_app().await.unwrap()
     }
@@ -116,7 +116,7 @@ mod interface_tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = response_body_read(resp).await;
+        let body = response_body_vec(resp).await;
         // type should be decided by caller, but this is just a test
         let x: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
@@ -161,6 +161,5 @@ mod interface_tests {
         let start = json["history"][0]["digest"].as_str().unwrap();
         let json = get_history(&trow, "history", "one", Some(20), Some(start.to_string())).await;
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
-        drop(data_dir);
     }
 }

@@ -22,7 +22,7 @@ mod no_cors_tests {
     async fn start_trow(data_dir: &Path) -> Router {
         let mut trow_builder = trow::TrowConfig::new();
         trow_builder.service_name = TROW_ADDRESS.to_string();
-        trow_builder.data_dir = data_dir.to_owned();
+        data_dir.clone_into(&mut trow_builder.data_dir);
         trow_builder.build_app().await.unwrap()
     }
 

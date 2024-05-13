@@ -32,6 +32,7 @@ impl TemporaryFile {
         Ok((TemporaryFile { file, path }, seek_pos))
     }
 
+    #[allow(unused)]
     pub async fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         self.file.write_all(buf).await?;
         self.file.flush().await

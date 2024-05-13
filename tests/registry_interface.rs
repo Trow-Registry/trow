@@ -21,13 +21,9 @@ mod interface_tests {
     use crate::common;
     use crate::common::DIST_API_HEADER;
 
-    const HOST: &str = "127.0.0.1:39365";
-    const ORIGIN: &str = "http://127.0.0.1:39365";
-
     async fn start_trow(data_dir: &Path) -> Router {
         let mut trow_builder = trow::TrowConfig::new();
-        trow_builder.service_name = HOST.to_string();
-        trow_builder.data_dir = data_dir.to_owned();
+        data_dir.clone_into(&mut trow_builder.data_dir);
         trow_builder.build_app().await.unwrap()
     }
 
@@ -121,7 +117,7 @@ mod interface_tests {
             )
             .await
             .unwrap();
-        let body = common::response_body_read(resp).await;
+        let body = common::response_body_vec(resp).await;
         let rc_resp: RepoCatalog = serde_json::from_slice(&body).unwrap();
         assert_eq!(rc, &rc_resp);
     }
@@ -136,7 +132,7 @@ mod interface_tests {
             )
             .await
             .unwrap();
-        let body = common::response_body_read(resp).await;
+        let body = common::response_body_vec(resp).await;
         let tl_resp: TagList = serde_json::from_slice(&body).unwrap();
         assert_eq!(tl, &tl_resp);
     }
@@ -432,7 +428,7 @@ mod interface_tests {
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let body = String::from_utf8(common::response_body_read(resp).await).unwrap();
+        let body = String::from_utf8(common::response_body_vec(resp).await).unwrap();
 
         assert!(body.contains("available_space"));
         assert!(body.contains("free_space"));
@@ -453,7 +449,7 @@ mod interface_tests {
         //     .unwrap();
 
         // let manifest_body =
-        //     String::from_utf8(common::response_body_read(manifest_response).await).unwrap();
+        //     String::from_utf8(common::response_body_vec(manifest_response).await).unwrap();
 
         // assert!(manifest_body.contains("total_manifest_requests{type=\"manifests\"} 7"));
 

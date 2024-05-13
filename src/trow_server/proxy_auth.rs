@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use aws_config::BehaviorVersion;
@@ -153,7 +152,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?
         .to_owned();
     let region = aws_types::region::Region::new(region);
-    let config = aws_config::defaults(BehaviorVersion::v2023_11_09())
+    let config = aws_config::defaults(BehaviorVersion::v2024_03_28())
         .region(region)
         .load()
         .await;

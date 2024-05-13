@@ -11,8 +11,6 @@ mod interface_tests {
     use environment::Environment;
     use reqwest::StatusCode;
 
-    use crate::common;
-
     const PORT: &str = "39376";
     const HOST: &str = "127.0.0.1:39376";
     const TROW_ADDRESS: &str = "http://127.0.0.1:39376";
@@ -52,7 +50,9 @@ mod interface_tests {
 
     impl Drop for TrowInstance {
         fn drop(&mut self) {
-            common::kill_gracefully(&self.pid);
+            unsafe {
+                libc::kill(self.pid.id() as i32, libc::SIGTERM);
+            }
         }
     }
 
@@ -64,6 +64,7 @@ mod interface_tests {
      *
      */
     #[tokio::test]
+    #[tracing_test::traced_test]
     #[ignore]
     async fn smoke_test() {
         //Need to start with empty repo

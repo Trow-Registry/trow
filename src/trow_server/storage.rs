@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::pin::pin;
 use std::{io, str};
 
-use anyhow::Result;
 use bytes::{Buf, Bytes};
 use chrono::prelude::*;
 use futures::{AsyncReadExt, Stream};
@@ -77,7 +76,7 @@ pub struct TrowStorageBackend {
 }
 
 impl TrowStorageBackend {
-    fn init_create_path(root: &Path, dir: &str) -> Result<()> {
+    fn init_create_path(root: &Path, dir: &str) -> Result<(), StorageBackendError> {
         let path = root.join(dir);
         match fs::create_dir_all(&path) {
             Ok(_) => Ok(()),
@@ -91,12 +90,12 @@ impl TrowStorageBackend {
                     path,
                     e
                 );
-                Err(e.into())
+                Err(StorageBackendError::Io(e))
             }
         }
     }
 
-    pub fn new(path: PathBuf) -> Result<Self> {
+    pub fn new(path: PathBuf) -> Result<Self, StorageBackendError> {
         Self::init_create_path(&path, MANIFESTS_DIR)?;
         Self::init_create_path(&path, BLOBS_DIR)?;
         Self::init_create_path(&path, UPLOADS_DIR)?;
@@ -402,7 +401,7 @@ impl TrowStorageBackend {
             })
     }
 
-    pub async fn list_repos(&self) -> Result<Vec<String>> {
+    pub async fn list_repos(&self) -> Result<Vec<String>, StorageBackendError> {
         let manifest_dir = self.path.join(MANIFESTS_DIR);
         // let dirs = tokio::fs::read_dir(manifest_dir);
         let manifests = WalkDir::new(&manifest_dir)
@@ -428,7 +427,7 @@ impl TrowStorageBackend {
         Ok(manifests)
     }
 
-    pub async fn list_repo_tags(&self, repo: &str) -> Result<Vec<String>> {
+    pub async fn list_repo_tags(&self, repo: &str) -> Result<Vec<String>, StorageBackendError> {
         let repo_manifest_dir = self.path.join(MANIFESTS_DIR).join(repo);
         let tags = WalkDir::new(&repo_manifest_dir)
             .sort_by_file_name()
@@ -448,7 +447,7 @@ impl TrowStorageBackend {
         Ok(tags)
     }
 
-    pub async fn delete_blob(&self, digest: &Digest) -> Result<()> {
+    pub async fn delete_blob(&self, digest: &Digest) -> Result<(), StorageBackendError> {
         let blob_path = self
             .path
             .join(BLOBS_DIR)
@@ -458,7 +457,11 @@ impl TrowStorageBackend {
         Ok(())
     }
 
-    pub async fn delete_manifest(&self, repo_name: &str, digest: &Digest) -> Result<()> {
+    pub async fn delete_manifest(
+        &self,
+        repo_name: &str,
+        digest: &Digest,
+    ) -> Result<(), StorageBackendError> {
         let path = self
             .path
             .join(BLOBS_DIR)

@@ -62,18 +62,6 @@ struct Upload {
     uuid: String,
 }
 
-// TODO: Each function should have it's own enum of the errors it can return
-// There must be a standard pattern for this somewhere...
-#[derive(Debug, Error)]
-pub enum RegistryError {
-    #[error("Invalid repository or tag")]
-    InvalidName,
-    #[error("Invalid manifest")]
-    InvalidManifest,
-    #[error("Internal registry error")]
-    Internal,
-}
-
 #[derive(Error, Debug)]
 #[error("Error getting proxied repo {msg:?}")]
 pub struct ProxyError {
@@ -138,8 +126,8 @@ pub fn is_digest(maybe_digest: &str) -> bool {
 impl TrowServer {
     pub async fn get_manifest(
         &self,
-        mut name: &str,
-        mut tag: &str,
+        name: &str,
+        tag: &str,
     ) -> Result<ManifestReader, StorageDriverError> {
         let get_manifest = if name.starts_with("f/") {
             let (image, cfg) = match self.get_remote_image_and_cfg(name, tag) {
@@ -626,7 +614,7 @@ impl TrowServer {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", proxy_cfg.alias, remote_image.get_repo());
 
-        let try_cl = match ProxyClient::try_new(proxy_cfg.clone(), &remote_image).await {
+        let try_cl = match ProxyClient::try_new(proxy_cfg.clone(), remote_image).await {
             Ok(cl) => Some(cl),
             Err(e) => {
                 event!(
@@ -650,17 +638,15 @@ impl TrowServer {
                     .await
                     .ok();
                 let latest_digest = match &try_cl {
-                    Some(cl) => self.get_digest_from_header(cl, &remote_image).await,
+                    Some(cl) => self.get_digest_from_header(cl, remote_image).await,
                     _ => None,
                 };
-                if latest_digest == local_digest {
-                    if local_digest.is_none() {
-                        anyhow::bail!(
-                            "Could not fetch digest for {}:{}",
-                            repo_name,
-                            remote_image.reference
-                        );
-                    }
+                if latest_digest == local_digest && local_digest.is_none() {
+                    anyhow::bail!(
+                        "Could not fetch digest for {}:{}",
+                        repo_name,
+                        remote_image.reference
+                    );
                 }
                 (local_digest, latest_digest)
             }
@@ -681,7 +667,7 @@ impl TrowServer {
             if let Some(cl) = &try_cl {
                 let img_ref_as_digest = Digest::try_from_raw(&remote_image.reference);
                 let manifest_download = self
-                    .download_manifest_and_layers(cl, &remote_image, &repo_name)
+                    .download_manifest_and_layers(cl, remote_image, &repo_name)
                     .await;
                 match (manifest_download, img_ref_as_digest) {
                     (Err(e), _) => {
@@ -819,7 +805,7 @@ impl TrowServer {
             .map_err(|e| Status::Internal(format!("Internal error streaming catalog: {e}")))?;
         let limit = num_results.unwrap_or(u32::MAX) as usize;
         let manifests = match start_value {
-            Some(repo) if repo != "" => manifests
+            Some(repo) if !repo.is_empty() => manifests
                 .into_iter()
                 .skip_while(|m| *m != repo)
                 .skip(1)

@@ -218,15 +218,12 @@ where
         let token = authorization.token();
 
         // parse for bearer token
-        // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
-        let dec_token = match decode::<TokenClaim>(
-            token,
-            &DecodingKey::from_base64_secret(&config.token_secret).map_err(|e| {
-                event!(Level::WARN, "Failed to decode secret: {}", e);
-                Authenticate::new(base_url.clone())
-            })?,
-            &Validation::default(),
-        ) {
+        let tok_priv_key = DecodingKey::from_base64_secret(&config.token_secret).map_err(|e| {
+            event!(Level::WARN, "Failed to decode secret: {}", e);
+            Authenticate::new(base_url.clone())
+        })?;
+
+        let dec_token = match decode::<TokenClaim>(token, &tok_priv_key, &Validation::default()) {
             Ok(td) => td.claims,
             Err(_) => {
                 event!(Level::WARN, "Failed to decode user token");

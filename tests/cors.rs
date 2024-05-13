@@ -20,7 +20,7 @@ mod cors_tests {
     async fn start_trow(data_dir: &Path) -> Router {
         let mut trow_builder = trow::TrowConfig::new();
         trow_builder.service_name = HOST.to_string();
-        trow_builder.data_dir = data_dir.to_owned();
+        data_dir.clone_into(&mut trow_builder.data_dir);
         trow_builder.with_user("authtest".to_owned(), "authpass");
         trow_builder.cors = Some(vec![
             "http://extrality.ai:8973".to_string(),

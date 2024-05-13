@@ -46,7 +46,7 @@ mod interface_tests {
 
         let mut trow_builder = trow::TrowConfig::new();
         trow_builder.proxy_registry_config = Some(config_file);
-        trow_builder.data_dir = data_dir.to_owned();
+        data_dir.clone_into(&mut trow_builder.data_dir);
         trow_builder.build_app().await.unwrap()
     }
 

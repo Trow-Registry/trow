@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Child;
 
 use axum::body::Body;
 use axum::Router;
@@ -36,18 +35,9 @@ pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     blob
 }
 
-// https://stackoverflow.com/questions/49210815/how-do-i-send-a-signal-to-a-child-subprocess
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn kill_gracefully(child: &Child) {
-    unsafe {
-        libc::kill(child.id() as i32, libc::SIGTERM);
-    }
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-pub async fn response_body_read(resp: Response<Body>) -> Vec<u8> {
+pub async fn response_body_vec(resp: Response<Body>) -> Vec<u8> {
     let mut buf = Vec::new();
     resp.into_body()
         .collect()
@@ -63,7 +53,7 @@ pub async fn response_body_read(resp: Response<Body>) -> Vec<u8> {
 #[cfg(test)]
 #[allow(dead_code)]
 pub async fn response_body_string(resp: Response<Body>) -> String {
-    let vec = response_body_read(resp).await;
+    let vec = response_body_vec(resp).await;
     String::from_utf8(vec).unwrap()
 }
 
@@ -151,7 +141,7 @@ pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
         .to_str()
         .unwrap();
     assert_eq!(digest.to_string(), digest_header);
-    let body = common::response_body_read(resp).await;
+    let body = common::response_body_vec(resp).await;
     assert_eq!(blob, body);
 
     //Upload manifest
