@@ -14,8 +14,7 @@ const BUFFER_SIZE: usize = 1024 * 1024;
 
 // These regex are used to do a simple validation of the tag fields
 lazy_static! {
-    static ref REGEX_ALGO: Regex = Regex::new(r"^[A-Za-z0-9_+.-]+$").unwrap();
-    static ref REGEX_DIGEST: Regex = Regex::new(r"^[A-Fa-f0-9]+$").unwrap();
+    static ref REGEX_DIGEST: Regex = Regex::new(r"^[A-Fa-f0-9]{32,}$").unwrap();
 }
 
 #[derive(Error, Debug)]
@@ -81,10 +80,9 @@ impl Digest {
             .collect::<Vec<String>>();
 
         // check that we have both parts: algo and digest
-        if algo_digest.len() < 2 {
+        if algo_digest.len() != 2 {
             return Err(DigestError::InvalidDigest(format!(
-                "Component cannot be parsed into a digest: {}",
-                &digest_str
+                "Digest cannot be split into components: {digest_str}"
             )));
         }
 
@@ -92,18 +90,8 @@ impl Digest {
         let algo = String::from(&algo_digest[0]);
         let hash = String::from(&algo_digest[1]);
 
-        if !REGEX_ALGO.is_match(&algo) {
-            return Err(DigestError::InvalidDigest(format!(
-                "Component cannot be parsed into a TAG wrong digest algorithm: {} - {}",
-                &digest_str, &algo
-            )));
-        }
-
         if !REGEX_DIGEST.is_match(&hash) {
-            return Err(DigestError::InvalidDigest(format!(
-                "Component cannot be parsed into a TAG wrong digest format: {} - {}",
-                &digest_str, &hash
-            )));
+            return Err(DigestError::InvalidDigest(format!("Invalid hash: {hash}")));
         }
 
         let algo_enum =
