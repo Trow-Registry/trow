@@ -40,6 +40,8 @@ pub enum StorageDriverError {
     InvalidContentRange,
     #[error("Internal storage error")]
     Internal,
+    #[error("Not found")]
+    NotFound,
 }
 
 pub struct TrowServerBuilder {

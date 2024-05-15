@@ -92,12 +92,12 @@ pub fn is_digest(maybe_digest: &str) -> bool {
 }
 
 impl TrowServer {
-    pub async fn get_manifest(&self, name: &str, tag: &str) -> Result<ManifestReader> {
+    pub async fn get_manifest(&self, name: &str, reference: &str) -> Result<ManifestReader> {
         let get_manifest = if name.starts_with("f/") {
-            let (image, cfg) = match self.get_remote_image_and_cfg(name, tag) {
+            let (image, cfg) = match self.get_remote_image_and_cfg(name, reference) {
                 Some(image) => image,
                 None => {
-                    return Err(anyhow!("No proxy config found for {name}:{tag}"));
+                    return Err(anyhow!("No proxy config found for {name}:{reference}"));
                 }
             };
             let digest = match self.download_remote_image(&image, &cfg).await {
@@ -111,7 +111,7 @@ impl TrowServer {
                 .get_manifest("(fixme: none)", &digest.to_string())
                 .await
         } else {
-            self.storage.get_manifest(name, tag).await
+            self.storage.get_manifest(name, reference).await
         };
 
         let man = get_manifest.map_err(|e| {
@@ -185,9 +185,7 @@ impl TrowServer {
         );
         let stream = match self.storage.get_blob_stream(repo_name, digest).await {
             Ok(stream) => stream,
-            Err(StorageBackendError::BlobNotFound(_)) => {
-                return Err(StorageDriverError::InvalidName("not found".to_owned()))
-            }
+            Err(StorageBackendError::BlobNotFound(_)) => return Err(StorageDriverError::NotFound),
             Err(_) => return Err(StorageDriverError::Internal),
         };
         Ok(BlobReader::new(digest.clone(), stream).await)
@@ -197,7 +195,7 @@ impl TrowServer {
         &self,
         name: &str,
         upload_uuid: &str,
-        data_info: Option<ContentInfo>,
+        content_info: Option<ContentInfo>,
         data: Body,
     ) -> Result<Stored, StorageDriverError> {
         // TODO: check that content length matches the body
@@ -205,7 +203,7 @@ impl TrowServer {
             .write_blob_part_stream(
                 upload_uuid,
                 data.into_data_stream(),
-                data_info.map(|d| d.range.0..d.range.1),
+                content_info.map(|d| d.range.0..d.range.1),
             )
             .await
             .map_err(|e| match e {

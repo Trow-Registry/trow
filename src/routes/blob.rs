@@ -152,7 +152,7 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 */
 pub async fn patch_blob(
     _auth_user: TrowToken,
-    info: Option<ContentInfo>,
+    content_info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, String)>,
     AlwaysHost(host): AlwaysHost,
@@ -160,7 +160,7 @@ pub async fn patch_blob(
 ) -> Result<UploadInfo, Error> {
     match state
         .registry
-        .store_blob_chunk(&repo, &uuid, info, chunk)
+        .store_blob_chunk(&repo, &uuid, content_info, chunk)
         .await
     {
         Ok(stored) => {

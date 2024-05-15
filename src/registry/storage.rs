@@ -269,6 +269,12 @@ impl TrowStorageBackend {
 
         if let Some(range) = &range {
             if range.start != seek_pos {
+                event!(
+                    Level::ERROR,
+                    "Invalid content-range: start={} file_pos={}",
+                    range.start,
+                    seek_pos
+                );
                 return Err(WriteBlobRangeError::InvalidContentRange);
             }
         }
@@ -278,6 +284,12 @@ impl TrowStorageBackend {
             .map_err(|_e| WriteBlobRangeError::Internal)? as u64;
 
         if matches!(range_len, Some(len) if len != bytes_written) {
+            event!(
+                Level::ERROR,
+                "Invalid content-length: expected={} actual={}",
+                range_len.unwrap(),
+                bytes_written
+            );
             return Err(WriteBlobRangeError::InvalidContentRange);
         }
         tmp_file.untrack();
@@ -562,13 +574,20 @@ mod tests {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         let stream = pin!(bytes_to_stream(Bytes::from("test")));
-        let digest = Digest::try_from_raw("sha256:1234").unwrap();
+        let digest = Digest::try_from_raw("sha256:123456789101112131415161718192021").unwrap();
         let location = store
             .write_blob_stream(&digest, stream, false)
             .await
             .unwrap();
         assert!(location.exists());
-        assert!(location == store.path.join("blobs").join("sha256").join("1234"));
+        assert!(
+            location
+                == store
+                    .path
+                    .join("blobs")
+                    .join("sha256")
+                    .join("123456789101112131415161718192021")
+        );
     }
 
     #[tokio::test]
@@ -581,7 +600,7 @@ mod tests {
             config: manifest::Object {
                 media_type: "application/vnd.docker.container.image.v1+json".to_string(),
                 size: Some(7027),
-                digest: "sha256:3b4e5a".to_string(),
+                digest: "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a".to_string(),
             },
             layers: vec![],
         });
@@ -597,10 +616,11 @@ mod tests {
                 m.layers.push(manifest::Object {
                     media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_string(),
                     size: Some(7027),
-                    digest: "sha256:3b4e5a".to_string(),
+                    digest: "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a".to_string(),
                 });
                 let stream = pin!(bytes_to_stream(Bytes::from("test")));
-                let digest = Digest::try_from_raw("sha256:3b4e5a").unwrap();
+                let digest =
+                    Digest::try_from_raw("sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a").unwrap();
                 store
                     .write_blob_stream(&digest, stream, false)
                     .await
@@ -624,7 +644,7 @@ mod tests {
         fs::create_dir_all(&fd).await.unwrap();
         let mut file = fs::File::create(fd.join("latest")).await.unwrap();
         let entry = HistoryEntry {
-            digest: "sha256:1234".to_string(),
+            digest: "sha256:123456789101112131415161718192021".to_string(),
             date: Utc::now(),
         };
         file.write_all(serde_json::to_string(&entry).unwrap().as_bytes())
@@ -636,7 +656,7 @@ mod tests {
             .get_manifest_digest("zozo/image", "latest")
             .await
             .unwrap();
-        assert!(digest.to_string() == "sha256:1234");
+        assert!(digest.to_string() == "sha256:123456789101112131415161718192021");
     }
 
     #[tokio::test]
@@ -648,7 +668,7 @@ mod tests {
         fs::create_dir_all(&fd).await.unwrap();
         let mut file = fs::File::create(fd.join("latest")).await.unwrap();
         let entry = HistoryEntry {
-            digest: "sha256:1234".to_string(),
+            digest: "sha256:123456789101112131415161718192021".to_string(),
             date: Utc::now(),
         };
         file.write_all(&serde_json::to_vec(&entry).unwrap())
@@ -662,6 +682,6 @@ mod tests {
             .await
             .unwrap();
         assert!(history.len() == 1);
-        assert!(history[0].digest == "sha256:1234");
+        assert!(history[0].digest == "sha256:123456789101112131415161718192021");
     }
 }

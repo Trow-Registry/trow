@@ -50,7 +50,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::get("/v2/test/test/blobs/sha256:baadf00d")
+                Request::get("/v2/test/test/blobs/sha256:baadf00dbaadf00dbaadf00dbaadf00d")
                     .body(Body::empty())
                     .unwrap(),
             )
