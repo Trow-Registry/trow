@@ -25,7 +25,7 @@ impl IntoResponse for UploadInfo {
         Response::builder()
             .header("Docker-Upload-UUID", self.uuid().0.clone())
             .header("Range", format!("{}-{}", left, right))
-            .header("X-Content-Length", format!("{}", right - left))
+            .header("Content-Length", format!("{}", right - left))
             .header("Location", location_url)
             .status(StatusCode::ACCEPTED)
             .body(Body::empty())
