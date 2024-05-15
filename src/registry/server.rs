@@ -203,7 +203,7 @@ impl TrowServer {
             .write_blob_part_stream(
                 upload_uuid,
                 data.into_data_stream(),
-                content_info.map(|d| d.range.0..d.range.1),
+                content_info.map(|d| d.range.0..=d.range.1),
             )
             .await
             .map_err(|e| match e {
