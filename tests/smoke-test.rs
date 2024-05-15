@@ -4,14 +4,14 @@ mod common;
 #[cfg(test)]
 mod interface_tests {
 
+    use std::path::Path;
     use std::process::{Child, Command};
+    use std::thread;
     use std::time::Duration;
-    use std::{fs, thread};
 
     use environment::Environment;
     use reqwest::StatusCode;
-
-    use crate::common;
+    use test_temp_dir::test_temp_dir;
 
     const PORT: &str = "39376";
     const HOST: &str = "127.0.0.1:39376";
@@ -22,14 +22,14 @@ mod interface_tests {
     }
     /// Call out to cargo to start trow.
     /// Seriously considering moving to docker run.
-    async fn start_trow() -> TrowInstance {
+    async fn start_trow(temp_dir: &Path) -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
             .arg("--")
-            .arg("--name")
-            .arg(HOST)
             .arg("--port")
             .arg(PORT)
+            .arg("--data-dir")
+            .arg(temp_dir)
             .env_clear()
             .envs(Environment::inherit().compile())
             .spawn()
@@ -52,7 +52,9 @@ mod interface_tests {
 
     impl Drop for TrowInstance {
         fn drop(&mut self) {
-            common::kill_gracefully(&self.pid);
+            unsafe {
+                libc::kill(self.pid.id() as i32, libc::SIGTERM);
+            }
         }
     }
 
@@ -64,44 +66,45 @@ mod interface_tests {
      *
      */
     #[tokio::test]
+    #[tracing_test::traced_test]
     #[ignore]
     async fn smoke_test() {
-        //Need to start with empty repo
-        fs::remove_dir_all("./data").unwrap_or(());
+        let temp_dir = test_temp_dir!();
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _trow = start_trow().await;
+        let _trow = start_trow(temp_dir.as_path_untracked()).await;
 
+        println!("Running docker pull alpine:latest");
         let mut status = Command::new("docker")
             .args(["pull", "alpine:latest"])
             .status()
             .expect("Failed to call docker pull - prereq for smoke test");
-
         assert!(status.success());
 
-        let image_name = format!("{}/alpine:trow", HOST);
+        println!("Running docker tag alpine:latest {HOST}/alpine:trow");
+        let image_name = format!("{HOST}/alpine:trow");
         status = Command::new("docker")
             .args(["tag", "alpine:latest", &image_name])
             .status()
             .expect("Failed to call docker");
-
         assert!(status.success());
 
+        println!("Running docker push {HOST}/alpine:trow");
         status = Command::new("docker")
             .args(["push", &image_name])
             .status()
             .expect("Failed to call docker");
-
         assert!(status.success());
 
+        println!("Running docker rmi {HOST}/alpine:trow");
         status = Command::new("docker")
             .args(["rmi", &image_name])
             .status()
             .expect("Failed to call docker");
-
         assert!(status.success());
 
+        println!("Running docker pull {HOST}/alpine:trow");
         status = Command::new("docker")
             .args(["pull", &image_name])
             .status()

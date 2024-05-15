@@ -6,79 +6,47 @@ mod interface_tests {
 
     use std::fmt::Write;
     use std::io::BufReader;
-    use std::process::{Child, Command};
-    use std::time::Duration;
-    use std::{fs, thread};
+    use std::path::Path;
 
-    use environment::Environment;
+    use axum::body::Body;
+    use axum::Router;
+    use hyper::Request;
     use reqwest::StatusCode;
-    use trow::trow_server::digest;
+    use test_temp_dir::test_temp_dir;
+    use tower::ServiceExt;
+    use tracing_test::traced_test;
+    use trow::registry::digest;
 
-    use crate::common;
+    use crate::common::{self, response_body_vec};
 
-    const PORT: &str = "39368";
-    const HOST: &str = "127.0.0.1:39368";
     const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
 
-    struct TrowInstance {
-        pid: Child,
-    }
-    /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.
-
-    async fn start_trow() -> TrowInstance {
-        let mut child = Command::new("cargo")
-            .arg("run")
-            .env_clear()
-            .envs(Environment::inherit().compile())
-            .arg("--")
-            .arg("--name")
-            .arg(HOST)
-            .arg("--port")
-            .arg(PORT)
-            .spawn()
-            .expect("failed to start");
-
-        let mut timeout = 100;
-        let client = reqwest::Client::new();
-        let mut response = client.get(TROW_ADDRESS).send().await;
-        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
-            thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send().await;
-            timeout -= 1;
-        }
-        if timeout == 0 {
-            child.kill().unwrap();
-            panic!("Failed to start Trow");
-        }
-        TrowInstance { pid: child }
+    async fn start_trow(data_dir: &Path) -> Router {
+        let mut trow_builder = trow::TrowConfig::new();
+        data_dir.clone_into(&mut trow_builder.data_dir);
+        trow_builder.service_name = TROW_ADDRESS.to_string();
+        trow_builder.build_app().await.unwrap()
     }
 
-    impl Drop for TrowInstance {
-        fn drop(&mut self) {
-            common::kill_gracefully(&self.pid);
-        }
-    }
-
-    async fn upload_config(cl: &reqwest::Client) {
+    async fn upload_config(trow: &Router) {
         let config = "{}\n".as_bytes();
-        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
-        let resp = cl
-            .post(&format!(
-                "{}/v2/{}/blobs/uploads/?digest={}",
-                TROW_ADDRESS, "config", digest
-            ))
-            .body(config)
-            .send()
-            .await
+        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let req = Request::post(format!("/v2/config/blobs/uploads/?digest={digest}"))
+            .body(Body::from(config))
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
+        let resp = trow.clone().oneshot(req).await.unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::CREATED,
+            "request failed: {}",
+            common::response_body_string(resp).await
+        );
     }
 
-    async fn push_random_foreign_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+    async fn push_random_foreign_manifest(trow: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob earlier
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         //To ensure each manifest is different, just use foreign content with random contents
         let ran_size = fastrand::u32(0..=u32::MAX);
@@ -105,19 +73,24 @@ mod interface_tests {
                  ], "schemaVersion": 2 }}"#,
         );
         let bytes = manifest.clone();
-        let resp = cl
-            .put(&format!("{}/v2/{}/manifests/{}", TROW_ADDRESS, name, tag))
-            .body(bytes)
-            .send()
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::put(format!("/v2/{}/manifests/{}", name, tag))
+                    .body(bytes)
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
-        digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap()
+        digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes()))
+            .unwrap()
+            .to_string()
     }
 
     async fn get_history(
-        cl: &reqwest::Client,
+        trow: &Router,
         repo: &str,
         tag: &str,
         limit: Option<u32>,
@@ -133,19 +106,19 @@ mod interface_tests {
         } else if let Some(val) = limit {
             options = format!("?n={}", val);
         }
-
-        let resp = cl
-            .get(&format!(
-                "{}/{}/manifest_history/{}{}",
-                TROW_ADDRESS, repo, tag, options
-            ))
-            .send()
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::get(format!("/{}/manifest_history/{}{}", repo, tag, options))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-
+        let body = response_body_vec(resp).await;
         // type should be decided by caller, but this is just a test
-        let x: serde_json::Value = resp.json().await.unwrap();
+        let x: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
         x
     }
@@ -157,36 +130,36 @@ mod interface_tests {
      *
      */
     #[tokio::test]
+    #[traced_test]
     async fn manifest_test() {
-        //Need to start with empty repo
-        fs::remove_dir_all("./data").unwrap_or(());
-        let _trow = start_trow().await;
-        let client = reqwest::Client::new();
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
 
-        upload_config(&client).await;
+        let trow = start_trow(data_dir).await;
+        upload_config(&trow).await;
 
         // Following is intentionally interleaved to add delays
         let mut history_one = Vec::new();
-        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
+        history_one.push(push_random_foreign_manifest(&trow, "history", "one").await);
         let mut history_two = Vec::new();
-        history_two.push(push_random_foreign_manifest(&client, "history", "two").await);
-        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
-        history_two.push(push_random_foreign_manifest(&client, "history", "two").await);
-        history_one.push(push_random_foreign_manifest(&client, "history", "one").await);
+        history_two.push(push_random_foreign_manifest(&trow, "history", "two").await);
+        history_one.push(push_random_foreign_manifest(&trow, "history", "one").await);
+        history_two.push(push_random_foreign_manifest(&trow, "history", "two").await);
+        history_one.push(push_random_foreign_manifest(&trow, "history", "one").await);
 
-        let json = get_history(&client, "history", "one", None, None).await;
+        let json = get_history(&trow, "history", "one", None, None).await;
         assert_eq!(json["image"], "history:one");
         assert_eq!(json["history"].as_array().unwrap().len(), 3);
 
-        let json = get_history(&client, "history", "two", None, None).await;
+        let json = get_history(&trow, "history", "two", None, None).await;
         assert_eq!(json["image"], "history:two");
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
 
-        let json = get_history(&client, "history", "one", Some(1), None).await;
+        let json = get_history(&trow, "history", "one", Some(1), None).await;
         assert_eq!(json["history"].as_array().unwrap().len(), 1);
 
         let start = json["history"][0]["digest"].as_str().unwrap();
-        let json = get_history(&client, "history", "one", Some(20), Some(start.to_string())).await;
+        let json = get_history(&trow, "history", "one", Some(20), Some(start.to_string())).await;
         assert_eq!(json["history"].as_array().unwrap().len(), 2);
     }
 }

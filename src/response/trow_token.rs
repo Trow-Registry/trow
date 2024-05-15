@@ -1,11 +1,11 @@
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use axum::body;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
+use axum::{body, RequestPartsExt};
 use axum_extra::headers;
 use base64::engine::general_purpose as base64_engine;
 use base64::Engine as _;
@@ -16,7 +16,7 @@ use tracing::{event, Level};
 use uuid::Uuid;
 
 use super::authenticate::Authenticate;
-use super::get_base_url;
+use crate::routes::extracts::AlwaysHost;
 use crate::{TrowConfig, UserConfig};
 
 const TOKEN_DURATION: u64 = 3600;
@@ -193,9 +193,16 @@ where
 {
     type Rejection = Authenticate;
 
-    async fn from_request_parts(req: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
-        let config = &TrowConfig::from_ref(config);
-        let base_url = get_base_url(&req.headers, config);
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let config = TrowConfig::from_ref(state);
+        let base_url = match parts
+            .extract_with_state::<Option<AlwaysHost>, _>(state)
+            .await
+            .unwrap()
+        {
+            Some(AlwaysHost(host)) => host,
+            None => String::new(),
+        };
 
         if config.user.is_none() {
             //Authentication is not configured
@@ -206,7 +213,7 @@ where
             };
             return Ok(no_auth_token);
         }
-        let authorization = match req
+        let authorization = match parts
             .headers
             .typed_get::<headers::Authorization<headers::authorization::Bearer>>()
         {
@@ -216,15 +223,12 @@ where
         let token = authorization.token();
 
         // parse for bearer token
-        // TODO: frank_jwt is meant to verify iat, nbf etc, but doesn't.
-        let dec_token = match decode::<TokenClaim>(
-            token,
-            &DecodingKey::from_base64_secret(&config.token_secret).map_err(|e| {
-                event!(Level::WARN, "Failed to decode secret: {}", e);
-                Authenticate::new(base_url.clone())
-            })?,
-            &Validation::default(),
-        ) {
+        let tok_priv_key = DecodingKey::from_base64_secret(&config.token_secret).map_err(|e| {
+            event!(Level::WARN, "Failed to decode secret: {}", e);
+            Authenticate::new(base_url.clone())
+        })?;
+
+        let dec_token = match decode::<TokenClaim>(token, &tok_priv_key, &Validation::default()) {
             Ok(td) => td.claims,
             Err(_) => {
                 event!(Level::WARN, "Failed to decode user token");

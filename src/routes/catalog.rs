@@ -5,7 +5,7 @@ use axum::extract::{Path, Query, State};
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
-use crate::registry_interface::{CatalogOperations, ManifestHistory};
+use crate::registry::ManifestHistory;
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::types::{RepoCatalog, TagList};
@@ -26,7 +26,7 @@ pub async fn get_catalog(
     let last_repo = query.last.clone().unwrap_or_default();
 
     let cat = state
-        .client
+        .registry
         .get_catalog(Some(&last_repo), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
@@ -44,7 +44,7 @@ pub async fn list_tags(
     let last_tag = query.last.clone().unwrap_or_default();
 
     let tags = state
-        .client
+        .registry
         .get_tags(&repo_name, Some(&last_tag), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
@@ -69,11 +69,12 @@ pub async fn get_manifest_history(
     let last_digest = query.last.clone().unwrap_or_default();
 
     let mh = state
-        .client
+        .registry
         .get_history(&name, &reference, Some(&last_digest), Some(limit))
         .await
         .map_err(|_| Error::InternalError)?;
-    Ok(mh)
+
+    Ok(ManifestHistory::new(format!("{name}:{reference}"), mh))
 }
 
 endpoint_fn_7_levels!(

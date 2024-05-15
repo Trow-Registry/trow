@@ -28,14 +28,14 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::registry_interface::{Digest, DigestAlgorithm};
-    use crate::types::{RepoName, VerifiedManifest};
+    use crate::registry::{Digest, DigestAlgorithm};
+    use crate::types::VerifiedManifest;
 
     #[test]
     fn accepted_ok() {
         let response = VerifiedManifest::new(
             Some("https://extrality.ai".to_string()),
-            RepoName("repo_name".to_string()),
+            "repo_name".to_string(),
             Digest {
                 algo: DigestAlgorithm::Sha256,
                 hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"

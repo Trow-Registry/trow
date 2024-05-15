@@ -40,12 +40,12 @@ mod test {
     use axum::response::IntoResponse;
 
     use crate::response::upload_info::UploadInfo;
-    use crate::types::{RepoName, Uuid};
+    use crate::types::Uuid;
     fn build_response() -> UploadInfo {
         UploadInfo::new(
             "ftp://darpa.org".to_string(),
             Uuid("whatever".to_owned()),
-            RepoName("moredhel/test".to_owned()),
+            "moredhel/test".to_owned(),
             (0, 0),
         )
     }

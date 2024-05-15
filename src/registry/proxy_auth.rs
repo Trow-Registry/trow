@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use aws_config::BehaviorVersion;
@@ -56,7 +55,7 @@ impl ProxyClient {
         proxy_image: &RemoteImage,
     ) -> Result<Self> {
         let base_client = reqwest::ClientBuilder::new()
-            .connect_timeout(Duration::from_millis(1000))
+            // .connect_timeout(Duration::from_millis(1000))
             .build()?;
 
         let authn_header = get_www_authenticate_header(&base_client, proxy_image).await?;
@@ -153,7 +152,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?
         .to_owned();
     let region = aws_types::region::Region::new(region);
-    let config = aws_config::defaults(BehaviorVersion::v2023_11_09())
+    let config = aws_config::defaults(BehaviorVersion::v2024_03_28())
         .region(region)
         .load()
         .await;
@@ -189,7 +188,7 @@ async fn get_www_authenticate_header(
         .await
         .map_err(|e| {
             anyhow!(
-                "Could not fetch www-authenticate header from {} (failed with: {})",
+                "Could not fetch www-authenticate header from {} (failed with: {:?})",
                 &image.get_manifest_url(),
                 e
             )

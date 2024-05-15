@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Path, State};
-use axum_extra::headers::HeaderMap;
+use digest::Digest;
 
+use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry_interface::{digest, ManifestReader, ManifestStorage, StorageDriverError};
+use crate::registry::{digest, ManifestReader, StorageDriverError};
 use crate::response::errors::Error;
-use crate::response::get_base_url;
 use crate::response::trow_token::TrowToken;
-use crate::types::{ManifestDeleted, RepoName, VerifiedManifest};
+use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::TrowServerState;
 
 /*
@@ -38,7 +38,7 @@ pub async fn get_manifest(
     Path((name, reference)): Path<(String, String)>,
 ) -> Result<ManifestReader, Error> {
     state
-        .client
+        .registry
         .get_manifest(&name, &reference)
         .await
         .map_err(|_| Error::ManifestUnknown(reference))
@@ -61,22 +61,20 @@ Content-Type: <manifest media type>
 
  */
 pub async fn put_image_manifest(
-    headers: HeaderMap,
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
+    AlwaysHost(host): AlwaysHost,
     Path((repo_name, reference)): Path<(String, String)>,
     chunk: Body,
 ) -> Result<VerifiedManifest, Error> {
-    let base_url = get_base_url(&headers, &state.config);
-
     match state
-        .client
+        .registry
         .store_manifest(&repo_name, &reference, chunk)
         .await
     {
         Ok(digest) => Ok(VerifiedManifest::new(
-            Some(base_url),
-            RepoName(repo_name),
+            Some(host),
+            repo_name,
             digest,
             reference,
         )),
@@ -87,9 +85,9 @@ pub async fn put_image_manifest(
 }
 endpoint_fn_7_levels!(
     put_image_manifest(
-        headers: HeaderMap,
         auth_user: TrowToken,
-        state: State<Arc<TrowServerState>>;
+        state: State<Arc<TrowServerState>>,
+        host: AlwaysHost;
         path: [image_name, reference],
         chunk: Body
     ) -> Result<VerifiedManifest, Error>
@@ -105,8 +103,8 @@ pub async fn delete_image_manifest(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, String)>,
 ) -> Result<ManifestDeleted, Error> {
-    let digest = digest::parse(&digest).map_err(|_| Error::Unsupported)?;
-    match state.client.delete_manifest(&repo, &digest).await {
+    let digest = Digest::try_from_raw(&digest).map_err(|_| Error::Unsupported)?;
+    match state.registry.delete_manifest(&repo, &digest).await {
         Ok(_) => Ok(ManifestDeleted {}),
         Err(StorageDriverError::Unsupported) => Err(Error::Unsupported),
         Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestUnknown(repo)),

@@ -5,90 +5,69 @@ mod common;
 mod interface_tests {
 
     use std::io::BufReader;
-    use std::process::{Child, Command};
-    use std::time::Duration;
-    use std::{fs, thread};
+    use std::path::Path;
 
-    use environment::Environment;
+    use axum::body::Body;
+    use axum::Router;
+    use hyper::Request;
     use reqwest::StatusCode;
-    use trow::trow_server::api_types::{HealthStatus, ReadyStatus};
-    use trow::trow_server::{digest, manifest};
+    use test_temp_dir::test_temp_dir;
+    use tower::ServiceExt;
+    use trow::registry::api_types::{HealthStatus, ReadyStatus};
+    use trow::registry::{digest, manifest};
     use trow::types::{RepoCatalog, TagList};
 
     use crate::common;
     use crate::common::DIST_API_HEADER;
 
-    const PORT: &str = "39365";
-    const HOST: &str = "127.0.0.1:39365";
-    const ORIGIN: &str = "http://127.0.0.1:39365";
-
-    struct TrowInstance {
-        pid: Child,
-    }
-    /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.
-
-    async fn start_trow() -> TrowInstance {
-        let mut child = Command::new("cargo")
-            .arg("run")
-            .arg("--")
-            .arg("--name")
-            .arg(HOST)
-            .arg("--port")
-            .arg(PORT)
-            .env_clear()
-            .envs(Environment::inherit().compile())
-            .spawn()
-            .expect("failed to start");
-
-        let mut timeout = 100;
-
-        let client = reqwest::Client::new();
-
-        let mut response = client.get(ORIGIN).send().await;
-        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
-            thread::sleep(Duration::from_millis(100));
-            response = client.get(ORIGIN).send().await;
-            timeout -= 1;
-        }
-        if timeout == 0 {
-            child.kill().unwrap();
-            panic!("Failed to start Trow");
-        }
-        TrowInstance { pid: child }
+    async fn start_trow(data_dir: &Path) -> Router {
+        let mut trow_builder = trow::TrowConfig::new();
+        data_dir.clone_into(&mut trow_builder.data_dir);
+        trow_builder.build_app().await.unwrap()
     }
 
-    impl Drop for TrowInstance {
-        fn drop(&mut self) {
-            common::kill_gracefully(&self.pid);
-        }
-    }
-
-    async fn get_main(cl: &reqwest::Client) {
-        let resp = cl.get(ORIGIN).send().await.unwrap();
+    async fn get_main(cl: &Router) {
+        let resp = cl
+            .clone()
+            .oneshot(Request::get("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
 
         //All v2 registries should respond with a 200 to this
-        let resp = cl.get(&(ORIGIN.to_owned() + "/v2/")).send().await.unwrap();
+        let resp = cl
+            .clone()
+            .oneshot(Request::get("/v2/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
     }
 
-    async fn get_non_existent_blob(cl: &reqwest::Client) {
+    async fn get_non_existent_blob(cl: &Router) {
         let resp = cl
-            .get(&(ORIGIN.to_owned() + "/v2/test/test/blobs/sha256:baadf00d"))
-            .send()
+            .clone()
+            .oneshot(
+                Request::get("/v2/test/test/blobs/sha256:baadf00dbaadf00dbaadf00dbaadf00d")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    async fn get_manifest(cl: &reqwest::Client, name: &str, tag: &str, size: Option<usize>) {
+    async fn get_manifest(cl: &Router, name: &str, tag: &str, size: Option<usize>) {
         //Might need accept headers here
         let resp = cl
-            .get(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
-            .send()
+            .clone()
+            .oneshot(
+                Request::get(&format!("/v2/{name}/manifests/{tag}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -108,61 +87,82 @@ mod interface_tests {
                 .unwrap();
             assert_eq!(actual_size, format!("{}", s));
         }
-        let mani: manifest::ManifestV2 = resp.json().await.unwrap();
+        let mani: manifest::OCIManifestV2 = common::response_body_json(resp).await;
 
         assert_eq!(mani.schema_version, 2);
     }
 
-    async fn get_non_existent_manifest(cl: &reqwest::Client, name: &str, tag: &str) {
+    async fn get_non_existent_manifest(cl: &Router, name: &str, tag: &str) {
         // Might need accept headers here
         let resp = cl
-            .get(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
-            .send()
+            .clone()
+            .oneshot(
+                Request::get(&format!("/v2/{name}/manifests/{tag}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    async fn check_repo_catalog(cl: &reqwest::Client, rc: &RepoCatalog) {
+    async fn check_repo_catalog(cl: &Router, rc: &RepoCatalog) {
         let resp = cl
-            .get(&format!("{}/v2/_catalog", ORIGIN))
-            .send()
+            .clone()
+            .oneshot(
+                Request::get(&"/v2/_catalog".to_string())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
-        let rc_resp: RepoCatalog = serde_json::from_str(&resp.text().await.unwrap()).unwrap();
+        let body = common::response_body_vec(resp).await;
+        let rc_resp: RepoCatalog = serde_json::from_slice(&body).unwrap();
         assert_eq!(rc, &rc_resp);
     }
 
-    async fn check_tag_list(cl: &reqwest::Client, tl: &TagList) {
+    async fn check_tag_list(cl: &Router, tl: &TagList) {
         let resp = cl
-            .get(&format!("{}/v2/{}/tags/list", ORIGIN, tl.repo_name()))
-            .send()
+            .clone()
+            .oneshot(
+                Request::get(&format!("/v2/{}/tags/list", tl.repo_name()))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
-        let tl_resp: TagList = serde_json::from_str(&resp.text().await.unwrap()).unwrap();
+        let body = common::response_body_vec(resp).await;
+        let tl_resp: TagList = serde_json::from_slice(&body).unwrap();
         assert_eq!(tl, &tl_resp);
     }
 
-    async fn check_tag_list_n_last(cl: &reqwest::Client, n: u32, last: &str, tl: &TagList) {
+    async fn check_tag_list_n_last(cl: &Router, n: u32, last: &str, tl: &TagList) {
         let resp = cl
-            .get(&format!(
-                "{}/v2/{}/tags/list?last={}&n={}",
-                ORIGIN,
-                tl.repo_name(),
-                last,
-                n
-            ))
-            .send()
+            .clone()
+            .oneshot(
+                Request::get(&format!(
+                    "/v2/{}/tags/list?last={}&n={}",
+                    tl.repo_name(),
+                    last,
+                    n
+                ))
+                .body(Body::empty())
+                .unwrap(),
+            )
             .await
             .unwrap();
-        let tl_resp: TagList = serde_json::from_str(&resp.text().await.unwrap()).unwrap();
+        let tl_resp: TagList = common::response_body_json(resp).await;
         assert_eq!(tl, &tl_resp);
     }
 
-    async fn upload_with_put(cl: &reqwest::Client, name: &str) {
+    async fn upload_with_put(cl: &Router, name: &str) {
         let resp = cl
-            .post(&format!("{}/v2/{}/blobs/uploads/", ORIGIN, name))
-            .send()
+            .clone()
+            .oneshot(
+                Request::post(&format!("/v2/{name}/blobs/uploads/"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
@@ -183,33 +183,12 @@ mod interface_tests {
 
         //used by oci_manifest_test
         let config = "{}\n".as_bytes();
-        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
-        let loc = &format!(
-            "{}/v2/{}/blobs/uploads/{}?digest={}",
-            ORIGIN, name, uuid, digest
-        );
+        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", name, uuid, digest);
 
-        let resp = cl.put(loc).body(config).send().await.unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-        let range = resp
-            .headers()
-            .get(common::RANGE_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
-        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
-    }
-
-    async fn upload_with_post(cl: &reqwest::Client, name: &str) {
-        let config = "{ }\n".as_bytes();
-        let digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
         let resp = cl
-            .post(&format!(
-                "{}/v2/{}/blobs/uploads/?digest={}",
-                ORIGIN, name, digest
-            ))
-            .body(config)
-            .send()
+            .clone()
+            .oneshot(Request::put(loc).body(Body::from(config)).unwrap())
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
@@ -222,10 +201,33 @@ mod interface_tests {
         assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
-    async fn push_oci_manifest(cl: &reqwest::Client, name: &str, tag: &str) -> String {
+    async fn upload_with_post(cl: &Router, name: &str) {
+        let config = "{ }\n".as_bytes();
+        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+
+        let resp = cl
+            .clone()
+            .oneshot(
+                Request::post(&format!("/v2/{}/blobs/uploads/?digest={}", name, digest))
+                    .body(Body::from(config))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let range = resp
+            .headers()
+            .get(common::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
+    }
+
+    async fn push_oci_manifest(cl: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -238,24 +240,22 @@ mod interface_tests {
         );
         let bytes = manifest.clone();
         let resp = cl
-            .put(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
-            .body(bytes)
-            .send()
+            .clone()
+            .oneshot(
+                Request::put(&format!("/v2/{}/manifests/{}", name, tag))
+                    .body(Body::from(bytes))
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
-        digest
+        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        digest.to_string()
     }
 
-    async fn push_manifest_list(
-        cl: &reqwest::Client,
-        digest: &str,
-        name: &str,
-        tag: &str,
-    ) -> String {
+    async fn push_manifest_list(cl: &Router, digest: &str, name: &str, tag: &str) -> String {
         let manifest = format!(
             r#"{{
                 "schemaVersion": 2,
@@ -277,26 +277,25 @@ mod interface_tests {
         );
         let bytes = manifest.clone();
         let resp = cl
-            .put(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
-            .body(bytes)
-            .send()
+            .clone()
+            .oneshot(
+                Request::put(&format!("/v2/{}/manifests/{}", name, tag))
+                    .body(Body::from(bytes))
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
-        digest
+        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        digest.to_string()
     }
 
-    async fn push_oci_manifest_with_foreign_blob(
-        cl: &reqwest::Client,
-        name: &str,
-        tag: &str,
-    ) -> String {
+    async fn push_oci_manifest_with_foreign_blob(cl: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -318,183 +317,169 @@ mod interface_tests {
         );
         let bytes = manifest.clone();
         let resp = cl
-            .put(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
-            .body(bytes)
-            .send()
+            .clone()
+            .oneshot(
+                Request::put(&format!("/v2/{}/manifests/{}", name, tag))
+                    .body(Body::from(bytes))
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::sha256_tag_digest(BufReader::new(manifest.as_bytes())).unwrap();
-        digest
+        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        digest.to_string()
     }
 
-    async fn delete_manifest(cl: &reqwest::Client, name: &str, digest: &str) {
+    async fn delete_manifest(cl: &Router, name: &str, digest: &str) {
         let resp = cl
-            .delete(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, digest))
-            .send()
+            .clone()
+            .oneshot(
+                Request::delete(&format!("/v2/{}/manifests/{}", name, digest))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    async fn delete_non_existent_manifest(cl: &reqwest::Client, name: &str) {
+    async fn delete_non_existent_manifest(cl: &Router, name: &str) {
         let resp = cl
-            .delete(&format!(
-                "{}/v2/{}/manifests/{}",
-                ORIGIN,
-                name,
-                "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
-            ))
-            .send()
+            .clone()
+            .oneshot(
+                Request::delete(&format!(
+                    "/v2/{}/manifests/{}",
+                    name, "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
+                ))
+                .body(Body::empty())
+                .unwrap(),
+            )
             .await
             .unwrap();
         // If it doesn't exist, that's kinda the same as deleted, right?
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
-    async fn attempt_delete_by_tag(cl: &reqwest::Client, name: &str, tag: &str) {
+    async fn attempt_delete_by_tag(cl: &Router, name: &str, tag: &str) {
         let resp = cl
-            .delete(&format!("{}/v2/{}/manifests/{}", ORIGIN, name, tag))
-            .send()
+            .clone()
+            .oneshot(
+                Request::delete(&format!("/v2/{}/manifests/{}", name, tag))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
-    async fn delete_config_blob(cl: &reqwest::Client, name: &str) {
+    async fn delete_config_blob(cl: &Router, name: &str) {
         //Deletes blob uploaded in config test
         let config = "{}\n".as_bytes();
-        let config_digest = digest::sha256_tag_digest(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
         let resp = cl
-            .delete(&format!("{}/v2/{}/blobs/{}", ORIGIN, name, config_digest))
-            .send()
+            .clone()
+            .oneshot(
+                Request::delete(&format!("/v2/{name}/blobs/{config_digest}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    async fn get_health(cl: &reqwest::Client) {
-        let resp = cl.get(&format!("{}/healthz", ORIGIN)).send().await.unwrap();
-
-        assert_eq!(resp.status(), StatusCode::OK);
-
-        let hr: HealthStatus = resp.json().await.unwrap();
-
-        assert!(hr.is_healthy);
-    }
-
-    async fn get_readiness(cl: &reqwest::Client) {
+    async fn get_health(cl: &Router) {
         let resp = cl
-            .get(&format!("{}/readiness", ORIGIN))
-            .send()
+            .clone()
+            .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
             .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let rr: ReadyStatus = resp.json().await.unwrap();
+        let hr: HealthStatus = common::response_body_json(resp).await;
+
+        assert!(hr.is_healthy);
+    }
+
+    async fn get_readiness(cl: &Router) {
+        let resp = cl
+            .clone()
+            .oneshot(Request::get("/readiness").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let rr: ReadyStatus = common::response_body_json(resp).await;
 
         assert!(rr.is_ready);
     }
 
-    async fn get_metrics(cl: &reqwest::Client) {
-        let resp = cl.get(&format!("{}/metrics", ORIGIN)).send().await.unwrap();
-
-        assert_eq!(resp.status(), StatusCode::OK);
-
-        let body = resp.text().await.unwrap();
-
-        println!("testout {}", body);
-
-        assert!(body.contains("available_space"));
-        assert!(body.contains("free_space"));
-        assert!(body.contains("total_space"));
-
-        assert!(body.contains("total_manifest_requests{type=\"manifests\"} 6"));
-        assert!(body.contains("total_blob_requests{type=\"blobs\"} 9"));
-
-        get_manifest(cl, "onename", "tag", None).await;
-        let manifest_response = cl.get(&format!("{}/metrics", ORIGIN)).send().await.unwrap();
-
-        let manifest_body = manifest_response.text().await.unwrap();
-
-        assert!(manifest_body.contains("total_manifest_requests{type=\"manifests\"} 7"));
-
-        get_non_existent_blob(cl).await;
-        let blob_response = cl.get(&format!("{}/metrics", ORIGIN)).send().await.unwrap();
-
-        assert_eq!(blob_response.status(), StatusCode::OK);
-
-        let blob_body = blob_response.text().await.unwrap();
-
-        assert!(blob_body.contains("total_blob_requests{type=\"blobs\"} 10"));
-    }
-
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn test_runner() {
-        //Need to start with empty repo
-        fs::remove_dir_all("./data").unwrap_or(());
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
 
-        //Had issues with stopping and starting trow causing test fails.
-        //It might be possible to improve things with a thread_local
-        let _trow = start_trow().await;
-        let client = reqwest::Client::new();
+        let trow = start_trow(data_dir).await;
 
         println!("Running get_main()");
-        get_main(&client).await;
+        get_main(&trow).await;
         println!("Running get_blob()");
-        get_non_existent_blob(&client).await;
+        get_non_existent_blob(&trow).await;
 
         println!("Running upload_layer(fifth/fourth/repo/image/test:tag)");
-        common::upload_layer(&client, ORIGIN, "fifth/fourth/repo/image/test", "tag").await;
+        common::upload_layer(&trow, "fifth/fourth/repo/image/test", "tag").await;
         println!("Running upload_layer(fourth/repo/image/test:tag)");
-        common::upload_layer(&client, ORIGIN, "fourth/repo/image/test", "tag").await;
+        common::upload_layer(&trow, "fourth/repo/image/test", "tag").await;
         println!("Running upload_layer(repo/image/test:tag)");
-        common::upload_layer(&client, ORIGIN, "repo/image/test", "tag").await;
+        common::upload_layer(&trow, "repo/image/test", "tag").await;
         println!("Running upload_layer(image/test:latest)");
-        common::upload_layer(&client, ORIGIN, "image/test", "latest").await;
+        common::upload_layer(&trow, "image/test", "latest").await;
         println!("Running upload_layer(onename:tag)");
-        common::upload_layer(&client, ORIGIN, "onename", "tag").await;
+        common::upload_layer(&trow, "onename", "tag").await;
         println!("Running upload_layer(onename:latest)");
-        common::upload_layer(&client, ORIGIN, "onename", "latest").await;
+        common::upload_layer(&trow, "onename", "latest").await;
         println!("Running upload_with_put()");
-        upload_with_put(&client, "puttest").await;
+        upload_with_put(&trow, "puttest").await;
         println!("Running upload_with_post");
-        upload_with_post(&client, "posttest").await;
+        upload_with_post(&trow, "posttest").await;
         println!("Running push_oci_manifest()");
-        let manifest_digest = push_oci_manifest(&client, "puttest", "puttest1").await;
+        let manifest_digest = push_oci_manifest(&trow, "puttest", "puttest1").await;
         println!("Running push_manifest_list()");
         let digest_manifest_list =
-            push_manifest_list(&client, &manifest_digest, "listtest", "listtest1").await;
+            push_manifest_list(&trow, &manifest_digest, "listtest", "listtest1").await;
         println!("Running get_manifest(puttest:puttest1)");
-        get_manifest(&client, "puttest", "puttest1", Some(354)).await;
+        get_manifest(&trow, "puttest", "puttest1", Some(354)).await;
         println!("Running get_manifest(puttest:digest)");
-        get_manifest(&client, "puttest", &manifest_digest, Some(354)).await;
+        get_manifest(&trow, "puttest", &manifest_digest, Some(354)).await;
         println!("Running delete_manifest(puttest:digest)");
-        delete_manifest(&client, "puttest", &manifest_digest).await;
+        delete_manifest(&trow, "puttest", &manifest_digest).await;
         println!("Running delete_manifest(listtest)");
-        delete_manifest(&client, "listtest", &digest_manifest_list).await;
+        delete_manifest(&trow, "listtest", &digest_manifest_list).await;
         println!("Running delete_non_existent_manifest(onename)");
-        delete_non_existent_manifest(&client, "onename").await;
+        delete_non_existent_manifest(&trow, "onename").await;
         println!("Running attempt_delete_by_tag(onename:tag)");
-        attempt_delete_by_tag(&client, "onename", "tag").await;
+        attempt_delete_by_tag(&trow, "onename", "tag").await;
         println!("Running get_non_existent_manifest(puttest:puttest1)");
-        get_non_existent_manifest(&client, "puttest", "puttest1").await;
+        get_non_existent_manifest(&trow, "puttest", "puttest1").await;
 
         println!("Running push_oci_manifest_with_foreign_blob()");
-        let digest = push_oci_manifest_with_foreign_blob(&client, "foreigntest", "blobtest1").await;
-        delete_manifest(&client, "foreigntest", &digest).await;
+        let digest = push_oci_manifest_with_foreign_blob(&trow, "foreigntest", "blobtest1").await;
+        delete_manifest(&trow, "foreigntest", &digest).await;
 
         println!("Running delete_config_blob");
-        delete_config_blob(&client, "puttest").await;
+        delete_config_blob(&trow, "puttest").await;
 
         println!("Running get_manifest(onename:tag)");
-        get_manifest(&client, "onename", "tag", None).await;
+        get_manifest(&trow, "onename", "tag", None).await;
         println!("Running get_manifest(image/test:latest)");
-        get_manifest(&client, "image/test", "latest", None).await;
+        get_manifest(&trow, "image/test", "latest", None).await;
         println!("Running get_manifest(repo/image/test:tag)");
-        get_manifest(&client, "repo/image/test", "tag", None).await;
+        get_manifest(&trow, "repo/image/test", "tag", None).await;
 
         let mut rc = RepoCatalog::new();
         rc.insert("fifth/fourth/repo/image/test".to_string());
@@ -504,15 +489,15 @@ mod interface_tests {
         rc.insert("onename".to_string());
 
         println!("Running check_repo_catalog");
-        check_repo_catalog(&client, &rc).await;
+        check_repo_catalog(&trow, &rc).await;
 
         let mut tl = TagList::new("repo/image/test".to_string());
         tl.insert("tag".to_string());
         println!("Running check_tag_list 1");
-        check_tag_list(&client, &tl).await;
+        check_tag_list(&trow, &tl).await;
 
-        common::upload_layer(&client, ORIGIN, "onename", "three").await;
-        common::upload_layer(&client, ORIGIN, "onename", "four").await;
+        common::upload_layer(&trow, "onename", "three").await;
+        common::upload_layer(&trow, "onename", "four").await;
 
         // list, in order should be [four, latest, tag, three]
         let mut tl2 = TagList::new("onename".to_string());
@@ -521,28 +506,24 @@ mod interface_tests {
         tl2.insert("tag".to_string());
         tl2.insert("three".to_string());
         println!("Running check_tag_list 2");
-        check_tag_list(&client, &tl2).await;
+        check_tag_list(&trow, &tl2).await;
 
         let mut tl3 = TagList::new("onename".to_string());
         tl3.insert("four".to_string());
         tl3.insert("latest".to_string());
         println!("Running check_tag_list_n_last 3");
-        check_tag_list_n_last(&client, 2, "", &tl3).await;
+        check_tag_list_n_last(&trow, 2, "", &tl3).await;
 
         let mut tl4 = TagList::new("onename".to_string());
         tl4.insert("tag".to_string());
         tl4.insert("three".to_string());
         println!("Running check_tag_list_n_last 4");
-        check_tag_list_n_last(&client, 2, "latest", &tl4).await;
+        check_tag_list_n_last(&trow, 2, "latest", &tl4).await;
 
         println!("Running get_readiness");
-        get_readiness(&client).await;
+        get_readiness(&trow).await;
 
         println!("Running get_health");
-        get_health(&client).await;
-
-        println!("Running get_metrics");
-        get_metrics(&client).await;
-        check_tag_list_n_last(&client, 2, "latest", &tl4).await;
+        get_health(&trow).await;
     }
 }

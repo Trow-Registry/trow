@@ -4,74 +4,43 @@ mod common;
 #[cfg(test)]
 mod no_cors_tests {
 
-    use std::process::{Child, Command};
-    use std::time::Duration;
-    use std::{fs, thread};
+    use std::path::Path;
 
-    use environment::Environment;
+    use axum::body::Body;
+    use axum::Router;
+    use hyper::Request;
     use reqwest::header::{
         HeaderMap, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
         ACCESS_CONTROL_REQUEST_METHOD, ORIGIN,
     };
     use reqwest::StatusCode;
+    use test_temp_dir::test_temp_dir;
+    use tower::ServiceExt;
 
-    use crate::common;
-
-    const PORT: &str = "39368";
-    const HOST: &str = "127.0.0.1:39368";
     const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
 
-    struct TrowInstance {
-        pid: Child,
-    }
-    /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.
-
-    async fn start_trow() -> TrowInstance {
-        let mut child = Command::new("cargo")
-            .arg("run")
-            .env_clear()
-            .arg("--")
-            .arg("--name")
-            .arg(HOST)
-            .arg("--port")
-            .arg(PORT)
-            .envs(Environment::inherit().compile())
-            .spawn()
-            .expect("failed to start");
-
-        let mut timeout = 100;
-        let client = reqwest::Client::new();
-        let mut response = client.get(TROW_ADDRESS).send().await;
-
-        while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
-            thread::sleep(Duration::from_millis(100));
-            response = client.get(TROW_ADDRESS).send().await;
-            timeout -= 1;
-        }
-        if timeout == 0 {
-            child.kill().unwrap();
-            panic!("Failed to start Trow");
-        }
-        TrowInstance { pid: child }
+    async fn start_trow(data_dir: &Path) -> Router {
+        let mut trow_builder = trow::TrowConfig::new();
+        trow_builder.service_name = TROW_ADDRESS.to_string();
+        data_dir.clone_into(&mut trow_builder.data_dir);
+        trow_builder.build_app().await.unwrap()
     }
 
-    impl Drop for TrowInstance {
-        fn drop(&mut self) {
-            common::kill_gracefully(&self.pid);
-        }
-    }
-
-    async fn test_preflight(cl: &reqwest::Client) {
+    async fn test_preflight(cl: &Router) {
         let mut headers = HeaderMap::new();
 
         headers.insert(ORIGIN, "https://example.com".parse().unwrap());
         headers.insert(ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS".parse().unwrap());
 
         let resp = cl
-            .request(reqwest::Method::OPTIONS, &(TROW_ADDRESS.to_owned()))
-            .headers(headers)
-            .send()
+            .clone()
+            .oneshot(
+                Request::options("/")
+                    .header(ORIGIN, "https://example.com")
+                    .header(ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -82,15 +51,12 @@ mod no_cors_tests {
 
     #[tokio::test]
     async fn test_runner() {
-        //Need to start with empty repo
-        fs::remove_dir_all("./data").unwrap_or(());
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
 
-        //Had issues with stopping and starting trow causing test fails.
-        //It might be possible to improve things with a thread_local
-        let _trow = start_trow().await;
-        let client = reqwest::Client::new();
+        let trow = start_trow(data_dir).await;
 
         println!("Running test_preflight()");
-        test_preflight(&client).await;
+        test_preflight(&trow).await;
     }
 }

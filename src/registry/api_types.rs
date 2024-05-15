@@ -78,13 +78,6 @@ pub struct VerifyManifestRequest {
 }
 
 #[derive(Clone, PartialEq)]
-pub struct VerifiedManifest {
-    pub digest: String,
-    /// Version of manifest, used for media type return
-    pub content_type: String,
-}
-
-#[derive(Clone, PartialEq)]
 pub struct ManifestReadLocation {
     pub digest: String,
     /// For the moment path to file
@@ -120,12 +113,6 @@ pub struct Tag {
 }
 
 #[derive(Clone, PartialEq)]
-pub struct BlobDeleted {}
-
-#[derive(Clone, PartialEq)]
-pub struct ManifestDeleted {}
-
-#[derive(Clone, PartialEq)]
 pub struct ManifestHistoryRequest {
     pub repo_name: String,
     /// Always tag, not digest
@@ -158,19 +145,6 @@ pub enum Status {
     Unavailable(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Timestamp {
-    pub seconds: i64,
-    pub nanos: i32,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct ManifestHistoryEntry {
-    pub digest: String,
-
-    pub date: Option<Timestamp>,
-}
-
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct HealthStatus {
     pub is_healthy: bool,
@@ -194,7 +168,7 @@ pub struct MetricsResponse {
 /// In future, we could directly use k8s types, but I'd rather leave that to a higher level.
 
 #[derive(Clone, PartialEq)]
-pub struct AdmissionRequest {
+pub struct IntAdmissionRequest {
     pub images: Vec<String>,
 
     pub namespace: String,
@@ -205,7 +179,7 @@ pub struct AdmissionRequest {
 }
 
 #[derive(Clone, PartialEq)]
-pub struct AdmissionResponse {
+pub struct IntAdmissionResponse {
     pub is_allowed: bool,
 
     pub reason: String,

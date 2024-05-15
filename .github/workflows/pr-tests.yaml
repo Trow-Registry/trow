@@ -80,13 +80,13 @@ jobs:
         id: start-container-image
         run: |
           docker load --input /tmp/trow_image.tar.zst
-          ID=$(docker run -d --name trow -p 8000:8000 trow:onpr)
+          ID=$(docker run -d -e RUST_LOG=debug --name trow -p 8000:8000 trow:onpr)
           IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $ID)
           echo "container-ip=$IP" >> $GITHUB_OUTPUT
       - name: Test connectivity
         run: curl "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
       - name: Run OCI Distribution Spec conformance tests
-        uses: opencontainers/distribution-spec@v1.1.0-rc3
+        uses: opencontainers/distribution-spec@v1.1.0
         env:
           OCI_ROOT_URL: "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
           OCI_NAMESPACE: oci-conformance/distribution-test
@@ -96,6 +96,9 @@ jobs:
           OCI_TEST_CONTENT_MANAGEMENT: 1
           OCI_HIDE_SKIPPED_WORKFLOWS: 0
           OCI_DEBUG: 0
+      - name: Print trow logs
+        if: always()
+        run: docker logs trow
 
 
   helm-chart-validation:

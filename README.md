@@ -49,10 +49,6 @@ Note that Trow is currently alpha and you can expect to find rough edges.
 If you're interested in the design of Trow please take a look at the [Architecture
 Guide](docs/ARCHITECTURE.md).
 
-## Tests
-
-There is a reasonably large test suite, which can be run with the `docker/test.sh` script.
-
 ## User Guide
 
 Work has started on a [User Guide](docs/USER_GUIDE.md). Currently this explains

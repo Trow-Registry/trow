@@ -1,11 +1,12 @@
 mod admission;
 mod blob;
 mod catalog;
+pub mod extracts;
 mod health;
 pub mod macros;
 mod manifest;
-mod metrics;
 mod readiness;
+
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
@@ -36,7 +37,6 @@ pub fn create_app(state: super::TrowServerState) -> Router {
         .route("/validate-image", post(admission::validate_image))
         .route("/mutate-image", post(admission::mutate_image))
         .route("/healthz", get(health::healthz))
-        .route("/metrics", get(metrics::metrics))
         .route("/readiness", get(readiness::readiness));
 
     // blob
@@ -95,9 +95,21 @@ pub fn create_app(state: super::TrowServerState) -> Router {
                     path = req.uri().path(),
                 )
             })
-            .on_response(|_: &_, duration: Duration, _span: &tracing::Span| {
-                tracing::info!("done in {:?}", duration)
-            }),
+            .on_response(
+                |body: &Response<Body>, duration: Duration, _span: &tracing::Span| {
+                    let size = body.size_hint();
+                    let size_str = humansize::format_size(
+                        size.upper().unwrap_or(size.lower()),
+                        humansize::BINARY.space_after_value(false),
+                    );
+                    tracing::info!(
+                        "{:?} {}ms {}",
+                        body.status(),
+                        duration.as_millis(),
+                        size_str
+                    );
+                },
+            ),
     );
 
     if let Some(domains) = &state.config.cors {

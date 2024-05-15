@@ -1,7 +1,7 @@
 # Trow Architecture
 
 Trow started with a front-end and a backend communicating via gRPC,
-gRPC was removed to simplify the structure, but you will still find that the trow_server
+gRPC was removed to simplify the structure, but you will still find that the registry
 module is very distinct from the rest of the trow crate.
 
 

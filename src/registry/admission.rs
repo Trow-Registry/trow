@@ -1,9 +1,9 @@
-use anyhow::Result;
 use json_patch::{Patch, PatchOperation, ReplaceOperation};
+use k8s_openapi::api::core::v1::Pod;
+use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use super::api_types::{AdmissionRequest, AdmissionResponse, Status};
 use super::image::RemoteImage;
 use super::TrowServer;
 
@@ -54,20 +54,46 @@ fn check_image_is_allowed(
     (is_allowed, match_reason)
 }
 
+fn extract_images(pod: &Pod) -> (Vec<String>, Vec<String>) {
+    let mut images = vec![];
+    let mut paths = vec![];
+
+    let spec = pod.spec.clone().unwrap_or_default();
+    for (i, container) in spec.containers.iter().enumerate() {
+        if let Some(image) = &container.image {
+            images.push(image.clone());
+            paths.push(format!("/spec/containers/{i}/image"));
+        }
+    }
+
+    for (i, container) in spec.init_containers.unwrap_or_default().iter().enumerate() {
+        if let Some(image) = &container.image {
+            images.push(image.clone());
+            paths.push(format!("/spec/initContainers/{i}/image"));
+        }
+    }
+
+    (images, paths)
+}
+
 // AdmissionController
 impl TrowServer {
-    pub async fn validate_admission(&self, ar: AdmissionRequest) -> Result<AdmissionResponse> {
+    pub async fn validate_admission(&self, ar: &AdmissionRequest<Pod>) -> AdmissionResponse {
+        let resp = AdmissionResponse::from(ar);
+
         if self.image_validation_config.is_none() {
-            return Ok(AdmissionResponse {
-                patch: None,
-                is_allowed: false,
-                reason: "Missing image validation config !".to_string(),
-            });
+            return resp.deny("Image validation not configured");
         }
+        let pod = match &ar.object {
+            Some(pod) => pod,
+            None => return resp.deny("No pod in pod admission request"),
+        };
+        let (images, _) = extract_images(pod);
+
         let mut valid = true;
         let mut reasons = Vec::new();
 
-        for image_raw in ar.images {
+        for image_raw in images {
             let (v, r) =
                 check_image_is_allowed(&image_raw, self.image_validation_config.as_ref().unwrap());
             if !v {
@@ -77,23 +103,39 @@ impl TrowServer {
             }
         }
 
-        let ar = AdmissionResponse {
-            patch: None,
-            is_allowed: valid,
-            reason: reasons.join("; "),
-        };
-        Ok(ar)
+        if valid {
+            resp
+        } else {
+            resp.deny(reasons.join("; "))
+        }
     }
 
     pub async fn mutate_admission(
         &self,
-        ar: AdmissionRequest,
-    ) -> Result<AdmissionResponse, Status> {
+        ar: &AdmissionRequest<Pod>,
+        host_name: &str,
+    ) -> AdmissionResponse {
+        let resp = AdmissionResponse::from(ar);
+        let proxy_config = match self.proxy_registry_config {
+            Some(ref cfg) => cfg,
+            None => {
+                event!(
+                    Level::WARN,
+                    "Proxy registry config not set, cannot mutate image references"
+                );
+                return resp;
+            }
+        };
+        let pod = match &ar.object {
+            Some(pod) => pod,
+            None => {
+                event!(Level::WARN, "No pod in pod admission mutation request");
+                return resp;
+            }
+        };
+        let (images, image_paths) = extract_images(pod);
         let mut patch_operations = Vec::<PatchOperation>::new();
-        let proxy_config = self.proxy_registry_config.as_ref().ok_or(Status::Internal(
-            "Proxy registry config not set, cannot mutate image references".to_owned(),
-        ))?;
-        for (raw_image, image_path) in ar.images.iter().zip(ar.image_paths.iter()) {
+        for (raw_image, image_path) in images.iter().zip(image_paths.iter()) {
             let image = match RemoteImage::try_from_str(raw_image) {
                 Ok(image) => image,
                 Err(e) => {
@@ -124,7 +166,7 @@ impl TrowServer {
                         proxy_config.alias
                     );
                     let im = RemoteImage::new(
-                        &ar.host_name,
+                        host_name,
                         format!("f/{}/{}", proxy_config.alias, image.get_repo()),
                         image.reference.clone(),
                     );
@@ -136,16 +178,13 @@ impl TrowServer {
             }
         }
         let patch = Patch(patch_operations);
-        let patch_vec = Some(
-            serde_json::to_vec(&patch)
-                .map_err(|e| Status::Internal(format!("Could not serialize patch: {}", e)))?,
-        );
-
-        Ok(AdmissionResponse {
-            patch: patch_vec,
-            is_allowed: true,
-            reason: "".to_string(),
-        })
+        match resp.with_patch(patch) {
+            Ok(resp) => resp,
+            Err(e) => {
+                event!(Level::WARN, "Produced invalid admission patch: {}", e);
+                AdmissionResponse::invalid("Internal error serializing the patch")
+            }
+        }
     }
 }
 #[cfg(test)]
