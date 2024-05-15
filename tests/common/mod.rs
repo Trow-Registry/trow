@@ -72,7 +72,7 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
+pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     use crate::common;
 
     let resp = cl
