@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::extract::{Path, State};
+use axum::routing::get;
+use axum::Router;
 use digest::Digest;
 use tracing::{event, Level};
 
@@ -9,6 +11,7 @@ use super::macros::endpoint_fn_7_levels;
 use crate::registry::{digest, BlobReader};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
+use crate::routes::macros::route_7_levels;
 use crate::types::BlobDeleted;
 use crate::TrowServerState;
 
@@ -23,7 +26,7 @@ digest - unique identifier for the blob to be downloaded
 200 - blob is downloaded
 307 - redirect to another service for downloading[1]
  */
-pub async fn get_blob(
+async fn get_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((one, digest)): Path<(String, String)>,
@@ -60,7 +63,7 @@ endpoint_fn_7_levels!(
  * TODO: This should probably be denied if the blob is referenced by any manifests
  * (manifest should be deleted first)
  */
-pub async fn delete_blob(
+async fn delete_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((one, digest)): Path<(String, String)>,
@@ -81,3 +84,14 @@ endpoint_fn_7_levels!(
     path: [image_name, digest]
     ) -> Result<BlobDeleted, Error>
 );
+
+pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {
+    #[rustfmt::skip]
+    route_7_levels!(
+        app,
+        "/v2" "/blobs/:digest",
+        get(get_blob, get_blob_2level, get_blob_3level, get_blob_4level, get_blob_5level, get_blob_6level, get_blob_7level),
+        delete(delete_blob, delete_blob_2level, delete_blob_3level, delete_blob_4level, delete_blob_5level, delete_blob_6level, delete_blob_7level)
+    );
+    app
+}

@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::extract::{Path, Query, State};
+use axum::routing::get;
+use axum::Router;
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::ManifestHistory;
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
+use crate::routes::macros::route_7_levels;
 use crate::types::{RepoCatalog, TagList};
 use crate::TrowServerState;
 
@@ -17,7 +20,7 @@ pub struct CatalogListQuery {
     last: Option<String>,
 }
 
-pub async fn get_catalog(
+async fn get_catalog(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Query(query): Query<CatalogListQuery>,
@@ -34,7 +37,7 @@ pub async fn get_catalog(
     Ok(RepoCatalog::from(cat))
 }
 
-pub async fn list_tags(
+async fn list_tags(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path(repo_name): Path<String>,
@@ -59,7 +62,7 @@ endpoint_fn_7_levels!(
     ) -> Result<TagList, Error>
 );
 
-pub async fn get_manifest_history(
+async fn get_manifest_history(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((name, reference)): Path<(String, String)>,
@@ -85,3 +88,20 @@ endpoint_fn_7_levels!(
         query: Query<CatalogListQuery>
     ) -> Result<ManifestHistory, Error>
 );
+
+pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {
+    app = app.route("/v2/_catalog", get(get_catalog));
+    #[rustfmt::skip]
+    route_7_levels!(
+        app,
+        "/v2" "/tags/list",
+        get(list_tags, list_tags_2level, list_tags_3level, list_tags_4level, list_tags_5level, list_tags_6level, list_tags_7level)
+    );
+    #[rustfmt::skip]
+    route_7_levels!(
+        app,
+        "" "/manifest_history/:reference",
+        get(get_manifest_history, get_manifest_history_2level, get_manifest_history_3level, get_manifest_history_4level, get_manifest_history_5level, get_manifest_history_6level, get_manifest_history_7level)
+    );
+    app
+}
