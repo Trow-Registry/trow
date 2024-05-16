@@ -3,7 +3,6 @@ pub mod authenticate;
 pub mod blob_deleted;
 pub mod blob_reader;
 pub mod content_info;
-pub mod empty;
 pub mod errors;
 pub mod health;
 pub mod html;

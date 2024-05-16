@@ -1,12 +1,16 @@
+// routes
 mod admission;
 mod blob;
 mod blob_upload;
 mod catalog;
-pub mod extracts;
 mod health;
-pub mod macros;
 mod manifest;
 mod readiness;
+
+// helpers
+mod extracts;
+mod macros;
+mod response;
 
 use std::str;
 use std::sync::Arc;
@@ -20,13 +24,13 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use hyper::http::HeaderValue;
+use response::errors::Error;
+use response::html::HTML;
+use response::trow_token::{self, TrowToken, ValidBasicToken};
 use tower::ServiceBuilder;
 use tower_http::{cors, trace};
 use tracing::{event, Level};
 
-use crate::response::errors::Error;
-use crate::response::html::HTML;
-use crate::response::trow_token::{self, TrowToken, ValidBasicToken};
 use crate::TrowServerState;
 
 fn create_router<S: Send + Sync + Clone + 'static>() -> Router<S> {
