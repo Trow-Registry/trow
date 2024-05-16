@@ -1,9 +1,7 @@
-pub mod response;
-#[allow(clippy::too_many_arguments)]
+pub mod registry;
 mod routes;
 pub mod types;
 
-pub mod registry;
 #[cfg(feature = "sqlite")]
 mod users;
 

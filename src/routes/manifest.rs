@@ -9,9 +9,9 @@ use digest::Digest;
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::{digest, ManifestReader, StorageDriverError};
-use crate::response::errors::Error;
-use crate::response::trow_token::TrowToken;
 use crate::routes::macros::route_7_levels;
+use crate::routes::response::errors::Error;
+use crate::routes::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::TrowServerState;
 

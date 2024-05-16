@@ -12,12 +12,11 @@ use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::storage::StorageBackendError;
-use crate::registry::{digest, ContentInfo, StorageDriverError};
-use crate::response::errors::Error;
-use crate::response::trow_token::TrowToken;
-use crate::response::upload_info::UploadInfo;
+use crate::registry::{digest, ContentInfo, StorageBackendError, StorageDriverError};
 use crate::routes::macros::route_7_levels;
+use crate::routes::response::errors::Error;
+use crate::routes::response::trow_token::TrowToken;
+use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, Upload, Uuid};
 use crate::TrowServerState;
 

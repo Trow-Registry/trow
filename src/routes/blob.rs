@@ -9,9 +9,9 @@ use tracing::{event, Level};
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::{digest, BlobReader};
-use crate::response::errors::Error;
-use crate::response::trow_token::TrowToken;
 use crate::routes::macros::route_7_levels;
+use crate::routes::response::errors::Error;
+use crate::routes::response::trow_token::TrowToken;
 use crate::types::BlobDeleted;
 use crate::TrowServerState;
 
