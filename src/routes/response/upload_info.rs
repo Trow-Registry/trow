@@ -39,7 +39,7 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::response::upload_info::UploadInfo;
+    use crate::routes::response::upload_info::UploadInfo;
     use crate::types::Uuid;
     fn build_response() -> UploadInfo {
         UploadInfo::new(
