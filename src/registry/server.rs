@@ -76,7 +76,7 @@ impl TrowServer {
                 .get_proxy_config(name, reference)
                 .await
             {
-                let digest = proxy_cfg.download_remote_image(&img, &self).await?;
+                let digest = proxy_cfg.download_remote_image(&img, self).await?;
                 self.storage
                     .get_manifest("(fixme: none)", &digest.to_string())
                     .await

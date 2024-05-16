@@ -1,3 +1,5 @@
+mod db;
+mod migrations;
 pub mod registry;
 mod routes;
 pub mod types;

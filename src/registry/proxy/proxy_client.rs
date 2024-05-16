@@ -34,7 +34,7 @@ impl HttpAuth {
         cl: &reqwest::Client,
         authn_header: &str,
     ) -> Result<Self> {
-        let tok = get_bearer_auth_token(&cl, authn_header, proxy_cfg)
+        let tok = get_bearer_auth_token(cl, authn_header, proxy_cfg)
             .await
             .map_err(|e| {
                 anyhow!(
@@ -65,7 +65,7 @@ impl ProxyClient {
             // .connect_timeout(Duration::from_millis(1000))
             .build()?;
 
-        let authn_header = get_www_authenticate_header(&base_client, &remote_image).await?;
+        let authn_header = get_www_authenticate_header(&base_client, remote_image).await?;
 
         if proxy_cfg.host.contains(".dkr.ecr.")
             && proxy_cfg.host.contains(".amazonaws.com")
