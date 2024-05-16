@@ -1,20 +1,25 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Result};
+use async_recursion::async_recursion;
 use aws_config::BehaviorVersion;
 use base64::engine::general_purpose;
 use base64::Engine as _;
+use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use quoted_string::strip_dquotes;
 use regex::Regex;
 use reqwest::{self, Method, StatusCode};
-use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use super::image::RemoteImage;
-use super::server::create_accept_header;
+use super::create_accept_header;
+use super::proxy_config::SingleRegistryProxyConfig;
+use super::remote_image::RemoteImage;
+use crate::registry::manifest::{Manifest, OCIManifest};
+use crate::registry::{Digest, TrowServer};
 
 const AUTHN_HEADER: &str = "www-authenticate";
+static DIGEST_HEADER: &str = "Docker-Content-Digest";
 
 #[derive(Debug)]
 pub enum HttpAuth {
@@ -23,95 +28,10 @@ pub enum HttpAuth {
     None,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RegistryProxiesConfig {
-    pub registries: Vec<SingleRegistryProxyConfig>,
-    #[serde(default)]
-    pub offline: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SingleRegistryProxyConfig {
-    pub alias: String,
-    /// This field is unvalidated and may contain a scheme or not.
-    /// eg: `http://example.com` and `example.com`
-    pub host: String,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    #[serde(default)]
-    pub ignore_repos: Vec<String>,
-}
-
-/// Wrapper around `reqwest::Client` that automagically handles authentication
-/// to other container registries
-pub struct ProxyClient {
-    pub cl: reqwest::Client,
-    pub auth: HttpAuth,
-}
-
-impl ProxyClient {
-    pub async fn try_new(
-        mut proxy_cfg: SingleRegistryProxyConfig,
-        proxy_image: &RemoteImage,
-    ) -> Result<Self> {
-        let base_client = reqwest::ClientBuilder::new()
-            // .connect_timeout(Duration::from_millis(1000))
-            .build()?;
-
-        let authn_header = get_www_authenticate_header(&base_client, proxy_image).await?;
-
-        if proxy_cfg.host.contains(".dkr.ecr.")
-            && proxy_cfg.host.contains(".amazonaws.com")
-            && matches!(&proxy_cfg.username, Some(u) if u == "AWS")
-            && proxy_cfg.password.is_none()
-        {
-            let passwd = get_aws_ecr_password_from_env(&proxy_cfg.host)
-                .await
-                .context("Could not fetch password to ECR registry")?;
-            proxy_cfg.password = Some(passwd);
-        }
-
-        match authn_header {
-            Some(h) if h.starts_with("Basic") => {
-                Self::try_new_with_basic_auth(&proxy_cfg, base_client).await
-            }
-            Some(h) if h.starts_with("Bearer") => {
-                Self::try_new_with_bearer_auth(&proxy_cfg, base_client, &h).await
-            }
-            None => Ok(ProxyClient {
-                cl: base_client,
-                auth: HttpAuth::None,
-            }),
-            Some(invalid_header) => Err(anyhow!(
-                "Could not parse {AUTHN_HEADER} of registry `{}`: `{}`",
-                proxy_cfg.host,
-                invalid_header
-            )),
-        }
-    }
-
-    async fn try_new_with_basic_auth(
+impl HttpAuth {
+    pub async fn bearer(
         proxy_cfg: &SingleRegistryProxyConfig,
-        cl: reqwest::Client,
-    ) -> Result<Self> {
-        if proxy_cfg.username.is_none() {
-            return Err(anyhow!(
-                "Registry `{}` requires Basic auth but no username was provided",
-                proxy_cfg.host
-            ));
-        }
-        Ok(ProxyClient {
-            cl,
-            auth: HttpAuth::Basic(
-                proxy_cfg.username.clone().unwrap(),
-                proxy_cfg.password.clone(),
-            ),
-        })
-    }
-
-    async fn try_new_with_bearer_auth(
-        proxy_cfg: &SingleRegistryProxyConfig,
-        cl: reqwest::Client,
+        cl: &reqwest::Client,
         authn_header: &str,
     ) -> Result<Self> {
         let tok = get_bearer_auth_token(&cl, authn_header, proxy_cfg)
@@ -124,20 +44,198 @@ impl ProxyClient {
                 )
             })?;
 
-        Ok(ProxyClient {
-            cl,
-            auth: HttpAuth::Bearer(tok),
+        Ok(Self::Bearer(tok))
+    }
+}
+
+/// Wrapper around `reqwest::Client` that automagically handles authentication
+/// to other container registries
+pub struct ProxyClient {
+    cl: reqwest::Client,
+    auth: HttpAuth,
+    remote_image: RemoteImage,
+}
+
+impl ProxyClient {
+    pub async fn try_new(
+        mut proxy_cfg: SingleRegistryProxyConfig,
+        remote_image: &RemoteImage,
+    ) -> Result<Self> {
+        let base_client = reqwest::ClientBuilder::new()
+            // .connect_timeout(Duration::from_millis(1000))
+            .build()?;
+
+        let authn_header = get_www_authenticate_header(&base_client, &remote_image).await?;
+
+        if proxy_cfg.host.contains(".dkr.ecr.")
+            && proxy_cfg.host.contains(".amazonaws.com")
+            && matches!(&proxy_cfg.username, Some(u) if u == "AWS")
+            && proxy_cfg.password.is_none()
+        {
+            let passwd = get_aws_ecr_password_from_env(&proxy_cfg.host)
+                .await
+                .context("Could not fetch password to ECR registry")?;
+            proxy_cfg.password = Some(passwd);
+        }
+
+        let auth = match authn_header {
+            Some(h) if h.starts_with("Basic") => {
+                if proxy_cfg.username.is_none() {
+                    return Err(anyhow!(
+                        "Registry `{}` requires Basic auth but no username was provided",
+                        proxy_cfg.host
+                    ));
+                }
+                HttpAuth::Basic(
+                    proxy_cfg.username.clone().unwrap(),
+                    proxy_cfg.password.clone(),
+                )
+            }
+            Some(h) if h.starts_with("Bearer") => {
+                HttpAuth::bearer(&proxy_cfg, &base_client, &h).await?
+            }
+            None => HttpAuth::None,
+
+            Some(invalid_header) => {
+                return Err(anyhow!(
+                    "Could not parse {AUTHN_HEADER} of registry `{}`: `{}`",
+                    proxy_cfg.host,
+                    invalid_header
+                ))
+            }
+        };
+
+        Ok(Self {
+            cl: base_client,
+            auth,
+            remote_image: remote_image.clone(),
         })
     }
 
     /// Build a request with added authentication.
     /// The auth method will vary depending on the registry being queried.
-    pub fn authenticated_request(&self, method: Method, url: &str) -> reqwest::RequestBuilder {
+    fn authenticated_request(&self, method: Method, url: &str) -> reqwest::RequestBuilder {
         let req = self.cl.request(method, url);
         match &self.auth {
             HttpAuth::Basic(username, password) => req.basic_auth(username, password.to_owned()),
             HttpAuth::Bearer(token) => req.bearer_auth(token),
             HttpAuth::None => req,
+        }
+    }
+
+    /// Download a blob that is part of `remote_image`.
+    async fn download_blob(&self, registry: &TrowServer, digest: &Digest) -> Result<()> {
+        if registry
+            .storage
+            .get_blob_stream(self.remote_image.get_repo(), digest)
+            .await
+            .is_ok()
+        {
+            event!(Level::DEBUG, "Already have blob {}", digest);
+            return Ok(());
+        }
+        let addr = format!("{}/blobs/{}", self.remote_image.get_base_uri(), digest);
+        event!(Level::INFO, "Downloading blob {}", addr);
+        let resp = self
+            .authenticated_request(Method::GET, &addr)
+            .send()
+            .await
+            .context("GET blob failed")?;
+        registry
+            .storage
+            .write_blob_stream(digest, resp.bytes_stream(), true)
+            .await
+            .context("Failed to write blob")?;
+        Ok(())
+    }
+
+    #[async_recursion]
+    pub async fn download_manifest_and_layers(
+        &self,
+        registry: &TrowServer,
+        remote_image: &RemoteImage,
+        local_repo_name: &str,
+    ) -> Result<()> {
+        event!(
+            Level::DEBUG,
+            "Downloading manifest + layers for {}",
+            remote_image
+        );
+        let resp = self
+            .authenticated_request(Method::GET, &remote_image.get_manifest_url())
+            .headers(create_accept_header())
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            return Err(anyhow!(
+                "GET {} returned unexpected {}",
+                &remote_image.get_manifest_url(),
+                resp.status()
+            ));
+        }
+        let bytes = resp.bytes().await?;
+        let mani = Manifest::from_bytes(bytes)?;
+        match mani.parsed() {
+            OCIManifest::List(_) => {
+                let images_to_dl = mani
+                    .get_local_asset_digests()?
+                    .into_iter()
+                    .map(|digest| {
+                        let mut image = remote_image.clone();
+                        image.reference = digest.to_string();
+                        image
+                    })
+                    .collect::<Vec<_>>();
+                let futures = images_to_dl
+                    .iter()
+                    .map(|img| self.download_manifest_and_layers(registry, img, local_repo_name));
+                try_join_all(futures).await?;
+            }
+            OCIManifest::V2(_) => {
+                let digests: Vec<_> = mani.get_local_asset_digests()?;
+
+                let futures = digests
+                    .iter()
+                    .map(|digest| self.download_blob(registry, digest));
+                try_join_all(futures).await?;
+            }
+        }
+        registry
+            .storage
+            .write_image_manifest(mani.raw(), local_repo_name, &remote_image.reference, false)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_digest_from_remote(&self) -> Option<Digest> {
+        let resp = self
+            .authenticated_request(Method::HEAD, &self.remote_image.get_manifest_url())
+            .headers(create_accept_header())
+            .send()
+            .await;
+        match resp.as_ref().map(|r| r.headers().get(DIGEST_HEADER)) {
+            Err(e) => {
+                event!(
+                    Level::ERROR,
+                    "Remote registry didn't respond correctly to HEAD request {}",
+                    e
+                );
+                None
+            }
+            Ok(None) => {
+                event!(
+                    Level::ERROR,
+                    "Remote registry didn't send header {DIGEST_HEADER}",
+                );
+                None
+            }
+            Ok(Some(header)) => {
+                let digest_str = header.to_str().unwrap();
+                let digest = Digest::try_from_raw(digest_str).unwrap();
+                Some(digest)
+            }
         }
     }
 }
