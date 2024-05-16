@@ -17,10 +17,10 @@ unacceptable behaviour to any of the project admins or adrian.mouat@container-so
 If you find a bug, please [open an issue](https://github.com/trow-registry/trow/issues)! Do try
 to include all the details needed to recreate your problem. This is likely to include:
 
- - The version of Trow being used
- - How Trow was installed
- - The exact platform and version of the platform that Trow is running on
- - The steps taken to cause the bug
+- The version of Trow being used
+- How Trow was installed
+- The exact platform and version of the platform that Trow is running on
+- The steps taken to cause the bug
 
 ## Building Features and Documentation
 

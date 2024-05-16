@@ -7,12 +7,7 @@ pub use crate::types::UploadInfo;
 
 impl IntoResponse for UploadInfo {
     fn into_response(self) -> Response {
-        let location_url = format!(
-            "{}/v2/{}/blobs/uploads/{}",
-            self.base_url(),
-            self.repo_name(),
-            self.uuid()
-        );
+        let location_url = format!("/v2/{}/blobs/uploads/{}", self.repo_name(), self.uuid());
         let (left, right) = self.range();
         event!(
             Level::DEBUG,
@@ -23,7 +18,7 @@ impl IntoResponse for UploadInfo {
         );
 
         Response::builder()
-            .header("Docker-Upload-UUID", self.uuid().0.clone())
+            .header("Docker-Upload-UUID", self.uuid().to_string())
             .header("Range", format!("{}-{}", left, right))
             .header("Content-Length", format!("{}", right - left))
             .header("Location", location_url)
@@ -40,11 +35,10 @@ mod test {
     use axum::response::IntoResponse;
 
     use crate::routes::response::upload_info::UploadInfo;
-    use crate::types::Uuid;
+
     fn build_response() -> UploadInfo {
         UploadInfo::new(
-            "ftp://darpa.org".to_string(),
-            Uuid("whatever".to_owned()),
+            uuid::Uuid::new_v4().to_string(),
             "moredhel/test".to_owned(),
             (0, 0),
         )

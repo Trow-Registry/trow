@@ -1,6 +1,7 @@
 //! types for the trow <=> trow-server interface
 
 use serde_derive::{Deserialize, Serialize};
+use tracing::{event, Level};
 
 #[derive(Clone, PartialEq)]
 pub struct UploadRequest {
@@ -143,6 +144,13 @@ pub enum Status {
     Internal(String),
     #[error("Unavailable: {0}")]
     Unavailable(String),
+}
+
+impl From<sqlx::Error> for Status {
+    fn from(err: sqlx::Error) -> Self {
+        event!(Level::ERROR, "Database error: {err:?}");
+        Self::Internal(String::new())
+    }
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

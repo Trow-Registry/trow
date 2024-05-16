@@ -1,10 +1,26 @@
-use anyhow::{anyhow, Result};
+use std::ops::DerefMut;
+use std::sync::Arc;
+
+use anyhow::Result;
+use aws_config::BehaviorVersion;
+use aws_sdk_ecr::config::http::HttpResponse;
+use aws_sdk_ecr::error::SdkError;
+use aws_sdk_ecr::operation::get_authorization_token::GetAuthorizationTokenError;
+use base64::Engine;
+use bytes::Bytes;
+use futures::future::try_join_all;
+use futures::lock::Mutex;
+use oci_client::client::ClientProtocol;
+use oci_client::secrets::RegistryAuth;
+use oci_client::Reference;
 use serde::{Deserialize, Serialize};
+use sqlx::{Sqlite, SqlitePool};
 use tracing::{event, Level};
 
-use crate::registry::proxy::proxy_client::ProxyClient;
+use crate::registry::manifest::{ManifestReference, OCIManifest};
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
+use crate::registry::storage::TrowStorageBackend;
 use crate::registry::{Digest, TrowServer};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -39,7 +55,7 @@ impl RegistryProxiesConfig {
     pub async fn get_proxy_config<'a>(
         &'a self,
         repo_name: &str,
-        reference: &str,
+        reference: &ManifestReference,
     ) -> Option<(&'a SingleRegistryProxyConfig, RemoteImage)> {
         // All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
@@ -50,7 +66,7 @@ impl RegistryProxiesConfig {
 
             for proxy in self.registries.iter() {
                 if proxy.alias == proxy_alias {
-                    let image = RemoteImage::new(&proxy.host, repo, reference.into());
+                    let image = RemoteImage::new(&proxy.host, repo, reference.clone());
                     return Some((proxy, image));
                 }
             }
@@ -58,102 +74,330 @@ impl RegistryProxiesConfig {
         None
     }
 }
+use crate::registry::digest::DigestError;
+
+#[derive(Debug, thiserror::Error)]
+pub enum DownloadRemoteImageError {
+    #[error("DatabaseError: {0}")]
+    DbError(#[from] sqlx::Error),
+    #[error("Invalid digest: {0}")]
+    InvalidDigest(#[from] DigestError),
+    #[error("Failed to download image")]
+    DownloadAttemptsFailed,
+}
 
 impl SingleRegistryProxyConfig {
+    async fn setup_client(&self, insecure: bool) -> Result<(oci_client::Client, RegistryAuth)> {
+        let mut client_config = oci_client::client::ClientConfig::default();
+        if insecure {
+            client_config.protocol = ClientProtocol::Http;
+        }
+        let client = oci_client::Client::new(client_config);
+        let auth = match self.username.as_deref() {
+            Some(u @ "AWS") if self.host.contains(".dkr.ecr.") => {
+                let passwd = get_aws_ecr_password_from_env(&self.host).await?;
+                RegistryAuth::Basic(u.to_string(), passwd)
+            }
+            Some(u) => {
+                RegistryAuth::Basic(u.to_string(), self.password.clone().unwrap_or_default())
+            }
+            None => RegistryAuth::Anonymous,
+        };
+        // client.auth(&image.clone().into(), &auth, RegistryOperation::Pull).await?;
+        Ok((client, auth))
+    }
+
     /// returns the downloaded digest
     pub async fn download_remote_image(
         &self,
         image: &RemoteImage,
         registry: &TrowServer,
-    ) -> Result<Digest> {
+        db: &SqlitePool,
+    ) -> Result<Digest, DownloadRemoteImageError> {
+        let mut txn = db.begin().await?;
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
+        event!(Level::DEBUG, "Downloading proxied image {}", repo_name);
 
-        let try_cl = match ProxyClient::try_new(self.clone(), image).await {
-            Ok(cl) => Some(cl),
-            Err(e) => {
-                event!(
-                    Level::WARN,
-                    "Could not create client for proxied registry {}: {:?}",
-                    self.host,
-                    e
-                );
-                None
-            }
-        };
-        let remote_img_ref_digest = Digest::try_from_raw(&image.reference);
-        let (local_digest, latest_digest) = match remote_img_ref_digest {
-            // The ref is a digest, no need to map tg to digest
-            Ok(digest) => (Some(digest), None),
-            // The ref is a tag, let's search for the digest
-            Err(_) => {
-                let local_digest = registry
-                    .storage
-                    .get_manifest_digest(&repo_name, &image.reference)
-                    .await
-                    .ok();
-                let latest_digest = match &try_cl {
-                    Some(cl) => cl.get_digest_from_remote().await,
-                    _ => None,
-                };
-                if latest_digest == local_digest && local_digest.is_none() {
-                    anyhow::bail!(
-                        "Could not fetch digest for {}:{}",
-                        repo_name,
-                        image.reference
-                    );
+        let image_ref: Reference = image.clone().into();
+        let try_cl = self.setup_client(image.scheme == "http").await.ok();
+
+        // digests is a list of posstible digests for the given reference
+        let digests = match &image.reference {
+            ManifestReference::Digest(d) => vec![d.clone()],
+            ManifestReference::Tag(t) => {
+                let mut digests = vec![];
+                let local_digest = sqlx::query_scalar!(
+                    r#"
+                    SELECT manifest_digest
+                    FROM tag
+                    WHERE repo = $1
+                    AND tag = $2
+                    "#,
+                    repo_name,
+                    t
+                )
+                .fetch_optional(&mut *txn)
+                .await?;
+                if let Some((cl, auth)) = &try_cl {
+                    match cl.fetch_manifest_digest(&image_ref, auth).await {
+                        Ok(d) => {
+                            if Some(&d) != local_digest.as_ref() {
+                                digests.push(Digest::try_from_raw(&d)?);
+                            }
+                        }
+                        Err(e) => event!(Level::WARN, "Failed to fetch manifest digest: {}", e),
+                    }
                 }
-                (local_digest, latest_digest)
+                if let Some(local_digest) = local_digest {
+                    digests.push(Digest::try_from_raw(&local_digest)?);
+                }
+                digests
             }
         };
 
-        let manifest_digests = [latest_digest, local_digest].into_iter().flatten();
-        for mani_digest in manifest_digests {
-            let have_manifest = registry
-                .storage
-                .get_blob_stream("(fixme: none)", &mani_digest)
-                .await
-                .is_ok();
+        for mani_digest in digests.into_iter() {
+            let mani_digest_str = mani_digest.as_str();
+            let have_manifest = sqlx::query_scalar!(
+                r#"
+                SELECT EXISTS(
+                    SELECT 1 FROM blob
+                    WHERE digest = $1 AND is_manifest = 1
+                )
+                "#,
+                mani_digest_str
+            )
+            .fetch_one(&mut *txn)
+            .await?
+                == 1;
             if have_manifest {
                 return Ok(mani_digest);
             }
-            if try_cl.is_none() {
-                event!(
-                    Level::WARN,
-                    "Missing manifest for proxied image, proxy client not available"
-                );
-            }
-            if let Some(cl) = &try_cl {
-                let img_ref_as_digest = Digest::try_from_raw(&image.reference);
-                let manifest_download = cl
-                    .download_manifest_and_layers(registry, &image, &repo_name)
-                    .await;
-                match (manifest_download, img_ref_as_digest) {
-                    (Err(e), _) => {
-                        event!(Level::WARN, "Failed to download proxied image: {}", e)
+            if let Some((cl, auth)) = &try_cl {
+                let ref_to_dl = image_ref.clone_with_digest(mani_digest.to_string());
+
+                let manifest_download = download_manifest_and_layers(
+                    cl,
+                    auth,
+                    Arc::new(Mutex::new(&mut *txn)),
+                    &registry.storage,
+                    &ref_to_dl,
+                    &repo_name,
+                )
+                .await;
+
+                if let Err(e) = manifest_download {
+                    event!(Level::WARN, "Failed to download proxied image: {}", e)
+                } else {
+                    if let Some(tag) = image_ref.tag() {
+                        sqlx::query!(
+                            r#"
+                            INSERT INTO tag (repo, tag, manifest_digest)
+                            VALUES ($1, $2, $3)
+                            ON CONFLICT (repo, tag) DO UPDATE SET manifest_digest = $3
+                            "#,
+                            repo_name,
+                            tag,
+                            mani_digest_str
+                        )
+                        .execute(&mut *txn)
+                        .await?;
                     }
-                    (Ok(()), Err(_)) => {
-                        let write_tag = registry
-                            .storage
-                            .write_tag(&repo_name, &image.reference, &mani_digest)
-                            .await;
-                        match write_tag {
-                            Ok(_) => return Ok(mani_digest),
-                            Err(e) => event!(
-                                Level::DEBUG,
-                                "Internal error updating tag for proxied image ({})",
-                                e
-                            ),
-                        }
-                    }
-                    (Ok(()), Ok(_)) => return Ok(mani_digest),
+                    txn.commit().await?;
+                    return Ok(mani_digest);
                 }
             }
         }
-        Err(anyhow!(
-            "Could not fetch manifest for proxied image {}:{}",
-            repo_name,
-            image.reference
-        ))
+
+        Err(DownloadRemoteImageError::DownloadAttemptsFailed)
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+enum EcrPasswordError {
+    #[error("Could not parse region from ECR URL")]
+    InvalidRegion,
+    #[error("Could not decode ECR token: {0}")]
+    Base64DecodeError(#[from] base64::DecodeError),
+    #[error("Could not convert ECR token to UTF8: {0}")]
+    Utf8Error(#[from] std::string::FromUtf8Error),
+    #[error("Could not get AWS token: {0}")]
+    AWSError(#[from] SdkError<GetAuthorizationTokenError, HttpResponse>),
+}
+
+/// Fetches AWS ECR credentials.
+/// We use the [rusoto ChainProvider](https://docs.rs/rusoto_credential/0.48.0/rusoto_credential/struct.ChainProvider.html)
+/// to fetch AWS credentials.
+async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPasswordError> {
+    let region = ecr_host
+        .split('.')
+        .nth(3)
+        .ok_or(EcrPasswordError::InvalidRegion)?
+        .to_owned();
+    let region = aws_types::region::Region::new(region);
+    let config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+        .region(region)
+        .load()
+        .await;
+    let ecr_clt = aws_sdk_ecr::Client::new(&config);
+    let token_response = ecr_clt.get_authorization_token().send().await?;
+    let token = token_response
+        .authorization_data
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap()
+        .authorization_token
+        .unwrap();
+
+    // The token is base64(username:password). Here, username is "AWS".
+    // To get the password, we trim "AWS:" from the decoded token.
+    let engine = base64::engine::general_purpose::STANDARD;
+    let mut auth_str = engine.decode(token)?;
+    auth_str.drain(0..4);
+
+    Ok(String::from_utf8(auth_str)?)
+}
+
+/// `ref_` MUST reference a digest (*not* a tag)
+// #[async_recursion]
+async fn download_manifest_and_layers<C>(
+    cl: &oci_client::Client,
+    auth: &RegistryAuth,
+    db: Arc<Mutex<&mut C>>,
+    storage: &TrowStorageBackend,
+    ref_: &Reference,
+    local_repo_name: &str,
+) -> Result<()>
+where
+    for<'e> &'e mut C: sqlx::Executor<'e, Database = Sqlite>,
+{
+    async fn download_blob<C>(
+        cl: &oci_client::Client,
+        db: Arc<Mutex<&mut C>>,
+        storage: &TrowStorageBackend,
+        ref_: &Reference,
+        layer_digest: &str,
+        local_repo_name: &str,
+    ) -> Result<()>
+    where
+        for<'e> &'e mut C: sqlx::Executor<'e, Database = Sqlite>,
+    {
+        event!(Level::TRACE, "Downloading blob {}", layer_digest);
+        let already_has_blob = match sqlx::query!(
+            "INSERT INTO blob (digest, is_manifest, size) VALUES ($1, FALSE, $2);",
+            layer_digest,
+            0
+        )
+        .execute(&mut **db.lock().await.deref_mut())
+        .await
+        {
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => true,
+            Err(e) => return Err(e.into()),
+            Ok(_) => false,
+        };
+
+        if !already_has_blob {
+            let stream = cl.pull_blob_stream(ref_, layer_digest).await?;
+            let path = storage
+                .write_blob_stream(&Digest::try_from_raw(layer_digest).unwrap(), stream, true)
+                .await?;
+            let size = path.metadata().unwrap().len() as i64;
+            sqlx::query!(
+                "UPDATE blob SET size = $1 WHERE digest = $2;",
+                size,
+                layer_digest
+            )
+            .execute(&mut **db.lock().await.deref_mut())
+            .await?;
+        }
+        sqlx::query!(
+            "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
+            local_repo_name,
+            layer_digest
+        )
+        .execute(&mut **db.lock().await.deref_mut())
+        .await?;
+        let parent_digest = ref_.digest().unwrap();
+        sqlx::query!(
+                "INSERT INTO blob_blob_association (parent_digest, child_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
+                parent_digest,
+                layer_digest
+            )
+            .execute(&mut **db.lock().await.deref_mut())
+            .await?;
+
+        Ok(())
+    }
+
+    const MIME_TYPES_DISTRIBUTION_MANIFEST: &[&str] = &[
+        oci_client::manifest::IMAGE_MANIFEST_MEDIA_TYPE,
+        oci_client::manifest::IMAGE_MANIFEST_LIST_MEDIA_TYPE,
+        oci_client::manifest::OCI_IMAGE_MEDIA_TYPE,
+        oci_client::manifest::OCI_IMAGE_INDEX_MEDIA_TYPE,
+    ];
+
+    event!(Level::DEBUG, "Downloading manifest + layers for {}", ref_);
+
+    let (raw_manifest, digest) = cl
+        .pull_manifest_raw(ref_, auth, MIME_TYPES_DISTRIBUTION_MANIFEST)
+        .await?;
+    let manifest: OCIManifest = serde_json::from_slice(&raw_manifest).map_err(|e| {
+        oci_client::errors::OciDistributionError::ManifestParsingError(e.to_string())
+    })?;
+
+    let manifest_size = raw_manifest.len() as i64;
+    let already_has_manifest = match sqlx::query!(
+        "INSERT INTO blob (digest, is_manifest, size) VALUES ($1, TRUE, $2);",
+        digest,
+        manifest_size
+    )
+    .execute(&mut **db.lock().await.deref_mut())
+    .await
+    {
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => true,
+        Err(e) => return Err(e.into()),
+        Ok(_) => false,
+    };
+
+    sqlx::query!(
+        "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
+        local_repo_name,
+        digest,
+    )
+    .execute(&mut **db.lock().await.deref_mut())
+    .await?;
+
+    if !already_has_manifest {
+        storage
+            .write_image_manifest(
+                Bytes::from(raw_manifest),
+                local_repo_name,
+                &Digest::try_from_raw(&digest).unwrap(),
+            )
+            .await?;
+    }
+
+    match manifest {
+        OCIManifest::List(m) => {
+            let images_to_dl = m
+                .manifests()
+                .iter()
+                .map(|m| ref_.clone_with_digest(m.digest().as_ref().to_string()))
+                .collect::<Vec<_>>();
+            let futures = images_to_dl.iter().map(|img| {
+                download_manifest_and_layers(cl, auth, db.clone(), storage, img, local_repo_name)
+            });
+            try_join_all(futures).await?;
+        }
+        OCIManifest::V2(m) => {
+            let layer_digests = m.layers().iter().map(|layer| layer.digest().as_ref());
+            let futures = layer_digests
+                .clone()
+                .map(|l| download_blob(cl, db.clone(), storage, ref_, l, local_repo_name));
+            try_join_all(futures).await?;
+        }
+    }
+
+    Ok(())
 }

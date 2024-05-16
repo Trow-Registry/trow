@@ -19,7 +19,7 @@ use std::time::Duration;
 use axum::body::{Body, HttpBody};
 use axum::extract::State;
 use axum::http::method::Method;
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderName, StatusCode};
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
@@ -28,13 +28,16 @@ use response::errors::Error;
 use response::html::HTML;
 use response::trow_token::{self, TrowToken, ValidBasicToken};
 use tower::ServiceBuilder;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::{cors, trace};
 use tracing::{event, Level};
 
 use crate::TrowServerState;
 
-fn create_router<S: Send + Sync + Clone + 'static>() -> Router<S> {
-    let mut app = Router::new();
+fn add_router_layers<S: Send + Sync + Clone + 'static>(
+    mut app: Router<S>,
+    cors_domains: &Option<Vec<String>>,
+) -> Router<S> {
     // configure logging
     app = app.layer(
         trace::TraceLayer::new_for_http()
@@ -69,45 +72,36 @@ fn create_router<S: Send + Sync + Clone + 'static>() -> Router<S> {
             ),
     );
     // Set API Version Header
-    app = app.layer(ServiceBuilder::new().map_response(|mut r: Response| {
-        r.headers_mut().insert(
-            "Docker-Distribution-API-Version",
-            HeaderValue::from_static("registry/2.0"),
-        );
-    }));
+    app = app.layer(SetResponseHeaderLayer::if_not_present(
+        HeaderName::try_from("Docker-Distribution-API-Version").unwrap(),
+        HeaderValue::from_static("registry/2.0"),
+    ));
     // Ugly hack to return a json body on HEAD requests
-    app = app.layer(ServiceBuilder::new().map_response(|mut r: Response| {
-        if r.status() == StatusCode::NOT_FOUND {
-            let body = r.body_mut();
-            if let Some(0) = body.size_hint().upper() {
-                let err = Error::NotFound.to_string();
+    app = app.layer(
+        ServiceBuilder::new()
+            .map_response(|mut r: Response| {
+                r.headers_mut().insert(
+                    "Docker-Distribution-API-Version",
+                    HeaderValue::from_static("registry/2.0"),
+                );
+                r
+            })
+            .map_response(|mut r: Response| {
+                if r.status() == StatusCode::NOT_FOUND {
+                    let body = r.body_mut();
+                    if let Some(0) = body.size_hint().upper() {
+                        let err = Error::NotFound.to_string();
 
-                *body = Body::from(err.clone());
-                r.headers_mut()
-                    .insert(header::CONTENT_LENGTH, err.len().into());
-            }
-        }
-        r
-    }));
+                        *body = Body::from(err.clone());
+                        r.headers_mut()
+                            .insert(header::CONTENT_LENGTH, err.len().into());
+                    }
+                }
+                r
+            }),
+    );
 
-    app
-}
-
-pub fn create_app(state: super::TrowServerState) -> Router {
-    let mut app = create_router()
-        .route("/v2/", get(get_v2root))
-        .route("/", get(get_homepage))
-        .route("/login", get(login))
-        .route("/healthz", get(health::healthz))
-        .route("/readiness", get(readiness::readiness));
-
-    app = blob::route(app);
-    app = blob_upload::route(app);
-    app = catalog::route(app);
-    app = manifest::route(app);
-    app = admission::route(app);
-
-    if let Some(domains) = &state.config.cors {
+    if let Some(domains) = &cors_domains {
         app = app.layer(
             cors::CorsLayer::new()
                 .allow_credentials(true)
@@ -121,8 +115,27 @@ pub fn create_app(state: super::TrowServerState) -> Router {
                 ),
         );
     }
+    app
+}
 
-    app.with_state(Arc::new(state))
+pub fn create_app(state: Arc<super::TrowServerState>) -> Router {
+    let mut app = Router::new();
+
+    app = app
+        .route("/v2/", get(get_v2root))
+        .route("/", get(get_homepage))
+        .route("/login", get(login))
+        .route("/healthz", get(health::healthz))
+        .route("/readiness", get(readiness::readiness));
+
+    app = blob::route(app);
+    app = blob_upload::route(app);
+    app = catalog::route(app);
+    app = manifest::route(app);
+    app = admission::route(app);
+
+    app = add_router_layers(app, &state.config.cors);
+    app.with_state(state)
 }
 
 /*

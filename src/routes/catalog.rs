@@ -4,19 +4,19 @@ use anyhow::Result;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
 use axum::Router;
+use oci_spec::distribution::{RepositoryList, RepositoryListBuilder, TagList, TagListBuilder};
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::ManifestHistory;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::types::{RepoCatalog, TagList};
+use crate::routes::response::OciJson;
 use crate::TrowServerState;
 
 #[derive(Debug, Deserialize)]
 pub struct CatalogListQuery {
-    n: Option<u32>,
+    n: Option<u64>,
     last: Option<String>,
 }
 
@@ -24,17 +24,34 @@ async fn get_catalog(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Query(query): Query<CatalogListQuery>,
-) -> Result<RepoCatalog, Error> {
-    let limit = query.n.unwrap_or(std::u32::MAX);
-    let last_repo = query.last.clone().unwrap_or_default();
+) -> Result<OciJson<RepositoryList>, Error> {
+    let mut conn = state.db.acquire().await?;
+    let last_name = match &query.last {
+        Some(l) => l,
+        None => "",
+    };
+    let limit = query.n.unwrap_or(i64::MAX as u64) as i64;
+    let repos = sqlx::query!(
+        r#"
+        SELECT DISTINCT rba.repo_name
+        FROM repo_blob_association rba
+        WHERE rba.repo_name > $1
+        ORDER BY rba.repo_name ASC
+        LIMIT $2
+        "#,
+        last_name,
+        limit
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let raw_repos = repos.into_iter().map(|r| r.repo_name).collect::<Vec<_>>();
 
-    let cat = state
-        .registry
-        .get_catalog(Some(&last_repo), Some(limit))
-        .await
-        .map_err(|_| Error::InternalError)?;
-
-    Ok(RepoCatalog::from(cat))
+    Ok(OciJson::new(
+        &RepositoryListBuilder::default()
+            .repositories(raw_repos)
+            .build()
+            .unwrap(),
+    ))
 }
 
 async fn list_tags(
@@ -42,16 +59,37 @@ async fn list_tags(
     State(state): State<Arc<TrowServerState>>,
     Path(repo_name): Path<String>,
     Query(query): Query<CatalogListQuery>,
-) -> Result<TagList, Error> {
-    let limit = query.n.unwrap_or(std::u32::MAX);
-    let last_tag = query.last.clone().unwrap_or_default();
+) -> Result<OciJson<TagList>, Error> {
+    let mut conn = state.db.acquire().await?;
+    let last_tag = match &query.last {
+        Some(l) => l,
+        None => "",
+    };
+    let limit = query.n.unwrap_or(i64::MAX as u64) as i64;
+    let tags = sqlx::query!(
+        r#"
+        SELECT t.tag
+        FROM tag t
+        WHERE t.repo = $1
+            AND t.tag > $2
+        ORDER BY t.tag ASC
+        LIMIT $3
+        "#,
+        repo_name,
+        last_tag,
+        limit
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let raw_tags = tags.into_iter().map(|t| t.tag).collect::<Vec<_>>();
 
-    let tags = state
-        .registry
-        .get_tags(&repo_name, Some(&last_tag), Some(limit))
-        .await
-        .map_err(|_| Error::InternalError)?;
-    Ok(TagList::new_filled(repo_name, tags))
+    Ok(OciJson::new(
+        &TagListBuilder::default()
+            .name(repo_name)
+            .tags(raw_tags)
+            .build()
+            .unwrap(),
+    ))
 }
 endpoint_fn_7_levels!(
     list_tags(
@@ -59,34 +97,7 @@ endpoint_fn_7_levels!(
         state: State<Arc<TrowServerState>>;
         path: [image_name],
         query: Query<CatalogListQuery>
-    ) -> Result<TagList, Error>
-);
-
-async fn get_manifest_history(
-    _auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((name, reference)): Path<(String, String)>,
-    Query(query): Query<CatalogListQuery>,
-) -> Result<ManifestHistory, Error> {
-    let limit = query.n.unwrap_or(std::u32::MAX);
-    let last_digest = query.last.clone().unwrap_or_default();
-
-    let mh = state
-        .registry
-        .get_history(&name, &reference, Some(&last_digest), Some(limit))
-        .await
-        .map_err(|_| Error::InternalError)?;
-
-    Ok(ManifestHistory::new(format!("{name}:{reference}"), mh))
-}
-
-endpoint_fn_7_levels!(
-    get_manifest_history(
-        auth_user: TrowToken,
-        state: State<Arc<TrowServerState>>;
-        path: [image_name, reference],
-        query: Query<CatalogListQuery>
-    ) -> Result<ManifestHistory, Error>
+    ) -> Result<OciJson<TagList>, Error>
 );
 
 pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {
@@ -96,12 +107,6 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
         app,
         "/v2" "/tags/list",
         get(list_tags, list_tags_2level, list_tags_3level, list_tags_4level, list_tags_5level, list_tags_6level, list_tags_7level)
-    );
-    #[rustfmt::skip]
-    route_7_levels!(
-        app,
-        "" "/manifest_history/:reference",
-        get(get_manifest_history, get_manifest_history_2level, get_manifest_history_3level, get_manifest_history_4level, get_manifest_history_5level, get_manifest_history_6level, get_manifest_history_7level)
     );
     app
 }

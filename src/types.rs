@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use derive_more::Display;
 use futures::AsyncRead;
 use serde::{Deserialize, Serialize};
 
@@ -34,19 +33,19 @@ impl<S: AsyncRead> BoundedStream<S> {
     }
 }
 
-#[derive(Clone, Debug, Display, Serialize)]
-#[display("{}", _0)]
-pub struct Uuid(pub String);
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct OptionalDigestQuery {
+    pub digest: Option<Digest>,
+}
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct DigestQuery {
-    pub digest: Option<String>,
+    pub digest: Digest,
 }
 
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
-    base_url: String,
-    uuid: Uuid,
+    uuid: String,
     repo_name: String,
     range: (u32, u32),
 }
@@ -56,16 +55,15 @@ pub struct BlobDeleted {}
 pub struct ManifestDeleted {}
 
 impl UploadInfo {
-    pub fn new(base_url: String, uuid: Uuid, repo_name: String, range: (u32, u32)) -> Self {
+    pub fn new(uuid: String, repo_name: String, range: (u32, u32)) -> Self {
         Self {
-            base_url,
             uuid,
             repo_name,
             range,
         }
     }
 
-    pub fn uuid(&self) -> &Uuid {
+    pub fn uuid(&self) -> &str {
         &self.uuid
     }
 
@@ -76,31 +74,19 @@ impl UploadInfo {
     pub fn range(&self) -> (u32, u32) {
         self.range
     }
-
-    pub fn base_url(&self) -> &str {
-        &self.base_url
-    }
 }
 
 #[derive(Debug, Serialize)]
 pub struct AcceptedUpload {
-    base_url: String,
     digest: Digest,
     repo_name: String,
-    uuid: Uuid,
+    uuid: uuid::Uuid,
     range: (u32, u32),
 }
 
 impl AcceptedUpload {
-    pub fn new(
-        base_url: String,
-        digest: Digest,
-        repo_name: String,
-        uuid: Uuid,
-        range: (u32, u32),
-    ) -> Self {
+    pub fn new(digest: Digest, repo_name: String, uuid: uuid::Uuid, range: (u32, u32)) -> Self {
         Self {
-            base_url,
             digest,
             repo_name,
             uuid,
@@ -120,8 +106,8 @@ impl AcceptedUpload {
         self.range
     }
 
-    pub fn base_url(&self) -> &str {
-        &self.base_url
+    pub fn uuid(&self) -> &uuid::Uuid {
+        &self.uuid
     }
 }
 
@@ -149,8 +135,8 @@ impl VerifiedManifest {
         }
     }
 
-    pub fn digest(&self) -> &Digest {
-        &self.digest
+    pub fn digest(&self) -> &str {
+        self.digest.as_str()
     }
 
     pub fn tag(&self) -> &str {
