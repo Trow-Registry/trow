@@ -126,7 +126,7 @@ impl SingleRegistryProxyConfig {
             if let Some(cl) = &try_cl {
                 let img_ref_as_digest = Digest::try_from_raw(&image.reference);
                 let manifest_download = cl
-                    .download_manifest_and_layers(registry, &image, &repo_name)
+                    .download_manifest_and_layers(registry, image, &repo_name)
                     .await;
                 match (manifest_download, img_ref_as_digest) {
                     (Err(e), _) => {
