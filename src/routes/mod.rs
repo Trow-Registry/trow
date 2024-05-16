@@ -17,10 +17,9 @@ use axum::extract::State;
 use axum::http::method::Method;
 use axum::http::{header, StatusCode};
 use axum::response::Response;
-use axum::routing::{get, post, put};
+use axum::routing::get;
 use axum::Router;
 use hyper::http::HeaderValue;
-use macros::route_7_levels;
 use tower::ServiceBuilder;
 use tower_http::{cors, trace};
 use tracing::{event, Level};
@@ -30,64 +29,9 @@ use crate::response::html::HTML;
 use crate::response::trow_token::{self, TrowToken, ValidBasicToken};
 use crate::TrowServerState;
 
-pub fn create_app(state: super::TrowServerState) -> Router {
-    let mut app = Router::new()
-        .route("/v2/", get(get_v2root))
-        .route("/", get(get_homepage))
-        .route("/login", get(login))
-        .route("/validate-image", post(admission::validate_image))
-        .route("/mutate-image", post(admission::mutate_image))
-        .route("/healthz", get(health::healthz))
-        .route("/readiness", get(readiness::readiness));
-
-    // blob
-    #[rustfmt::skip]
-    route_7_levels!(
-        app,
-        "/v2" "/blobs/:digest",
-        get(blob::get_blob, blob::get_blob_2level, blob::get_blob_3level, blob::get_blob_4level, blob::get_blob_5level, blob::get_blob_6level, blob::get_blob_7level),
-        delete(blob::delete_blob, blob::delete_blob_2level, blob::delete_blob_3level, blob::delete_blob_4level, blob::delete_blob_5level, blob::delete_blob_6level, blob::delete_blob_7level)
-    );
-    #[rustfmt::skip]
-    route_7_levels!(
-        app,
-        "/v2" "/blobs/uploads/",
-        post(blob_upload::post_blob_upload, blob_upload::post_blob_upload_2level, blob_upload::post_blob_upload_3level, blob_upload::post_blob_upload_4level, blob_upload::post_blob_upload_5level, blob_upload::post_blob_upload_6level, blob_upload::post_blob_upload_7level)
-    );
-    #[rustfmt::skip]
-    route_7_levels!(
-        app,
-        "/v2" "/blobs/uploads/:uuid",
-        put(blob_upload::put_blob_upload, blob_upload::put_blob_upload_2level, blob_upload::put_blob_upload_3level, blob_upload::put_blob_upload_4level, blob_upload::put_blob_upload_5level, blob_upload::put_blob_upload_6level, blob_upload::put_blob_upload_7level),
-        patch(blob_upload::patch_blob_upload, blob_upload::patch_blob_upload_2level, blob_upload::patch_blob_upload_3level, blob_upload::patch_blob_upload_4level, blob_upload::patch_blob_upload_5level, blob_upload::patch_blob_upload_6level, blob_upload::patch_blob_upload_7level),
-        get(blob_upload::get_blob_upload, blob_upload::get_blob_upload_2level, blob_upload::get_blob_upload_3level, blob_upload::get_blob_upload_4level, blob_upload::get_blob_upload_5level, blob_upload::get_blob_upload_6level, blob_upload::get_blob_upload_7level)
-    );
-
-    // catalog
-    app = app.route("/v2/_catalog", get(catalog::get_catalog));
-    #[rustfmt::skip]
-    route_7_levels!(
-        app,
-        "/v2" "/tags/list",
-        get(catalog::list_tags, catalog::list_tags_2level, catalog::list_tags_3level, catalog::list_tags_4level, catalog::list_tags_5level, catalog::list_tags_6level, catalog::list_tags_7level)
-    );
-    #[rustfmt::skip]
-    route_7_levels!(
-        app,
-        "" "/manifest_history/:reference",
-        get(catalog::get_manifest_history, catalog::get_manifest_history_2level, catalog::get_manifest_history_3level, catalog::get_manifest_history_4level, catalog::get_manifest_history_5level, catalog::get_manifest_history_6level, catalog::get_manifest_history_7level)
-    );
-
-    // manifest
-    #[rustfmt::skip]
-    route_7_levels!(
-        app,
-        "/v2" "/manifests/:reference",
-        get(manifest::get_manifest, manifest::get_manifest_2level, manifest::get_manifest_3level, manifest::get_manifest_4level, manifest::get_manifest_5level, manifest::get_manifest_6level, manifest::get_manifest_7level),
-        put(manifest::put_image_manifest, manifest::put_image_manifest_2level, manifest::put_image_manifest_3level, manifest::put_image_manifest_4level, manifest::put_image_manifest_5level, manifest::put_image_manifest_6level, manifest::put_image_manifest_7level),
-        delete(manifest::delete_image_manifest, manifest::delete_image_manifest_2level, manifest::delete_image_manifest_3level, manifest::delete_image_manifest_4level, manifest::delete_image_manifest_5level, manifest::delete_image_manifest_6level, manifest::delete_image_manifest_7level)
-    );
-
+fn create_router<S: Send + Sync + Clone + 'static>() -> Router<S> {
+    let mut app = Router::new();
+    // configure logging
     app = app.layer(
         trace::TraceLayer::new_for_http()
             .make_span_with(|req: &axum::http::Request<Body>| {
@@ -120,6 +64,44 @@ pub fn create_app(state: super::TrowServerState) -> Router {
                 },
             ),
     );
+    // Set API Version Header
+    app = app.layer(ServiceBuilder::new().map_response(|mut r: Response| {
+        r.headers_mut().insert(
+            "Docker-Distribution-API-Version",
+            HeaderValue::from_static("registry/2.0"),
+        );
+    }));
+    // Ugly hack to return a json body on HEAD requests
+    app = app.layer(ServiceBuilder::new().map_response(|mut r: Response| {
+        if r.status() == StatusCode::NOT_FOUND {
+            let body = r.body_mut();
+            if let Some(0) = body.size_hint().upper() {
+                let err = Error::NotFound.to_string();
+
+                *body = Body::from(err.clone());
+                r.headers_mut()
+                    .insert(header::CONTENT_LENGTH, err.len().into());
+            }
+        }
+        r
+    }));
+
+    app
+}
+
+pub fn create_app(state: super::TrowServerState) -> Router {
+    let mut app = create_router()
+        .route("/v2/", get(get_v2root))
+        .route("/", get(get_homepage))
+        .route("/login", get(login))
+        .route("/healthz", get(health::healthz))
+        .route("/readiness", get(readiness::readiness));
+
+    app = blob::route(app);
+    app = blob_upload::route(app);
+    app = catalog::route(app);
+    app = manifest::route(app);
+    app = admission::route(app);
 
     if let Some(domains) = &state.config.cors {
         app = app.layer(
@@ -136,27 +118,7 @@ pub fn create_app(state: super::TrowServerState) -> Router {
         );
     }
 
-    app.with_state(Arc::new(state)).layer(
-        // Set API Version Header
-        ServiceBuilder::new().map_response(|mut r: Response| {
-            r.headers_mut().insert(
-                "Docker-Distribution-API-Version",
-                HeaderValue::from_static("registry/2.0"),
-            );
-            // ugly hack to work around the fact that axum returns no body for HEAD
-            if r.status() == StatusCode::NOT_FOUND {
-                let body = r.body_mut();
-                if let Some(0) = body.size_hint().upper() {
-                    let err = Error::NotFound.to_string();
-
-                    *body = Body::from(err.clone());
-                    r.headers_mut()
-                        .insert(header::CONTENT_LENGTH, err.len().into());
-                }
-            }
-            r
-        }),
-    )
+    app.with_state(Arc::new(state))
 }
 
 /*

@@ -4,6 +4,8 @@ use anyhow::Result;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::response::Response;
+use axum::routing::{post, put};
+use axum::Router;
 use digest::Digest;
 use hyper::StatusCode;
 use tracing::{event, Level};
@@ -15,6 +17,7 @@ use crate::registry::{digest, ContentInfo, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
 use crate::response::upload_info::UploadInfo;
+use crate::routes::macros::route_7_levels;
 use crate::types::{AcceptedUpload, DigestQuery, Upload, Uuid};
 use crate::TrowServerState;
 
@@ -29,7 +32,7 @@ Content-Type: application/octet-stream
 ---
 Completes the upload.
 */
-pub async fn put_blob_upload(
+async fn put_blob_upload(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, String)>,
@@ -111,7 +114,7 @@ Uploads a blob or chunk of a blob.
 Checks UUID. Returns UploadInfo with range set to correct position.
 
 */
-pub async fn patch_blob_upload(
+async fn patch_blob_upload(
     _auth_user: TrowToken,
     content_info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
@@ -163,7 +166,7 @@ We respond with details of location and UUID to upload to with patch/put.
 No data is being transferred _unless_ the request ends with "?digest".
 In this case the whole blob is attached.
 */
-pub async fn post_blob_upload(
+async fn post_blob_upload(
     auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     host: AlwaysHost,
@@ -217,7 +220,7 @@ endpoint_fn_7_levels!(
 /*
 GET /v2/<name>/blobs/uploads/<upload_id>
 */
-pub async fn get_blob_upload(
+async fn get_blob_upload(
     _auth: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     AlwaysHost(host): AlwaysHost,
@@ -251,3 +254,21 @@ endpoint_fn_7_levels!(
         path: [image_name, upload_id]
     ) -> Result<Response, Error>
 );
+
+pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {
+    #[rustfmt::skip]
+    route_7_levels!(
+        app,
+        "/v2" "/blobs/uploads/",
+        post(post_blob_upload, post_blob_upload_2level, post_blob_upload_3level, post_blob_upload_4level, post_blob_upload_5level, post_blob_upload_6level, post_blob_upload_7level)
+    );
+    #[rustfmt::skip]
+    route_7_levels!(
+        app,
+        "/v2" "/blobs/uploads/:uuid",
+        put(put_blob_upload, put_blob_upload_2level, put_blob_upload_3level, put_blob_upload_4level, put_blob_upload_5level, put_blob_upload_6level, put_blob_upload_7level),
+        patch(patch_blob_upload, patch_blob_upload_2level, patch_blob_upload_3level, patch_blob_upload_4level, patch_blob_upload_5level, patch_blob_upload_6level, patch_blob_upload_7level),
+        get(get_blob_upload, get_blob_upload_2level, get_blob_upload_3level, get_blob_upload_4level, get_blob_upload_5level, get_blob_upload_6level, get_blob_upload_7level)
+    );
+    app
+}

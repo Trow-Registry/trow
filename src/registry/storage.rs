@@ -339,7 +339,7 @@ impl TrowStorageBackend {
         upload_id: &str,
     ) -> Result<u64, StorageBackendError> {
         event!(Level::DEBUG, "Check upload status for {repo_name}");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(&upload_id);
+        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id);
         let (_, offset) = TemporaryFile::append(tmp_location).await?;
 
         Ok(offset)
