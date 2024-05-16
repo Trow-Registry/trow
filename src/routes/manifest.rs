@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Path, State};
+use axum::routing::get;
+use axum::Router;
 use digest::Digest;
 
 use super::extracts::AlwaysHost;
@@ -9,6 +11,7 @@ use super::macros::endpoint_fn_7_levels;
 use crate::registry::{digest, ManifestReader, StorageDriverError};
 use crate::response::errors::Error;
 use crate::response::trow_token::TrowToken;
+use crate::routes::macros::route_7_levels;
 use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::TrowServerState;
 
@@ -32,7 +35,7 @@ Accept: manifest-version
 200 - return the manifest
 404 - manifest not known to the registry
  */
-pub async fn get_manifest(
+async fn get_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((name, reference)): Path<(String, String)>,
@@ -60,7 +63,7 @@ PUT /v2/<name>/manifests/<reference>
 Content-Type: <manifest media type>
 
  */
-pub async fn put_image_manifest(
+async fn put_image_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     AlwaysHost(host): AlwaysHost,
@@ -98,7 +101,7 @@ endpoint_fn_7_levels!(
 Deleting an Image
 DELETE /v2/<name>/manifests/<reference>
 */
-pub async fn delete_image_manifest(
+async fn delete_image_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, String)>,
@@ -118,3 +121,15 @@ endpoint_fn_7_levels!(
     path: [image_name, digest]
     ) -> Result<ManifestDeleted, Error>
 );
+
+pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {
+    #[rustfmt::skip]
+    route_7_levels!(
+        app,
+        "/v2" "/manifests/:reference",
+        get(get_manifest, get_manifest_2level, get_manifest_3level, get_manifest_4level, get_manifest_5level, get_manifest_6level, get_manifest_7level),
+        put(put_image_manifest, put_image_manifest_2level, put_image_manifest_3level, put_image_manifest_4level, put_image_manifest_5level, put_image_manifest_6level, put_image_manifest_7level),
+        delete(delete_image_manifest, delete_image_manifest_2level, delete_image_manifest_3level, delete_image_manifest_4level, delete_image_manifest_5level, delete_image_manifest_6level, delete_image_manifest_7level)
+    );
+    app
+}

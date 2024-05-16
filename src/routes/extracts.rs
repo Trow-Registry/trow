@@ -23,12 +23,10 @@ where
             // Check if we have an upstream load balancer doing TLS termination
             let scheme = if let Some(proto) = parts.headers.get("X-Forwarded-Proto") {
                 proto.to_str().unwrap_or("http")
+            } else if config.uses_tls {
+                "https"
             } else {
-                if config.uses_tls {
-                    "https"
-                } else {
-                    "http"
-                }
+                "http"
             };
 
             return Ok(AlwaysHost(format!("{}://{}", scheme, host)));

@@ -2,13 +2,15 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::extract::{Json, State};
+use axum::routing::post;
+use axum::Router;
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 use kube::core::DynamicObject;
 
 use crate::TrowServerState;
 
-pub async fn validate_image(
+async fn validate_image(
     State(state): State<Arc<TrowServerState>>,
     Json(image_data): Json<AdmissionReview<Pod>>,
 ) -> Json<AdmissionReview<DynamicObject>> {
@@ -22,7 +24,7 @@ pub async fn validate_image(
     })
 }
 
-pub async fn mutate_image(
+async fn mutate_image(
     State(state): State<Arc<TrowServerState>>,
     Json(image_data): Json<AdmissionReview<Pod>>,
 ) -> Json<AdmissionReview<DynamicObject>> {
@@ -40,4 +42,9 @@ pub async fn mutate_image(
     };
 
     Json::from(res)
+}
+
+pub fn route(app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {
+    app.route("/validate-image", post(validate_image))
+        .route("/mutate-image", post(mutate_image))
 }
