@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use const_format::formatcp;
 use lazy_static::lazy_static;
 
-use super::server::is_digest;
+use crate::registry::digest::Digest;
 
 /// The regex validates an image reference.
 /// It returns `name`, `tag` and `digest`.
@@ -96,7 +96,8 @@ impl RemoteImage {
 
     /// Example return value: `registry-1.docker.io/library/nginx@sha256:12345`
     pub fn get_ref(&self) -> String {
-        let tag_sep = if is_digest(&self.reference) { "@" } else { ":" };
+        let is_digest = Digest::try_from_raw(&self.reference).is_ok();
+        let tag_sep = if is_digest { "@" } else { ":" };
         format!("{}/{}{tag_sep}{}", self.host, self.repo, self.reference)
     }
 
