@@ -4,7 +4,7 @@ mod image;
 pub mod manifest;
 mod proxy_auth;
 mod server;
-pub mod storage;
+mod storage;
 mod temporary_file;
 
 use std::path::PathBuf;
@@ -17,6 +17,7 @@ pub use digest::{Digest, DigestAlgorithm};
 pub use manifest_storage::ManifestReader;
 pub use proxy_auth::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 pub use server::TrowServer;
+pub use storage::StorageBackendError;
 use thiserror::Error;
 
 pub mod blob_storage;

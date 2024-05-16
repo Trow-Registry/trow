@@ -8,9 +8,9 @@ use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::ManifestHistory;
-use crate::response::errors::Error;
-use crate::response::trow_token::TrowToken;
 use crate::routes::macros::route_7_levels;
+use crate::routes::response::errors::Error;
+use crate::routes::response::trow_token::TrowToken;
 use crate::types::{RepoCatalog, TagList};
 use crate::TrowServerState;
 
