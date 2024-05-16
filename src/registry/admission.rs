@@ -4,8 +4,8 @@ use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
-use super::image::RemoteImage;
 use super::TrowServer;
+use crate::registry::proxy::RemoteImage;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageValidationConfig {
@@ -118,16 +118,7 @@ impl TrowServer {
         host_name: &str,
     ) -> AdmissionResponse {
         let resp = AdmissionResponse::from(ar);
-        let proxy_config = match self.proxy_registry_config {
-            Some(ref cfg) => cfg,
-            None => {
-                event!(
-                    Level::WARN,
-                    "Proxy registry config not set, cannot mutate image references"
-                );
-                return resp;
-            }
-        };
+        let proxy_config = &self.proxy_registry_config;
         let pod = match &ar.object {
             Some(pod) => pod,
             None => {

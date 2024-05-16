@@ -1,8 +1,7 @@
 mod admission;
 pub mod api_types;
-mod image;
 pub mod manifest;
-mod proxy_auth;
+mod proxy;
 mod server;
 mod storage;
 mod temporary_file;
@@ -15,7 +14,7 @@ pub use blob_storage::{BlobReader, ContentInfo, UploadInfo};
 pub use catalog_operations::ManifestHistory;
 pub use digest::{Digest, DigestAlgorithm};
 pub use manifest_storage::ManifestReader;
-pub use proxy_auth::{RegistryProxiesConfig, SingleRegistryProxyConfig};
+pub use proxy::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;
