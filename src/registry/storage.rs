@@ -16,7 +16,7 @@ use tracing::{event, Level};
 use walkdir::WalkDir;
 
 use super::manifest::{Manifest, ManifestError};
-use super::server::{PROXY_DIR, SUPPORTED_DIGESTS};
+use super::server::PROXY_DIR;
 use crate::registry::blob_storage::Stored;
 use crate::registry::catalog_operations::HistoryEntry;
 use crate::registry::temporary_file::TemporaryFile;
@@ -538,27 +538,6 @@ impl TrowStorageBackend {
 
         Ok(())
     }
-}
-
-pub fn is_digest(maybe_digest: &str) -> bool {
-    for alg in &SUPPORTED_DIGESTS {
-        if maybe_digest.starts_with(&format!("{}:", alg)) {
-            return true;
-        }
-    }
-
-    false
-}
-
-pub fn is_digest2(maybe_digest: &str) -> Option<(&str, &str)> {
-    for alg in &SUPPORTED_DIGESTS {
-        if maybe_digest.starts_with(&format!("{}:", alg)) {
-            let parts: Vec<&str> = maybe_digest.splitn(2, ':').collect();
-            return Some((alg, parts[1]));
-        }
-    }
-
-    None
 }
 
 fn bytes_to_stream(bytes: Bytes) -> impl Stream<Item = Result<Bytes, reqwest::Error>> {
