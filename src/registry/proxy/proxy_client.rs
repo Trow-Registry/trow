@@ -15,7 +15,7 @@ use tracing::{event, Level};
 use super::create_accept_header;
 use super::proxy_config::SingleRegistryProxyConfig;
 use super::remote_image::RemoteImage;
-use crate::registry::manifest::{Manifest, OCIManifest};
+use crate::registry::manifest::{ManifestReference, OCIManifest};
 use crate::registry::{Digest, TrowServer};
 
 const AUTHN_HEADER: &str = "www-authenticate";
@@ -174,16 +174,16 @@ impl ProxyClient {
                 resp.status()
             ));
         }
-        let bytes = resp.bytes().await?;
-        let mani = Manifest::from_bytes(bytes)?;
-        match mani.parsed() {
+        let manifest_bytes = resp.bytes().await?;
+        let manifest: OCIManifest = serde_json::from_slice(&manifest_bytes)?;
+        match manifest {
             OCIManifest::List(_) => {
-                let images_to_dl = mani
-                    .get_local_asset_digests()?
+                let images_to_dl = manifest
+                    .get_local_asset_digests()
                     .into_iter()
                     .map(|digest| {
                         let mut image = remote_image.clone();
-                        image.reference = digest.to_string();
+                        image.reference = ManifestReference::Digest(digest.clone());
                         image
                     })
                     .collect::<Vec<_>>();
@@ -193,7 +193,7 @@ impl ProxyClient {
                 try_join_all(futures).await?;
             }
             OCIManifest::V2(_) => {
-                let digests: Vec<_> = mani.get_local_asset_digests()?;
+                let digests: Vec<_> = manifest.get_local_asset_digests();
 
                 let futures = digests
                     .iter()
@@ -201,9 +201,11 @@ impl ProxyClient {
                 try_join_all(futures).await?;
             }
         }
+        let str_ref = remote_image.reference.to_string();
+        let digest = Digest::try_from_raw(&str_ref).unwrap();
         registry
             .storage
-            .write_image_manifest(mani.raw(), local_repo_name, &remote_image.reference, false)
+            .write_image_manifest(manifest_bytes, local_repo_name, &digest)
             .await?;
 
         Ok(())
@@ -231,11 +233,7 @@ impl ProxyClient {
                 );
                 None
             }
-            Ok(Some(header)) => {
-                let digest_str = header.to_str().unwrap();
-                let digest = Digest::try_from_raw(digest_str).unwrap();
-                Some(digest)
-            }
+            Ok(Some(header)) => Some(Digest::try_from_raw(header.to_str().unwrap()).unwrap()),
         }
     }
 }
@@ -280,7 +278,7 @@ async fn get_www_authenticate_header(
     image: &RemoteImage,
 ) -> Result<Option<String>> {
     let resp = cl
-        .head(&image.get_manifest_url())
+        .head(image.get_manifest_url())
         .headers(create_accept_header())
         .send()
         .await
@@ -387,7 +385,11 @@ mod tests {
             ignore_repos: vec![],
         };
 
-        let proxy_image = RemoteImage::new(&proxy_cfg.host, "hello_world".into(), "latest".into());
+        let proxy_image = RemoteImage::new(
+            &proxy_cfg.host,
+            "hello_world".into(),
+            "latest".try_into().unwrap(),
+        );
         (server, proxy_cfg, proxy_image)
     }
 

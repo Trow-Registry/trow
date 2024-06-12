@@ -1,22 +1,24 @@
+use std::sync::Arc;
+
 use axum::extract::{FromRef, FromRequestParts, Host};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::RequestPartsExt;
 
-use crate::TrowConfig;
+use crate::TrowServerState;
 
 pub struct AlwaysHost(pub String);
 
 #[axum::async_trait]
 impl<S> FromRequestParts<S> for AlwaysHost
 where
-    TrowConfig: FromRef<S>,
+    Arc<TrowServerState>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = (StatusCode, ());
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let config = TrowConfig::from_ref(state);
+        let config = &Arc::from_ref(state).config;
 
         let maybe_host = parts.extract::<Option<Host>>().await.unwrap();
         if let Some(Host(host)) = maybe_host {

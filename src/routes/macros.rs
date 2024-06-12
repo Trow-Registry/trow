@@ -34,121 +34,114 @@ macro_rules! route_7_levels {
     };
 }
 
-/// Macro to replace a captured TokenTree by a Type
-macro_rules! replace_expr {
-    ($_t:tt -> $sub:tt) => {
-        $sub
-    };
-}
-
 /// Macro to quickly write functions for image names several layers depp
 /// eg: `nvidia/dcgm/whatever`
 macro_rules! endpoint_fn_7_levels {
-    ($fn_name:ident($($arg:ident: $t:ty),+; path: [image_name $(,$p:ident)*] $(,$pa:ident: $pt:ty)*) -> $ret:ty) => {
+    ($fn_name:ident($($arg:ident: $arg_ty:ty),+; path: [image_name $(,$path_param:ident: $path_param_ty:ty)*] $(,$post_arg:ident: $post_arg_ty:ty)*) -> $ret:ty) => {
         paste::item! {
             pub async fn [< $fn_name _2level >](
-                $($arg: $t),*,
-                Path((one, two, $($p),*)): Path<(
+                $($arg: $arg_ty),*,
+                Path((one, two, $($path_param),*)): Path<(
                     String,
                     String,
-                    $($crate::routes::macros::replace_expr!(($p) -> String)),*
+                    $($path_param_ty),*
                 )>,
-                $($pa: $pt),*
+                $($post_arg: $post_arg_ty),*
             ) -> $ret {
                 $fn_name(
                     $($arg),*,
-                    Path((format!("{one}/{two}") $(,$p)*)),
-                    $($pa),*
+                    Path((format!("{one}/{two}") $(,$path_param)*)),
+                    $($post_arg),*
                 )
                 .await
             }
         }
         paste::item! {
             pub async fn [< $fn_name _3level >](
-                $($arg: $t),*,
-                Path((one, two, three, $($p),*)): Path<(
+                $($arg: $arg_ty),*,
+                Path((one, two, three, $($path_param),*)): Path<(
                     String,
                     String,
                     String,
-                    $($crate::routes::macros::replace_expr!(($p) -> String)),*
+                    $($path_param_ty),*
                 )>,
-                $($pa: $pt),*
+                $($post_arg: $post_arg_ty),*
             ) -> $ret {
                 $fn_name(
                     $($arg),*,
-                    Path((format!("{one}/{two}/{three}") $(,$p)*)),
-                    $($pa),*
+                    Path((format!("{one}/{two}/{three}") $(,$path_param)*)),
+                    $($post_arg),*
                 )
                 .await
             }
         }
         paste::item! {
             pub async fn [< $fn_name _4level >](
-                $($arg: $t),*,
-                Path((one, two, three, four, $($p),*)): Path<(
+                $($arg: $arg_ty),*,
+                Path((one, two, three, four, $($path_param),*)): Path<(
                     String,
                     String,
                     String,
                     String,
-                    $($crate::routes::macros::replace_expr!(($p) -> String)),*
+                    $($path_param_ty),*
                 )>,
-                $($pa: $pt),*
+                $($post_arg: $post_arg_ty),*
             ) -> $ret {
                 $fn_name(
                     $($arg),*,
-                    Path((format!("{one}/{two}/{three}/{four}") $(,$p)*)),
-                    $($pa),*
+                    Path((format!("{one}/{two}/{three}/{four}") $(,$path_param)*)),
+                    $($post_arg),*
                 )
                 .await
             }
         }
         paste::item! {
             pub async fn [< $fn_name _5level >](
-                $($arg: $t),*,
-                Path((one, two, three, four, five, $($p),*)): Path<(
+                $($arg: $arg_ty),*,
+                Path((one, two, three, four, five, $($path_param),*)): Path<(
                     String,
                     String,
                     String,
                     String,
                     String,
-                    $($crate::routes::macros::replace_expr!(($p) -> String)),*
+                    $($path_param_ty),*
                 )>,
-                $($pa: $pt),*
+                $($post_arg: $post_arg_ty),*
             ) -> $ret {
                 $fn_name(
                     $($arg),*,
-                    Path((format!("{one}/{two}/{three}/{four}/{five}") $(,$p)*)),
-                    $($pa),*
+                    Path((format!("{one}/{two}/{three}/{four}/{five}") $(,$path_param)*)),
+                    $($post_arg),*
                 )
                 .await
             }
         }
         paste::item! {
             pub async fn [< $fn_name _6level >](
-                $($arg: $t),*,
-                Path((one, two, three, four, five, six, $($p),*)): Path<(
+                $($arg: $arg_ty),*,
+                Path((one, two, three, four, five, six, $($path_param),*)): Path<(
                     String,
                     String,
                     String,
                     String,
                     String,
                     String,
-                    $($crate::routes::macros::replace_expr!(($p) -> String)),*
+                    $($path_param_ty),*
                 )>,
-                $($pa: $pt),*
+                $($post_arg: $post_arg_ty),*
             ) -> $ret {
                 $fn_name(
                     $($arg),*,
-                    Path((format!("{one}/{two}/{three}/{four}/{five}/{six}") $(,$p)*)),
-                    $($pa),*
+                    Path((format!("{one}/{two}/{three}/{four}/{five}/{six}") $(,$path_param)*)),
+                    $($post_arg),*
                 )
                 .await
             }
         }
         paste::item! {
             pub async fn [< $fn_name _7level >](
-                $($arg: $t),*,
-                Path((one, two, three, four, five, six, seven, $($p),*)): Path<(
+                $($arg: $arg_ty),*,
+                Path((one, two, three, four, five, six, seven, $($path_param),*)): Path<(
                     String,
                     String,
                     String,
@@ -156,14 +149,14 @@ macro_rules! endpoint_fn_7_levels {
                     String,
                     String,
                     String,
-                    $($crate::routes::macros::replace_expr!(($p) -> String)),*
+                    $($path_param_ty),*
                 )>,
-                $($pa: $pt),*
+                $($post_arg: $post_arg_ty),*
             ) -> $ret {
                 $fn_name(
                     $($arg),*,
-                    Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}") $(,$p)*)),
-                    $($pa),*
+                    Path((format!("{one}/{two}/{three}/{four}/{five}/{six}/{seven}") $(,$path_param)*)),
+                    $($post_arg),*
                 )
                 .await
             }
@@ -171,4 +164,4 @@ macro_rules! endpoint_fn_7_levels {
     };
 }
 
-pub(crate) use {endpoint_fn_7_levels, replace_expr, route_7_levels};
+pub(crate) use {endpoint_fn_7_levels, route_7_levels};

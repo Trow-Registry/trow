@@ -2,10 +2,11 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
 
+use crate::registry::manifest::ManifestReference;
 use crate::registry::proxy::proxy_client::ProxyClient;
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::{Digest, TrowServer};
+use crate::registry::TrowServer;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
@@ -39,7 +40,7 @@ impl RegistryProxiesConfig {
     pub async fn get_proxy_config<'a>(
         &'a self,
         repo_name: &str,
-        reference: &str,
+        reference: &ManifestReference,
     ) -> Option<(&'a SingleRegistryProxyConfig, RemoteImage)> {
         // All proxies are under "f_"
         if repo_name.starts_with(PROXY_DIR) {
@@ -50,7 +51,7 @@ impl RegistryProxiesConfig {
 
             for proxy in self.registries.iter() {
                 if proxy.alias == proxy_alias {
-                    let image = RemoteImage::new(&proxy.host, repo, reference.into());
+                    let image = RemoteImage::new(&proxy.host, repo, reference.clone());
                     return Some((proxy, image));
                 }
             }
@@ -61,11 +62,12 @@ impl RegistryProxiesConfig {
 
 impl SingleRegistryProxyConfig {
     /// returns the downloaded digest
+    /// TO RE-DO !!!
     pub async fn download_remote_image(
         &self,
         image: &RemoteImage,
         registry: &TrowServer,
-    ) -> Result<Digest> {
+    ) -> Result<String> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
 
@@ -81,17 +83,18 @@ impl SingleRegistryProxyConfig {
                 None
             }
         };
-        let remote_img_ref_digest = Digest::try_from_raw(&image.reference);
+        let remote_img_ref_digest = image.reference.digest();
         let (local_digest, latest_digest) = match remote_img_ref_digest {
             // The ref is a digest, no need to map tg to digest
-            Ok(digest) => (Some(digest), None),
+            Some(digest) => (Some(digest.to_string()), None),
             // The ref is a tag, let's search for the digest
-            Err(_) => {
-                let local_digest = registry
-                    .storage
-                    .get_manifest_digest(&repo_name, &image.reference)
-                    .await
-                    .ok();
+            None => {
+                // let local_digest = registry
+                //     .storage
+                //     .get_manifest_digest(&repo_name, &image.reference.to_string())
+                //     .await
+                //     .ok();
+                let local_digest = None;
                 let latest_digest = match &try_cl {
                     Some(cl) => cl.get_digest_from_remote().await,
                     _ => None,
@@ -124,7 +127,7 @@ impl SingleRegistryProxyConfig {
                 );
             }
             if let Some(cl) = &try_cl {
-                let img_ref_as_digest = Digest::try_from_raw(&image.reference);
+                let img_ref_as_digest = image.reference.digest();
                 let manifest_download = cl
                     .download_manifest_and_layers(registry, image, &repo_name)
                     .await;
@@ -132,21 +135,22 @@ impl SingleRegistryProxyConfig {
                     (Err(e), _) => {
                         event!(Level::WARN, "Failed to download proxied image: {}", e)
                     }
-                    (Ok(()), Err(_)) => {
-                        let write_tag = registry
-                            .storage
-                            .write_tag(&repo_name, &image.reference, &mani_digest)
-                            .await;
+                    (Ok(()), None) => {
+                        // let write_tag = registry
+                        //     .storage
+                        //     .write_tag(&repo_name, &image.reference.to_string(), &mani_digest)
+                        //     .await;
+                        let write_tag: Result<(), ()> = Err(());
                         match write_tag {
                             Ok(_) => return Ok(mani_digest),
-                            Err(e) => event!(
+                            Err(_) => event!(
                                 Level::DEBUG,
                                 "Internal error updating tag for proxied image ({})",
-                                e
+                                "unimplemented"
                             ),
                         }
                     }
-                    (Ok(()), Ok(_)) => return Ok(mani_digest),
+                    (Ok(()), Some(_)) => return Ok(mani_digest),
                 }
             }
         }

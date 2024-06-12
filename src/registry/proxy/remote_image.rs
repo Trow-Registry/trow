@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt;
 
 use anyhow::{anyhow, Result};
@@ -5,6 +6,7 @@ use const_format::formatcp;
 use lazy_static::lazy_static;
 
 use crate::registry::digest::Digest;
+use crate::registry::manifest::ManifestReference;
 
 /// The regex validates an image reference.
 /// It returns `name`, `tag` and `digest`.
@@ -33,7 +35,7 @@ pub struct RemoteImage {
     host: String,
     repo: String,
     /// Tag or digest, `latest` by default
-    pub reference: String,
+    pub reference: ManifestReference,
 }
 
 impl std::default::Default for RemoteImage {
@@ -42,7 +44,7 @@ impl std::default::Default for RemoteImage {
             scheme: "https",
             host: "registry-1.docker.io".to_string(),
             repo: "(none)".to_string(),
-            reference: "latest".to_string(),
+            reference: ManifestReference::Tag("latest".to_string()),
         }
     }
 }
@@ -54,7 +56,7 @@ impl fmt::Display for RemoteImage {
 }
 
 impl RemoteImage {
-    pub fn new(mut host: &str, mut repo: String, tag: String) -> Self {
+    pub fn new(mut host: &str, mut repo: String, reference: ManifestReference) -> Self {
         if host.ends_with("docker.io") {
             // The real docker registry is `registry-1.docker.io`, not `docker.io`.
             host = "registry-1.docker.io";
@@ -76,7 +78,7 @@ impl RemoteImage {
         RemoteImage {
             host: host.to_string(),
             repo,
-            reference: tag,
+            reference,
             scheme,
         }
     }
@@ -96,9 +98,11 @@ impl RemoteImage {
 
     /// Example return value: `registry-1.docker.io/library/nginx@sha256:12345`
     pub fn get_ref(&self) -> String {
-        let is_digest = Digest::try_from_raw(&self.reference).is_ok();
-        let tag_sep = if is_digest { "@" } else { ":" };
-        format!("{}/{}{tag_sep}{}", self.host, self.repo, self.reference)
+        let (sep, ref_) = match &self.reference {
+            ManifestReference::Digest(d) => ("@", Cow::Owned(d.to_string())),
+            ManifestReference::Tag(t) => (":", Cow::Borrowed(t)),
+        };
+        format!("{}/{}{sep}{ref_}", self.host, self.repo)
     }
 
     pub fn get_repo(&self) -> &str {
@@ -137,14 +141,17 @@ impl RemoteImage {
             repo = name[i + 1..].to_string();
         }
 
-        let tag = match captures.name("digest") {
-            Some(match_) => match_.as_str(),
-            None => match captures.name("tag") {
-                Some(match_) => match_.as_str(),
-                None => "latest",
-            },
+        let ref_ = if let Some(match_digest) = captures.name("digest") {
+            let digest = match_digest.as_str().to_string();
+            Digest::try_from_raw(&digest)?;
+            ManifestReference::Digest(digest)
+        } else if let Some(match_tag) = captures.name("tag") {
+            ManifestReference::Tag(match_tag.as_str().to_owned())
+        } else {
+            ManifestReference::Tag("latest".to_string())
         };
-        Ok(Self::new(host, repo, tag.to_string()))
+
+        Ok(Self::new(host, repo, ref_))
     }
 }
 
@@ -178,7 +185,7 @@ mod test {
             RemoteImage {
                 host: "registry-1.docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
-                reference: "beta".to_string(),
+                reference: ManifestReference::Tag("beta".to_string()),
                 ..Default::default()
             }
         );
@@ -197,7 +204,7 @@ mod test {
             RemoteImage {
                 host: "localhost:8080".to_string(),
                 repo: "myimage".to_string(),
-                reference: "test".to_string(),
+                reference: ManifestReference::try_from_str("test").unwrap(),
                 ..Default::default()
             }
         );
@@ -207,7 +214,7 @@ mod test {
             RemoteImage {
                 host: "localhost:8080".to_string(),
                 repo: "mydir/myimage".to_string(),
-                reference: "test".to_string(),
+                reference: ManifestReference::try_from_str("test").unwrap(),
                 ..Default::default()
             }
         );
@@ -218,7 +225,7 @@ mod test {
             RemoteImage {
                 host: "quay.io".to_string(),
                 repo: "mydir/another/myimage".to_string(),
-                reference: "test".to_string(),
+                reference: ManifestReference::try_from_str("test").unwrap(),
                 ..Default::default()
             }
         );
@@ -229,9 +236,10 @@ mod test {
             RemoteImage {
                 host: "quay.io:99".to_string(),
                 repo: "myimage".to_string(),
-                reference:
+                reference: ManifestReference::try_from_str(
                     "sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5"
-                        .to_string(),
+                )
+                .unwrap(),
                 ..Default::default()
             }
         );
@@ -259,7 +267,7 @@ mod test {
         let img = RemoteImage::new(
             "registry-1.docker.io",
             "debian".to_string(),
-            "funky".to_string(),
+            ManifestReference::try_from_str("funky").unwrap(),
         );
         assert_eq!(
             img.get_base_uri(),
@@ -273,7 +281,7 @@ mod test {
         let img = RemoteImage::new(
             "http://cia.gov",
             "not-watching".to_string(),
-            "i-swear".to_string(),
+            ManifestReference::try_from_str("i-swear").unwrap(),
         );
         assert_eq!(img.get_base_uri(), "http://cia.gov/v2/not-watching");
         assert_eq!(

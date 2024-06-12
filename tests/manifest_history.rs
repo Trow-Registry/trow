@@ -3,13 +3,12 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
-
     use std::fmt::Write;
     use std::io::BufReader;
-    use std::path::Path;
 
     use axum::body::Body;
     use axum::Router;
+    use bytes::Buf;
     use hyper::Request;
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
@@ -19,18 +18,9 @@ mod interface_tests {
 
     use crate::common::{self, response_body_vec};
 
-    const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
-
-    async fn start_trow(data_dir: &Path) -> Router {
-        let mut trow_builder = trow::TrowConfig::new();
-        data_dir.clone_into(&mut trow_builder.data_dir);
-        trow_builder.service_name = TROW_ADDRESS.to_string();
-        trow_builder.build_app().await.unwrap()
-    }
-
-    async fn upload_config(trow: &Router) {
+    async fn upload_config_blob(trow: &Router) {
         let config = "{}\n".as_bytes();
-        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let digest = digest::Digest::digest_sha256(config.reader()).unwrap();
         let req = Request::post(format!("/v2/config/blobs/uploads/?digest={digest}"))
             .body(Body::from(config))
             .unwrap();
@@ -41,6 +31,7 @@ mod interface_tests {
             "request failed: {}",
             common::response_body_string(resp).await
         );
+        panic!();
     }
 
     async fn push_random_foreign_manifest(trow: &Router, name: &str, tag: &str) -> String {
@@ -135,8 +126,11 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
-        upload_config(&trow).await;
+        let trow = common::trow_router(|c| {
+            c.data_dir = data_dir.to_owned();
+        })
+        .await;
+        upload_config_blob(&trow).await;
 
         // Following is intentionally interleaved to add delays
         let mut history_one = Vec::new();
