@@ -61,6 +61,7 @@ impl RegistryProxiesConfig {
 
 impl SingleRegistryProxyConfig {
     /// returns the downloaded digest
+    /// TO RE-DO !!!
     pub async fn download_remote_image(
         &self,
         image: &RemoteImage,

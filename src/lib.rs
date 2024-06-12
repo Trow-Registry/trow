@@ -7,6 +7,7 @@ pub mod types;
 #[cfg(feature = "sqlite")]
 mod users;
 
+mod entity;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;

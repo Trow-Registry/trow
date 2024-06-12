@@ -73,6 +73,25 @@ impl fmt::Display for Digest {
 }
 
 impl Digest {
+    pub fn is_digest(digest_str: &str) -> bool {
+        let algo_digest = digest_str
+            .split(':')
+            .map(String::from)
+            .collect::<Vec<String>>();
+        if algo_digest.len() != 2 {
+            return false;
+        }
+        let algo = &algo_digest[0];
+        let hash = &algo_digest[1];
+        if !REGEX_DIGEST.is_match(hash) {
+            return false;
+        }
+        if let Err(_) = DigestAlgorithm::from_str(algo) {
+            return false;
+        }
+        true
+    }
+
     pub fn try_from_raw(digest_str: &str) -> Result<Digest, DigestError> {
         let algo_digest = digest_str
             .split(':')

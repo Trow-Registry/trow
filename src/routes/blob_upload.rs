@@ -12,7 +12,7 @@ use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, ContentInfo, StorageBackendError, StorageDriverError};
+use crate::registry::{digest, ContentInfo, StorageBackendError, RegistryError};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -50,8 +50,8 @@ async fn put_blob_upload(
         .await
     {
         Ok(stored) => stored.total_stored,
-        Err(StorageDriverError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidContentRange) => {
+        Err(RegistryError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
+        Err(RegistryError::InvalidContentRange) => {
             return Err(Error::BlobUploadInvalid(
                 "Invalid Content Range".to_string(),
             ))
@@ -68,7 +68,7 @@ async fn put_blob_upload(
         .complete_and_verify_blob_upload(&repo, &uuid, &digest_obj)
         .await
         .map_err(|e| match e {
-            StorageDriverError::InvalidDigest => Error::DigestInvalid,
+            RegistryError::InvalidDigest => Error::DigestInvalid,
             e => {
                 event!(Level::ERROR, "Error completing blob upload: {}", e);
                 Error::InternalError
@@ -136,8 +136,8 @@ async fn patch_blob_upload(
                 (0, (stored.total_stored as u32).saturating_sub(1)), // First byte is 0
             ))
         }
-        Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidContentRange) => Err(Error::BlobUploadInvalid(
+        Err(RegistryError::InvalidName(name)) => Err(Error::NameInvalid(name)),
+        Err(RegistryError::InvalidContentRange) => Err(Error::BlobUploadInvalid(
             "Invalid Content Range".to_string(),
         )),
         Err(_) => Err(Error::InternalError),

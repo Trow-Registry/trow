@@ -5,10 +5,11 @@ use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::Router;
 use digest::Digest;
+use hyper::body::Body as HyperBody;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, ManifestReader, StorageDriverError};
+use crate::registry::{digest, ManifestReader, RegistryError};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -68,11 +69,19 @@ async fn put_image_manifest(
     State(state): State<Arc<TrowServerState>>,
     AlwaysHost(host): AlwaysHost,
     Path((repo_name, reference)): Path<(String, String)>,
-    chunk: Body,
+    body: Body,
 ) -> Result<VerifiedManifest, Error> {
+    const MANIFEST_BODY_SIZE_LIMIT_MB: usize = 2;
+    let man_bytes = axum::body::to_bytes(
+        body,
+        MANIFEST_BODY_SIZE_LIMIT_MB * 1024 * 1024
+    )
+    .await
+    .map_err(|_| Error::ManifestInvalid(format!("Manifest is bigger than limit of {MANIFEST_BODY_SIZE_LIMIT_MB}MiB")))?;
+
     match state
         .registry
-        .store_manifest(&repo_name, &reference, chunk)
+        .store_manifest(&repo_name, &reference, man_bytes)
         .await
     {
         Ok(digest) => Ok(VerifiedManifest::new(
@@ -81,8 +90,8 @@ async fn put_image_manifest(
             digest,
             reference,
         )),
-        Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestInvalid("".to_string())),
+        Err(RegistryError::InvalidName(name)) => Err(Error::NameInvalid(name)),
+        Err(RegistryError::InvalidManifest) => Err(Error::ManifestInvalid("".to_string())),
         Err(_) => Err(Error::InternalError),
     }
 }
@@ -109,8 +118,8 @@ async fn delete_image_manifest(
     let digest = Digest::try_from_raw(&digest).map_err(|_| Error::Unsupported)?;
     match state.registry.delete_manifest(&repo, &digest).await {
         Ok(_) => Ok(ManifestDeleted {}),
-        Err(StorageDriverError::Unsupported) => Err(Error::Unsupported),
-        Err(StorageDriverError::InvalidManifest) => Err(Error::ManifestUnknown(repo)),
+        Err(RegistryError::Unsupported) => Err(Error::Unsupported),
+        Err(RegistryError::InvalidManifest) => Err(Error::ManifestUnknown(repo)),
         Err(_) => Err(Error::InternalError),
     }
 }

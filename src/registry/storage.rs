@@ -129,21 +129,19 @@ impl TrowStorageBackend {
 
     pub async fn get_manifest(
         &self,
-        repo_name: &str,
-        reference: &str,
+        repo: &str,
+        digest: &Digest,
     ) -> Result<Manifest, StorageBackendError> {
-        event!(Level::DEBUG, "Get manifest {repo_name}:{reference}");
-        let digest = match Digest::try_from_raw(reference) {
-            Ok(d) => d,
-            Err(_) => self.get_manifest_digest(repo_name, reference).await?,
-        };
-        let manifest_stream = self.get_blob_stream(repo_name, &digest).await?;
-        let mut manifest_bytes = Vec::new();
-        manifest_stream
-            .reader()
-            .read_to_end(&mut manifest_bytes)
-            .await?;
-        // let manifest_bytes = tokio::fs::read(&path).await?;
+        event!(Level::DEBUG, "Get manifest {repo}:{digest}");
+        let path = self
+            .path
+            .join(MANIFESTS_DIR)
+            .join(repo)
+            .join(digest.to_string());
+        if !path.exists() {
+            return Err(StorageBackendError::BlobNotFound(path));
+        }
+        let manifest_bytes = tokio::fs::read(&path).await?;
         let manifest = Manifest::from_vec(manifest_bytes)?;
         Ok(manifest)
     }
