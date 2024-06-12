@@ -1,6 +1,5 @@
 use futures::AsyncRead;
 
-use super::digest::Digest;
 use crate::types::BoundedStream;
 
 pub struct ContentInfo {
@@ -17,7 +16,7 @@ pub struct UploadInfo {
 }
 
 pub struct BlobReader<S: AsyncRead + ?Sized + Send> {
-    digest: Digest,
+    digest: String,
     reader: Box<S>,
     size: u64,
 }
@@ -27,7 +26,7 @@ pub struct Stored {
 }
 
 impl<S: futures::AsyncRead + Send> BlobReader<S> {
-    pub async fn new(digest: Digest, file: BoundedStream<S>) -> Self {
+    pub async fn new(digest: String, file: BoundedStream<S>) -> Self {
         let file_size = file.size() as u64;
         Self {
             digest,
@@ -40,7 +39,7 @@ impl<S: futures::AsyncRead + Send> BlobReader<S> {
         self.reader
     }
 
-    pub fn digest(&self) -> &Digest {
+    pub fn digest(&self) -> &String {
         &self.digest
     }
 

@@ -1,113 +1,91 @@
+use std::borrow::Cow;
+
 use anyhow::Result;
-use bytes::{Buf, Bytes};
+use lazy_static::lazy_static;
+use oci_spec::image::{ImageIndex, ImageManifest, MediaType};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json;
-use thiserror::Error;
 
 use crate::registry::digest::{Digest, DigestError};
+use crate::registry::RegistryError;
+
+lazy_static! {
+    pub static ref REGEX_TAG: Regex = Regex::new("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$").unwrap();
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum ManifestError {
-    #[error("Could not serialize manifest")]
-    SerializeError,
-    #[error("Could not deserialize manifest")]
-    DeserializeError,
+    #[error("Could not serialize manifest: {0}")]
+    DeserializeError(#[from] serde_json::Error),
     #[error("Manifest contains invalid digest: {0}")]
     InvalidDigest(#[from] DigestError),
 }
 
-#[derive(Debug)]
-pub struct Manifest {
-    raw: Bytes,
-    parsed: OCIManifest,
-    // TODO: lazycell ?
-    digest: Digest,
+#[derive(Debug, Clone, PartialEq)]
+pub enum ManifestReference {
+    Tag(String),
+    Digest(String),
 }
 
-impl Manifest {
-    pub fn from_vec(vec: Vec<u8>) -> Result<Self, ManifestError> {
-        Self::from_bytes(Bytes::from(vec))
-    }
-    pub fn from_bytes(bytes: Bytes) -> Result<Self, ManifestError> {
-        let parsed = serde_json::from_slice(&bytes).map_err(|_| ManifestError::DeserializeError)?;
-        let digest = Digest::digest_sha256(bytes.clone().reader()).unwrap();
-        Ok(Self {
-            raw: bytes,
-            parsed,
-            digest,
-        })
-    }
-
-    pub fn parsed(&self) -> &OCIManifest {
-        &self.parsed
-    }
-    pub fn raw(&self) -> Bytes {
-        self.raw.clone()
-    }
-    pub fn digest(&self) -> &Digest {
-        &self.digest
+impl std::fmt::Display for ManifestReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Tag(t) => Cow::Borrowed(t),
+            Self::Digest(d) => Cow::Owned(d.to_string()),
+        };
+        write!(f, "{}", s)
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+impl TryFrom<&str> for ManifestReference {
+    type Error = RegistryError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from_str(value)
+    }
+}
+
+impl ManifestReference {
+    pub fn try_from_str(reference: &str) -> Result<Self, RegistryError> {
+        if reference.contains(':') {
+            match Digest::try_from_raw(reference) {
+                Ok(_) => Ok(Self::Digest(reference.to_string())),
+                Err(_) => Err(RegistryError::InvalidDigest),
+            }
+        } else if REGEX_TAG.is_match(reference) {
+            Ok(Self::Tag(reference.to_string()))
+        } else {
+            Err(RegistryError::InvalidName(String::new()))
+        }
+    }
+
+    pub fn tag(&self) -> Option<&str> {
+        match self {
+            Self::Tag(t) => Some(t),
+            Self::Digest(_) => None,
+        }
+    }
+
+    pub fn digest(&self) -> Option<&str> {
+        match self {
+            Self::Tag(_) => None,
+            Self::Digest(d) => Some(d),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum OCIManifest {
-    List(OCIManifestList),
-    V2(OCIManifestV2),
+    List(ImageIndex),
+    V2(ImageManifest),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct OCIManifestList {
-    pub schema_version: u8,
-    pub media_type: String, //TODO: make enum
-    pub manifests: Vec<ManifestListEntry>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ManifestListEntry {
-    pub media_type: String, //TODO: make enum
-    pub size: u32,
-    pub digest: String,
-    pub platform: Option<Platform>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Platform {
-    pub architecture: String,
-    pub os: String,
-    #[serde(rename = "os.version")]
-    pub os_version: Option<String>,
-    #[serde(rename = "os.features")]
-    pub os_features: Option<String>,
-    pub variant: Option<String>,
-    pub features: Option<Vec<String>>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct OCIManifestV2 {
-    pub schema_version: u8,
-    pub media_type: Option<String>, //TODO: make enum
-    pub config: Object,
-    pub layers: Vec<Object>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Object {
-    pub media_type: String, //enum would be better
-    pub size: Option<u64>,
-    pub digest: String, //special type would be nice
-}
-
-#[derive(Error, Debug)]
-#[error("Invalid Manifest: {err:?}")]
-pub struct InvalidManifest {
-    err: String,
-}
+// #[derive(Error, Debug)]
+// #[error("Invalid Manifest: {err:?}")]
+// pub struct InvalidManifest {
+//     err: String,
+// }
 
 // TODO: Consider changing this to enum with as_str() impl?
 pub mod manifest_media_type {
@@ -122,119 +100,106 @@ pub mod manifest_media_type {
     pub const DEFAULT: &str = OCI_V1;
 }
 
-impl Manifest {
+impl OCIManifest {
     /// Returns a Vector of the digests of all assets referenced in the Manifest
     /// With the exception of digests for "foreign blobs"
-    pub fn get_local_asset_digests(&self) -> Result<Vec<Digest>, ManifestError> {
-        let digests = match self.parsed {
+    pub fn get_local_asset_digests(&self) -> Vec<String> {
+        let digests = match self {
             OCIManifest::V2(ref m2) => {
-                let mut digests: Vec<&str> = m2
-                    .layers
+                let mut digests: Vec<String> = m2
+                    .layers()
                     .iter()
-                    .filter(|x| {
-                        x.media_type != "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
+                    .filter(|l| {
+                        l.media_type()
+                            != &MediaType::Other(
+                                "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
+                                    .to_string(),
+                            )
                     })
-                    .map(|x| x.digest.as_str())
+                    .map(|x| x.digest().to_string())
                     .collect();
-                digests.push(&m2.config.digest);
+                digests.push(m2.config().digest().to_string());
                 digests
             }
             OCIManifest::List(ref list) => {
                 // Just return the manifest digests.
                 // We could recurse into the manifests, but they should have been checked already.
-
-                list.manifests.iter().map(|x| x.digest.as_str()).collect()
+                list.manifests()
+                    .iter()
+                    .map(|x| x.digest().to_string())
+                    .collect()
             }
         };
-        Ok(digests
-            .into_iter()
-            .map(Digest::try_from_raw)
-            .collect::<Result<Vec<Digest>, DigestError>>()?)
+        digests
     }
 
-    // TODO: use proper enums and return &str
-    pub fn get_media_type(&self) -> String {
-        match self.parsed {
-            OCIManifest::V2(ref m2) => m2
-                .media_type
-                .as_ref()
-                .unwrap_or(&manifest_media_type::DEFAULT.to_string())
-                .to_string(),
-            OCIManifest::List(ref list) => list.media_type.clone(),
+    pub fn media_type(&self) -> &Option<MediaType> {
+        match &self {
+            OCIManifest::V2(m2) => m2.media_type(),
+            OCIManifest::List(list) => list.media_type(),
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Manifest, OCIManifest};
+
+    use super::OCIManifest;
 
     #[test]
-    fn valid_v2_2() {
+    fn ocimanifest_parse_valid_v2_2() {
         let data = r#"{
-   "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-   "config": {
-      "mediaType": "application/vnd.docker.container.image.v1+json",
-      "digest": "sha256:4d3c246dfef2edb11eccb051b47d896d0db8f1c4563c0cce9f6274b9abd9ac74"
-   },
-   "layers": [
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 2789670,
-         "digest": "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 5876721,
-         "digest": "sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826"
-      },
-      {
-          "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
-          "size": 1612893008,
-          "digest": "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2",
-          "urls": [
-                    "https://mcr.microsoft.com/v2/windows/servercore/blobs/sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
-          ]
-
-      }
-   ]
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+  "config": {
+    "mediaType": "application/vnd.docker.container.image.v1+json",
+    "digest": "sha256:4d3c246dfef2edb11eccb051b47d896d0db8f1c4563c0cce9f6274b9abd9ac74",
+    "size": 0
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 2789670,
+      "digest": "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 5876721,
+      "digest": "sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826"
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+      "size": 1612893008,
+      "digest": "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2",
+      "urls": [
+        "https://mcr.microsoft.com/v2/windows/servercore/blobs/sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
+      ]
+    }
+  ]
 }"#;
-        let mani = Manifest::from_vec(data.as_bytes().to_vec()).unwrap();
-        let m_v2 = match mani.parsed() {
+        let mani: OCIManifest = serde_json::from_str(data).unwrap();
+        let m_v2 = match mani {
             OCIManifest::V2(ref m2) => m2,
             OCIManifest::List(_) => unreachable!(),
         };
 
+        // oci-spec serializes docker mediatypes as `Other`
+        // assert_eq!(m_v2.media_type(), &Some(MediaType::ImageManifest));
+        assert_eq!(m_v2.schema_version(), 2);
+        // assert_eq!(m_v2.config().media_type(), &MediaType::ImageConfig);
+        assert_eq!(m_v2.config().size(), 0);
         assert_eq!(
-            m_v2.media_type,
-            Some("application/vnd.docker.distribution.manifest.v2+json".to_string())
-        );
-        assert_eq!(m_v2.schema_version, 2);
-        assert_eq!(
-            m_v2.config.media_type,
-            "application/vnd.docker.container.image.v1+json"
-        );
-        assert_eq!(m_v2.config.size, None);
-        assert_eq!(
-            m_v2.config.digest,
+            m_v2.config().digest(),
             "sha256:4d3c246dfef2edb11eccb051b47d896d0db8f1c4563c0cce9f6274b9abd9ac74"
         );
+        // assert_eq!(m_v2.layers()[0].media_type(), &MediaType::ImageLayerGzip);
+        assert_eq!(m_v2.layers()[0].size(), 2789670);
         assert_eq!(
-            m_v2.layers[0].media_type,
-            "application/vnd.docker.image.rootfs.diff.tar.gzip"
-        );
-        assert_eq!(m_v2.layers[0].size, Some(2789670));
-        assert_eq!(
-            m_v2.layers[0].digest,
+            m_v2.layers()[0].digest(),
             "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
         );
-        let digests_str: Vec<_> = mani
-            .get_local_asset_digests()
-            .unwrap()
-            .iter()
-            .map(|d| d.to_string())
-            .collect();
+        assert_eq!(m_v2.layers().len(), 3);
+        let digests_str: Vec<_> = mani.get_local_asset_digests();
 
         assert_eq!(digests_str.len(), 3);
         assert!(digests_str.contains(
@@ -244,8 +209,9 @@ mod test {
             &"sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826".to_string()
         ));
     }
+
     #[test]
-    fn valid_v2() {
+    fn ocimanifest_parse_valid_v2() {
         let data = r#"{
      "schemaVersion": 2,
      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -262,42 +228,28 @@ mod test {
         }
      ]
    }"#;
-        let mani = Manifest::from_vec(data.as_bytes().to_vec()).unwrap();
-        let m_v2 = match mani.parsed() {
+        let mani: OCIManifest = serde_json::from_str(data).unwrap();
+        let m_v2 = match mani {
             OCIManifest::V2(ref m2) => m2,
             OCIManifest::List(_) => unreachable!(),
         };
 
+        // assert_eq!(m_v2.media_type(), &Some(MediaType::ImageManifest));
+        assert_eq!(m_v2.schema_version(), 2);
+        // assert_eq!(m_v2.config().media_type(), &MediaType::ImageConfig);
+        assert_eq!(m_v2.config().size(), 1278);
         assert_eq!(
-            m_v2.media_type,
-            Some("application/vnd.docker.distribution.manifest.v2+json".to_string())
-        );
-        assert_eq!(m_v2.schema_version, 2);
-        assert_eq!(
-            m_v2.config.media_type,
-            "application/vnd.docker.container.image.v1+json"
-        );
-        assert_eq!(m_v2.config.size.unwrap(), 1278);
-        assert_eq!(
-            m_v2.config.digest,
+            m_v2.config().digest(),
             "sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
         );
+        // assert_eq!(m_v2.layers()[0].media_type(), &MediaType::ImageLayerGzip);
+        assert_eq!(m_v2.layers()[0].size(), 1967949);
         assert_eq!(
-            m_v2.layers[0].media_type,
-            "application/vnd.docker.image.rootfs.diff.tar.gzip"
-        );
-        assert_eq!(m_v2.layers[0].size.unwrap(), 1967949);
-        assert_eq!(
-            m_v2.layers[0].digest,
+            m_v2.layers()[0].digest(),
             "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
         );
 
-        let digests_str: Vec<_> = mani
-            .get_local_asset_digests()
-            .unwrap()
-            .iter()
-            .map(|d| d.to_string())
-            .collect();
+        let digests_str: Vec<_> = mani.get_local_asset_digests();
         assert_eq!(digests_str.len(), 2);
         assert!(digests_str.contains(
             &"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d".to_string()

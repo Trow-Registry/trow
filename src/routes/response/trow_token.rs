@@ -1,4 +1,5 @@
 use std::ops::Add;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::extract::{FromRef, FromRequestParts};
@@ -17,7 +18,7 @@ use uuid::Uuid;
 
 use super::authenticate::Authenticate;
 use crate::routes::extracts::AlwaysHost;
-use crate::{TrowConfig, UserConfig};
+use crate::{TrowConfig, TrowServerState, UserConfig};
 
 const TOKEN_DURATION: u64 = 3600;
 const AUTHORIZATION: &str = "authorization";
@@ -29,13 +30,13 @@ pub struct ValidBasicToken {
 #[axum::async_trait]
 impl<S> FromRequestParts<S> for ValidBasicToken
 where
-    TrowConfig: FromRef<S>,
+    Arc<TrowServerState>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = (StatusCode, ());
 
-    async fn from_request_parts(req: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
-        let config = TrowConfig::from_ref(config);
+    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let config = &Arc::from_ref(state).config;
 
         let user_cfg = match config.user {
             Some(ref user_cfg) => user_cfg,
@@ -188,13 +189,13 @@ impl IntoResponse for TrowToken {
 #[axum::async_trait]
 impl<S> FromRequestParts<S> for TrowToken
 where
-    TrowConfig: FromRef<S>,
+    Arc<TrowServerState>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = Authenticate;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let config = TrowConfig::from_ref(state);
+        let config = &Arc::from_ref(state).config;
         let base_url = match parts
             .extract_with_state::<Option<AlwaysHost>, _>(state)
             .await

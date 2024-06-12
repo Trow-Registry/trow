@@ -6,6 +6,7 @@ edition = "2021"
 
 [features]
 sqlite = []
+test-utils = []
 
 [dependencies]
 futures = "0.3"
@@ -60,8 +61,13 @@ async-trait = "0.1.74"
 walkdir = "2.0"
 rand = "0.8"
 humansize = "2.1"
-sea-orm = { version="0.12.15", features = [ "sqlx-sqlite", "runtime-tokio-rustls", "macros" ] }
-sea-orm-migration = "^0.12.0"
+sea-orm = { version = "1.0.1", features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+sea-orm-migration = "^1.0.1"
+oci-spec = "0.6.4"
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -73,3 +79,5 @@ fastrand = "2.0.1"
 http-body-util = "0.1.1"
 tracing-test = {version="0.2", features = ["no-env-filter"]}
 test-temp-dir = "0.3.0"
+rstest = "0.22.0"
+async-std = { version = "1.5", features = ["attributes"] }       # needed by rstest

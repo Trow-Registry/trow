@@ -14,6 +14,7 @@ use serde::Serialize;
 use tower::ServiceExt;
 use trow::registry::digest::Digest;
 use trow::registry::manifest;
+use trow::TrowConfig;
 
 /* None of these are dead code, they are called from tests */
 #[allow(dead_code)]
@@ -25,7 +26,13 @@ pub const LOCATION_HEADER: &str = "Location";
 #[allow(dead_code)]
 pub const RANGE_HEADER: &str = "Range";
 
-#[cfg(test)]
+#[allow(dead_code)]
+pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(custom_cfg: F) -> Router {
+    let mut trow_builder = TrowConfig::new();
+    custom_cfg(&mut trow_builder);
+    trow_builder.build_app().await.unwrap()
+}
+
 #[allow(dead_code)]
 pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     let mut blob = Vec::with_capacity(size);
@@ -35,8 +42,6 @@ pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     blob
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
 pub async fn response_body_vec(resp: Response<Body>) -> Vec<u8> {
     let mut buf = Vec::new();
     resp.into_body()
@@ -50,14 +55,12 @@ pub async fn response_body_vec(resp: Response<Body>) -> Vec<u8> {
     buf
 }
 
-#[cfg(test)]
 #[allow(dead_code)]
 pub async fn response_body_string(resp: Response<Body>) -> String {
     let vec = response_body_vec(resp).await;
     String::from_utf8(vec).unwrap()
 }
 
-#[cfg(test)]
 #[allow(dead_code)]
 pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {
     let reader = resp
@@ -70,11 +73,8 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
     serde_json::from_reader(reader).unwrap()
 }
 
-#[cfg(test)]
 #[allow(dead_code)]
 pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
-    use crate::common;
-
     let resp = cl
         .clone()
         .oneshot(
@@ -141,28 +141,30 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
         .to_str()
         .unwrap();
     assert_eq!(digest.to_string(), digest_header);
-    let body = common::response_body_vec(resp).await;
+    let body = response_body_vec(resp).await;
     assert_eq!(blob, body);
 
     //Upload manifest
     //For time being use same blob for config and layer
-    let config = manifest::Object {
-        media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
-        size: Some(blob.len() as u64),
-        digest: digest.to_string(),
-    };
-    let layer = manifest::Object {
-        media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_owned(),
-        size: Some(blob.len() as u64),
-        digest: digest.to_string(),
-    };
-    let layers = vec![layer];
-    let mani = manifest::OCIManifestV2 {
-        schema_version: 2,
-        media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
-        config,
-        layers,
-    };
+    let blob_size = blob.len();
+    let mani: manifest::OCIManifest = serde_json::from_str(&format!(
+        r#"{{
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "config": {{
+            "media_type": "application/vnd.docker.container.image.v1+json",
+            "size": {blob_size},
+            "digest": "{digest}"
+        }},
+        "layers": [{{
+            "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+            "size": {blob_size},
+            "digest": "{digest}"
+        }}]
+    }}"#
+    ))
+    .unwrap();
+
     let manifest_addr = format!("/v2/{}/manifests/{}", name, tag);
     let resp = cl
         .clone()
@@ -178,7 +180,6 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     assert_eq!(&location, &manifest_addr);
 }
 
-#[cfg(test)]
 #[allow(dead_code)]
 /// Returns a temporary file filled with `contents`
 pub fn get_file<T: Serialize>(dir: &Path, contents: T) -> PathBuf {

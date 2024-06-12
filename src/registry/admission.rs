@@ -1,4 +1,4 @@
-use json_patch::{Patch, PatchOperation, ReplaceOperation};
+use json_patch::{Patch, PatchOperation};
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use serde::{Deserialize, Serialize};
@@ -163,10 +163,14 @@ impl TrowServer {
                         format!("f/{}/{}", proxy_config.alias, image.get_repo()),
                         image.reference.clone(),
                     );
-                    patch_operations.push(PatchOperation::Replace(ReplaceOperation {
-                        path: image_path.clone(),
-                        value: serde_json::Value::String(im.get_ref()),
-                    }));
+                    patch_operations.push(
+                        serde_json::from_str(&format!(
+                            r#"{{ "op": "replace", "path": "{}", "value": "{}" }}"#,
+                            image_path,
+                            im.get_ref()
+                        ))
+                        .unwrap(),
+                    );
                 }
             }
         }

@@ -33,19 +33,18 @@ mod test {
     use axum::response::IntoResponse;
 
     use crate::registry::{Digest, DigestAlgorithm};
-    use crate::types::{AcceptedUpload, Uuid};
+    use crate::types::AcceptedUpload;
 
     #[tokio::test]
     async fn test_resp() {
         let accepted_upload = AcceptedUpload::new(
             "http://trowuw".to_string(),
-            Digest {
-                algo: DigestAlgorithm::Sha256,
-                hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
-                    .to_string(),
-            },
+            Digest::try_from_raw(
+                "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec",
+            )
+            .unwrap(),
             "moredhel/test".to_owned(),
-            Uuid("whatever".to_owned()),
+            uuid::Uuid::new_v4(),
             (0, 0),
         );
 
