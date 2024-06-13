@@ -96,7 +96,7 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("FK_tag_repo")
                             .from(Tag::Table, Tag::Repo)
-                            .to(Repo::Table, Repo::Id)
+                            .to(Repo::Table, Repo::Name)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .index(

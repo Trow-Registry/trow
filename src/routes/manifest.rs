@@ -72,12 +72,13 @@ async fn put_image_manifest(
     body: Body,
 ) -> Result<VerifiedManifest, Error> {
     const MANIFEST_BODY_SIZE_LIMIT_MB: usize = 2;
-    let man_bytes = axum::body::to_bytes(
-        body,
-        MANIFEST_BODY_SIZE_LIMIT_MB * 1024 * 1024
-    )
-    .await
-    .map_err(|_| Error::ManifestInvalid(format!("Manifest is bigger than limit of {MANIFEST_BODY_SIZE_LIMIT_MB}MiB")))?;
+    let man_bytes = axum::body::to_bytes(body, MANIFEST_BODY_SIZE_LIMIT_MB * 1024 * 1024)
+        .await
+        .map_err(|_| {
+            Error::ManifestInvalid(format!(
+                "Manifest is bigger than limit of {MANIFEST_BODY_SIZE_LIMIT_MB}MiB"
+            ))
+        })?;
 
     match state
         .registry

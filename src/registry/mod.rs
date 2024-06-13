@@ -59,7 +59,7 @@ impl From<StorageBackendError> for RegistryError {
             StorageBackendError::Internal(e) => {
                 event!(Level::ERROR, "Internal storage error: {e}");
                 Self::Internal
-            },
+            }
             StorageBackendError::InvalidContentRange => Self::InvalidContentRange,
             StorageBackendError::InvalidDigest => Self::InvalidDigest,
             StorageBackendError::InvalidManifest(_msg) => Self::InvalidManifest,
@@ -67,8 +67,8 @@ impl From<StorageBackendError> for RegistryError {
             StorageBackendError::Io(e) => {
                 event!(Level::ERROR, "Internal IO error: {e:?}");
                 Self::Internal
-            },
-            StorageBackendError::Unsupported => Self::Unsupported
+            }
+            StorageBackendError::Unsupported => Self::Unsupported,
         }
     }
 }
@@ -92,8 +92,11 @@ pub fn build_server(
 }
 
 impl TrowServerBuilder {
-    pub fn get_server(self) -> Result<TrowServer> {
+    pub async fn get_server(self) -> Result<TrowServer> {
+        use sea_orm::Database;
+        let fake_db = Database::connect("/lol").await.unwrap();
         TrowServer::new(
+            fake_db,
             self.data_path,
             self.proxy_registry_config,
             self.image_validation_config,

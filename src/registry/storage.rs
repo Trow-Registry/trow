@@ -15,7 +15,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{event, Level};
 use walkdir::WalkDir;
 
-use super::manifest::{Manifest, ManifestError};
+use super::manifest::{ManifestError, OCIManifest};
 use super::server::PROXY_DIR;
 use crate::registry::blob_storage::Stored;
 use crate::registry::catalog_operations::HistoryEntry;
@@ -28,7 +28,7 @@ use crate::types::BoundedStream;
 pub enum StorageBackendError {
     #[error("the name `{0}` is not valid")]
     InvalidName(String),
-    #[error("Manifest is not valid ({0:?})")]
+    #[error("Invalid manifest: {0:?}")]
     InvalidManifest(#[from] ManifestError),
     #[error("Blob not found:{0}")]
     BlobNotFound(PathBuf),
@@ -131,7 +131,7 @@ impl TrowStorageBackend {
         &self,
         repo: &str,
         digest: &Digest,
-    ) -> Result<Manifest, StorageBackendError> {
+    ) -> Result<OCIManifest, StorageBackendError> {
         event!(Level::DEBUG, "Get manifest {repo}:{digest}");
         let path = self
             .path
@@ -142,7 +142,8 @@ impl TrowStorageBackend {
             return Err(StorageBackendError::BlobNotFound(path));
         }
         let manifest_bytes = tokio::fs::read(&path).await?;
-        let manifest = Manifest::from_vec(manifest_bytes)?;
+        let manifest = serde_json::from_slice(&manifest_bytes)
+            .map_err(|e| ManifestError::DeserializeError(e))?;
         Ok(manifest)
     }
 
@@ -384,7 +385,8 @@ impl TrowStorageBackend {
             )))
         })?;
         if verify_assets {
-            let manifest = Manifest::from_bytes(manifest.clone())?;
+            let manifest: OCIManifest = serde_json::from_slice(&manifest)
+                .map_err(|e| ManifestError::DeserializeError(e))?;
             for digest in manifest.get_local_asset_digests()? {
                 let blob_path = self
                     .path
@@ -548,6 +550,8 @@ fn is_proxy_repo(repo_name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use oci_spec::image::ImageManifest;
+
     use super::*;
     use crate::registry::manifest;
 
@@ -584,16 +588,21 @@ mod tests {
     async fn trow_storage_backend_write_image_manifest() {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
-        let mut manifest = manifest::OCIManifest::V2(manifest::OCIManifestV2 {
-            schema_version: 2,
-            media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_string()),
-            config: manifest::Object {
-                media_type: "application/vnd.docker.container.image.v1+json".to_string(),
-                size: Some(7027),
-                digest: "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a".to_string(),
-            },
-            layers: vec![],
-        });
+        let mut manifest = manifest::OCIManifest::V2(
+            serde_json::from_str(
+                r#"{
+                schema_version: 2,
+                media_type: "application/vnd.docker.distribution.manifest.v2+json",
+                config: manifest::Object {
+                    media_type: "application/vnd.docker.container.image.v1+json",
+                    size: 7027,
+                    digest: "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a",
+                },
+                layers: []
+            }"#,
+            )
+            .unwrap(),
+        );
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         let location = store
             .write_image_manifest(Bytes::from(manifest_bytes), "zozo/image", "latest", false)
@@ -603,11 +612,16 @@ mod tests {
         // Now let's test verification
         match manifest {
             manifest::OCIManifest::V2(ref mut m) => {
-                m.layers.push(manifest::Object {
-                    media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_string(),
-                    size: Some(7027),
-                    digest: "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a".to_string(),
-                });
+                m.layers_mut().push(
+                    serde_json::from_str(
+                        r#"{
+                    media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+                    size: 7027,
+                    digest: "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a",
+                }"#,
+                    )
+                    .unwrap(),
+                );
                 let stream = pin!(bytes_to_stream(Bytes::from("test")));
                 let digest =
                     Digest::try_from_raw("sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a").unwrap();

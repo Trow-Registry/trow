@@ -8,7 +8,7 @@ pub struct Model {
     pub digest: String,
     pub size: i32,
     pub last_accessed: String,
-    pub repo: i32,
+    pub repo_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -17,8 +17,8 @@ pub enum Relation {
     ManifestBlobAssociation,
     #[sea_orm(
         belongs_to = "super::repo::Entity",
-        from = "Column::Repo",
-        to = "super::repo::Column::id",
+        from = "Column::RepoId",
+        to = "super::repo::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

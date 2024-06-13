@@ -1,32 +1,27 @@
 use std::path::PathBuf;
 use std::str;
 
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use axum::body::Body;
-use bytes::Buf;
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use futures::AsyncRead;
 use lazy_static::lazy_static;
 use regex::Regex;
-use sea_orm::ActiveModelTrait;
-use sea_orm::DatabaseConnection;
-use sea_orm::EntityOrSelect;
-use sea_orm::ModelTrait;
-use sea_orm::QueryOrder;
-use sea_orm::QuerySelect;
+use sea_orm::entity::{NotSet, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityOrSelect, EntityTrait, ModelTrait,
+    QueryFilter, QueryOrder, QuerySelect,
+};
+use serde::Serialize;
 use thiserror::Error;
 use tracing::{event, Level};
-use sea_orm::EntityTrait;
-use sea_orm::QueryFilter;
-use sea_orm::entity::{Set, NotSet};
-use sea_orm::ColumnTrait;
 
-use super::manifest::ManifestReference;
+use super::manifest::{ManifestReference, OCIManifest};
 // use super::manifest::Manifest;
 use super::proxy::RegistryProxiesConfig;
 use super::storage::{StorageBackendError, TrowStorageBackend};
 use super::ImageValidationConfig;
+use crate::entity;
 use crate::registry::api_types::Status;
 use crate::registry::blob_storage::Stored;
 use crate::registry::catalog_operations::HistoryEntry;
@@ -34,7 +29,6 @@ use crate::registry::digest::Digest;
 use crate::registry::storage::WriteBlobRangeError;
 use crate::registry::{BlobReader, ContentInfo, ManifestReader, RegistryError};
 use crate::types::*;
-use crate::entity;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
@@ -80,45 +74,49 @@ impl TrowServer {
         if reference.digest().is_none() && name.starts_with(PROXY_DIR) {
             if let Some((proxy_cfg, img)) = self
                 .proxy_registry_config
-                .get_proxy_config(name, reference)
+                .get_proxy_config(name, &reference)
                 .await
             {
-                reference = ManifestReference::Digest(proxy_cfg.download_remote_image(&img, self).await?);
+                reference =
+                    ManifestReference::Digest(proxy_cfg.download_remote_image(&img, self).await?);
             }
         }
-        if let Some(ManifestReference::Tag(tag)) = reference {
-            let manifest = entity::Manifest::find()
-                .inner_join(entity::Tag::Entity)
-                .inner_join(entity::repo::Entity)
-                .filter(entity::repo::Column::Name.eq(name))
-                .filter(entity::tag::Column::Tag.eq(tag))
-                .one(&self.db).await?;
+        if let ManifestReference::Tag(tag) = &reference {
+            // let manifest = entity::Manifest::find()
+            //     .inner_join(entity::tag::Entity)
+            //     .inner_join(entity::repo::Entity)
+            //     .filter(entity::repo::Column::Name.eq(name))
+            //     .filter(entity::tag::Column::Tag.eq(tag))
+            //     .one(&self.db).await?;
 
             let tag = entity::Tag::find()
                 .left_join(entity::repo::Entity)
                 .filter(entity::repo::Column::Name.eq(name))
                 .filter(entity::tag::Column::Tag.eq(tag))
-                .one(&self.db).await?;
+                .one(&self.db)
+                .await?;
             if let Some(tag) = tag {
-                reference = ManifestReference::Digest(Digest::try_from_raw(&tag.manifest_digest).unwrap());
+                // reference = ManifestReference::Digest(Digest::try_from_raw(&tag.manifest_digest).unwrap());
             }
         }
-        let digest = match digest {
-            Some(d) => d,
-            None => return Err(anyhow!("Could not find {name}:{reference}"))
+        let digest = match reference {
+            ManifestReference::Digest(d) => d,
+            ManifestReference::Tag(t) => return Err(anyhow!("Could not find {name}:{t}")),
         };
-        let man = self.storage.get_manifest(name, &digest).await.map_err(|e| {
-            event!(Level::WARN, "Error getting manifest: {}", e);
-            RegistryError::Internal
-        })?;
-        Ok(
-            ManifestReader::new(
-            man.get_media_type(),
-            man.digest().clone(),
-            man.raw().clone(),
+        let man = self
+            .storage
+            .get_manifest(name, &digest)
+            .await
+            .map_err(|e| {
+                event!(Level::WARN, "Error getting manifest: {}", e);
+                RegistryError::Internal
+            })?;
+        Ok(ManifestReader::new(
+            man.media_type().as_ref().unwrap().to_string(),
+            digest,
+            Bytes::from(serde_json::ser::to_vec(&man).unwrap()),
         )
-        .await
-        )
+        .await)
     }
 
     pub async fn store_manifest<'a>(
@@ -132,20 +130,17 @@ impl TrowServer {
                 "Cannot upload manifest for proxied repo {repo}"
             )));
         }
-        let digest = Digest::digest(&mut raw_manifest.reader()).unwrap();
-        let manifest = Manifest::from_bytes(raw_manifest).map_err(|_| {
-            RegistryError::InvalidManifest
-        })?;
-        entity::manifest::ActiveModel {
-            digest: digest.to_string(),
-            repo: repo,
-            size: ""
+        let digest = Digest::digest_sha256(&mut raw_manifest.clone().reader()).unwrap();
+        let manifest: OCIManifest =
+            serde_json::from_slice(&raw_manifest).map_err(|_| RegistryError::InvalidManifest)?;
+        // entity::manifest::ActiveModel {
+        //     digest: digest.to_string(),
+        //     repo: repo,
+        //     size: ""
 
-        }
+        // }
 
         // entity::Manifest::insert()
-
-
 
         self.storage
             .write_image_manifest(raw_manifest.clone(), repo, reference, true)
@@ -155,7 +150,7 @@ impl TrowServer {
                 RegistryError::Internal
             })?;
 
-        Ok(Digest::digest_sha256(man_bytes.reader()).unwrap())
+        Ok(Digest::digest_sha256(raw_manifest.reader()).unwrap())
     }
 
     pub async fn delete_manifest(
@@ -225,11 +220,10 @@ impl TrowServer {
     ) -> Result<(), RegistryError> {
         let upload = entity::Upload::find_by_id(session_id)
             .one(&self.db)
-            .await?.ok_or(RegistryError::NotFound)?;
+            .await?
+            .ok_or(RegistryError::NotFound)?;
 
-        self.storage
-            .complete_blob_write(session_id, digest)
-            .await?;
+        self.storage.complete_blob_write(session_id, digest).await?;
         let blob_size = upload.offset;
         upload.delete(&self.db).await?;
         entity::blob::ActiveModel {
@@ -237,7 +231,9 @@ impl TrowServer {
             size: Set(blob_size),
             last_accessed: NotSet,
             ..Default::default()
-        }.insert(&self.db).await?;
+        }
+        .insert(&self.db)
+        .await?;
 
         Ok(())
     }
@@ -251,15 +247,18 @@ impl TrowServer {
         let num_results = num_results.unwrap_or(u32::MAX);
         let start_id = if let Some(val) = start_value {
             entity::Tag::find()
-            .filter(entity::tag::Column::Tag.eq(val))
-            .column(entity::tag::Column::Id)
-            .one(&self.db).await?.ok_or(RegistryError::InvalidName(val.to_string()))?.id
+                .filter(entity::tag::Column::Tag.eq(val))
+                .column(entity::tag::Column::Id)
+                .one(&self.db)
+                .await?
+                .ok_or(RegistryError::InvalidName(val.to_string()))?
+                .id
         } else {
             i32::MAX
         };
-        entity::Tag::find().order_by("id", "dsc").filter(filter) .limit()
+        // entity::Tag::find().order_by("id", "dsc").filter(filter) .limit();
 
-        self.list_tags(repo, num_results, start_value)
+        self.list_tags(repo, num_results, start_value.unwrap_or_default())
             .await
             .map_err(|_| RegistryError::Internal)
     }

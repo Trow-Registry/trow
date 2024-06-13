@@ -15,7 +15,7 @@ pub enum Relation {
     #[sea_orm(
         belongs_to = "super::manifest::Entity",
         from = "Column::ManifestId",
-        to = "super::manifest::Column::id",
+        to = "super::manifest::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
@@ -23,7 +23,7 @@ pub enum Relation {
     #[sea_orm(
         belongs_to = "super::repo::Entity",
         from = "Column::RepoId",
-        to = "super::repo::Column::id",
+        to = "super::repo::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

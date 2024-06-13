@@ -1,7 +1,7 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "tag")]
+#[sea_orm(table_name = "repo")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = true)]
     pub id: i32,
@@ -10,13 +10,13 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::manifest::Entity")]
-    Manifest,
+    #[sea_orm(has_many = "super::blob::Entity")]
+    Blob,
 }
 
 impl Related<super::manifest::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Manifest.def()
+        Relation::Blob.def()
     }
 }
 

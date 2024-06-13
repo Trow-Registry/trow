@@ -49,7 +49,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_migrations() {
-        eprintln!("runnig in {:?}", std::env::current_dir());
+        eprintln!("running in {:?}", std::env::current_dir());
         run().await.unwrap();
     }
 }

@@ -169,7 +169,7 @@ impl TrowConfig {
             self.proxy_registry_config.clone(),
             self.image_validation_config.clone(),
         );
-        let registry = ts_builder.get_server()?;
+        let registry = ts_builder.get_server().await?;
 
         let server_state = TrowServerState {
             config: self.clone(),

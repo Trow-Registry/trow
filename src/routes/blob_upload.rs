@@ -12,7 +12,7 @@ use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, ContentInfo, StorageBackendError, RegistryError};
+use crate::registry::{digest, ContentInfo, RegistryError, StorageBackendError};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
