@@ -3,21 +3,17 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "blob")]
+#[sea_orm(table_name = "blob_upload")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
-    #[sea_orm(unique)]
-    pub digest: String,
-    pub size: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub uuid: String,
+    pub offset: i32,
     pub last_accessed: String,
-    pub repo: Option<i32>,
+    pub repo: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::manifest_blob_association::Entity")]
-    ManifestBlobAssociation,
     #[sea_orm(
         belongs_to = "super::repo::Entity",
         from = "Column::Repo",
@@ -26,12 +22,6 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Repo,
-}
-
-impl Related<super::manifest_blob_association::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::ManifestBlobAssociation.def()
-    }
 }
 
 impl Related<super::repo::Entity> for Entity {
