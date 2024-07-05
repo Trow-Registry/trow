@@ -412,70 +412,6 @@ impl TrowStorageBackend {
         Ok(location)
     }
 
-    pub async fn get_manifest_history(
-        &self,
-        repo_name: &str,
-        tag: &str,
-    ) -> Result<Vec<HistoryEntry>, StorageBackendError> {
-        let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(tag);
-        let history_raw = tokio::fs::read(manifest_history_loc).await?;
-        io::Cursor::new(history_raw)
-            .lines()
-            .map(|man| serde_json::from_slice(man.unwrap().as_bytes()))
-            .collect::<Result<Vec<HistoryEntry>, _>>()
-            .map_err(|e| {
-                StorageBackendError::Internal(Cow::Owned(format!(
-                    "Could not parse manifest history ({repo_name}:{tag}): {e}"
-                )))
-            })
-    }
-
-    pub async fn list_repos(&self) -> Result<Vec<String>, StorageBackendError> {
-        let manifest_dir = self.path.join(MANIFESTS_DIR);
-        // let dirs = tokio::fs::read_dir(manifest_dir);
-        let manifests = WalkDir::new(&manifest_dir)
-            .sort_by_file_name()
-            .into_iter()
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    let repo = path.parent()?.strip_prefix(&manifest_dir).ok()?;
-                    Some(repo.to_string_lossy().to_string())
-                } else {
-                    None
-                }
-            })
-            .fold(Vec::new(), |mut acc, e| {
-                if acc.last() != Some(&e) {
-                    acc.push(e);
-                }
-                acc
-            });
-
-        Ok(manifests)
-    }
-
-    pub async fn list_repo_tags(&self, repo: &str) -> Result<Vec<String>, StorageBackendError> {
-        let repo_manifest_dir = self.path.join(MANIFESTS_DIR).join(repo);
-        let tags = WalkDir::new(&repo_manifest_dir)
-            .sort_by_file_name()
-            .into_iter()
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    let repo = path.strip_prefix(&repo_manifest_dir).ok()?;
-                    Some(repo.to_string_lossy().into_owned())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        Ok(tags)
-    }
-
     pub async fn delete_blob(&self, digest: &Digest) -> Result<(), StorageBackendError> {
         let blob_path = self
             .path
@@ -499,7 +435,8 @@ impl TrowStorageBackend {
         if let Err(e) = tokio::fs::remove_file(path).await {
             event!(Level::WARN, "Could not delete manifest file: {}", e);
         }
-        let tags = self.list_repo_tags(repo_name).await?;
+        let tags: [String; 0] = [];
+        // let tags = self.list_repo_tags(repo_name).await?;
         for t in tags {
             let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(t);
             let history_raw = tokio::fs::read(&manifest_history_loc).await?;
@@ -661,31 +598,5 @@ mod tests {
             .await
             .unwrap();
         assert!(digest.to_string() == "sha256:123456789101112131415161718192021");
-    }
-
-    #[tokio::test]
-    async fn trow_storage_backend_get_manifest_history() {
-        let dir = test_temp_dir::test_temp_dir!();
-        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
-
-        let fd = store.path.join("manifests").join("zozo").join("image");
-        fs::create_dir_all(&fd).await.unwrap();
-        let mut file = fs::File::create(fd.join("latest")).await.unwrap();
-        let entry = HistoryEntry {
-            digest: "sha256:123456789101112131415161718192021".to_string(),
-            date: Utc::now(),
-        };
-        file.write_all(&serde_json::to_vec(&entry).unwrap())
-            .await
-            .unwrap();
-        drop(file);
-        // file.flush().unwrap();
-
-        let history = store
-            .get_manifest_history("zozo/image", "latest")
-            .await
-            .unwrap();
-        assert!(history.len() == 1);
-        assert!(history[0].digest == "sha256:123456789101112131415161718192021");
     }
 }

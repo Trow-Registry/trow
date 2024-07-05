@@ -6,8 +6,6 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "blob")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32,
-    #[sea_orm(unique)]
     pub digest: String,
     pub size: i32,
     pub last_accessed: String,

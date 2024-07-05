@@ -47,7 +47,7 @@ pub struct TrowServer {
     pub storage: TrowStorageBackend,
     pub proxy_registry_config: RegistryProxiesConfig,
     pub image_validation_config: Option<ImageValidationConfig>,
-    db: DatabaseConnection,
+    pub db: DatabaseConnection,
 }
 
 impl TrowServer {
@@ -82,21 +82,13 @@ impl TrowServer {
             }
         }
         if let ManifestReference::Tag(tag) = &reference {
-            // let manifest = entity::Manifest::find()
-            //     .inner_join(entity::tag::Entity)
-            //     .inner_join(entity::repo::Entity)
-            //     .filter(entity::repo::Column::Name.eq(name))
-            //     .filter(entity::tag::Column::Tag.eq(tag))
-            //     .one(&self.db).await?;
-
-            let tag = entity::Tag::find()
-                .left_join(entity::repo::Entity)
-                .filter(entity::repo::Column::Name.eq(name))
+            let tag = entity::tag::Entity::find()
+                .filter(entity::tag::Column::Repo.eq(name))
                 .filter(entity::tag::Column::Tag.eq(tag))
                 .one(&self.db)
                 .await?;
             if let Some(tag) = tag {
-                // reference = ManifestReference::Digest(Digest::try_from_raw(&tag.manifest_digest).unwrap());
+                reference = ManifestReference::Digest(Digest::try_from_raw(&tag.manifest_digest).unwrap());
             }
         }
         let digest = match reference {
@@ -218,7 +210,7 @@ impl TrowServer {
         session_id: &str,
         digest: &Digest,
     ) -> Result<(), RegistryError> {
-        let upload = entity::Upload::find_by_id(session_id)
+        let upload = entity::blob_upload::Entity::find_by_id(session_id)
             .one(&self.db)
             .await?
             .ok_or(RegistryError::NotFound)?;
@@ -236,46 +228,6 @@ impl TrowServer {
         .await?;
 
         Ok(())
-    }
-
-    pub async fn get_tags(
-        &self,
-        repo: &str,
-        start_value: Option<&str>,
-        num_results: Option<u32>,
-    ) -> Result<Vec<String>, RegistryError> {
-        let num_results = num_results.unwrap_or(u32::MAX);
-        let start_id = if let Some(val) = start_value {
-            entity::Tag::find()
-                .filter(entity::tag::Column::Tag.eq(val))
-                .column(entity::tag::Column::Id)
-                .one(&self.db)
-                .await?
-                .ok_or(RegistryError::InvalidName(val.to_string()))?
-                .id
-        } else {
-            i32::MAX
-        };
-        // entity::Tag::find().order_by("id", "dsc").filter(filter) .limit();
-
-        self.list_tags(repo, num_results, start_value.unwrap_or_default())
-            .await
-            .map_err(|_| RegistryError::Internal)
-    }
-
-    pub async fn get_history(
-        &self,
-        repo: &str,
-        name: &str,
-        start_value: Option<&str>,
-        num_results: Option<u32>,
-    ) -> Result<Vec<HistoryEntry>, RegistryError> {
-        let num_results = num_results.unwrap_or(u32::MAX);
-        let start_value = start_value.unwrap_or_default();
-
-        self.get_manifest_history(repo, name, num_results, start_value)
-            .await
-            .map_err(|_| RegistryError::Internal)
     }
 
     /**
@@ -308,99 +260,6 @@ impl TrowServer {
     //     unimplemented!("Manifest deletion not yet implemented")
     //     // Ok(ManifestDeleted {})
     // }
-
-    pub async fn get_catalog(
-        &self,
-        start_value: Option<&str>,
-        num_results: Option<u32>,
-    ) -> Result<Vec<String>, Status> {
-        let mut manifests = self
-            .storage
-            .list_repos()
-            .await
-            .map_err(|e| Status::Internal(format!("Internal error streaming catalog: {e}")))?;
-        let limit = num_results.unwrap_or(u32::MAX) as usize;
-        let manifests = match start_value {
-            Some(repo) if !repo.is_empty() => manifests
-                .into_iter()
-                .skip_while(|m| *m != repo)
-                .skip(1)
-                .take(limit)
-                .collect(),
-            _ => {
-                manifests.truncate(limit);
-                manifests
-            }
-        };
-
-        Ok(manifests)
-    }
-
-    pub async fn list_tags(
-        &self,
-        repo_name: &str,
-        limit: u32,
-        last_tag: &str,
-    ) -> Result<Vec<String>, Status> {
-        let mut tags = self.storage.list_repo_tags(repo_name).await.map_err(|e| {
-            event!(Level::ERROR, "Error listing catalog repo tags {:?}", e);
-            Status::Internal("Internal error streaming catalog".to_owned())
-        })?;
-        tags.sort();
-        let limit = limit as usize;
-
-        let partial_catalog: Vec<String> = if last_tag.is_empty() {
-            tags.truncate(limit);
-            tags
-        } else {
-            tags.into_iter()
-                .skip_while(|t| t != last_tag)
-                .skip(1)
-                .take(limit)
-                .collect()
-        };
-
-        Ok(partial_catalog)
-    }
-
-    pub async fn get_manifest_history(
-        &self,
-        repo_name: &str,
-        reference: &str,
-        limit: u32,
-        last_digest: &str,
-    ) -> Result<Vec<HistoryEntry>, Status> {
-        let is_digest = Digest::try_from_raw(reference).is_ok();
-        if is_digest {
-            return Err(Status::InvalidArgument(
-                "Require valid tag (not digest) to search for history".to_owned(),
-            ));
-        }
-
-        let mut manifest_history = self
-            .storage
-            .get_manifest_history(repo_name, reference)
-            .await
-            .map_err(|e| {
-                event!(Level::ERROR, "Error listing manifest history: {e}");
-                Status::Internal("Could not list manifest history".to_owned())
-            })?;
-
-        let limit = limit as usize;
-        let entries = if last_digest.is_empty() {
-            manifest_history.truncate(limit);
-            manifest_history
-        } else {
-            manifest_history
-                .into_iter()
-                .skip_while(|entry| entry.digest != last_digest)
-                .skip(1)
-                .take(limit)
-                .collect()
-        };
-
-        Ok(entries)
-    }
 
     // Readiness check
     pub async fn is_ready(&self) -> bool {

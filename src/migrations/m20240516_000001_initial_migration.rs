@@ -17,25 +17,18 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Blob::Table)
                     .col(
-                        ColumnDef::new(Blob::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(
                         ColumnDef::new(Blob::Digest)
                             .string()
                             .not_null()
-                            .unique_key(),
+                            .primary_key(),
                     )
                     .col(ColumnDef::new(Blob::Size).integer().not_null())
                     .col(ColumnDef::new(Blob::LastAccessed).timestamp().not_null())
-                    .col(ColumnDef::new(Blob::RepoId).integer().not_null())
+                    .col(ColumnDef::new(Blob::Repo).string().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_blob_repo")
-                            .from(Blob::Table, Blob::RepoId)
+                            .from(Blob::Table, Blob::Repo)
                             .to(Repo::Table, Repo::Name)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -48,17 +41,10 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Manifest::Table)
                     .col(
-                        ColumnDef::new(Manifest::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(
                         ColumnDef::new(Manifest::Digest)
                             .string()
                             .not_null()
-                            .unique_key(),
+                            .primary_key(),
                     )
                     .col(ColumnDef::new(Manifest::Size).integer().not_null())
                     .col(
@@ -66,11 +52,11 @@ impl MigrationTrait for Migration {
                             .timestamp()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Manifest::RepoId).integer())
+                    .col(ColumnDef::new(Manifest::Repo).string())
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_manifest_repo")
-                            .from(Manifest::Table, Manifest::RepoId)
+                            .from(Manifest::Table, Manifest::Repo)
                             .to(Repo::Table, Repo::Name)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -83,19 +69,19 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Tag::Table)
                     .col(ColumnDef::new(Tag::Tag).string().not_null())
-                    .col(ColumnDef::new(Tag::RepoId).string().not_null())
-                    .col(ColumnDef::new(Tag::ManifestId).integer().not_null())
+                    .col(ColumnDef::new(Tag::Repo).string().not_null())
+                    .col(ColumnDef::new(Tag::ManifestDigest).string().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_tag_manifest")
-                            .from(Tag::Table, Tag::ManifestId)
-                            .to(Manifest::Table, Manifest::Id)
+                            .from(Tag::Table, Tag::ManifestDigest)
+                            .to(Manifest::Table, Manifest::Digest)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_tag_repo")
-                            .from(Tag::Table, Tag::RepoId)
+                            .from(Tag::Table, Tag::Repo)
                             .to(Repo::Table, Repo::Name)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -103,7 +89,7 @@ impl MigrationTrait for Migration {
                         Index::create()
                             .name("IDX_repo_tag")
                             .table(Tag::Table)
-                            .col(Tag::RepoId)
+                            .col(Tag::Repo)
                             .col(Tag::Tag)
                             .unique(),
                     )
@@ -116,37 +102,37 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(ManifestBlobAssociation::Table)
                     .col(
-                        ColumnDef::new(ManifestBlobAssociation::ManifestId)
-                            .integer()
+                        ColumnDef::new(ManifestBlobAssociation::ManifestDigest)
+                            .string()
                             .not_null(),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(
                                 ManifestBlobAssociation::Table,
-                                ManifestBlobAssociation::ManifestId,
+                                ManifestBlobAssociation::ManifestDigest,
                             )
-                            .to(Manifest::Table, Manifest::Id)
+                            .to(Manifest::Table, Manifest::Digest)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .col(
-                        ColumnDef::new(ManifestBlobAssociation::BlobId)
-                            .integer()
+                        ColumnDef::new(ManifestBlobAssociation::BlobDigest)
+                            .string()
                             .not_null(),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(
                                 ManifestBlobAssociation::Table,
-                                ManifestBlobAssociation::BlobId,
+                                ManifestBlobAssociation::BlobDigest,
                             )
-                            .to(Blob::Table, Blob::Id)
+                            .to(Blob::Table, Blob::Digest)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .primary_key(
                         Index::create()
-                            .col(ManifestBlobAssociation::BlobId)
-                            .col(ManifestBlobAssociation::ManifestId),
+                            .col(ManifestBlobAssociation::BlobDigest)
+                            .col(ManifestBlobAssociation::ManifestDigest),
                     )
                     .to_owned(),
             )
@@ -168,10 +154,10 @@ impl MigrationTrait for Migration {
                             .timestamp()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(BlobUpload::RepoId).string().not_null())
+                    .col(ColumnDef::new(BlobUpload::Repo).string().not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .from(BlobUpload::Table, BlobUpload::RepoId)
+                            .from(BlobUpload::Table, BlobUpload::Repo)
                             .to(Repo::Table, Repo::Name)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -219,42 +205,40 @@ impl MigrationTrait for Migration {
 #[derive(Iden)]
 enum Blob {
     Table,
-    Id,
     Digest,
     Size,
     LastAccessed,
-    RepoId,
+    Repo,
 }
 
 #[derive(Iden)]
 enum Manifest {
     Table,
-    Id,
     Digest,
     Size,
     LastAccessed,
-    RepoId,
+    Repo,
 }
 
 #[derive(Iden)]
 enum Tag {
     Table,
-    RepoId,
+    Repo,
     Tag,
-    ManifestId,
+    ManifestDigest,
 }
 
 #[derive(Iden)]
 enum ManifestBlobAssociation {
     Table,
-    ManifestId,
-    BlobId,
+    ManifestDigest,
+    BlobDigest,
 }
 
 #[derive(Iden)]
 enum BlobUpload {
     Table,
-    RepoId,
+    Repo,
     Uuid,
     Offset,
     LastAccessed,

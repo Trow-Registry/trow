@@ -5,17 +5,19 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "tag")]
 pub struct Model {
+    #[sea_orm(primary_key)]
     pub tag: String,
+    #[sea_orm(primary_key)]
     pub repo: String,
-    pub manifest_id: i32,
+    pub manifest_digest: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::manifest::Entity",
-        from = "Column::ManifestId",
-        to = "super::manifest::Column::Id",
+        from = "Column::ManifestDigest",
+        to = "super::manifest::Column::Digest",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

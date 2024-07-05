@@ -5,24 +5,26 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "manifest_blob_association")]
 pub struct Model {
-    pub manifest_id: i32,
-    pub blob_id: i32,
+    #[sea_orm(primary_key)]
+    pub manifest_digest: String,
+    #[sea_orm(primary_key)]
+    pub blob_digest: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::blob::Entity",
-        from = "Column::BlobId",
-        to = "super::blob::Column::Id",
+        from = "Column::BlobDigest",
+        to = "super::blob::Column::Digest",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
     Blob,
     #[sea_orm(
         belongs_to = "super::manifest::Entity",
-        from = "Column::ManifestId",
-        to = "super::manifest::Column::Id",
+        from = "Column::ManifestDigest",
+        to = "super::manifest::Column::Digest",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

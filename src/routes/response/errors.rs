@@ -5,6 +5,7 @@ use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tracing::{event, Level};
 
 #[derive(Debug)]
 pub enum Error {
@@ -151,5 +152,12 @@ impl IntoResponse for Error {
             .body(body::Body::from(json))
             .unwrap()
             .into_response()
+    }
+}
+
+impl From<sea_orm::DbErr> for Error {
+    fn from(err: sea_orm::DbErr) -> Self {
+        event!(Level::ERROR, "DbErr: {err}");
+        Self::InternalError
     }
 }
