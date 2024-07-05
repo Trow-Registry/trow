@@ -135,12 +135,12 @@ pub enum Upload {
 pub struct VerifiedManifest {
     base_url: Option<String>,
     repo_name: String,
-    digest: Digest,
+    digest: String,
     tag: String,
 }
 
 impl VerifiedManifest {
-    pub fn new(base_url: Option<String>, repo_name: String, digest: Digest, tag: String) -> Self {
+    pub fn new(base_url: Option<String>, repo_name: String, digest: String, tag: String) -> Self {
         Self {
             base_url,
             repo_name,
@@ -149,7 +149,7 @@ impl VerifiedManifest {
         }
     }
 
-    pub fn digest(&self) -> &Digest {
+    pub fn digest(&self) -> &String {
         &self.digest
     }
 

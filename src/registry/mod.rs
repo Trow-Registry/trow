@@ -2,7 +2,7 @@ mod admission;
 pub mod api_types;
 pub mod manifest;
 mod proxy;
-mod server;
+pub mod server;
 mod storage;
 mod temporary_file;
 

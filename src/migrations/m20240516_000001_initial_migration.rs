@@ -20,11 +20,16 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Blob::Digest)
                             .string()
                             .not_null()
-                            .primary_key(),
                     )
-                    .col(ColumnDef::new(Blob::Size).integer().not_null())
-                    .col(ColumnDef::new(Blob::LastAccessed).timestamp().not_null())
                     .col(ColumnDef::new(Blob::Repo).string().not_null())
+                    .col(ColumnDef::new(Blob::Size).integer().not_null())
+                    .col(ColumnDef::new(Blob::LastAccessed).timestamp()
+                    .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)).not_null())
+                    .primary_key(
+                        Index::create()
+                            .col(Blob::Digest)
+                            .col(Blob::Repo),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_blob_repo")
@@ -50,6 +55,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(Manifest::LastAccessed)
                             .timestamp()
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
                             .not_null(),
                     )
                     .col(ColumnDef::new(Manifest::Repo).string())
@@ -152,6 +158,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(BlobUpload::LastAccessed)
                             .timestamp()
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
                             .not_null(),
                     )
                     .col(ColumnDef::new(BlobUpload::Repo).string().not_null())

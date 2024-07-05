@@ -36,7 +36,7 @@ async fn get_catalog(
     let repos = select.limit(query.n).all(&state.registry.db).await?;
     let raw_repos = repos.into_iter().map(|r| r.name).collect::<Vec<_>>();
 
-    Ok(OciJson(RepositoryListBuilder::default()
+    Ok(OciJson::new(&RepositoryListBuilder::default()
         .repositories(raw_repos)
         .build()
         .unwrap())
@@ -60,7 +60,7 @@ async fn list_tags(
     let tags = select.all(&state.registry.db).await?;
     let raw_tags = tags.into_iter().map(|t| t.tag).collect::<Vec<_>>();
 
-    Ok(OciJson(TagListBuilder::default()
+    Ok(OciJson::new(&TagListBuilder::default()
         .name(repo_name)
         .tags(raw_tags)
         .build()

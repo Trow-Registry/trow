@@ -10,6 +10,11 @@ use thiserror::Error;
 use crate::registry::digest::{Digest, DigestError};
 use crate::registry::RegistryError;
 
+lazy_static! {
+    pub static ref REGEX_TAG: Regex =
+        Regex::new("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$").unwrap();
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ManifestError {
     #[error("Could not serialize manifest: {0}")]
@@ -44,10 +49,6 @@ impl TryFrom<&str> for ManifestReference {
 
 impl ManifestReference {
     pub fn try_from_str(reference: &str) -> Result<Self, RegistryError> {
-        lazy_static! {
-            static ref REGEX_TAG: Regex =
-                Regex::new("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$").unwrap();
-        }
         if reference.contains(':') {
             match Digest::try_from_raw(reference) {
                 Ok(d) => Ok(Self::Digest(d)),
@@ -106,12 +107,12 @@ pub mod manifest_media_type {
 impl OCIManifest {
     /// Returns a Vector of the digests of all assets referenced in the Manifest
     /// With the exception of digests for "foreign blobs"
-    pub fn get_local_asset_digests(&self) -> Result<Vec<Digest>, ManifestError> {
+    pub fn get_local_asset_digests(&self) -> Vec<String> {
         let digests = match self {
             OCIManifest::V2(ref m2) => {
-                let mut digests: Vec<&str> =
-                    m2.layers().iter().map(|x| x.digest().as_str()).collect();
-                digests.push(&m2.config().digest());
+                let mut digests: Vec<String> =
+                    m2.layers().iter().map(|x| x.digest().to_string()).collect();
+                digests.push(m2.config().digest().to_string());
                 digests
             }
             OCIManifest::List(ref list) => {
@@ -119,14 +120,11 @@ impl OCIManifest {
                 // We could recurse into the manifests, but they should have been checked already.
                 list.manifests()
                     .iter()
-                    .map(|x| x.digest().as_str())
+                    .map(|x| x.digest().to_string())
                     .collect()
             }
         };
-        Ok(digests
-            .into_iter()
-            .map(Digest::try_from_raw)
-            .collect::<Result<Vec<Digest>, DigestError>>()?)
+        digests
     }
 
     pub fn media_type(&self) -> &Option<MediaType> {
@@ -195,11 +193,7 @@ mod test {
             "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
         );
         let digests_str: Vec<_> = mani
-            .get_local_asset_digests()
-            .unwrap()
-            .iter()
-            .map(|d| d.to_string())
-            .collect();
+            .get_local_asset_digests();
 
         assert_eq!(digests_str.len(), 3);
         assert!(digests_str.contains(
@@ -249,11 +243,7 @@ mod test {
         );
 
         let digests_str: Vec<_> = mani
-            .get_local_asset_digests()
-            .unwrap()
-            .iter()
-            .map(|d| d.to_string())
-            .collect();
+            .get_local_asset_digests();
         assert_eq!(digests_str.len(), 2);
         assert!(digests_str.contains(
             &"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d".to_string()
