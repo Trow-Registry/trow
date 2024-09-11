@@ -35,7 +35,7 @@ impl<S: AsyncRead> BoundedStream<S> {
 }
 
 #[derive(Clone, Debug, Display, Serialize)]
-#[display(fmt = "{}", _0)]
+#[display("{}", _0)]
 pub struct Uuid(pub String);
 
 #[derive(Deserialize, Debug)]
@@ -46,7 +46,7 @@ pub struct DigestQuery {
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
     base_url: String,
-    uuid: Uuid,
+    uuid: uuid::Uuid,
     repo_name: String,
     range: (u32, u32),
 }
@@ -56,7 +56,7 @@ pub struct BlobDeleted {}
 pub struct ManifestDeleted {}
 
 impl UploadInfo {
-    pub fn new(base_url: String, uuid: Uuid, repo_name: String, range: (u32, u32)) -> Self {
+    pub fn new(base_url: String, uuid: uuid::Uuid, repo_name: String, range: (u32, u32)) -> Self {
         Self {
             base_url,
             uuid,
@@ -65,7 +65,7 @@ impl UploadInfo {
         }
     }
 
-    pub fn uuid(&self) -> &Uuid {
+    pub fn uuid(&self) -> &uuid::Uuid {
         &self.uuid
     }
 
@@ -87,7 +87,7 @@ pub struct AcceptedUpload {
     base_url: String,
     digest: Digest,
     repo_name: String,
-    uuid: Uuid,
+    uuid: uuid::Uuid,
     range: (u32, u32),
 }
 
@@ -96,7 +96,7 @@ impl AcceptedUpload {
         base_url: String,
         digest: Digest,
         repo_name: String,
-        uuid: Uuid,
+        uuid: uuid::Uuid,
         range: (u32, u32),
     ) -> Self {
         Self {

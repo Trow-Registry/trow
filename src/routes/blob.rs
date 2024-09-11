@@ -8,13 +8,12 @@ use sea_orm::{EntityTrait, ModelTrait, TransactionTrait};
 use tracing::{event, Level};
 
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, BlobReader};
+use crate::registry::BlobReader;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::BlobDeleted;
-use crate::TrowServerState;
-use crate::entity;
+use crate::{entity, TrowServerState};
 
 /*
 ---
@@ -32,14 +31,13 @@ async fn get_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, String)>,
 ) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
-    let blob = entity::blob::Entity::find_by_id((digest.clone(), repo.clone()))
-    .one(&state.registry.db).await?.ok_or(Error::BlobUnknown)?;
-
+    let _blob = entity::blob::Entity::find_by_id((digest.clone(), repo.clone()))
+        .one(&state.db)
+        .await?
+        .ok_or(Error::BlobUnknown)?;
     let stream = match state.registry.storage.get_blob_stream(&repo, &digest).await {
         Ok(stream) => stream,
-        Err(_) => {
-            return Err(Error::InternalError)
-        },
+        Err(_) => return Err(Error::InternalError),
     };
     Ok(BlobReader::new(digest, stream).await)
 }
@@ -48,7 +46,7 @@ endpoint_fn_7_levels!(
     get_blob(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
-        path: [image_name, digest]
+        path: [image_name, digest: String]
     ) -> Result<BlobReader<impl futures::AsyncRead>, Error>
 );
 
@@ -65,13 +63,14 @@ async fn delete_blob(
     Path((repo, digest)): Path<(String, String)>,
 ) -> Result<BlobDeleted, Error> {
     let blob = entity::blob::Entity::find_by_id((digest.clone(), repo.clone()))
-        .one(&state.registry.db).await?.ok_or(Error::BlobUnknown)?;
-
-    let txn = state.registry.db.begin().await?;
+        .one(&state.db)
+        .await?
+        .ok_or(Error::BlobUnknown)?;
+    let txn = state.db.begin().await?;
     blob.delete(&txn).await?;
     let res = state.registry.storage.delete_blob(&repo, &digest).await;
     if let Err(e) = res {
-        event!(Level::ERROR, "Storage error while deletign blob: {e}");
+        event!(Level::ERROR, "Storage error while deleting blob: {e}");
         return Err(Error::InternalError);
     }
     txn.commit().await?;
@@ -83,7 +82,7 @@ endpoint_fn_7_levels!(
     delete_blob(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>;
-    path: [image_name, digest]
+    path: [image_name, digest: String]
     ) -> Result<BlobDeleted, Error>
 );
 

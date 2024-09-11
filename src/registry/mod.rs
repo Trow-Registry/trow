@@ -93,10 +93,7 @@ pub fn build_server(
 
 impl TrowServerBuilder {
     pub async fn get_server(self) -> Result<TrowServer> {
-        use sea_orm::Database;
-        let fake_db = Database::connect("/lol").await.unwrap();
         TrowServer::new(
-            fake_db,
             self.data_path,
             self.proxy_registry_config,
             self.image_validation_config,

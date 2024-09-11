@@ -1,6 +1,5 @@
 use futures::AsyncRead;
 
-use super::digest::Digest;
 use crate::types::BoundedStream;
 
 pub struct ContentInfo {

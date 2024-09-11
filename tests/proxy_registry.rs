@@ -84,24 +84,21 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
         //Try manifest
-        let config = manifest::Object {
-            media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
-            digest: "fake".to_string(),
-            size: None,
-        };
-        let layer = manifest::Object {
-            media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_owned(),
-            size: None,
-            digest: "fake".to_string(),
-        };
-
-        let layers = vec![layer];
-        let mani = manifest::OCIManifestV2 {
-            schema_version: 2,
-            media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
-            config,
-            layers,
-        };
+        let mani: manifest::OCIManifest = serde_json::from_str(
+            r#"{
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "config": {
+                "media_type": "application/vnd.docker.container.image.v1+json",
+                "digest": "fake"
+            },
+            "layers": [{
+                "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+                "digest": "fake"
+            }]
+        }"#,
+        )
+        .unwrap();
         let manifest_addr = format!("/v2/{}/manifests/{}", name, "tag");
         let resp = cl
             .clone()

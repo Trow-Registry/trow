@@ -3,18 +3,18 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
-
     use std::io::BufReader;
     use std::path::Path;
 
     use axum::body::Body;
     use axum::Router;
     use hyper::Request;
+    use oci_spec::image::ImageManifest;
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
     use trow::registry::api_types::{HealthStatus, ReadyStatus};
-    use trow::registry::{digest, manifest};
+    use trow::registry::digest;
     use trow::types::{RepoCatalog, TagList};
 
     use crate::common;
@@ -87,9 +87,9 @@ mod interface_tests {
                 .unwrap();
             assert_eq!(actual_size, format!("{}", s));
         }
-        let mani: manifest::OCIManifestV2 = common::response_body_json(resp).await;
+        let mani: ImageManifest = common::response_body_json(resp).await;
 
-        assert_eq!(mani.schema_version, 2);
+        assert_eq!(mani.schema_version(), 2);
     }
 
     async fn get_non_existent_manifest(cl: &Router, name: &str, tag: &str) {

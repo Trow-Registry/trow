@@ -5,15 +5,10 @@ use anyhow::{anyhow, Result};
 use axum::body::Body;
 use bytes::{Buf, Bytes};
 use futures::AsyncRead;
-use lazy_static::lazy_static;
-use regex::Regex;
 use sea_orm::entity::{NotSet, Set};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityOrSelect, EntityTrait, ModelTrait,
-    QueryFilter, QueryOrder, QuerySelect,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, QueryFilter,
 };
-use serde::Serialize;
-use thiserror::Error;
 use tracing::{event, Level};
 
 use super::manifest::{ManifestReference, OCIManifest};
@@ -24,7 +19,6 @@ use super::ImageValidationConfig;
 use crate::entity;
 use crate::registry::api_types::Status;
 use crate::registry::blob_storage::Stored;
-use crate::registry::catalog_operations::HistoryEntry;
 use crate::registry::digest::Digest;
 use crate::registry::storage::WriteBlobRangeError;
 use crate::registry::{BlobReader, ContentInfo, ManifestReader, RegistryError};
@@ -47,12 +41,10 @@ pub struct TrowServer {
     pub storage: TrowStorageBackend,
     pub proxy_registry_config: RegistryProxiesConfig,
     pub image_validation_config: Option<ImageValidationConfig>,
-    pub db: DatabaseConnection,
 }
 
 impl TrowServer {
     pub fn new(
-        db: DatabaseConnection,
         data_path: PathBuf,
         proxy_registry_config: Option<RegistryProxiesConfig>,
         image_validation_config: Option<ImageValidationConfig>,
@@ -60,7 +52,6 @@ impl TrowServer {
         let proxy_registry_config = proxy_registry_config.unwrap_or_default();
 
         let svc = Self {
-            db,
             proxy_registry_config,
             image_validation_config,
             storage: TrowStorageBackend::new(data_path)?,
@@ -68,7 +59,12 @@ impl TrowServer {
         Ok(svc)
     }
 
-    pub async fn get_manifest(&self, name: &str, reference: &str) -> Result<ManifestReader> {
+    pub async fn get_manifest(
+        &self,
+        db: &impl ConnectionTrait,
+        name: &str,
+        reference: &str,
+    ) -> Result<ManifestReader> {
         let mut reference = ManifestReference::try_from_str(reference)?;
 
         if reference.digest().is_none() && name.starts_with(PROXY_DIR) {
@@ -85,10 +81,10 @@ impl TrowServer {
             let tag = entity::tag::Entity::find()
                 .filter(entity::tag::Column::Repo.eq(name))
                 .filter(entity::tag::Column::Tag.eq(tag))
-                .one(&self.db)
+                .one(db)
                 .await?;
             if let Some(tag) = tag {
-                reference = ManifestReference::Digest(Digest::try_from_raw(&tag.manifest_digest).unwrap());
+                reference = ManifestReference::Digest(tag.manifest_digest.clone());
             }
         }
         let digest = match reference {
@@ -104,9 +100,9 @@ impl TrowServer {
                 RegistryError::Internal
             })?;
         Ok(ManifestReader::new(
-            man.media_type().as_ref().unwrap().to_string(),
+            "zozio".to_string(), // man.media_type().as_ref().unwrap().to_string(),
             digest,
-            Bytes::from(serde_json::ser::to_vec(&man).unwrap()),
+            man,
         )
         .await)
     }
@@ -135,7 +131,7 @@ impl TrowServer {
         // entity::Manifest::insert()
 
         self.storage
-            .write_image_manifest(raw_manifest.clone(), repo, reference, true)
+            .write_image_manifest(raw_manifest.clone(), repo, reference)
             .await
             .map_err(|e| {
                 event!(Level::ERROR, "Could not write manifest: {e}");
@@ -148,7 +144,7 @@ impl TrowServer {
     pub async fn delete_manifest(
         &self,
         repo_name: &str,
-        digest: &Digest,
+        digest: &str,
     ) -> Result<(), RegistryError> {
         event!(Level::WARN, "Manifest deletion is not correctly handled !");
 
@@ -164,7 +160,7 @@ impl TrowServer {
     pub async fn get_blob(
         &self,
         repo_name: &str,
-        digest: &Digest,
+        digest: &str,
     ) -> Result<BlobReader<impl AsyncRead>, RegistryError> {
         event!(
             Level::DEBUG,
@@ -177,13 +173,13 @@ impl TrowServer {
             Err(StorageBackendError::BlobNotFound(_)) => return Err(RegistryError::NotFound),
             Err(_) => return Err(RegistryError::Internal),
         };
-        Ok(BlobReader::new(digest.clone(), stream).await)
+        Ok(BlobReader::new(digest.to_string(), stream).await)
     }
 
     pub async fn store_blob_chunk<'a>(
         &self,
         name: &str,
-        upload_uuid: &str,
+        upload_uuid: &uuid::Uuid,
         content_info: Option<ContentInfo>,
         data: Body,
     ) -> Result<Stored, RegistryError> {
@@ -206,25 +202,28 @@ impl TrowServer {
 
     pub async fn complete_and_verify_blob_upload(
         &self,
+        db: &impl ConnectionTrait,
         _repo_name: &str,
-        session_id: &str,
-        digest: &Digest,
+        session_id: &uuid::Uuid,
+        digest: &str,
     ) -> Result<(), RegistryError> {
-        let upload = entity::blob_upload::Entity::find_by_id(session_id)
-            .one(&self.db)
+        let upload = entity::blob_upload::Entity::find_by_id(*session_id)
+            .one(db)
             .await?
             .ok_or(RegistryError::NotFound)?;
 
-        self.storage.complete_blob_write(session_id, digest).await?;
+        self.storage
+            .complete_blob_write(&session_id, digest)
+            .await?;
         let blob_size = upload.offset;
-        upload.delete(&self.db).await?;
+        upload.delete(db).await?;
         entity::blob::ActiveModel {
             digest: Set(digest.to_string()),
             size: Set(blob_size),
             last_accessed: NotSet,
             ..Default::default()
         }
-        .insert(&self.db)
+        .insert(db)
         .await?;
 
         Ok(())
@@ -233,14 +232,14 @@ impl TrowServer {
     /**
      * TODO: check if blob referenced by manifests. If so, refuse to delete.
      */
-    pub async fn delete_blob(&self, name: &str, digest: &Digest) -> Result<BlobDeleted, Status> {
+    pub async fn delete_blob(&self, name: &str, digest: &str) -> Result<BlobDeleted, Status> {
         // if !is_digest(digest) {
         //     return Err(Status::InvalidArgument(format!(
         //         "Invalid digest: {}",
         //         digest
         //     )));
         // }
-        match self.storage.delete_blob(digest).await {
+        match self.storage.delete_blob(name, digest).await {
             Ok(_) => Ok(BlobDeleted {}),
             Err(e) => {
                 event!(

@@ -86,7 +86,7 @@ impl Digest {
         if !REGEX_DIGEST.is_match(hash) {
             return false;
         }
-        if let Err(_) = DigestAlgorithm::from_str(algo) {
+        if DigestAlgorithm::from_str(algo).is_err() {
             return false;
         }
         true

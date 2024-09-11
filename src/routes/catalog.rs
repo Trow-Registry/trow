@@ -4,19 +4,16 @@ use anyhow::Result;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
 use axum::Router;
-use oci_spec::distribution::{TagList, TagListBuilder};
-use oci_spec::distribution::{RepositoryList, RepositoryListBuilder};
+use oci_spec::distribution::{RepositoryList, RepositoryListBuilder, TagList, TagListBuilder};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
-use crate::entity;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::TrowServerState;
 use crate::routes::response::OciJson;
-
+use crate::{entity, TrowServerState};
 
 #[derive(Debug, Deserialize)]
 pub struct CatalogListQuery {
@@ -33,14 +30,15 @@ async fn get_catalog(
     if let Some(last) = query.last {
         select = select.filter(entity::repo::Column::Name.gt(last));
     }
-    let repos = select.limit(query.n).all(&state.registry.db).await?;
+    let repos = select.limit(query.n).all(&state.db).await?;
     let raw_repos = repos.into_iter().map(|r| r.name).collect::<Vec<_>>();
 
-    Ok(OciJson::new(&RepositoryListBuilder::default()
-        .repositories(raw_repos)
-        .build()
-        .unwrap())
-    )
+    Ok(OciJson::new(
+        &RepositoryListBuilder::default()
+            .repositories(raw_repos)
+            .build()
+            .unwrap(),
+    ))
 }
 
 async fn list_tags(
@@ -57,14 +55,16 @@ async fn list_tags(
         select = select.filter(entity::tag::Column::Tag.gt(last));
     }
     select = select.limit(query.n);
-    let tags = select.all(&state.registry.db).await?;
+    let tags = select.all(&state.db).await?;
     let raw_tags = tags.into_iter().map(|t| t.tag).collect::<Vec<_>>();
 
-    Ok(OciJson::new(&TagListBuilder::default()
-        .name(repo_name)
-        .tags(raw_tags)
-        .build()
-        .unwrap()))
+    Ok(OciJson::new(
+        &TagListBuilder::default()
+            .name(repo_name)
+            .tags(raw_tags)
+            .build()
+            .unwrap(),
+    ))
 }
 endpoint_fn_7_levels!(
     list_tags(

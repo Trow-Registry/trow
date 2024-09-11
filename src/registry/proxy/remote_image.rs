@@ -142,14 +142,13 @@ impl RemoteImage {
         }
 
         let ref_ = if let Some(match_digest) = captures.name("digest") {
-            let parsed_digest = Digest::try_from_raw(match_digest.as_str())?;
-            ManifestReference::Digest(parsed_digest)
+            let digest = match_digest.as_str().to_string();
+            Digest::try_from_raw(&digest)?;
+            ManifestReference::Digest(digest)
+        } else if let Some(match_tag) = captures.name("tag") {
+            ManifestReference::Tag(match_tag.as_str().to_owned())
         } else {
-            if let Some(match_tag) = captures.name("tag") {
-                ManifestReference::Tag(match_tag.as_str().to_owned())
-            } else {
-                ManifestReference::Tag("latest".to_string())
-            }
+            ManifestReference::Tag("latest".to_string())
         };
 
         Ok(Self::new(host, repo, ref_))

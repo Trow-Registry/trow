@@ -1,4 +1,5 @@
 use sea_orm_migration::prelude::*;
+use sea_orm_migration::schema::*;
 
 pub struct Migration;
 
@@ -16,20 +17,14 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Blob::Table)
+                    .col(string(Blob::Digest))
+                    .col(string(Blob::Repo))
+                    .col(integer(Blob::Size))
                     .col(
-                        ColumnDef::new(Blob::Digest)
-                            .string()
-                            .not_null()
+                        timestamp(Blob::LastAccessed)
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
                     )
-                    .col(ColumnDef::new(Blob::Repo).string().not_null())
-                    .col(ColumnDef::new(Blob::Size).integer().not_null())
-                    .col(ColumnDef::new(Blob::LastAccessed).timestamp()
-                    .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)).not_null())
-                    .primary_key(
-                        Index::create()
-                            .col(Blob::Digest)
-                            .col(Blob::Repo),
-                    )
+                    .primary_key(Index::create().col(Blob::Digest).col(Blob::Repo))
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_blob_repo")
@@ -45,20 +40,13 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Manifest::Table)
+                    .col(string(Manifest::Digest).primary_key())
+                    .col(integer(Manifest::Size))
                     .col(
-                        ColumnDef::new(Manifest::Digest)
-                            .string()
-                            .not_null()
-                            .primary_key(),
+                        timestamp(Manifest::LastAccessed)
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
                     )
-                    .col(ColumnDef::new(Manifest::Size).integer().not_null())
-                    .col(
-                        ColumnDef::new(Manifest::LastAccessed)
-                            .timestamp()
-                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
-                            .not_null(),
-                    )
-                    .col(ColumnDef::new(Manifest::Repo).string())
+                    .col(string(Manifest::Repo))
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_manifest_repo")
@@ -74,9 +62,9 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Tag::Table)
-                    .col(ColumnDef::new(Tag::Tag).string().not_null())
-                    .col(ColumnDef::new(Tag::Repo).string().not_null())
-                    .col(ColumnDef::new(Tag::ManifestDigest).string().not_null())
+                    .col(string(Tag::Tag))
+                    .col(string(Tag::Repo))
+                    .col(string(Tag::ManifestDigest))
                     .foreign_key(
                         ForeignKey::create()
                             .name("FK_tag_manifest")
@@ -107,11 +95,7 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(ManifestBlobAssociation::Table)
-                    .col(
-                        ColumnDef::new(ManifestBlobAssociation::ManifestDigest)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(string(ManifestBlobAssociation::ManifestDigest))
                     .foreign_key(
                         ForeignKey::create()
                             .from(
@@ -121,11 +105,7 @@ impl MigrationTrait for Migration {
                             .to(Manifest::Table, Manifest::Digest)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .col(
-                        ColumnDef::new(ManifestBlobAssociation::BlobDigest)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(string(ManifestBlobAssociation::BlobDigest))
                     .foreign_key(
                         ForeignKey::create()
                             .from(
@@ -148,20 +128,13 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(BlobUpload::Table)
+                    .col(uuid(BlobUpload::Uuid).primary_key())
+                    .col(integer(BlobUpload::Offset))
                     .col(
-                        ColumnDef::new(BlobUpload::Uuid)
-                            .uuid()
-                            .primary_key()
-                            .not_null(),
+                        timestamp(BlobUpload::LastAccessed)
+                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
                     )
-                    .col(ColumnDef::new(BlobUpload::Offset).integer().not_null())
-                    .col(
-                        ColumnDef::new(BlobUpload::LastAccessed)
-                            .timestamp()
-                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
-                            .not_null(),
-                    )
-                    .col(ColumnDef::new(BlobUpload::Repo).string().not_null())
+                    .col(string(BlobUpload::Repo).string())
                     .foreign_key(
                         ForeignKey::create()
                             .from(BlobUpload::Table, BlobUpload::Repo)
@@ -176,7 +149,7 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Repo::Table)
-                    .col(ColumnDef::new(Repo::Name).string().primary_key().not_null())
+                    .col(string(Repo::Name).primary_key())
                     .to_owned(),
             )
             .await

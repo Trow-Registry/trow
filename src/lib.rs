@@ -1,24 +1,26 @@
-mod db;
+mod entity;
 mod migrations;
 pub mod registry;
 mod routes;
+#[cfg(test)]
+pub mod test_utilities;
 pub mod types;
-
 #[cfg(feature = "sqlite")]
 mod users;
 
-mod entity;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::{env, fs};
 
 use anyhow::{Context, Result};
-use axum::extract::FromRef;
 use axum::Router;
 use registry::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
+use sea_orm::Database;
+use sea_orm_migration::MigratorTrait;
 use thiserror::Error;
 use uuid::Uuid;
+
+use crate::migrations::Migrator;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -35,12 +37,7 @@ pub struct NetAddr {
 pub struct TrowServerState {
     pub registry: TrowServer,
     pub config: TrowConfig,
-}
-
-impl FromRef<Arc<TrowServerState>> for TrowConfig {
-    fn from_ref(state: &Arc<TrowServerState>) -> Self {
-        state.config.clone()
-    }
+    pub db: sea_orm::DatabaseConnection,
 }
 
 #[derive(Clone, Debug)]
@@ -64,7 +61,7 @@ struct UserConfig {
     hash_encoded: String, //Surprised not bytes
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct TrowConfig {
     pub data_dir: PathBuf,
     pub service_name: String,
@@ -75,6 +72,7 @@ pub struct TrowConfig {
     user: Option<UserConfig>,
     pub cors: Option<Vec<String>>,
     pub uses_tls: bool,
+    pub db_connection: Option<sea_orm::DatabaseConnection>,
 }
 
 impl Default for TrowConfig {
@@ -96,6 +94,7 @@ impl TrowConfig {
             user: None,
             cors: None,
             uses_tls: false,
+            db_connection: None,
         }
     }
 
@@ -131,7 +130,7 @@ impl TrowConfig {
         self
     }
 
-    pub async fn build_app(&self) -> Result<Router> {
+    pub async fn build_app(mut self) -> Result<Router> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!(
             "Hostname of this registry (for the MutatingWebhook): {:?}",
@@ -171,9 +170,24 @@ impl TrowConfig {
         );
         let registry = ts_builder.get_server().await?;
 
+        let db = match self.db_connection {
+            Some(conn) => conn,
+            None => {
+                let db_path = std::path::absolute(self.data_dir.join("trow.db")).unwrap();
+                let db_url = format!(
+                    "sqlite://{}?mode=rwc",
+                    db_path.to_str().expect("Invalid path to DB file")
+                );
+                Database::connect(&db_url).await?
+            }
+        };
+        self.db_connection = None;
+        Migrator::up(&db, None).await?;
+
         let server_state = TrowServerState {
-            config: self.clone(),
+            config: self,
             registry,
+            db,
         };
         Ok(routes::create_app(server_state))
     }

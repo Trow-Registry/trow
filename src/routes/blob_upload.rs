@@ -8,17 +8,18 @@ use axum::routing::{post, put};
 use axum::Router;
 use digest::Digest;
 use hyper::StatusCode;
+use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, ModelTrait, Set, TransactionTrait};
 use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, ContentInfo, RegistryError, StorageBackendError};
+use crate::registry::{digest, ContentInfo, RegistryError};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, Upload, Uuid};
-use crate::TrowServerState;
+use crate::{entity, TrowServerState};
 
 /*
 ---
@@ -34,7 +35,7 @@ Completes the upload.
 async fn put_blob_upload(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, uuid)): Path<(String, String)>,
+    Path((repo, uuid)): Path<(String, uuid::Uuid)>,
     AlwaysHost(host): AlwaysHost,
     Query(digest): Query<DigestQuery>,
     chunk: Body,
@@ -42,6 +43,15 @@ async fn put_blob_upload(
     let digest = match digest.digest {
         Some(d) => d,
         None => return Err(Error::DigestInvalid),
+    };
+
+    let txn = state.db.begin().await?;
+    let upload = match entity::blob_upload::Entity::find_by_id(uuid.clone())
+        .one(&txn)
+        .await?
+    {
+        Some(u) => u,
+        None => return Err(Error::NotFound),
     };
 
     let size = match state
@@ -61,11 +71,17 @@ async fn put_blob_upload(
             return Err(Error::InternalError);
         }
     };
+    state
+        .registry
+        .storage
+        .complete_blob_write(&uuid, &digest)
+        .await?;
+    upload.delete(&txn).await?;
 
     let digest_obj = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
     state
         .registry
-        .complete_and_verify_blob_upload(&repo, &uuid, &digest_obj)
+        .complete_and_verify_blob_upload(&txn, &repo, &uuid, &digest)
         .await
         .map_err(|e| match e {
             RegistryError::InvalidDigest => Error::DigestInvalid,
@@ -75,11 +91,22 @@ async fn put_blob_upload(
             }
         })?;
 
+    let blob = entity::blob::ActiveModel {
+        digest: Set(digest.clone()),
+        repo: Set(repo.clone()),
+        size: Set(size as i32),
+        ..Default::default()
+    };
+    blob.insert(&txn).await?;
+    // upload.delete(&txn).await?;
+
+    txn.commit().await?;
+
     Ok(AcceptedUpload::new(
         host,
         digest_obj,
         repo,
-        Uuid(uuid),
+        uuid,
         (0, (size as u32).saturating_sub(1)), // Note first byte is 0
     ))
 }
@@ -88,7 +115,7 @@ endpoint_fn_7_levels!(
     put_blob_upload(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
-        path: [image_name, uuid],
+        path: [image_name, uuid: uuid::Uuid],
         host: AlwaysHost,
         digest: Query<DigestQuery>,
         chunk: Body
@@ -117,31 +144,47 @@ async fn patch_blob_upload(
     _auth_user: TrowToken,
     content_info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, uuid)): Path<(String, String)>,
+    Path((repo, uuid)): Path<(String, uuid::Uuid)>,
     AlwaysHost(host): AlwaysHost,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
-    match state
+    let txn = state.db.begin().await?;
+    let mut upload = match entity::blob_upload::Entity::find_by_id(uuid)
+        .one(&txn)
+        .await?
+    {
+        Some(u) => u.into_active_model(),
+        None => return Err(Error::NotFound),
+    };
+
+    let size = match state
         .registry
         .store_blob_chunk(&repo, &uuid, content_info, chunk)
         .await
     {
-        Ok(stored) => {
-            let repo_name = repo;
-            let uuid = Uuid(uuid);
-            Ok(UploadInfo::new(
-                host,
-                uuid,
-                repo_name,
-                (0, (stored.total_stored as u32).saturating_sub(1)), // First byte is 0
+        Ok(stored) => stored.total_stored,
+        Err(RegistryError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
+        Err(RegistryError::InvalidContentRange) => {
+            return Err(Error::BlobUploadInvalid(
+                "Invalid Content Range".to_string(),
             ))
         }
-        Err(RegistryError::InvalidName(name)) => Err(Error::NameInvalid(name)),
-        Err(RegistryError::InvalidContentRange) => Err(Error::BlobUploadInvalid(
-            "Invalid Content Range".to_string(),
-        )),
-        Err(_) => Err(Error::InternalError),
-    }
+        Err(e) => {
+            event!(Level::ERROR, "Error storing blob chunk: {}", e);
+            return Err(Error::InternalError);
+        }
+    };
+    // let mut upload = upload.into_active_model();
+    upload.offset = Set(size as i32);
+
+    txn.commit().await?;
+
+    Ok(UploadInfo::new(
+        host,
+        uuid,
+        repo,
+        (0, (size as u32).saturating_sub(1)), // Note first byte is 0
+    ))
 }
 
 endpoint_fn_7_levels!(
@@ -149,7 +192,7 @@ endpoint_fn_7_levels!(
         auth_user: TrowToken,
         info: Option<ContentInfo>,
         state: State<Arc<TrowServerState>>;
-        path: [image_name, uuid],
+        path: [image_name, uuid: uuid::Uuid],
         host: AlwaysHost,
         chunk: Body
     ) -> Result<UploadInfo, Error>
@@ -173,22 +216,20 @@ async fn post_blob_upload(
     Path(repo_name): Path<String>,
     data: Body,
 ) -> Result<Upload, Error> {
-    let uuid = state
-        .registry
-        .storage
-        .request_blob_upload(&repo_name)
-        .await
-        .map_err(|e| match e {
-            StorageBackendError::InvalidName(n) => Error::NameInvalid(n),
-            _ => Error::InternalError,
-        })?;
+    let txn = state.db.begin().await?;
+
+    let upload = entity::blob_upload::ActiveModel {
+        repo: Set(repo_name.clone()),
+        ..Default::default()
+    };
+    let upload = upload.insert(&txn).await?;
 
     if digest.digest.is_some() {
         // Have a monolithic upload with data
         return put_blob_upload(
             auth_user,
             State(state),
-            Path((repo_name, uuid)),
+            Path((repo_name, upload.uuid)),
             host,
             Query(digest),
             data,
@@ -196,11 +237,10 @@ async fn post_blob_upload(
         .await
         .map(Upload::Accepted);
     }
-
     Ok(Upload::Info(UploadInfo::new(
         host.0,
-        Uuid(uuid),
-        repo_name.clone(),
+        upload.uuid,
+        repo_name,
         (0, 0),
     )))
 }
@@ -223,20 +263,21 @@ async fn get_blob_upload(
     _auth: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     AlwaysHost(host): AlwaysHost,
-    Path((repo_name, upload_id)): Path<(String, String)>,
+    Path((repo_name, upload_id)): Path<(String, uuid::Uuid)>,
 ) -> Result<Response, Error> {
-    let offset = state
-        .registry
-        .storage
-        .get_upload_status(&repo_name, &upload_id)
-        .await
-        .map_err(|e| match e {
-            StorageBackendError::InvalidName(n) => Error::NameInvalid(n),
-            _ => Error::InternalError,
-        })?;
+    // let offset = state
+    //     .registry
+    //     .storage
+    //     .get_upload_status(&repo_name, &upload_id)
+    //     .await
+    //     .map_err(|e| match e {
+    //         StorageBackendError::InvalidName(n) => Error::NameInvalid(n),
+    //         _ => Error::InternalError,
+    //     })?;
+    let offset = 1;
 
     Ok(Response::builder()
-        .header("Docker-Upload-UUID", upload_id)
+        .header("Docker-Upload-UUID", upload_id.to_string())
         .header("Range", format!("0-{offset}"))
         .header("Content-Length", "0")
         .header("Location", host)
@@ -250,7 +291,7 @@ endpoint_fn_7_levels!(
         auth: TrowToken,
         state: State<Arc<TrowServerState>>,
         host: AlwaysHost;
-        path: [image_name, upload_id]
+        path: [image_name, upload_id: uuid::Uuid]
     ) -> Result<Response, Error>
 );
 

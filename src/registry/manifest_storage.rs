@@ -1,16 +1,14 @@
 use bytes::Bytes;
 
-use super::Digest;
-
 pub struct ManifestReader {
     content_type: String,
-    digest: Digest,
+    digest: String,
     contents: Bytes,
     size: u64,
 }
 
 impl ManifestReader {
-    pub async fn new(content_type: String, digest: Digest, contents: Bytes) -> Self {
+    pub async fn new(content_type: String, digest: String, contents: Bytes) -> Self {
         let size = contents.len() as u64;
         Self {
             content_type,
@@ -28,7 +26,7 @@ impl ManifestReader {
         &self.content_type
     }
 
-    pub fn digest(&self) -> &Digest {
+    pub fn digest(&self) -> &str {
         &self.digest
     }
 

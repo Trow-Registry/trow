@@ -1,24 +1,19 @@
 use std::borrow::Cow;
-use std::io::BufRead;
 use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::pin::pin;
 use std::{io, str};
 
-use bytes::{Buf, Bytes};
-use chrono::prelude::*;
-use futures::{AsyncReadExt, Stream};
+use bytes::Bytes;
+use futures::Stream;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{event, Level};
-use walkdir::WalkDir;
 
-use super::manifest::{ManifestError, OCIManifest};
-use super::server::PROXY_DIR;
+use super::manifest::ManifestError;
 use crate::registry::blob_storage::Stored;
-use crate::registry::catalog_operations::HistoryEntry;
 use crate::registry::temporary_file::TemporaryFile;
 use crate::registry::Digest;
 use crate::types::BoundedStream;
@@ -109,10 +104,7 @@ impl TrowStorageBackend {
         digest: &str,
     ) -> Result<Bytes, StorageBackendError> {
         event!(Level::DEBUG, "Get manifest {repo}:{digest}");
-        let path = self
-            .path
-            .join(MANIFESTS_DIR)
-            .join(digest.to_string());
+        let path = self.path.join(MANIFESTS_DIR).join(digest);
         if !path.exists() {
             return Err(StorageBackendError::BlobNotFound(path));
         }
@@ -126,10 +118,7 @@ impl TrowStorageBackend {
         digest: &str,
     ) -> Result<BoundedStream<impl futures::AsyncRead>, StorageBackendError> {
         event!(Level::DEBUG, "Get blob {repo_name}:{digest}");
-        let path = self
-            .path
-            .join(BLOBS_DIR)
-            .join(digest);
+        let path = self.path.join(BLOBS_DIR).join(digest);
         let file = tokio::fs::File::open(&path).await.map_err(|e| {
             event!(Level::ERROR, "Could not open blob: {}", e);
             StorageBackendError::BlobNotFound(path)
@@ -149,11 +138,8 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         event!(Level::DEBUG, "Write blob {digest}");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(digest.to_string());
-        let location = self
-            .path
-            .join(BLOBS_DIR)
-            .join(digest);
+        let tmp_location = self.path.join(UPLOADS_DIR).join(digest);
+        let location = self.path.join(BLOBS_DIR).join(digest);
         if location.exists() {
             event!(Level::INFO, "Blob already exists");
             return Ok(location);
@@ -181,12 +167,14 @@ impl TrowStorageBackend {
             let reader = std::fs::File::open(tmp_file.path()).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!("Could not open tmp file: {e}")))
             })?;
-            let tmp_digest = Digest::digest_sha256(reader).map_err(|e| {
-                StorageBackendError::Internal(Cow::Owned(format!(
-                    "Could not calculate digest of blob: {e}"
-                )))
-            })?;
-            if &tmp_digest != digest {
+            let tmp_digest = Digest::digest_sha256(reader)
+                .map_err(|e| {
+                    StorageBackendError::Internal(Cow::Owned(format!(
+                        "Could not calculate digest of blob: {e}"
+                    )))
+                })?
+                .to_string();
+            if tmp_digest != digest {
                 return Err(StorageBackendError::InvalidDigest);
             }
         }
@@ -195,12 +183,11 @@ impl TrowStorageBackend {
         Ok(location)
     }
 
-
     /// Writes part of a blob to disk.
     /// Upload then needs to be "completed"
     pub async fn write_blob_part_stream<'a, S, E>(
         &'a self,
-        upload_id: &str,
+        upload_id: &uuid::Uuid,
         stream: S,
         range: Option<RangeInclusive<u64>>,
     ) -> Result<Stored, WriteBlobRangeError>
@@ -209,7 +196,7 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         event!(Level::DEBUG, "Write blob part {upload_id} ({range:?})");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id);
+        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
         let (mut tmp_file, seek_pos) = TemporaryFile::append(tmp_location).await.map_err(|e| {
             event!(Level::ERROR, "Could not open tmp file: {}", e);
             match e.kind() {
@@ -255,16 +242,12 @@ impl TrowStorageBackend {
 
     pub async fn complete_blob_write(
         &self,
-        upload_id: &str,
-        user_digest: &Digest,
+        upload_id: &uuid::Uuid,
+        user_digest: &str,
     ) -> Result<(), StorageBackendError> {
         event!(Level::DEBUG, "Complete blob write {upload_id}");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id);
-        let final_location = self
-            .path
-            .join(BLOBS_DIR)
-            .join(user_digest.algo_str())
-            .join(&user_digest.hash);
+        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
+        let final_location = self.path.join(BLOBS_DIR).join(user_digest);
         // Should we even do this ? It breaks OCI tests:
         // let f = std::fs::File::open(&tmp_location)?;
         // let calculated_digest = Digest::digest_sha256(f)?;
@@ -303,10 +286,7 @@ impl TrowStorageBackend {
 
     pub async fn delete_blob(&self, repo: &str, digest: &str) -> Result<(), StorageBackendError> {
         event!(Level::DEBUG, "Delete blob {repo}:{digest}");
-        let blob_path = self
-            .path
-            .join(BLOBS_DIR)
-            .join(digest);
+        let blob_path = self.path.join(BLOBS_DIR).join(digest);
         tokio::fs::remove_file(blob_path).await?;
         Ok(())
     }
@@ -316,10 +296,7 @@ impl TrowStorageBackend {
         repo_name: &str,
         digest: &str,
     ) -> Result<(), StorageBackendError> {
-        let path = self
-            .path
-            .join(BLOBS_DIR)
-            .join(digest)
+        let path = self.path.join(BLOBS_DIR).join(digest);
         if let Err(e) = tokio::fs::remove_file(path).await {
             event!(Level::WARN, "Could not delete manifest file: {}", e);
         }
@@ -369,13 +346,13 @@ fn bytes_to_stream(bytes: Bytes) -> impl Stream<Item = Result<Bytes, reqwest::Er
     futures::stream::once(async move { Ok(bytes) })
 }
 
-fn is_proxy_repo(repo_name: &str) -> bool {
-    repo_name.starts_with(PROXY_DIR)
-}
+// fn is_proxy_repo(repo_name: &str) -> bool {
+//     repo_name.starts_with(PROXY_DIR)
+// }
 
 #[cfg(test)]
 mod tests {
-    use oci_spec::image::ImageManifest;
+    use bytes::Buf;
 
     use super::*;
     use crate::registry::manifest;
@@ -399,41 +376,56 @@ mod tests {
             .await
             .unwrap();
         assert!(location.exists());
-        assert!(
-            location
-                == store
-                    .path
-                    .join("blobs")
-                    .join("sha256")
-                    .join("123456789101112131415161718192021")
+        assert_eq!(
+            location,
+            store
+                .path
+                .join("blobs")
+                .join("sha256:123456789101112131415161718192021")
         );
+        drop(dir);
+    }
+
+    const IMAGE_MANIFEST: &str = r#"{
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "config": {
+            "mediaType": "application/vnd.docker.container.image.v1+json",
+            "size": 7027,
+            "digest": "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a"
+        },
+        "layers": []
+    }"#;
+
+    #[tokio::test]
+    #[should_panic]
+    async fn trow_storage_backend_write_image_manifest_bad_digest() {
+        let dir = test_temp_dir::test_temp_dir!();
+        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
+        let manifest = manifest::OCIManifest::V2(serde_json::from_str(IMAGE_MANIFEST).unwrap());
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let _location = store
+            .write_image_manifest(Bytes::from(manifest_bytes), "zozo/image", "baddigest")
+            .await
+            .unwrap();
+        drop(dir);
     }
 
     #[tokio::test]
     async fn trow_storage_backend_write_image_manifest() {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
-        let manifest = manifest::OCIManifest::V2(
-            serde_json::from_str(
-                r#"{
-                schema_version: 2,
-                media_type: "application/vnd.docker.distribution.manifest.v2+json",
-                config: manifest::Object {
-                    media_type: "application/vnd.docker.container.image.v1+json",
-                    size: 7027,
-                    digest: "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a",
-                },
-                layers: []
-            }"#,
-            )
-            .unwrap(),
-        );
+        let manifest = manifest::OCIManifest::V2(serde_json::from_str(IMAGE_MANIFEST).unwrap());
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
-        let location = store
-            .write_image_manifest(Bytes::from(manifest_bytes), "zozo/image", "latest")
+        let digest = Digest::digest_sha256(manifest_bytes.clone().reader()).unwrap();
+        let _location = store
+            .write_image_manifest(
+                Bytes::from(manifest_bytes),
+                "zozo/image",
+                &digest.to_string(),
+            )
             .await
             .unwrap();
-        fs::remove_file(location).await.unwrap();
+        drop(dir);
     }
-
 }

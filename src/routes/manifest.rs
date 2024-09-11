@@ -6,19 +6,18 @@ use axum::routing::get;
 use axum::Router;
 use bytes::Buf;
 use digest::Digest;
-use sea_orm::sea_query::{Expr, Query};
+use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IsolationLevel, NotSet,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, StatementBuilder, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, IsolationLevel, NotSet, PaginatorTrait,
+    QueryFilter, QuerySelect, Set, TransactionTrait,
 };
-use serde_derive::Deserialize;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
+use crate::registry::digest;
 use crate::registry::manifest::{OCIManifest, REGEX_TAG};
 use crate::registry::server::PROXY_DIR;
-use crate::registry::{digest, ManifestReader, RegistryError};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -54,13 +53,12 @@ async fn get_manifest(
         let tag = entity::tag::Entity::find()
             .filter(entity::tag::Column::Repo.eq(&repo))
             .filter(entity::tag::Column::Tag.eq(&reference))
-            .one(&state.registry.db)
+            .one(&state.db)
             .await?
             .ok_or(Error::NotFound)?;
         reference = tag.manifest_digest;
     }
     let txn = state
-        .registry
         .db
         .begin_with_config(Some(IsolationLevel::RepeatableRead), None)
         .await?;
@@ -73,7 +71,7 @@ async fn get_manifest(
         .storage
         .get_manifest(&repo, &manifest.digest)
         .await?;
-    txn.commit();
+    txn.commit().await?;
     let manifest_parsed: OCIManifest = serde_json::from_slice(&manifest_raw).unwrap();
     let content_type = manifest_parsed
         .media_type()
@@ -89,7 +87,7 @@ endpoint_fn_7_levels!(
     get_manifest(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
-        path: [image_name, reference]
+        path: [image_name, reference: String]
     ) -> Result<OciJson<OCIManifest>, Error>
 );
 
@@ -135,7 +133,7 @@ async fn put_image_manifest(
                         .in_tuples(&assets)
                         .not(),
                 )
-                .count(&state.registry.db)
+                .count(&state.db)
                 .await?
         }
         OCIManifest::V2(_) => {
@@ -145,7 +143,7 @@ async fn put_image_manifest(
                         .in_tuples(&assets)
                         .not(),
                 )
-                .count(&state.registry.db)
+                .count(&state.db)
                 .await?
         }
     };
@@ -162,7 +160,7 @@ async fn put_image_manifest(
     if !is_tag && computed_digest != reference {
         return Err(Error::ManifestInvalid("Digest does not match".to_string()));
     }
-    let txn = state.registry.db.begin().await?;
+    let txn = state.db.begin().await?;
     entity::manifest::ActiveModel {
         digest: Set(computed_digest.clone()),
         last_accessed: NotSet,
@@ -192,7 +190,7 @@ endpoint_fn_7_levels!(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>,
         host: AlwaysHost;
-        path: [image_name, reference],
+        path: [image_name, reference: String],
         chunk: Body
     ) -> Result<VerifiedManifest, Error>
 );
@@ -207,17 +205,24 @@ async fn delete_image_manifest(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, String)>,
 ) -> Result<ManifestDeleted, Error> {
-    let txn = state.registry.db.begin().await?;
-    entity::manifest::Entity::delete_by_id((digest.clone(), repo.clone())).exec(&txn).await?;
-    state.registry.storage.delete_manifest(&repo, &digest).await?;
+    let txn = state.db.begin().await?;
+    entity::manifest::Entity::delete_by_id((digest.clone(), repo.clone()))
+        .exec(&txn)
+        .await?;
+    state
+        .registry
+        .storage
+        .delete_manifest(&repo, &digest)
+        .await?;
+    txn.commit().await?;
 
-    Ok(ManifestDeleted{})
+    Ok(ManifestDeleted {})
 }
 endpoint_fn_7_levels!(
     delete_image_manifest(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>;
-    path: [image_name, digest]
+    path: [image_name, digest: String]
     ) -> Result<ManifestDeleted, Error>
 );
 

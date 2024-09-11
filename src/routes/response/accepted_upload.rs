@@ -33,7 +33,7 @@ mod test {
     use axum::response::IntoResponse;
 
     use crate::registry::{Digest, DigestAlgorithm};
-    use crate::types::{AcceptedUpload, Uuid};
+    use crate::types::AcceptedUpload;
 
     #[tokio::test]
     async fn test_resp() {
@@ -45,7 +45,7 @@ mod test {
                     .to_string(),
             },
             "moredhel/test".to_owned(),
-            Uuid("whatever".to_owned()),
+            uuid::Uuid::new_v4(),
             (0, 0),
         );
 

@@ -29,23 +29,24 @@ use bytes::Bytes;
 pub struct OciJson<T> {
     response: Response<Body>,
     content_length: usize,
-    content_type: std::marker::PhantomData<T>
+    content_type: std::marker::PhantomData<T>,
 }
 
 impl<T> OciJson<T>
 where
-    T: serde::Serialize, {
-        pub fn new(content: &T) -> Self {
-            let body_bytes = serde_json::to_vec(content).unwrap();
-            let content_length = body_bytes.len();
-            let response = Response::new(Body::from(body_bytes));
+    T: serde::Serialize,
+{
+    pub fn new(content: &T) -> Self {
+        let body_bytes = serde_json::to_vec(content).unwrap();
+        let content_length = body_bytes.len();
+        let response = Response::new(Body::from(body_bytes));
 
-            Self {
-                response,
-                content_length,
-                content_type: PhantomData
-            }
+        Self {
+            response,
+            content_length,
+            content_type: PhantomData,
         }
+    }
 
     /// To work around the fact that manifests cannot be serialized/deserialized
     /// or their digest might not match
@@ -55,15 +56,14 @@ where
         Self {
             response,
             content_length,
-            content_type: PhantomData
+            content_type: PhantomData,
         }
     }
-
 
     pub fn set_digest(mut self, digest: &str) -> Self {
         self.response.headers_mut().insert(
             HeaderName::from_static("Docker-Content-Digest"),
-            HeaderValue::from_str(digest).unwrap()
+            HeaderValue::from_str(digest).unwrap(),
         );
         self
     }
@@ -72,18 +72,21 @@ where
     pub fn set_content_type(mut self, content_type: &str) -> Self {
         self.response.headers_mut().insert(
             header::CONTENT_TYPE,
-            HeaderValue::from_str(content_type).unwrap()
+            HeaderValue::from_str(content_type).unwrap(),
         );
         self
     }
-
 }
 
 impl<T> IntoResponse for OciJson<T> {
     fn into_response(mut self) -> Response {
         let headers = self.response.headers_mut();
-        headers.entry(header::CONTENT_TYPE).or_insert(HeaderValue::from_str("application/json").unwrap());
-        headers.entry(header::CONTENT_LENGTH).or_insert(HeaderValue::try_from(self.content_length).unwrap());
+        headers
+            .entry(header::CONTENT_TYPE)
+            .or_insert(HeaderValue::from_str("application/json").unwrap());
+        headers
+            .entry(header::CONTENT_LENGTH)
+            .or_insert(HeaderValue::from(self.content_length));
 
         self.response
     }

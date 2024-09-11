@@ -3,10 +3,8 @@ mod common;
 
 #[cfg(test)]
 mod interface_tests {
-
     use std::fmt::Write;
     use std::io::BufReader;
-    use std::path::Path;
 
     use axum::body::Body;
     use axum::Router;
@@ -18,15 +16,6 @@ mod interface_tests {
     use trow::registry::digest;
 
     use crate::common::{self, response_body_vec};
-
-    const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
-
-    async fn start_trow(data_dir: &Path) -> Router {
-        let mut trow_builder = trow::TrowConfig::new();
-        data_dir.clone_into(&mut trow_builder.data_dir);
-        trow_builder.service_name = TROW_ADDRESS.to_string();
-        trow_builder.build_app().await.unwrap()
-    }
 
     async fn upload_config(trow: &Router) {
         let config = "{}\n".as_bytes();
@@ -135,7 +124,10 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let trow = common::trow_router(|c| {
+            c.data_dir = data_dir.to_owned();
+        })
+        .await;
         upload_config(&trow).await;
 
         // Following is intentionally interleaved to add delays

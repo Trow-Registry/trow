@@ -16,7 +16,7 @@ use super::create_accept_header;
 use super::proxy_config::SingleRegistryProxyConfig;
 use super::remote_image::RemoteImage;
 use crate::registry::manifest::{ManifestReference, OCIManifest};
-use crate::registry::{Digest, TrowServer};
+use crate::registry::TrowServer;
 
 const AUTHN_HEADER: &str = "www-authenticate";
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
@@ -124,7 +124,7 @@ impl ProxyClient {
     }
 
     /// Download a blob that is part of `remote_image`.
-    async fn download_blob(&self, registry: &TrowServer, digest: &Digest) -> Result<()> {
+    async fn download_blob(&self, registry: &TrowServer, digest: &str) -> Result<()> {
         if registry
             .storage
             .get_blob_stream(self.remote_image.get_repo(), digest)
@@ -179,11 +179,11 @@ impl ProxyClient {
         match manifest {
             OCIManifest::List(_) => {
                 let images_to_dl = manifest
-                    .get_local_asset_digests()?
+                    .get_local_asset_digests()
                     .into_iter()
                     .map(|digest| {
                         let mut image = remote_image.clone();
-                        image.reference = ManifestReference::Digest(digest);
+                        image.reference = ManifestReference::Digest(digest.clone());
                         image
                     })
                     .collect::<Vec<_>>();
@@ -193,7 +193,7 @@ impl ProxyClient {
                 try_join_all(futures).await?;
             }
             OCIManifest::V2(_) => {
-                let digests: Vec<_> = manifest.get_local_asset_digests()?;
+                let digests: Vec<_> = manifest.get_local_asset_digests();
 
                 let futures = digests
                     .iter()
@@ -204,13 +204,13 @@ impl ProxyClient {
         let str_ref = remote_image.reference.to_string();
         registry
             .storage
-            .write_image_manifest(manifest_bytes, local_repo_name, &str_ref, false)
+            .write_image_manifest(manifest_bytes, local_repo_name, &str_ref)
             .await?;
 
         Ok(())
     }
 
-    pub async fn get_digest_from_remote(&self) -> Option<Digest> {
+    pub async fn get_digest_from_remote(&self) -> Option<String> {
         let resp = self
             .authenticated_request(Method::HEAD, &self.remote_image.get_manifest_url())
             .headers(create_accept_header())
@@ -232,11 +232,7 @@ impl ProxyClient {
                 );
                 None
             }
-            Ok(Some(header)) => {
-                let digest_str = header.to_str().unwrap();
-                let digest = Digest::try_from_raw(digest_str).unwrap();
-                Some(digest)
-            }
+            Ok(Some(header)) => Some(header.to_str().unwrap().to_owned()),
         }
     }
 }
@@ -281,7 +277,7 @@ async fn get_www_authenticate_header(
     image: &RemoteImage,
 ) -> Result<Option<String>> {
     let resp = cl
-        .head(&image.get_manifest_url())
+        .head(image.get_manifest_url())
         .headers(create_accept_header())
         .send()
         .await
