@@ -154,15 +154,13 @@ async fn put_image_manifest(
     }
 
     let size = manifest_bytes.len();
-    let computed_digest = Digest::digest_sha256(manifest_bytes.clone().reader())
-        .unwrap()
-        .to_string();
-    if !is_tag && computed_digest != reference {
+    let computed_digest = Digest::digest_sha256(manifest_bytes.clone().reader()).unwrap();
+    if !is_tag && computed_digest.as_str() != &reference {
         return Err(Error::ManifestInvalid("Digest does not match".to_string()));
     }
     let txn = state.db.begin().await?;
     entity::manifest::ActiveModel {
-        digest: Set(computed_digest.clone()),
+        digest: Set(computed_digest.to_string()),
         last_accessed: NotSet,
         repo: Set(repo_name.clone()),
         size: Set(size as i32),
@@ -203,10 +201,10 @@ DELETE /v2/<name>/manifests/<reference>
 async fn delete_image_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, digest)): Path<(String, String)>,
+    Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<ManifestDeleted, Error> {
     let txn = state.db.begin().await?;
-    entity::manifest::Entity::delete_by_id((digest.clone(), repo.clone()))
+    entity::manifest::Entity::delete_by_id((digest.to_string(), repo.clone()))
         .exec(&txn)
         .await?;
     state
@@ -222,7 +220,7 @@ endpoint_fn_7_levels!(
     delete_image_manifest(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>;
-    path: [image_name, digest: String]
+    path: [image_name, digest: Digest]
     ) -> Result<ManifestDeleted, Error>
 );
 

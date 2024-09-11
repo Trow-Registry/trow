@@ -34,13 +34,14 @@ impl<S: AsyncRead> BoundedStream<S> {
     }
 }
 
-#[derive(Clone, Debug, Display, Serialize)]
-#[display("{}", _0)]
-pub struct Uuid(pub String);
+#[derive(Deserialize, Debug, Clone)]
+pub struct OptionalDigestQuery {
+    pub digest: Option<Digest>,
+}
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct DigestQuery {
-    pub digest: Option<String>,
+    pub digest: Digest,
 }
 
 #[derive(Debug, Serialize)]
@@ -135,12 +136,12 @@ pub enum Upload {
 pub struct VerifiedManifest {
     base_url: Option<String>,
     repo_name: String,
-    digest: String,
+    digest: Digest,
     tag: String,
 }
 
 impl VerifiedManifest {
-    pub fn new(base_url: Option<String>, repo_name: String, digest: String, tag: String) -> Self {
+    pub fn new(base_url: Option<String>, repo_name: String, digest: Digest, tag: String) -> Self {
         Self {
             base_url,
             repo_name,
@@ -149,8 +150,8 @@ impl VerifiedManifest {
         }
     }
 
-    pub fn digest(&self) -> &String {
-        &self.digest
+    pub fn digest(&self) -> &str {
+        self.digest.as_str()
     }
 
     pub fn tag(&self) -> &str {

@@ -28,6 +28,7 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
+    use crate::registry::Digest;
     use crate::types::VerifiedManifest;
 
     #[test]
@@ -35,7 +36,10 @@ mod test {
         let response = VerifiedManifest::new(
             Some("https://extrality.ai".to_string()),
             "repo_name".to_string(),
-            "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec".to_string(),
+            Digest::try_from_raw(
+                "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec",
+            )
+            .unwrap(),
             "ref".to_string(),
         )
         .into_response();

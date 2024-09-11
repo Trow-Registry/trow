@@ -8,6 +8,7 @@ mod interface_tests {
 
     use axum::body::Body;
     use axum::Router;
+    use bytes::Buf;
     use hyper::Request;
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
@@ -17,9 +18,9 @@ mod interface_tests {
 
     use crate::common::{self, response_body_vec};
 
-    async fn upload_config(trow: &Router) {
+    async fn upload_config_blob(trow: &Router) {
         let config = "{}\n".as_bytes();
-        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let digest = digest::Digest::digest_sha256(config.reader()).unwrap();
         let req = Request::post(format!("/v2/config/blobs/uploads/?digest={digest}"))
             .body(Body::from(config))
             .unwrap();
@@ -30,6 +31,7 @@ mod interface_tests {
             "request failed: {}",
             common::response_body_string(resp).await
         );
+        panic!();
     }
 
     async fn push_random_foreign_manifest(trow: &Router, name: &str, tag: &str) -> String {
@@ -128,7 +130,7 @@ mod interface_tests {
             c.data_dir = data_dir.to_owned();
         })
         .await;
-        upload_config(&trow).await;
+        upload_config_blob(&trow).await;
 
         // Following is intentionally interleaved to add delays
         let mut history_one = Vec::new();

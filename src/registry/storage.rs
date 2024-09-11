@@ -37,18 +37,8 @@ pub enum StorageBackendError {
     Internal(Cow<'static, str>),
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
-}
-
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum WriteBlobRangeError {
     #[error("Invalid content range")]
     InvalidContentRange,
-    #[error("Not found")]
-    NotFound,
-    #[error("Internal storage error")]
-    Internal,
-    #[error("Could not read from stream")]
-    InvalidStream,
 }
 
 static MANIFESTS_DIR: &str = "manifests";
@@ -115,10 +105,10 @@ impl TrowStorageBackend {
     pub async fn get_blob_stream<'a>(
         &'a self,
         repo_name: &str,
-        digest: &str,
+        digest: &Digest,
     ) -> Result<BoundedStream<impl futures::AsyncRead>, StorageBackendError> {
         event!(Level::DEBUG, "Get blob {repo_name}:{digest}");
-        let path = self.path.join(BLOBS_DIR).join(digest);
+        let path = self.path.join(BLOBS_DIR).join(digest.to_string());
         let file = tokio::fs::File::open(&path).await.map_err(|e| {
             event!(Level::ERROR, "Could not open blob: {}", e);
             StorageBackendError::BlobNotFound(path)
@@ -129,7 +119,7 @@ impl TrowStorageBackend {
 
     pub async fn write_blob_stream<'a, S, E>(
         &'a self,
-        digest: &str,
+        digest: &Digest,
         stream: S,
         verify: bool,
     ) -> Result<PathBuf, StorageBackendError>
@@ -138,8 +128,8 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         event!(Level::DEBUG, "Write blob {digest}");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(digest);
-        let location = self.path.join(BLOBS_DIR).join(digest);
+        let tmp_location = self.path.join(UPLOADS_DIR).join(digest.to_string());
+        let location = self.path.join(BLOBS_DIR).join(digest.to_string());
         if location.exists() {
             event!(Level::INFO, "Blob already exists");
             return Ok(location);
@@ -167,14 +157,12 @@ impl TrowStorageBackend {
             let reader = std::fs::File::open(tmp_file.path()).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!("Could not open tmp file: {e}")))
             })?;
-            let tmp_digest = Digest::digest_sha256(reader)
-                .map_err(|e| {
-                    StorageBackendError::Internal(Cow::Owned(format!(
-                        "Could not calculate digest of blob: {e}"
-                    )))
-                })?
-                .to_string();
-            if tmp_digest != digest {
+            let tmp_digest = Digest::digest_sha256(reader).map_err(|e| {
+                StorageBackendError::Internal(Cow::Owned(format!(
+                    "Could not calculate digest of blob: {e}"
+                )))
+            })?;
+            if tmp_digest != *digest {
                 return Err(StorageBackendError::InvalidDigest);
             }
         }
@@ -190,7 +178,7 @@ impl TrowStorageBackend {
         upload_id: &uuid::Uuid,
         stream: S,
         range: Option<RangeInclusive<u64>>,
-    ) -> Result<Stored, WriteBlobRangeError>
+    ) -> Result<Stored, StorageBackendError>
     where
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
@@ -200,9 +188,9 @@ impl TrowStorageBackend {
         let (mut tmp_file, seek_pos) = TemporaryFile::append(tmp_location).await.map_err(|e| {
             event!(Level::ERROR, "Could not open tmp file: {}", e);
             match e.kind() {
-                io::ErrorKind::NotFound => WriteBlobRangeError::NotFound,
-                io::ErrorKind::AlreadyExists => WriteBlobRangeError::InvalidContentRange,
-                _ => WriteBlobRangeError::Internal,
+                io::ErrorKind::NotFound => StorageBackendError::BlobNotFound(tmp_location),
+                io::ErrorKind::AlreadyExists => StorageBackendError::InvalidContentRange,
+                _ => StorageBackendError::Io(e),
             }
         })?;
         let range_len = range.as_ref().map(|r| r.end() - r.start() + 1);
@@ -215,13 +203,12 @@ impl TrowStorageBackend {
                     range.start(),
                     seek_pos
                 );
-                return Err(WriteBlobRangeError::InvalidContentRange);
+                return Err(StorageBackendError::InvalidContentRange);
             }
         }
-        let bytes_written = tmp_file
-            .write_stream(stream)
-            .await
-            .map_err(|_e| WriteBlobRangeError::Internal)? as u64;
+        let bytes_written = tmp_file.write_stream(stream).await.map_err(|_e| {
+            StorageBackendError::Internal(Cow::Borrowed("Couldn't write stream to file"))
+        })? as u64;
 
         if matches!(range_len, Some(len) if len != bytes_written) {
             event!(
@@ -230,7 +217,7 @@ impl TrowStorageBackend {
                 range_len.unwrap(),
                 bytes_written
             );
-            return Err(WriteBlobRangeError::InvalidContentRange);
+            return Err(StorageBackendError::InvalidContentRange);
         }
         tmp_file.untrack();
 
@@ -243,11 +230,11 @@ impl TrowStorageBackend {
     pub async fn complete_blob_write(
         &self,
         upload_id: &uuid::Uuid,
-        user_digest: &str,
+        user_digest: &Digest,
     ) -> Result<(), StorageBackendError> {
         event!(Level::DEBUG, "Complete blob write {upload_id}");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
-        let final_location = self.path.join(BLOBS_DIR).join(user_digest);
+        let final_location = self.path.join(BLOBS_DIR).join(user_digest.to_string());
         // Should we even do this ? It breaks OCI tests:
         // let f = std::fs::File::open(&tmp_location)?;
         // let calculated_digest = Digest::digest_sha256(f)?;
@@ -273,7 +260,7 @@ impl TrowStorageBackend {
         &self,
         manifest: Bytes,
         repo_name: &str,
-        digest: &str,
+        digest: &Digest,
     ) -> Result<PathBuf, StorageBackendError> {
         event!(Level::DEBUG, "Write image manifest {repo_name}:{digest}");
         let manifest_stream = bytes_to_stream(manifest);
@@ -294,9 +281,9 @@ impl TrowStorageBackend {
     pub async fn delete_manifest(
         &self,
         repo_name: &str,
-        digest: &str,
+        digest: &Digest,
     ) -> Result<(), StorageBackendError> {
-        let path = self.path.join(BLOBS_DIR).join(digest);
+        let path = self.path.join(BLOBS_DIR).join(digest.to_string());
         if let Err(e) = tokio::fs::remove_file(path).await {
             event!(Level::WARN, "Could not delete manifest file: {}", e);
         }
@@ -370,9 +357,9 @@ mod tests {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         let stream = pin!(bytes_to_stream(Bytes::from("test")));
-        let digest = "sha256:123456789101112131415161718192021";
+        let digest = Digest::try_from_raw("sha256:123456789101112131415161718192021").unwrap();
         let location = store
-            .write_blob_stream(digest, stream, false)
+            .write_blob_stream(&digest, stream, false)
             .await
             .unwrap();
         assert!(location.exists());
@@ -405,7 +392,11 @@ mod tests {
         let manifest = manifest::OCIManifest::V2(serde_json::from_str(IMAGE_MANIFEST).unwrap());
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         let _location = store
-            .write_image_manifest(Bytes::from(manifest_bytes), "zozo/image", "baddigest")
+            .write_image_manifest(
+                Bytes::from(manifest_bytes),
+                "zozo/image",
+                &Digest::try_from_raw("sha256:none").unwrap(),
+            )
             .await
             .unwrap();
         drop(dir);
@@ -419,11 +410,7 @@ mod tests {
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         let digest = Digest::digest_sha256(manifest_bytes.clone().reader()).unwrap();
         let _location = store
-            .write_image_manifest(
-                Bytes::from(manifest_bytes),
-                "zozo/image",
-                &digest.to_string(),
-            )
+            .write_image_manifest(Bytes::from(manifest_bytes), "zozo/image", &digest)
             .await
             .unwrap();
         drop(dir);

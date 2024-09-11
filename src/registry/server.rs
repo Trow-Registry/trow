@@ -3,7 +3,6 @@ use std::str;
 
 use anyhow::{anyhow, Result};
 use axum::body::Body;
-use bytes::{Buf, Bytes};
 use futures::AsyncRead;
 use sea_orm::entity::{NotSet, Set};
 use sea_orm::{
@@ -11,7 +10,7 @@ use sea_orm::{
 };
 use tracing::{event, Level};
 
-use super::manifest::{ManifestReference, OCIManifest};
+use super::manifest::ManifestReference;
 // use super::manifest::Manifest;
 use super::proxy::RegistryProxiesConfig;
 use super::storage::{StorageBackendError, TrowStorageBackend};
@@ -107,55 +106,55 @@ impl TrowServer {
         .await)
     }
 
-    pub async fn store_manifest<'a>(
-        &self,
-        repo: &str,
-        reference: &str,
-        raw_manifest: Bytes,
-    ) -> Result<Digest, RegistryError> {
-        if repo.starts_with(PROXY_DIR) {
-            return Err(RegistryError::InvalidName(format!(
-                "Cannot upload manifest for proxied repo {repo}"
-            )));
-        }
-        let digest = Digest::digest_sha256(&mut raw_manifest.clone().reader()).unwrap();
-        let manifest: OCIManifest =
-            serde_json::from_slice(&raw_manifest).map_err(|_| RegistryError::InvalidManifest)?;
-        // entity::manifest::ActiveModel {
-        //     digest: digest.to_string(),
-        //     repo: repo,
-        //     size: ""
+    // pub async fn store_manifest<'a>(
+    //     &self,
+    //     repo: &str,
+    //     reference: &str,
+    //     raw_manifest: Bytes,
+    // ) -> Result<Digest, RegistryError> {
+    //     if repo.starts_with(PROXY_DIR) {
+    //         return Err(RegistryError::InvalidName(format!(
+    //             "Cannot upload manifest for proxied repo {repo}"
+    //         )));
+    //     }
+    //     let _digest = Digest::digest_sha256(&mut raw_manifest.clone().reader()).unwrap();
+    //     let _manifest: OCIManifest =
+    //         serde_json::from_slice(&raw_manifest).map_err(|_| RegistryError::InvalidManifest)?;
+    //     // entity::manifest::ActiveModel {
+    //     //     digest: digest.to_string(),
+    //     //     repo: repo,
+    //     //     size: ""
 
-        // }
+    //     // }
 
-        // entity::Manifest::insert()
+    //     // entity::Manifest::insert()
 
-        self.storage
-            .write_image_manifest(raw_manifest.clone(), repo, reference)
-            .await
-            .map_err(|e| {
-                event!(Level::ERROR, "Could not write manifest: {e}");
-                RegistryError::Internal
-            })?;
+    //     self.storage
+    //         .write_image_manifest(raw_manifest.clone(), repo, reference)
+    //         .await
+    //         .map_err(|e| {
+    //             event!(Level::ERROR, "Could not write manifest: {e}");
+    //             RegistryError::Internal
+    //         })?;
 
-        Ok(Digest::digest_sha256(raw_manifest.reader()).unwrap())
-    }
+    //     Ok(Digest::digest_sha256(raw_manifest.reader()).unwrap())
+    // }
 
-    pub async fn delete_manifest(
-        &self,
-        repo_name: &str,
-        digest: &str,
-    ) -> Result<(), RegistryError> {
-        event!(Level::WARN, "Manifest deletion is not correctly handled !");
+    // pub async fn delete_manifest(
+    //     &self,
+    //     repo_name: &str,
+    //     digest: &str,
+    // ) -> Result<(), RegistryError> {
+    //     event!(Level::WARN, "Manifest deletion is not correctly handled !");
 
-        self.storage
-            .delete_manifest(repo_name, digest)
-            .await
-            .map_err(|e| {
-                event!(Level::ERROR, "Failed to delete manifest: {e}");
-                RegistryError::Internal
-            })
-    }
+    //     self.storage
+    //         .delete_manifest(repo_name, digest)
+    //         .await
+    //         .map_err(|e| {
+    //             event!(Level::ERROR, "Failed to delete manifest: {e}");
+    //             RegistryError::Internal
+    //         })
+    // }
 
     pub async fn get_blob(
         &self,
@@ -200,34 +199,34 @@ impl TrowServer {
             })
     }
 
-    pub async fn complete_and_verify_blob_upload(
-        &self,
-        db: &impl ConnectionTrait,
-        _repo_name: &str,
-        session_id: &uuid::Uuid,
-        digest: &str,
-    ) -> Result<(), RegistryError> {
-        let upload = entity::blob_upload::Entity::find_by_id(*session_id)
-            .one(db)
-            .await?
-            .ok_or(RegistryError::NotFound)?;
+    // pub async fn complete_and_verify_blob_upload(
+    //     &self,
+    //     db: &impl ConnectionTrait,
+    //     _repo_name: &str,
+    //     session_id: &uuid::Uuid,
+    //     digest: &str,
+    // ) -> Result<(), RegistryError> {
+    //     let upload = entity::blob_upload::Entity::find_by_id(*session_id)
+    //         .one(db)
+    //         .await?
+    //         .ok_or(RegistryError::NotFound)?;
 
-        self.storage
-            .complete_blob_write(&session_id, digest)
-            .await?;
-        let blob_size = upload.offset;
-        upload.delete(db).await?;
-        entity::blob::ActiveModel {
-            digest: Set(digest.to_string()),
-            size: Set(blob_size),
-            last_accessed: NotSet,
-            ..Default::default()
-        }
-        .insert(db)
-        .await?;
+    //     self.storage
+    //         .complete_blob_write(&session_id, digest)
+    //         .await?;
+    //     let blob_size = upload.offset;
+    //     upload.delete(db).await?;
+    //     entity::blob::ActiveModel {
+    //         digest: Set(digest.to_string()),
+    //         size: Set(blob_size),
+    //         last_accessed: NotSet,
+    //         ..Default::default()
+    //     }
+    //     .insert(db)
+    //     .await?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     /**
      * TODO: check if blob referenced by manifests. If so, refuse to delete.

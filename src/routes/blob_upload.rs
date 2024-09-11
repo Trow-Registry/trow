@@ -8,18 +8,77 @@ use axum::routing::{post, put};
 use axum::Router;
 use digest::Digest;
 use hyper::StatusCode;
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, ModelTrait, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, RuntimeErr,
+    Set, TransactionTrait,
+};
 use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, ContentInfo, RegistryError};
+use crate::registry::{digest, ContentInfo, RegistryError, TrowServer};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
-use crate::types::{AcceptedUpload, DigestQuery, Upload, Uuid};
+use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
 use crate::{entity, TrowServerState};
+
+async fn _complete_upload(
+    txn: impl TransactionTrait,
+    registry: TrowServer,
+    upload: entity::blob_upload::Model,
+    digest: &Digest,
+    repo: &str,
+    chunk: Body,
+) -> Result<AcceptedUpload, Error> {
+    let size = registry
+        .storage
+        .write_blob_part_stream(
+            &upload.uuid,
+            chunk.into_data_stream(),
+            None, // range: ???
+        )
+        .await?;
+    registry
+        .storage
+        .complete_blob_write(&upload.uuid, &digest)
+        .await?;
+
+    upload.delete(&txn).await?;
+
+    let digest_obj = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
+    state
+        .registry
+        .complete_and_verify_blob_upload(&txn, &repo, &uuid, &digest)
+        .await
+        .map_err(|e| match e {
+            RegistryError::InvalidDigest => Error::DigestInvalid,
+            e => {
+                event!(Level::ERROR, "Error completing blob upload: {}", e);
+                Error::InternalError
+            }
+        })?;
+
+    let blob = entity::blob::ActiveModel {
+        digest: Set(digest.clone()),
+        repo: Set(repo.clone()),
+        size: Set(size as i32),
+        ..Default::default()
+    };
+    blob.insert(&txn).await?;
+    // upload.delete(&txn).await?;
+
+    txn.commit().await?;
+
+    Ok(AcceptedUpload::new(
+        host,
+        digest_obj,
+        repo,
+        uuid,
+        (0, (size as u32).saturating_sub(1)), // Note first byte is 0
+    ))
+}
 
 /*
 ---
@@ -40,11 +99,6 @@ async fn put_blob_upload(
     Query(digest): Query<DigestQuery>,
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
-    let digest = match digest.digest {
-        Some(d) => d,
-        None => return Err(Error::DigestInvalid),
-    };
-
     let txn = state.db.begin().await?;
     let upload = match entity::blob_upload::Entity::find_by_id(uuid.clone())
         .one(&txn)
@@ -74,14 +128,14 @@ async fn put_blob_upload(
     state
         .registry
         .storage
-        .complete_blob_write(&uuid, &digest)
+        .complete_blob_write(&uuid, &digest.digest)
         .await?;
     upload.delete(&txn).await?;
 
-    let digest_obj = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
+    let digest_obj = digest.digest;
     state
         .registry
-        .complete_and_verify_blob_upload(&txn, &repo, &uuid, &digest)
+        .complete_and_verify_blob_upload(&txn, &repo, &uuid, &digest_obj)
         .await
         .map_err(|e| match e {
             RegistryError::InvalidDigest => Error::DigestInvalid,
@@ -212,12 +266,13 @@ async fn post_blob_upload(
     auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     host: AlwaysHost,
-    Query(digest): Query<DigestQuery>,
+    Query(digest): Query<OptionalDigestQuery>,
     Path(repo_name): Path<String>,
     data: Body,
 ) -> Result<Upload, Error> {
     let txn = state.db.begin().await?;
 
+    entity::repo::insert_if_not_exists(&txn, repo_name.clone()).await?;
     let upload = entity::blob_upload::ActiveModel {
         repo: Set(repo_name.clone()),
         ..Default::default()
@@ -226,17 +281,23 @@ async fn post_blob_upload(
 
     if digest.digest.is_some() {
         // Have a monolithic upload with data
-        return put_blob_upload(
-            auth_user,
-            State(state),
-            Path((repo_name, upload.uuid)),
-            host,
-            Query(digest),
-            data,
-        )
-        .await
-        .map(Upload::Accepted);
+        return _complete_upload(txn, upload, data)
+            .await
+            .map(Upload::Accepted);
+        // return put_blob_upload(
+        //     auth_user,
+        //     State(state),
+        //     Path((repo_name, upload.uuid)),
+        //     host,
+        //     Query(digest),
+        //     data,
+        // )
+        // .await
+        // .map(Upload::Accepted);
     }
+    println!("hello 3");
+    txn.commit().await?;
+    println!("hello 4");
     Ok(Upload::Info(UploadInfo::new(
         host.0,
         upload.uuid,
@@ -250,7 +311,7 @@ endpoint_fn_7_levels!(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>,
         host: AlwaysHost,
-        digest: Query<DigestQuery>;
+        digest: Query<OptionalDigestQuery>;
         path: [image_name],
         data: Body
     ) -> Result<Upload, Error>

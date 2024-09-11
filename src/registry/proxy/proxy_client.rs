@@ -16,7 +16,7 @@ use super::create_accept_header;
 use super::proxy_config::SingleRegistryProxyConfig;
 use super::remote_image::RemoteImage;
 use crate::registry::manifest::{ManifestReference, OCIManifest};
-use crate::registry::TrowServer;
+use crate::registry::{Digest, TrowServer};
 
 const AUTHN_HEADER: &str = "www-authenticate";
 static DIGEST_HEADER: &str = "Docker-Content-Digest";
@@ -124,7 +124,7 @@ impl ProxyClient {
     }
 
     /// Download a blob that is part of `remote_image`.
-    async fn download_blob(&self, registry: &TrowServer, digest: &str) -> Result<()> {
+    async fn download_blob(&self, registry: &TrowServer, digest: &Digest) -> Result<()> {
         if registry
             .storage
             .get_blob_stream(self.remote_image.get_repo(), digest)
@@ -202,15 +202,16 @@ impl ProxyClient {
             }
         }
         let str_ref = remote_image.reference.to_string();
+        let digest = Digest::try_from_raw(&str_ref).unwrap();
         registry
             .storage
-            .write_image_manifest(manifest_bytes, local_repo_name, &str_ref)
+            .write_image_manifest(manifest_bytes, local_repo_name, &digest)
             .await?;
 
         Ok(())
     }
 
-    pub async fn get_digest_from_remote(&self) -> Option<String> {
+    pub async fn get_digest_from_remote(&self) -> Option<Digest> {
         let resp = self
             .authenticated_request(Method::HEAD, &self.remote_image.get_manifest_url())
             .headers(create_accept_header())
@@ -232,7 +233,7 @@ impl ProxyClient {
                 );
                 None
             }
-            Ok(Some(header)) => Some(header.to_str().unwrap().to_owned()),
+            Ok(Some(header)) => Some(Digest::try_from_raw(header.to_str().unwrap()).unwrap()),
         }
     }
 }

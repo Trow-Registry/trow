@@ -8,7 +8,7 @@ use sea_orm::{EntityTrait, ModelTrait, TransactionTrait};
 use tracing::{event, Level};
 
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::BlobReader;
+use crate::registry::{BlobReader, Digest};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -29,9 +29,9 @@ digest - unique identifier for the blob to be downloaded
 async fn get_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, digest)): Path<(String, String)>,
+    Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
-    let _blob = entity::blob::Entity::find_by_id((digest.clone(), repo.clone()))
+    let _blob = entity::blob::Entity::find_by_id((digest.to_string(), repo.clone()))
         .one(&state.db)
         .await?
         .ok_or(Error::BlobUnknown)?;
@@ -46,7 +46,7 @@ endpoint_fn_7_levels!(
     get_blob(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
-        path: [image_name, digest: String]
+        path: [image_name, digest: Digest]
     ) -> Result<BlobReader<impl futures::AsyncRead>, Error>
 );
 
