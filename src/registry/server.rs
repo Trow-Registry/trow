@@ -2,12 +2,8 @@ use std::path::PathBuf;
 use std::str;
 
 use anyhow::{anyhow, Result};
-use axum::body::Body;
 use futures::AsyncRead;
-use sea_orm::entity::{NotSet, Set};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, QueryFilter,
-};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use tracing::{event, Level};
 
 use super::manifest::ManifestReference;
@@ -16,12 +12,8 @@ use super::proxy::RegistryProxiesConfig;
 use super::storage::{StorageBackendError, TrowStorageBackend};
 use super::ImageValidationConfig;
 use crate::entity;
-use crate::registry::api_types::Status;
-use crate::registry::blob_storage::Stored;
 use crate::registry::digest::Digest;
-use crate::registry::storage::WriteBlobRangeError;
-use crate::registry::{BlobReader, ContentInfo, ManifestReader, RegistryError};
-use crate::types::*;
+use crate::registry::{BlobReader, ManifestReader, RegistryError};
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
@@ -159,7 +151,7 @@ impl TrowServer {
     pub async fn get_blob(
         &self,
         repo_name: &str,
-        digest: &str,
+        digest: &Digest,
     ) -> Result<BlobReader<impl AsyncRead>, RegistryError> {
         event!(
             Level::DEBUG,
@@ -172,32 +164,32 @@ impl TrowServer {
             Err(StorageBackendError::BlobNotFound(_)) => return Err(RegistryError::NotFound),
             Err(_) => return Err(RegistryError::Internal),
         };
-        Ok(BlobReader::new(digest.to_string(), stream).await)
+        Ok(BlobReader::new(digest.clone(), stream).await)
     }
 
-    pub async fn store_blob_chunk<'a>(
-        &self,
-        name: &str,
-        upload_uuid: &uuid::Uuid,
-        content_info: Option<ContentInfo>,
-        data: Body,
-    ) -> Result<Stored, RegistryError> {
-        // TODO: check that content length matches the body
-        self.storage
-            .write_blob_part_stream(
-                upload_uuid,
-                data.into_data_stream(),
-                content_info.map(|d| d.range.0..=d.range.1),
-            )
-            .await
-            .map_err(|e| match e {
-                WriteBlobRangeError::NotFound => {
-                    RegistryError::InvalidName(format!("{} {}", name, upload_uuid))
-                }
-                WriteBlobRangeError::InvalidContentRange => RegistryError::InvalidContentRange,
-                _ => RegistryError::Internal,
-            })
-    }
+    // pub async fn store_blob_chunk<'a>(
+    //     &self,
+    //     name: &str,
+    //     upload_uuid: &uuid::Uuid,
+    //     content_info: Option<ContentInfo>,
+    //     data: Body,
+    // ) -> Result<Stored, RegistryError> {
+    //     // TODO: check that content length matches the body
+    //     self.storage
+    //         .write_blob_part_stream(
+    //             upload_uuid,
+    //             data.into_data_stream(),
+    //             content_info.map(|d| d.range.0..=d.range.1),
+    //         )
+    //         .await
+    //         .map_err(|e| match e {
+    //             WriteBlobRangeError::NotFound => {
+    //                 RegistryError::InvalidName(format!("{} {}", name, upload_uuid))
+    //             }
+    //             WriteBlobRangeError::InvalidContentRange => RegistryError::InvalidContentRange,
+    //             _ => RegistryError::Internal,
+    //         })
+    // }
 
     // pub async fn complete_and_verify_blob_upload(
     //     &self,
@@ -231,27 +223,27 @@ impl TrowServer {
     /**
      * TODO: check if blob referenced by manifests. If so, refuse to delete.
      */
-    pub async fn delete_blob(&self, name: &str, digest: &str) -> Result<BlobDeleted, Status> {
-        // if !is_digest(digest) {
-        //     return Err(Status::InvalidArgument(format!(
-        //         "Invalid digest: {}",
-        //         digest
-        //     )));
-        // }
-        match self.storage.delete_blob(name, digest).await {
-            Ok(_) => Ok(BlobDeleted {}),
-            Err(e) => {
-                event!(
-                    Level::ERROR,
-                    "Failed to delete blob {} {:?} {:?}",
-                    name,
-                    digest,
-                    e
-                );
-                Err(Status::Internal("Internal error deleting blob".to_owned()))
-            }
-        }
-    }
+    // pub async fn delete_blob(&self, name: &str, digest: &str) -> Result<BlobDeleted, Status> {
+    //     // if !is_digest(digest) {
+    //     //     return Err(Status::InvalidArgument(format!(
+    //     //         "Invalid digest: {}",
+    //     //         digest
+    //     //     )));
+    //     // }
+    //     match self.storage.delete_blob(name, digest).await {
+    //         Ok(_) => Ok(BlobDeleted {}),
+    //         Err(e) => {
+    //             event!(
+    //                 Level::ERROR,
+    //                 "Failed to delete blob {} {:?} {:?}",
+    //                 name,
+    //                 digest,
+    //                 e
+    //             );
+    //             Err(Status::Internal("Internal error deleting blob".to_owned()))
+    //         }
+    //     }
+    // }
 
     // pub async fn delete_manifest(&self, _mr: ManifestRef) -> Result<ManifestDeleted, Status> {
     //     // event!(Level::ERROR, "Manifest deletion requested but not handled !");

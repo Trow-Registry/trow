@@ -142,8 +142,7 @@ impl RemoteImage {
         }
 
         let ref_ = if let Some(match_digest) = captures.name("digest") {
-            let digest = match_digest.as_str().to_string();
-            Digest::try_from_raw(&digest)?;
+            let digest = Digest::try_from_raw(match_digest.as_str())?;
             ManifestReference::Digest(digest)
         } else if let Some(match_tag) = captures.name("tag") {
             ManifestReference::Tag(match_tag.as_str().to_owned())

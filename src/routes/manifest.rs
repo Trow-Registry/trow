@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -6,10 +7,10 @@ use axum::routing::get;
 use axum::Router;
 use bytes::Buf;
 use digest::Digest;
-use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IsolationLevel, NotSet, PaginatorTrait,
-    QueryFilter, QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QuerySelect, Set,
+    TransactionTrait,
 };
 
 use super::extracts::AlwaysHost;
@@ -47,32 +48,40 @@ Accept: manifest-version
 async fn get_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, mut reference)): Path<(String, String)>,
+    Path((repo, reference)): Path<(String, String)>,
 ) -> Result<OciJson<OCIManifest>, Error> {
-    if REGEX_TAG.is_match(&reference) {
+    println!("-- HELLO --");
+    let digest = if REGEX_TAG.is_match(&reference) {
         let tag = entity::tag::Entity::find()
             .filter(entity::tag::Column::Repo.eq(&repo))
             .filter(entity::tag::Column::Tag.eq(&reference))
             .one(&state.db)
             .await?
             .ok_or(Error::NotFound)?;
-        reference = tag.manifest_digest;
-    }
-    let txn = state
-        .db
-        .begin_with_config(Some(IsolationLevel::RepeatableRead), None)
-        .await?;
-    let manifest = entity::manifest::Entity::find_by_id((repo.clone(), reference.clone()))
-        .one(&txn)
+        tag.manifest_digest.clone()
+    } else {
+        Digest::try_from_raw(&reference)?
+    };
+    // let txn = state
+    //     .db
+    //     .begin_with_config(Some(IsolationLevel::RepeatableRead), None)
+    //     .await?;
+    let manifest = entity::blob::Entity::find_by_id(digest.clone())
+        .filter(entity::blob::Column::IsManifest.eq(true))
+        .inner_join(entity::repo_blob_association::Entity)
+        .filter(entity::repo_blob_association::Column::RepoName.eq(repo.clone()))
+        .one(&state.db)
         .await?
         .ok_or(Error::NotFound)?;
+
     let manifest_raw = state
         .registry
         .storage
         .get_manifest(&repo, &manifest.digest)
         .await?;
-    txn.commit().await?;
-    let manifest_parsed: OCIManifest = serde_json::from_slice(&manifest_raw).unwrap();
+    // txn.commit().await?;
+    let manifest_parsed: OCIManifest = serde_json::from_slice(&manifest_raw)
+        .map_err(|e| Error::ManifestInvalid(format!("serialization error: {e}")))?;
     let content_type = manifest_parsed
         .media_type()
         .as_ref()
@@ -108,9 +117,7 @@ async fn put_image_manifest(
     body: Body,
 ) -> Result<VerifiedManifest, Error> {
     if repo_name.starts_with(PROXY_DIR) {
-        return Err(Error::NameInvalid(format!(
-            "Cannot upload manifest for proxied repo {repo_name}"
-        )));
+        return Err(Error::UnsupportedForProxiedRepo);
     }
     let is_tag = REGEX_TAG.is_match(&reference);
     const MANIFEST_BODY_SIZE_LIMIT_MB: usize = 4;
@@ -125,32 +132,23 @@ async fn put_image_manifest(
         .map_err(|e| Error::ManifestInvalid(format!("{e}")))?;
     let assets = manifest_parsed.get_local_asset_digests();
 
-    let count_missing = match manifest_parsed {
-        OCIManifest::List(_) => {
-            entity::manifest::Entity::find()
-                .expr(
-                    Expr::col(entity::manifest::Column::Digest)
-                        .in_tuples(&assets)
-                        .not(),
-                )
-                .count(&state.db)
-                .await?
-        }
-        OCIManifest::V2(_) => {
-            entity::blob::Entity::find()
-                .expr(
-                    Expr::col(entity::blob::Column::Digest)
-                        .in_tuples(&assets)
-                        .not(),
-                )
-                .count(&state.db)
-                .await?
-        }
-    };
-    if count_missing > 0 {
-        return Err(Error::ManifestInvalid(
-            "Missing manifest assets".to_string(),
-        ));
+    let existing_assets = entity::repo_blob_association::Entity::find()
+        .select_only()
+        .column(entity::repo_blob_association::Column::BlobDigest)
+        .filter(Expr::col(entity::repo_blob_association::Column::BlobDigest).is_in(&assets))
+        .filter(entity::repo_blob_association::Column::RepoName.eq(repo_name.clone()))
+        .into_tuple()
+        .all(&state.db)
+        .await?;
+
+    let assets_set = HashSet::<String>::from_iter(assets.into_iter());
+    let existing_assets_set = HashSet::from_iter(existing_assets.into_iter());
+    let assets_diff: Vec<&String> = assets_set.difference(&existing_assets_set).collect();
+    if !assets_diff.is_empty() {
+        return Err(Error::ManifestInvalid(format!(
+            "Missing manifest assets: {:?}",
+            assets_diff
+        )));
     }
 
     let size = manifest_bytes.len();
@@ -159,15 +157,43 @@ async fn put_image_manifest(
         return Err(Error::ManifestInvalid("Digest does not match".to_string()));
     }
     let txn = state.db.begin().await?;
-    entity::manifest::ActiveModel {
-        digest: Set(computed_digest.to_string()),
-        last_accessed: NotSet,
-        repo: Set(repo_name.clone()),
+    entity::repo::insert_if_not_exists(&txn, repo_name.clone()).await?;
+    entity::blob::Entity::insert(entity::blob::ActiveModel {
+        digest: Set(computed_digest.clone()),
+        is_manifest: Set(true),
         size: Set(size as i32),
         ..Default::default()
-    }
-    .save(&txn)
+    })
+    .on_conflict(
+        OnConflict::column(entity::blob::Column::Digest)
+            .update_column(entity::blob::Column::LastAccessed)
+            .to_owned(),
+    )
+    .exec(&txn)
     .await?;
+    entity::repo_blob_association::Entity::insert(entity::repo_blob_association::ActiveModel {
+        repo_name: Set(repo_name.clone()),
+        blob_digest: Set(computed_digest.clone()),
+    })
+    .on_conflict(
+        OnConflict::columns([
+            entity::repo_blob_association::Column::RepoName,
+            entity::repo_blob_association::Column::BlobDigest,
+        ])
+        .do_nothing()
+        .to_owned(),
+    )
+    .exec(&txn)
+    .await?;
+    if is_tag {
+        entity::tag::insert_or_update(
+            reference.clone(),
+            repo_name.clone(),
+            computed_digest.clone(),
+            &txn,
+        )
+        .await?;
+    }
 
     state
         .registry
@@ -203,16 +229,16 @@ async fn delete_image_manifest(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<ManifestDeleted, Error> {
-    let txn = state.db.begin().await?;
-    entity::manifest::Entity::delete_by_id((digest.to_string(), repo.clone()))
-        .exec(&txn)
+    if repo.starts_with(PROXY_DIR) {
+        return Err(Error::UnsupportedForProxiedRepo);
+    }
+    // irh, Digest is not doing validation it seems ?
+    if REGEX_TAG.is_match(digest.as_str()) {
+        return Err(Error::Unsupported);
+    }
+    entity::repo_blob_association::Entity::delete_by_id((repo.clone(), digest.clone()))
+        .exec(&state.db)
         .await?;
-    state
-        .registry
-        .storage
-        .delete_manifest(&repo, &digest)
-        .await?;
-    txn.commit().await?;
 
     Ok(ManifestDeleted {})
 }
