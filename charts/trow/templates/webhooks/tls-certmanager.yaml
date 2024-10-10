@@ -1,5 +1,5 @@
 {{- include "validateWebhookTlsGenValues" . -}}
-{{- if and (or .Values.trow.validationWebhook.enable .Values.trow.proxyRegistries.webhook.enable) .Values.trow.webhooks.tlsCertmanager.enable }}
+{{- if and (or .Values.trow.validationWebhook.enabled .Values.trow.proxyRegistries.webhook.enabled) .Values.webhooks.tls.certmanager.enabled }}
 # Create a selfsigned Issuer, in order to create a root CA certificate for
 # signing webhook serving certificates
 apiVersion: cert-manager.io/v1
@@ -18,7 +18,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   secretName: {{ include "trow.fullname" . }}-root-cert
-  duration: {{ .Values.trow.webhooks.tlsCertmanager.rootCert.duration | default "43800h0m0s" | quote }}
+  duration: {{ .Values.webhooks.tls.certmanager.rootCert.duration | default "43800h0m0s" | quote }}
   issuerRef:
     name: {{ include "trow.fullname" . }}-self-signed-issuer
   commonName: "ca.webhook.trow"
@@ -45,10 +45,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   secretName: {{ include "trow.fullname" . }}-admission
-  duration: {{ .Values.trow.webhooks.tlsCertmanager.admissionCert.duration | default "8760h0m0s" | quote }}
+  duration: {{ .Values.webhooks.tls.certmanager.admissionCert.duration | default "8760h0m0s" | quote }}
   issuerRef:
-    {{- if .Values.trow.webhooks.tlsCertmanager.issuerRef }}
-    {{- toYaml .Values.trow.webhooks.tlsCertmanager.issuerRef | nindent 4 }}
+    {{- if .Values.webhooks.tls.certmanager.issuerRef }}
+    {{- toYaml .Values.webhooks.tls.certmanager.issuerRef | nindent 4 }}
     {{- else }}
     name: {{ include "trow.fullname" . }}-root-issuer
     {{- end }}

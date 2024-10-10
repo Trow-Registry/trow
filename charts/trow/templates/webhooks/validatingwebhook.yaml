@@ -1,4 +1,4 @@
-{{ if .Values.trow.validationWebhook.enable }}
+{{ if .Values.trow.validationWebhook.enabled }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
@@ -7,7 +7,7 @@ metadata:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: admission-webhook
   annotations:
-  {{- if .Values.trow.webhooks.tlsCertmanager.enable }}
+  {{- if .Values.webhooks.tls.certmanager.enabled }}
     certmanager.k8s.io/inject-ca-from: {{ printf "%s/%s-webhooks" (.Release.Namespace) (include "trow.fullname" .) | quote }}
     cert-manager.io/inject-ca-from: {{ printf "%s/%s-webhooks" (.Release.Namespace) (include "trow.fullname" .) | quote }}
   {{- end }}
@@ -15,9 +15,9 @@ webhooks:
   - name: validate.trow.io
     admissionReviewVersions: ["v1"]
     sideEffects: None
-    {{ if .Values.trow.webhooks.namespaceSelector }}
+    {{ if .Values.webhooks.namespaceSelector }}
     namespaceSelector:
-      {{- toYaml .Values.trow.webhooks.namespaceSelector | toYaml | indent 6 }}
+      {{- toYaml .Values.webhooks.namespaceSelector | toYaml | indent 6 }}
     {{- end }}
     rules:
       - apiGroups: [""]

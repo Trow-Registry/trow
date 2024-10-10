@@ -1,6 +1,6 @@
-{{- if or .Values.trow.validationWebhook.enable .Values.trow.proxyRegistries.webhook.enable }}
+{{- if or .Values.trow.validationWebhook.enabled .Values.trow.proxyRegistries.webhook.enabled }}
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   labels:
     {{- include "webhook.labels" . | nindent 4 }}
@@ -104,3 +104,14 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 {{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "trow.fullname" . }}-webhook-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "webhook.selectorLabels" . | nindent 6 }}
