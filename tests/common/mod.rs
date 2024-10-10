@@ -147,12 +147,12 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     //Upload manifest
     //For time being use same blob for config and layer
     let blob_size = blob.len();
-    let mani: manifest::OCIManifest = serde_json::from_str(&format!(
+    let raw_manifest = format!(
         r#"{{
         "schemaVersion": 2,
         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
         "config": {{
-            "media_type": "application/vnd.docker.container.image.v1+json",
+            "mediaType": "application/vnd.docker.container.image.v1+json",
             "size": {blob_size},
             "digest": "{digest}"
         }},
@@ -162,8 +162,8 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
             "digest": "{digest}"
         }}]
     }}"#
-    ))
-    .unwrap();
+    );
+    let mani: manifest::OCIManifest = serde_json::from_str(&raw_manifest).unwrap();
 
     let manifest_addr = format!("/v2/{}/manifests/{}", name, tag);
     let resp = cl
@@ -175,7 +175,12 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED);
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "response: {}",
+        response_body_string(resp).await
+    );
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();
     assert_eq!(&location, &manifest_addr);
 }
@@ -186,7 +191,7 @@ pub fn get_file<T: Serialize>(dir: &Path, contents: T) -> PathBuf {
     let rnum: u16 = rand::thread_rng().gen();
     let path = dir.join(rnum.to_string());
     let mut file = File::create(&path).unwrap();
-    file.write_all(serde_yaml::to_string(&contents).unwrap().as_bytes())
+    file.write_all(serde_yaml_ng::to_string(&contents).unwrap().as_bytes())
         .unwrap();
     file.flush().unwrap();
 

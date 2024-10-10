@@ -7,11 +7,9 @@ pub mod errors;
 pub mod health;
 pub mod html;
 pub mod manifest_deleted;
-pub mod manifest_history;
 pub mod manifest_reader;
 pub mod metrics;
 pub mod readiness;
-pub mod repo_catalog;
 pub mod tag_list;
 pub mod trow_token;
 pub mod upload;
@@ -21,9 +19,11 @@ pub mod verified_manifest;
 use std::marker::PhantomData;
 
 use axum::body::Body;
-use axum::http::{header, HeaderName, HeaderValue};
+use axum::http::{header, HeaderValue};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
+
+use crate::registry::Digest;
 
 #[derive(Debug, Default)]
 pub struct OciJson<T> {
@@ -60,10 +60,10 @@ where
         }
     }
 
-    pub fn set_digest(mut self, digest: &str) -> Self {
+    pub fn set_digest(mut self, digest: &Digest) -> Self {
         self.response.headers_mut().insert(
-            HeaderName::from_static("Docker-Content-Digest"),
-            HeaderValue::from_str(digest).unwrap(),
+            "Docker-Content-Digest",
+            HeaderValue::from_str(digest.as_str()).unwrap(),
         );
         self
     }
@@ -87,7 +87,8 @@ impl<T> IntoResponse for OciJson<T> {
         headers
             .entry(header::CONTENT_LENGTH)
             .or_insert(HeaderValue::from(self.content_length));
-
+        println!("resp: {:?}\n\n---", self.response.headers());
+        println!();
         self.response
     }
 }

@@ -4,8 +4,7 @@ use anyhow::Result;
 use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::Router;
-use sea_orm::{EntityTrait, ModelTrait, TransactionTrait};
-use tracing::{event, Level};
+use sea_orm::{EntityTrait, ModelTrait};
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::{BlobReader, Digest};
@@ -31,7 +30,7 @@ async fn get_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
-    let _blob = entity::blob::Entity::find_by_id((digest.to_string(), repo.clone()))
+    let _blob = entity::blob::Entity::find_by_id(digest.clone())
         .one(&state.db)
         .await?
         .ok_or(Error::BlobUnknown)?;
@@ -60,20 +59,14 @@ endpoint_fn_7_levels!(
 async fn delete_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, digest)): Path<(String, String)>,
+    Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobDeleted, Error> {
-    let blob = entity::blob::Entity::find_by_id((digest.clone(), repo.clone()))
-        .one(&state.db)
-        .await?
-        .ok_or(Error::BlobUnknown)?;
-    let txn = state.db.begin().await?;
-    blob.delete(&txn).await?;
-    let res = state.registry.storage.delete_blob(&repo, &digest).await;
-    if let Err(e) = res {
-        event!(Level::ERROR, "Storage error while deleting blob: {e}");
-        return Err(Error::InternalError);
-    }
-    txn.commit().await?;
+    let repo_blob_assoc =
+        entity::repo_blob_association::Entity::find_by_id((repo.clone(), digest.clone()))
+            .one(&state.db)
+            .await?
+            .ok_or(Error::BlobUnknown)?;
+    repo_blob_assoc.delete(&state.db).await?;
 
     Ok(BlobDeleted {})
 }
@@ -82,7 +75,7 @@ endpoint_fn_7_levels!(
     delete_blob(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>;
-    path: [image_name, digest: String]
+    path: [image_name, digest: Digest]
     ) -> Result<BlobDeleted, Error>
 );
 

@@ -183,7 +183,8 @@ impl ProxyClient {
                     .into_iter()
                     .map(|digest| {
                         let mut image = remote_image.clone();
-                        image.reference = ManifestReference::Digest(digest.clone());
+                        image.reference =
+                            ManifestReference::Digest(Digest::try_from_raw(&digest).unwrap());
                         image
                     })
                     .collect::<Vec<_>>();
@@ -193,7 +194,11 @@ impl ProxyClient {
                 try_join_all(futures).await?;
             }
             OCIManifest::V2(_) => {
-                let digests: Vec<_> = manifest.get_local_asset_digests();
+                let digests: Vec<_> = manifest
+                    .get_local_asset_digests()
+                    .iter()
+                    .map(|d| Digest::try_from_raw(d).unwrap())
+                    .collect();
 
                 let futures = digests
                     .iter()
