@@ -1,0 +1,62 @@
+{{- include "validateWebhookTlsGenValues" . -}}
+{{- if and (or .Values.trow.validationWebhook.enable .Values.trow.proxyRegistries.webhook.enable) .Values.trow.webhooks.tlsCertmanager.enable }}
+# Create a selfsigned Issuer, in order to create a root CA certificate for
+# signing webhook serving certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "trow.fullname" . }}-self-signed-issuer
+  namespace: {{ .Release.Namespace }}
+spec:
+  selfSigned: {}
+---
+# Generate a CA Certificate used to sign certificates for the webhook
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "trow.fullname" . }}-root-cert
+  namespace: {{ .Release.Namespace }}
+spec:
+  secretName: {{ include "trow.fullname" . }}-root-cert
+  duration: {{ .Values.trow.webhooks.tlsCertmanager.rootCert.duration | default "43800h0m0s" | quote }}
+  issuerRef:
+    name: {{ include "trow.fullname" . }}-self-signed-issuer
+  commonName: "ca.webhook.trow"
+  isCA: true
+  subject:
+    organizations:
+      - trow-registry
+---
+# Create an Issuer that uses the above generated CA certificate to issue certs
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "trow.fullname" . }}-root-issuer
+  namespace: {{ .Release.Namespace }}
+spec:
+  ca:
+    secretName: {{ include "trow.fullname" . }}-root-cert
+---
+# generate a server certificate for the apiservices to use
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "trow.fullname" . }}-webhooks
+  namespace: {{ .Release.Namespace }}
+spec:
+  secretName: {{ include "trow.fullname" . }}-admission
+  duration: {{ .Values.trow.webhooks.tlsCertmanager.admissionCert.duration | default "8760h0m0s" | quote }}
+  issuerRef:
+    {{- if .Values.trow.webhooks.tlsCertmanager.issuerRef }}
+    {{- toYaml .Values.trow.webhooks.tlsCertmanager.issuerRef | nindent 4 }}
+    {{- else }}
+    name: {{ include "trow.fullname" . }}-root-issuer
+    {{- end }}
+  dnsNames:
+    - {{ include "trow.fullname" . }}-admission
+    - {{ include "trow.fullname" . }}-admission.{{ .Release.Namespace }}
+    - {{ include "trow.fullname" . }}-admission.{{ .Release.Namespace }}.svc
+  subject:
+    organizations:
+      - trow-registry
+{{- end -}}

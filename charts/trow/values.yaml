@@ -17,7 +17,7 @@ trow:
   # password: password
 
   ## The Trow validation webhook validates which images are allowed to run on your cluster.
-  ## Note: it runs AFTER the mutatiting webhook.
+  ## Note: it runs AFTER the mutating webhook.
   validationWebhook:
     enable: false
     failurePolicy: Ignore
@@ -48,6 +48,23 @@ trow:
       #     ignore_repos: ["trow-registry/trow"]
   ## For more info on log levels see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html
   logLevel: info
+  ## Global config options for webhooks (validation and mutation)
+  webhooks:
+    ## https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
+    # namespaceSelector:
+    tlsCertmanager:
+      enable: false
+      rootCert:
+        # default to be 5y
+        duration: ""
+      admissionCert:
+        # default to be 1y
+        duration: ""
+      # issuerRef:
+      #   name: "issuer"
+      #   kind: "ClusterIssuer"
+    tlsPatch:
+      enable: true
 
 ## Job to configure the webhooks
 webhookPatch:

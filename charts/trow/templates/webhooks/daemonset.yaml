@@ -27,8 +27,8 @@ spec:
           - sh
           - -c
           - |
-            cp /etc/trow/webhook-cert-ecc/cert /etc/trow/webhook-cert && \
-            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/key -out /etc/trow/webhook-cert/key
+            cp /etc/trow/webhook-cert-ecc/tls.crt /etc/trow/webhook-cert/cert && \
+            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/tls.key -out /etc/trow/webhook-cert/key
         volumeMounts:
         - name: webhook-cert-translated
           mountPath: /etc/trow/webhook-cert

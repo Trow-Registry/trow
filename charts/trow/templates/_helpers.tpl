@@ -80,3 +80,12 @@ Webhook selector labels
 {{- define "webhook.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "trow.name" . }}-webhook
 {{- end -}}
+
+{{/*
+Webhook certificate generation is done either via patch or certmanager
+*/}}
+{{- define "validateWebhookTlsGenValues" -}}
+{{- if and .Values.trow.webhooks.tlsCertmanager.enable .Values.trow.webhooks.tlsPatch.enable -}}
+{{- fail "Error (webhooks): tlsCertmanager and tlsPatch cannot be enabled simultaneously" -}}
+{{- end -}}
+{{- end -}}
