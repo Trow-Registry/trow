@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use derive_more::Display;
 use futures::AsyncRead;
 use serde::{Deserialize, Serialize};
 

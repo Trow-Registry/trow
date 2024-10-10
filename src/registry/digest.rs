@@ -1,5 +1,4 @@
 use std::io::Read;
-use std::str::FromStr;
 use std::{fmt, io};
 
 use lazy_static::lazy_static;
@@ -23,8 +22,17 @@ pub enum DigestError {
     InvalidDigest(String),
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sea_orm::DeriveValueType)]
+#[serde(transparent)]
 pub struct Digest(String);
+
+impl sea_orm::TryFromU64 for Digest {
+    fn try_from_u64(_: u64) -> Result<Self, sea_orm::DbErr> {
+        Err(sea_orm::DbErr::ConvertFromU64(
+            "Fail to construct ActiveEnum from a u64, if your primary key consist of a ActiveEnum field, its auto increment should be set to false."
+        ))
+    }
+}
 
 impl fmt::Display for Digest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -32,9 +40,9 @@ impl fmt::Display for Digest {
     }
 }
 
-impl AsRef<str> for Digest {
-    fn as_ref(&self) -> &str {
-        self.as_str()
+impl AsRef<String> for Digest {
+    fn as_ref(&self) -> &String {
+        &self.0
     }
 }
 
@@ -64,11 +72,11 @@ impl Digest {
         Ok(Self(digest_str))
     }
 
-    pub fn algo_str<'a>(&'a self) -> &'a str {
+    pub fn algo_str(&self) -> &str {
         &self.0[..6]
     }
 
-    pub fn hash<'a>(&'a self) -> &'a str {
+    pub fn hash(&self) -> &str {
         &self.0[7..]
     }
 

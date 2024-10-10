@@ -9,14 +9,13 @@ use axum::Router;
 use digest::Digest;
 use hyper::StatusCode;
 use sea_orm::{
-    ActiveModelTrait, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, RuntimeErr,
-    Set, TransactionTrait,
+    ActiveModelTrait, DatabaseTransaction, EntityTrait, IntoActiveModel, ModelTrait, Set,
+    TransactionTrait,
 };
-use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, ContentInfo, RegistryError, TrowServer};
+use crate::registry::{digest, ContentInfo, TrowServer};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -24,62 +23,56 @@ use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
 use crate::{entity, TrowServerState};
 
-async fn _complete_upload(
-    txn: impl TransactionTrait,
-    registry: TrowServer,
-    upload: entity::blob_upload::Model,
-    digest: &Digest,
-    repo: &str,
-    chunk: Body,
-) -> Result<AcceptedUpload, Error> {
-    let size = registry
-        .storage
-        .write_blob_part_stream(
-            &upload.uuid,
-            chunk.into_data_stream(),
-            None, // range: ???
-        )
+mod utils {
+    use std::ops::RangeInclusive;
+
+    use super::*;
+
+    pub async fn complete_upload(
+        txn: &DatabaseTransaction,
+        host: &str,
+        registry: &TrowServer,
+        upload: entity::blob_upload::Model,
+        digest: &Digest,
+        data: Body,
+        range: Option<RangeInclusive<u64>>,
+    ) -> Result<AcceptedUpload, Error> {
+        let repo = upload.repo.clone();
+        let uuid = upload.uuid;
+        let size = registry
+            .storage
+            .write_blob_part_stream(&uuid, data.into_data_stream(), range)
+            .await?;
+        let mut active_upload = upload.clone().into_active_model();
+        active_upload.offset = Set(size.total_stored as i32);
+        active_upload.update(txn).await?;
+        registry.storage.complete_blob_write(&uuid, digest).await?;
+
+        upload.delete(txn).await?;
+        entity::blob::ActiveModel {
+            digest: Set(digest.clone()),
+            size: Set(size.total_stored as i32),
+            is_manifest: Set(false),
+            ..Default::default()
+        }
+        .insert(txn)
         .await?;
-    registry
-        .storage
-        .complete_blob_write(&upload.uuid, &digest)
+        entity::repo_blob_association::ActiveModel {
+            repo_name: Set(repo.clone()),
+            blob_digest: Set(digest.clone()),
+        }
+        .insert(txn)
         .await?;
 
-    upload.delete(&txn).await?;
-
-    let digest_obj = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
-    state
-        .registry
-        .complete_and_verify_blob_upload(&txn, &repo, &uuid, &digest)
-        .await
-        .map_err(|e| match e {
-            RegistryError::InvalidDigest => Error::DigestInvalid,
-            e => {
-                event!(Level::ERROR, "Error completing blob upload: {}", e);
-                Error::InternalError
-            }
-        })?;
-
-    let blob = entity::blob::ActiveModel {
-        digest: Set(digest.clone()),
-        repo: Set(repo.clone()),
-        size: Set(size as i32),
-        ..Default::default()
-    };
-    blob.insert(&txn).await?;
-    // upload.delete(&txn).await?;
-
-    txn.commit().await?;
-
-    Ok(AcceptedUpload::new(
-        host,
-        digest_obj,
-        repo,
-        uuid,
-        (0, (size as u32).saturating_sub(1)), // Note first byte is 0
-    ))
+        Ok(AcceptedUpload::new(
+            host.to_string(),
+            digest.clone(),
+            repo,
+            uuid,
+            (0, (size.total_stored as u32).saturating_sub(1)), // Note first byte is 0
+        ))
+    }
 }
-
 /*
 ---
 Monolithic Upload
@@ -100,69 +93,28 @@ async fn put_blob_upload(
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
     let txn = state.db.begin().await?;
-    let upload = match entity::blob_upload::Entity::find_by_id(uuid.clone())
+    let upload = match entity::blob_upload::Entity::find_by_id(uuid)
         .one(&txn)
         .await?
     {
         Some(u) => u,
         None => return Err(Error::NotFound),
     };
+    assert_eq!(upload.repo, repo);
 
-    let size = match state
-        .registry
-        .store_blob_chunk(&repo, &uuid, None, chunk)
-        .await
-    {
-        Ok(stored) => stored.total_stored,
-        Err(RegistryError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
-        Err(RegistryError::InvalidContentRange) => {
-            return Err(Error::BlobUploadInvalid(
-                "Invalid Content Range".to_string(),
-            ))
-        }
-        Err(e) => {
-            event!(Level::ERROR, "Error storing blob chunk: {}", e);
-            return Err(Error::InternalError);
-        }
-    };
-    state
-        .registry
-        .storage
-        .complete_blob_write(&uuid, &digest.digest)
-        .await?;
-    upload.delete(&txn).await?;
-
-    let digest_obj = digest.digest;
-    state
-        .registry
-        .complete_and_verify_blob_upload(&txn, &repo, &uuid, &digest_obj)
-        .await
-        .map_err(|e| match e {
-            RegistryError::InvalidDigest => Error::DigestInvalid,
-            e => {
-                event!(Level::ERROR, "Error completing blob upload: {}", e);
-                Error::InternalError
-            }
-        })?;
-
-    let blob = entity::blob::ActiveModel {
-        digest: Set(digest.clone()),
-        repo: Set(repo.clone()),
-        size: Set(size as i32),
-        ..Default::default()
-    };
-    blob.insert(&txn).await?;
-    // upload.delete(&txn).await?;
-
+    let accepted_upload = utils::complete_upload(
+        &txn,
+        &host,
+        &state.registry,
+        upload,
+        &digest.digest,
+        chunk,
+        None,
+    )
+    .await?;
     txn.commit().await?;
 
-    Ok(AcceptedUpload::new(
-        host,
-        digest_obj,
-        repo,
-        uuid,
-        (0, (size as u32).saturating_sub(1)), // Note first byte is 0
-    ))
+    Ok(accepted_upload)
 }
 
 endpoint_fn_7_levels!(
@@ -203,41 +155,30 @@ async fn patch_blob_upload(
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
     let txn = state.db.begin().await?;
-    let mut upload = match entity::blob_upload::Entity::find_by_id(uuid)
+    let mut upload = entity::blob_upload::Entity::find_by_id(uuid)
         .one(&txn)
         .await?
-    {
-        Some(u) => u.into_active_model(),
-        None => return Err(Error::NotFound),
-    };
+        .ok_or(Error::NotFound)?
+        .into_active_model();
 
-    let size = match state
+    let size = state
         .registry
-        .store_blob_chunk(&repo, &uuid, content_info, chunk)
-        .await
-    {
-        Ok(stored) => stored.total_stored,
-        Err(RegistryError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
-        Err(RegistryError::InvalidContentRange) => {
-            return Err(Error::BlobUploadInvalid(
-                "Invalid Content Range".to_string(),
-            ))
-        }
-        Err(e) => {
-            event!(Level::ERROR, "Error storing blob chunk: {}", e);
-            return Err(Error::InternalError);
-        }
-    };
-    // let mut upload = upload.into_active_model();
-    upload.offset = Set(size as i32);
+        .storage
+        .write_blob_part_stream(
+            &uuid,
+            chunk.into_data_stream(),
+            content_info.map(|d| d.range.0..=d.range.1),
+        )
+        .await?;
 
+    upload.offset = Set(size.total_stored as i32);
     txn.commit().await?;
 
     Ok(UploadInfo::new(
         host,
         uuid,
         repo,
-        (0, (size as u32).saturating_sub(1)), // Note first byte is 0
+        (0, (size.total_stored as u32).saturating_sub(1)), // Note first byte is 0
     ))
 }
 
@@ -263,7 +204,7 @@ No data is being transferred _unless_ the request ends with "?digest".
 In this case the whole blob is attached.
 */
 async fn post_blob_upload(
-    auth_user: TrowToken,
+    _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     host: AlwaysHost,
     Query(digest): Query<OptionalDigestQuery>,
@@ -271,33 +212,37 @@ async fn post_blob_upload(
     data: Body,
 ) -> Result<Upload, Error> {
     let txn = state.db.begin().await?;
-
     entity::repo::insert_if_not_exists(&txn, repo_name.clone()).await?;
     let upload = entity::blob_upload::ActiveModel {
         repo: Set(repo_name.clone()),
+        offset: Set(0),
         ..Default::default()
     };
     let upload = upload.insert(&txn).await?;
 
-    if digest.digest.is_some() {
+    if let Some(digest) = digest.digest {
         // Have a monolithic upload with data
-        return _complete_upload(txn, upload, data)
-            .await
-            .map(Upload::Accepted);
-        // return put_blob_upload(
-        //     auth_user,
-        //     State(state),
-        //     Path((repo_name, upload.uuid)),
-        //     host,
-        //     Query(digest),
-        //     data,
-        // )
-        // .await
-        // .map(Upload::Accepted);
+        return match utils::complete_upload(
+            &txn,
+            &host.0,
+            &state.registry,
+            upload,
+            &digest,
+            data,
+            None,
+        )
+        .await
+        {
+            Ok(accepted_upload) => {
+                txn.commit().await?;
+                Ok(Upload::Accepted(accepted_upload))
+            }
+            Err(e) => return Err(e),
+        };
     }
-    println!("hello 3");
+    println!("aaaaa");
     txn.commit().await?;
-    println!("hello 4");
+    println!("bbbb");
     Ok(Upload::Info(UploadInfo::new(
         host.0,
         upload.uuid,
@@ -372,4 +317,144 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
         get(get_blob_upload, get_blob_upload_2level, get_blob_upload_3level, get_blob_upload_4level, get_blob_upload_5level, get_blob_upload_6level, get_blob_upload_7level)
     );
     app
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::io::BufReader;
+
+    use axum::body::Body;
+    use http_body_util::BodyExt;
+    use hyper::Request;
+    use reqwest::StatusCode;
+    use sea_orm::EntityTrait;
+    use tower::{Service, ServiceExt};
+    use uuid::Uuid;
+
+    use crate::registry::Digest;
+    use crate::{entity, test_utilities};
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn post_new_upload() {
+        let (db, mut router) = test_utilities::trow_router(|_| {}, None).await;
+        let resp = router
+            .call(
+                Request::post(&format!("/v2/test/blobs/uploads/"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::ACCEPTED,
+            "resp: {:?}",
+            resp.into_body().collect().await.unwrap().to_bytes()
+        );
+        let resp_headers = resp.headers();
+        let uuid = resp_headers
+            .get(test_utilities::UPLOAD_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let uuid = Uuid::parse_str(uuid).unwrap();
+
+        let range = resp_headers
+            .get(test_utilities::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, "0-0"); // Haven't uploaded anything yet
+
+        let upload = entity::blob_upload::Entity::find_by_id(uuid)
+            .one(&db)
+            .await
+            .unwrap();
+        assert!(upload.is_some());
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn upload_with_put() {
+        let (_, mut router) = test_utilities::trow_router(|_| {}, None).await;
+        let repo_name = "test";
+        let resp = router
+            .call(
+                Request::post(&format!("/v2/{repo_name}/blobs/uploads/"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::ACCEPTED,
+            "resp: {:?}",
+            resp.into_body().collect().await.unwrap().to_bytes()
+        );
+        let resp_headers = resp.headers();
+        let uuid = resp_headers
+            .get(test_utilities::UPLOAD_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+
+        let range = resp_headers
+            .get(test_utilities::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, "0-0"); // Haven't uploaded anything yet
+
+        //used by oci_manifest_test
+        let config = "{}\n".as_bytes();
+        let digest = Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", repo_name, uuid, digest);
+
+        let resp = router
+            .call(Request::put(loc).body(Body::from(config)).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let range = resp
+            .headers()
+            .get(test_utilities::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn upload_with_post() {
+        let (_, router) = test_utilities::trow_router(|_| {}, None).await;
+        let repo_name = "test";
+
+        let config = "{ }\n".as_bytes();
+        let digest = Digest::digest_sha256(BufReader::new(config)).unwrap();
+
+        let resp = router
+            .clone()
+            .oneshot(
+                Request::post(&format!(
+                    "/v2/{}/blobs/uploads/?digest={}",
+                    repo_name, digest
+                ))
+                .body(Body::from(config))
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let range = resp
+            .headers()
+            .get(test_utilities::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
+    }
 }

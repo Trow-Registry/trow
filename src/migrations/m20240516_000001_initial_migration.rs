@@ -16,48 +16,55 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
+                    .table(Repo::Table)
+                    .col(string(Repo::Name).primary_key())
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
                     .table(Blob::Table)
-                    .col(string(Blob::Digest))
-                    .col(string(Blob::Repo))
+                    .col(string(Blob::Digest).primary_key())
                     .col(integer(Blob::Size))
+                    .col(boolean(Blob::IsManifest))
                     .col(
                         timestamp(Blob::LastAccessed)
                             .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
                     )
-                    .primary_key(Index::create().col(Blob::Digest).col(Blob::Repo))
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("FK_blob_repo")
-                            .from(Blob::Table, Blob::Repo)
-                            .to(Repo::Table, Repo::Name)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
+                    // .index(IndexCreateStatement::new().col(Blob::IsManifest))
                     .to_owned(),
             )
-            .await
-            .unwrap();
+            .await?;
         manager
             .create_table(
                 Table::create()
-                    .table(Manifest::Table)
-                    .col(string(Manifest::Digest).primary_key())
-                    .col(integer(Manifest::Size))
-                    .col(
-                        timestamp(Manifest::LastAccessed)
-                            .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
+                    .table(RepoBlobAssociation::Table)
+                    .col(string(RepoBlobAssociation::RepoName))
+                    .col(string(RepoBlobAssociation::BlobDigest))
+                    .primary_key(
+                        Index::create()
+                            .col(RepoBlobAssociation::RepoName)
+                            .col(RepoBlobAssociation::BlobDigest),
                     )
-                    .col(string(Manifest::Repo))
                     .foreign_key(
                         ForeignKey::create()
-                            .name("FK_manifest_repo")
-                            .from(Manifest::Table, Manifest::Repo)
+                            .name("FK_repo_blob_repo_name")
+                            .from(RepoBlobAssociation::Table, RepoBlobAssociation::RepoName)
                             .to(Repo::Table, Repo::Name)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("FK_repo_blob_blob_digest")
+                            .from(RepoBlobAssociation::Table, RepoBlobAssociation::BlobDigest)
+                            .to(Blob::Table, Blob::Digest)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
-            .await
-            .unwrap();
+            .await?;
+
         manager
             .create_table(
                 Table::create()
@@ -67,19 +74,16 @@ impl MigrationTrait for Migration {
                     .col(string(Tag::ManifestDigest))
                     .foreign_key(
                         ForeignKey::create()
-                            .name("FK_tag_manifest")
-                            .from(Tag::Table, Tag::ManifestDigest)
-                            .to(Manifest::Table, Manifest::Digest)
+                            .name("FK_repo_blob_assoc")
+                            .from_tbl(Tag::Table)
+                            .from_col(Tag::Repo)
+                            .from_col(Tag::ManifestDigest)
+                            .to_tbl(RepoBlobAssociation::Table)
+                            .to_col(RepoBlobAssociation::RepoName)
+                            .to_col(RepoBlobAssociation::BlobDigest)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("FK_tag_repo")
-                            .from(Tag::Table, Tag::Repo)
-                            .to(Repo::Table, Repo::Name)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
-                    .index(
+                    .primary_key(
                         Index::create()
                             .name("IDX_repo_tag")
                             .table(Tag::Table)
@@ -89,41 +93,38 @@ impl MigrationTrait for Migration {
                     )
                     .to_owned(),
             )
-            .await
-            .unwrap();
+            .await?;
         manager
             .create_table(
                 Table::create()
-                    .table(ManifestBlobAssociation::Table)
-                    .col(string(ManifestBlobAssociation::ManifestDigest))
+                    .table(BlobBlobAssociation::Table)
+                    .col(string(BlobBlobAssociation::ParentDigest))
                     .foreign_key(
                         ForeignKey::create()
+                            .name("FK_blob_blob_association_parent")
                             .from(
-                                ManifestBlobAssociation::Table,
-                                ManifestBlobAssociation::ManifestDigest,
-                            )
-                            .to(Manifest::Table, Manifest::Digest)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
-                    .col(string(ManifestBlobAssociation::BlobDigest))
-                    .foreign_key(
-                        ForeignKey::create()
-                            .from(
-                                ManifestBlobAssociation::Table,
-                                ManifestBlobAssociation::BlobDigest,
+                                BlobBlobAssociation::Table,
+                                BlobBlobAssociation::ParentDigest,
                             )
                             .to(Blob::Table, Blob::Digest)
-                            .on_delete(ForeignKeyAction::Cascade),
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
+                    )
+                    .col(string(BlobBlobAssociation::ChildDigest))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("FK_blob_blob_association_child")
+                            .from(BlobBlobAssociation::Table, BlobBlobAssociation::ChildDigest)
+                            .to(Blob::Table, Blob::Digest),
                     )
                     .primary_key(
                         Index::create()
-                            .col(ManifestBlobAssociation::BlobDigest)
-                            .col(ManifestBlobAssociation::ManifestDigest),
+                            .col(BlobBlobAssociation::ParentDigest)
+                            .col(BlobBlobAssociation::ChildDigest),
                     )
                     .to_owned(),
             )
-            .await
-            .unwrap();
+            .await?;
         manager
             .create_table(
                 Table::create()
@@ -137,19 +138,11 @@ impl MigrationTrait for Migration {
                     .col(string(BlobUpload::Repo).string())
                     .foreign_key(
                         ForeignKey::create()
+                            .name("FK_blob_upload_repo")
                             .from(BlobUpload::Table, BlobUpload::Repo)
                             .to(Repo::Table, Repo::Name)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .to_owned(),
-            )
-            .await
-            .unwrap();
-        manager
-            .create_table(
-                Table::create()
-                    .table(Repo::Table)
-                    .col(string(Repo::Name).primary_key())
                     .to_owned(),
             )
             .await
@@ -161,23 +154,19 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(Blob::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(Manifest::Table).to_owned())
-            .await?;
-        manager
             .drop_table(Table::drop().table(Tag::Table).to_owned())
             .await?;
         manager
-            .drop_table(
-                Table::drop()
-                    .table(ManifestBlobAssociation::Table)
-                    .to_owned(),
-            )
+            .drop_table(Table::drop().table(BlobBlobAssociation::Table).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(BlobUpload::Table).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(Repo::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(RepoBlobAssociation::Table).to_owned())
             .await
     }
 }
@@ -187,17 +176,8 @@ enum Blob {
     Table,
     Digest,
     Size,
+    IsManifest,
     LastAccessed,
-    Repo,
-}
-
-#[derive(Iden)]
-enum Manifest {
-    Table,
-    Digest,
-    Size,
-    LastAccessed,
-    Repo,
 }
 
 #[derive(Iden)]
@@ -209,10 +189,10 @@ enum Tag {
 }
 
 #[derive(Iden)]
-enum ManifestBlobAssociation {
+enum BlobBlobAssociation {
     Table,
-    ManifestDigest,
-    BlobDigest,
+    ParentDigest,
+    ChildDigest,
 }
 
 #[derive(Iden)]
@@ -228,4 +208,11 @@ enum BlobUpload {
 enum Repo {
     Table,
     Name,
+}
+
+#[derive(Iden)]
+enum RepoBlobAssociation {
+    Table,
+    RepoName,
+    BlobDigest,
 }

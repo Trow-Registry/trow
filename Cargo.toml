@@ -13,14 +13,19 @@ futures = "0.3"
 axum = { version = "0.7.2", features = ["tracing"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.0", features = ["typed-header"] }
-tower = "0.5"
-tower-http = { version = "0.5", features = ["cors", "normalize-path", "trace"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.5", features = [
+    "cors",
+    "normalize-path",
+    "trace",
+    "set-header",
+] }
 jsonwebtoken = "9.2"
 rust-argon2 = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_derive = "1.0"
-serde_yaml = "0.9.0"
+serde_yaml_ng = "0.10"
 uuid = { version = "1.3", features = ["v4", "serde"] }
 base64 = "0.22.1"
 anyhow = "1.0"
@@ -53,21 +58,22 @@ reqwest = { version = "0.12", features = [
 prometheus = "0.13"
 fs3 = "0.5.0"
 quoted-string = "0.6.1"
-aws-config = "1.0.3"
-aws-types = "1.0.3"
+aws-config = "1.5.0"
+aws-types = "1.3.0"
 aws-sdk-ecr = "1.5.0"
 const_format = "0.2.24"
 async-trait = "0.1.74"
 walkdir = "2.0"
 rand = "0.8"
 humansize = "2.1"
+sqlx = "*"
 sea-orm = { version = "1.0.1", features = [
     "sqlx-sqlite",
     "runtime-tokio-rustls",
     "macros",
 ] }
 sea-orm-migration = "^1.0.1"
-oci-spec = "0.6.4"
+oci-spec = "0.7.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"

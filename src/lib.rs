@@ -102,7 +102,7 @@ impl TrowConfig {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
             .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml::from_str::<RegistryProxiesConfig>(&config_str)
+        let config = serde_yaml_ng::from_str::<RegistryProxiesConfig>(&config_str)
             .with_context(|| format!("Could not parse file `{}`", config_file))?;
         self.proxy_registry_config = Some(config);
         Ok(self)
@@ -112,7 +112,7 @@ impl TrowConfig {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
             .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml::from_str::<ImageValidationConfig>(&config_str)
+        let config = serde_yaml_ng::from_str::<ImageValidationConfig>(&config_str)
             .with_context(|| format!("Could not parse file `{}`", config_file))?;
         self.image_validation_config = Some(config);
         Ok(self)

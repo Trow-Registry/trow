@@ -89,7 +89,7 @@ mod interface_tests {
             "schemaVersion": 2,
             "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
             "config": {
-                "media_type": "application/vnd.docker.container.image.v1+json",
+                "mediaType": "application/vnd.docker.container.image.v1+json",
                 "digest": "fake"
             },
             "layers": [{

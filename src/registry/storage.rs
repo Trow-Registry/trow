@@ -31,17 +31,14 @@ pub enum StorageBackendError {
     InvalidDigest,
     #[error("Unsupported Operation")]
     Unsupported,
-    #[error("Requested index does not match actual")]
+    #[error("Invalid content range")]
     InvalidContentRange,
     #[error("Internal error: {0}")]
     Internal(Cow<'static, str>),
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
-    #[error("Invalid content range")]
-    InvalidContentRange,
 }
 
-static MANIFESTS_DIR: &str = "manifests";
 static BLOBS_DIR: &str = "blobs";
 static UPLOADS_DIR: &str = "scratch";
 
@@ -81,7 +78,6 @@ impl TrowStorageBackend {
     }
 
     pub fn new(path: PathBuf) -> Result<Self, StorageBackendError> {
-        Self::init_create_path(&path, MANIFESTS_DIR)?;
         Self::init_create_path(&path, BLOBS_DIR)?;
         Self::init_create_path(&path, UPLOADS_DIR)?;
 
@@ -91,10 +87,10 @@ impl TrowStorageBackend {
     pub async fn get_manifest(
         &self,
         repo: &str,
-        digest: &str,
+        digest: &Digest,
     ) -> Result<Bytes, StorageBackendError> {
         event!(Level::DEBUG, "Get manifest {repo}:{digest}");
-        let path = self.path.join(MANIFESTS_DIR).join(digest);
+        let path = self.path.join(BLOBS_DIR).join(digest.as_str());
         if !path.exists() {
             return Err(StorageBackendError::BlobNotFound(path));
         }
@@ -185,14 +181,17 @@ impl TrowStorageBackend {
     {
         event!(Level::DEBUG, "Write blob part {upload_id} ({range:?})");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
-        let (mut tmp_file, seek_pos) = TemporaryFile::append(tmp_location).await.map_err(|e| {
-            event!(Level::ERROR, "Could not open tmp file: {}", e);
-            match e.kind() {
-                io::ErrorKind::NotFound => StorageBackendError::BlobNotFound(tmp_location),
-                io::ErrorKind::AlreadyExists => StorageBackendError::InvalidContentRange,
-                _ => StorageBackendError::Io(e),
-            }
-        })?;
+        let (mut tmp_file, seek_pos) =
+            TemporaryFile::append(tmp_location.clone())
+                .await
+                .map_err(|e| {
+                    event!(Level::ERROR, "Could not open tmp file: {}", e);
+                    match e.kind() {
+                        io::ErrorKind::NotFound => StorageBackendError::BlobNotFound(tmp_location),
+                        io::ErrorKind::AlreadyExists => StorageBackendError::InvalidContentRange,
+                        _ => StorageBackendError::Io(e),
+                    }
+                })?;
         let range_len = range.as_ref().map(|r| r.end() - r.start() + 1);
 
         if let Some(range) = &range {
@@ -236,17 +235,17 @@ impl TrowStorageBackend {
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
         let final_location = self.path.join(BLOBS_DIR).join(user_digest.to_string());
         // Should we even do this ? It breaks OCI tests:
-        // let f = std::fs::File::open(&tmp_location)?;
-        // let calculated_digest = Digest::digest_sha256(f)?;
-        // if &calculated_digest != user_digest {
-        //     event!(
-        //         Level::ERROR,
-        //         "Upload did not match given digest. Was given {} but got {}",
-        //         user_digest,
-        //         calculated_digest
-        //     );
-        //     return Err(StorageBackendError::InvalidDigest);
-        // }
+        let f = std::fs::File::open(&tmp_location)?;
+        let calculated_digest = Digest::digest_sha256(f)?;
+        if &calculated_digest != user_digest {
+            event!(
+                Level::ERROR,
+                "Upload did not match given digest. Was given {} but got {}",
+                user_digest,
+                calculated_digest
+            );
+            return Err(StorageBackendError::InvalidDigest);
+        }
         fs::create_dir_all(final_location.parent().unwrap())
             .await
             .unwrap();
@@ -271,40 +270,44 @@ impl TrowStorageBackend {
         Ok(location)
     }
 
-    pub async fn delete_blob(&self, repo: &str, digest: &str) -> Result<(), StorageBackendError> {
+    pub async fn delete_blob(
+        &self,
+        repo: &str,
+        digest: &Digest,
+    ) -> Result<(), StorageBackendError> {
         event!(Level::DEBUG, "Delete blob {repo}:{digest}");
-        let blob_path = self.path.join(BLOBS_DIR).join(digest);
+        let blob_path = self.path.join(BLOBS_DIR).join(digest.as_str());
         tokio::fs::remove_file(blob_path).await?;
         Ok(())
     }
 
-    pub async fn delete_manifest(
-        &self,
-        repo_name: &str,
-        digest: &Digest,
-    ) -> Result<(), StorageBackendError> {
-        let path = self.path.join(BLOBS_DIR).join(digest.to_string());
-        if let Err(e) = tokio::fs::remove_file(path).await {
-            event!(Level::WARN, "Could not delete manifest file: {}", e);
-        }
-        let tags: [String; 0] = [];
-        // let tags = self.list_repo_tags(repo_name).await?;
-        for t in tags {
-            let manifest_history_loc = self.path.join(MANIFESTS_DIR).join(repo_name).join(t);
-            let history_raw = tokio::fs::read(&manifest_history_loc).await?;
-            let old_history = String::from_utf8(history_raw).unwrap();
-            let new_history: String = old_history
-                .lines()
-                .filter(|l| !l.contains(&digest.to_string()))
-                .collect();
-            if new_history.is_empty() {
-                tokio::fs::remove_file(&manifest_history_loc).await?;
-            } else if new_history.len() != old_history.len() {
-                tokio::fs::write(&manifest_history_loc, new_history).await?;
-            }
-        }
-        Ok(())
-    }
+    // pub async fn delete_manifest(
+    //     &self,
+    //     repo_name: &str,
+    //     digest: &Digest,
+    // ) -> Result<(), StorageBackendError> {
+    //     let path = self.path.join(BLOBS_DIR).join(digest.to_string());
+    //     if let Err(e) = tokio::fs::remove_file(path).await {
+    //         event!(Level::WARN, "Could not delete manifest file: {}", e);
+    //     }
+    //     let tags: [String; 0] = [];
+    //     // let tags = self.list_repo_tags(repo_name).await?;
+    //     for t in tags {
+    //         let manifest_history_loc = self.path.join(BLOBS_DIR).join(repo_name).join(t);
+    //         let history_raw = tokio::fs::read(&manifest_history_loc).await?;
+    //         let old_history = String::from_utf8(history_raw).unwrap();
+    //         let new_history: String = old_history
+    //             .lines()
+    //             .filter(|l| !l.contains(&digest.to_string()))
+    //             .collect();
+    //         if new_history.is_empty() {
+    //             tokio::fs::remove_file(&manifest_history_loc).await?;
+    //         } else if new_history.len() != old_history.len() {
+    //             tokio::fs::write(&manifest_history_loc, new_history).await?;
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
     pub async fn is_ready(&self) -> Result<(), StorageBackendError> {
         let path = self.path.join("fs-ready");
@@ -349,7 +352,7 @@ mod tests {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         assert!(store.path.join("blobs").exists());
-        assert!(store.path.join("manifests").exists());
+        drop(dir);
     }
 
     #[tokio::test]

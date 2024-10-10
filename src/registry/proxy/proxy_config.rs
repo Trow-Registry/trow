@@ -6,7 +6,7 @@ use crate::registry::manifest::ManifestReference;
 use crate::registry::proxy::proxy_client::ProxyClient;
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::TrowServer;
+use crate::registry::{Digest, TrowServer};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
@@ -67,7 +67,7 @@ impl SingleRegistryProxyConfig {
         &self,
         image: &RemoteImage,
         registry: &TrowServer,
-    ) -> Result<String> {
+    ) -> Result<Digest> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
 
@@ -86,7 +86,7 @@ impl SingleRegistryProxyConfig {
         let remote_img_ref_digest = image.reference.digest();
         let (local_digest, latest_digest) = match remote_img_ref_digest {
             // The ref is a digest, no need to map tg to digest
-            Some(digest) => (Some(digest.to_string()), None),
+            Some(digest) => (Some(digest.clone()), None),
             // The ref is a tag, let's search for the digest
             None => {
                 // let local_digest = registry

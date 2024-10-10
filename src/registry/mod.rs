@@ -11,8 +11,7 @@ use std::path::PathBuf;
 pub use admission::ImageValidationConfig;
 use anyhow::Result;
 pub use blob_storage::{BlobReader, ContentInfo, UploadInfo};
-pub use catalog_operations::ManifestHistory;
-pub use digest::{Digest, DigestAlgorithm};
+pub use digest::Digest;
 pub use manifest_storage::ManifestReader;
 pub use proxy::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 pub use server::TrowServer;
@@ -21,7 +20,6 @@ use thiserror::Error;
 use tracing::{event, Level};
 
 pub mod blob_storage;
-pub mod catalog_operations;
 #[allow(dead_code)]
 pub mod digest;
 pub mod manifest_storage;

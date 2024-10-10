@@ -9,6 +9,7 @@ mod interface_tests {
     use axum::body::Body;
     use axum::Router;
     use bytes::Buf;
+    use http_body_util::BodyExt;
     use hyper::Request;
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
@@ -31,7 +32,6 @@ mod interface_tests {
             "request failed: {}",
             common::response_body_string(resp).await
         );
-        panic!();
     }
 
     async fn push_random_foreign_manifest(trow: &Router, name: &str, tag: &str) -> String {
@@ -73,7 +73,12 @@ mod interface_tests {
             )
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
+        assert_eq!(
+            resp.status(),
+            StatusCode::CREATED,
+            "Could not upload manifest: {}",
+            common::response_body_string(resp).await
+        );
 
         digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes()))
             .unwrap()

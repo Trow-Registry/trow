@@ -24,7 +24,7 @@ pub enum ManifestError {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ManifestReference {
     Tag(String),
-    Digest(String),
+    Digest(Digest),
 }
 
 impl std::fmt::Display for ManifestReference {
@@ -49,7 +49,7 @@ impl ManifestReference {
     pub fn try_from_str(reference: &str) -> Result<Self, RegistryError> {
         if reference.contains(':') {
             match Digest::try_from_raw(reference) {
-                Ok(_) => Ok(Self::Digest(reference.to_string())),
+                Ok(d) => Ok(Self::Digest(d)),
                 Err(_) => Err(RegistryError::InvalidDigest),
             }
         } else if REGEX_TAG.is_match(reference) {
@@ -66,7 +66,7 @@ impl ManifestReference {
         }
     }
 
-    pub fn digest(&self) -> Option<&str> {
+    pub fn digest(&self) -> Option<&Digest> {
         match self {
             Self::Tag(_) => None,
             Self::Digest(d) => Some(d),
@@ -189,13 +189,13 @@ mod test {
         // assert_eq!(m_v2.config().media_type(), &MediaType::ImageConfig);
         assert_eq!(m_v2.config().size(), 0);
         assert_eq!(
-            m_v2.config().digest(),
+            m_v2.config().digest().to_string(),
             "sha256:4d3c246dfef2edb11eccb051b47d896d0db8f1c4563c0cce9f6274b9abd9ac74"
         );
         // assert_eq!(m_v2.layers()[0].media_type(), &MediaType::ImageLayerGzip);
         assert_eq!(m_v2.layers()[0].size(), 2789670);
         assert_eq!(
-            m_v2.layers()[0].digest(),
+            m_v2.layers()[0].digest().to_string(),
             "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
         );
         assert_eq!(m_v2.layers().len(), 3);
@@ -239,13 +239,13 @@ mod test {
         // assert_eq!(m_v2.config().media_type(), &MediaType::ImageConfig);
         assert_eq!(m_v2.config().size(), 1278);
         assert_eq!(
-            m_v2.config().digest(),
+            m_v2.config().digest().to_string(),
             "sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
         );
         // assert_eq!(m_v2.layers()[0].media_type(), &MediaType::ImageLayerGzip);
         assert_eq!(m_v2.layers()[0].size(), 1967949);
         assert_eq!(
-            m_v2.layers()[0].digest(),
+            m_v2.layers()[0].digest().to_string(),
             "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
         );
 
