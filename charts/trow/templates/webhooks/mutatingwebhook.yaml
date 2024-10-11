@@ -15,10 +15,10 @@ webhooks:
   - name: mutate.trow.io
     admissionReviewVersions: ["v1"]
     sideEffects: None
-    {{ if .Values.webhooks.namespaceSelector }}
+    {{- if .Values.webhooks.namespaceSelector }}
     namespaceSelector:
-      {{- toYaml .Values.webhooks.namespaceSelector | toYaml | indent 6 }}
-    {{ end }}
+      {{- toYaml .Values.webhooks.namespaceSelector | nindent 6 }}
+    {{- end }}
     rules:
       - apiGroups: [""]
         apiVersions: ["v1"]

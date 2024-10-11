@@ -73,7 +73,7 @@ webhooks:
     patch:
       enabled: true
       image:
-        image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230312-helm-chart-4.5.2-28-g66a760794@sha256:01d181618f270f2a96c04006f33b2699ad3ccb02da48d0f89b22abce084b292f
+        image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.4.4@sha256:a9f03b34a3cbfbb26d103a14046ab2c5130a80c3d69d526ff8063d2b37b9fd3f
         pullPolicy: IfNotPresent
     ## Use an existing secret that contains tls.crt and tls.key
     existingSecretRef: ~

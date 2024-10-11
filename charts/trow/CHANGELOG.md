@@ -8,6 +8,7 @@
 * `Values.yaml`:
   * `.webhookPatch` renamed `.webhooks.tls.patch`
   * add in `.webhooks.tls`: `certmanager` & `existingSecretRef`
+  * add `namespaceSelector` to `.webhooks`
 
 ## v0.7.0
 
