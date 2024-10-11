@@ -1,5 +1,5 @@
-{{- include "validateWebhookTlsGenValues" . -}}
-{{- if and (or .Values.trow.validationWebhook.enabled .Values.trow.proxyRegistries.webhook.enabled) .Values.webhooks.tls.certmanager.enabled }}
+{{- if and (include "webhook.enabled" .) .Values.webhooks.tls.certmanager.enabled }}
+{{- include "webhook.validateTlsGenValues" . -}}
 # Create a selfsigned Issuer, in order to create a root CA certificate for
 # signing webhook serving certificates
 apiVersion: cert-manager.io/v1

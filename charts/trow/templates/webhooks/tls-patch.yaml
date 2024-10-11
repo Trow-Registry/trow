@@ -1,5 +1,5 @@
-{{- include "validateWebhookTlsGenValues" . -}}
-{{- if and (or .Values.trow.validationWebhook.enabled .Values.trow.proxyRegistries.webhook.enabled) .Values.webhooks.tls.patch.enabled }}
+{{- if and (include "webhook.enabled" .) .Values.webhooks.tls.patch.enabled }}
+{{- include "webhook.validateTlsGenValues" . -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -63,8 +63,8 @@ spec:
     spec:
       containers:
         - name: create
-          image: {{ .Values.webhookPatch.image.image }}
-          imagePullPolicy: {{ .Values.webhookPatch.image.pullPolicy }}
+          image: {{ .Values.webhooks.tls.patch.image.image }}
+          imagePullPolicy: {{ .Values.webhooks.tls.patch.image.pullPolicy }}
           args:
             - create
             - --host={{ include "trow.fullname" . }}-admission,{{ include "trow.fullname" . }}-admission.$(POD_NAMESPACE).svc
@@ -109,8 +109,8 @@ spec:
       containers:
       {{- if .Values.trow.validationWebhook.enabled }}
         - name: patch-validation
-          image: {{ .Values.webhookPatch.image.image }}
-          imagePullPolicy: {{ .Values.webhookPatch.image.pullPolicy }}
+          image: {{ .Values.webhooks.tls.patch.image.image }}
+          imagePullPolicy: {{ .Values.webhooks.tls.patch.image.pullPolicy }}
           args:
             - patch
             - --webhook-name={{ include "trow.fullname" . }}-validation
@@ -130,8 +130,8 @@ spec:
       {{- end }}
       {{- if .Values.trow.proxyRegistries.webhook.enabled }}
         - name: patch-mutation
-          image: {{ .Values.webhookPatch.image.image }}
-          imagePullPolicy: {{ .Values.webhookPatch.image.pullPolicy }}
+          image: {{ .Values.webhooks.tls.patch.image.image }}
+          imagePullPolicy: {{ .Values.webhooks.tls.patch.image.pullPolicy }}
           args:
             - patch
             - --webhook-name={{ include "trow.fullname" . }}-mutation

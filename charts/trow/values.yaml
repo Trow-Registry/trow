@@ -57,6 +57,7 @@ webhooks:
   replicas: 2
   ## Config to create a TLS cert for the webhooks (required if webhooks are used)
   tls:
+    ## Create the cert using certmanager
     certmanager:
       enabled: false
       rootCert:
@@ -68,11 +69,14 @@ webhooks:
       # issuerRef:
       #   name: "issuer"
       #   kind: "ClusterIssuer"
+    ## Create a self-signed cert using kube-webhook-certgen to patch the webhooks (creates ClusterRole)
     patch:
       enabled: true
       image:
         image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230312-helm-chart-4.5.2-28-g66a760794@sha256:01d181618f270f2a96c04006f33b2699ad3ccb02da48d0f89b22abce084b292f
         pullPolicy: IfNotPresent
+    ## Use an existing secret that contains tls.crt and tls.key
+    existingSecretRef: ~
 
 imagePullSecrets: []
 nameOverride: ""

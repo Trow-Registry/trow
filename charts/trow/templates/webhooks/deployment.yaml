@@ -1,4 +1,4 @@
-{{- if or .Values.trow.validationWebhook.enabled .Values.trow.proxyRegistries.webhook.enabled }}
+{{- if (include "webhook.enabled" .) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -74,7 +74,11 @@ spec:
       volumes:
         - name: webhook-cert-ecc
           secret:
+          {{- if (not (empty .Values.webhooks.tls.existingSecretRef)) }}
+            secretName: {{ .Values.webhooks.tls.existingSecretRef }}
+          {{- else }}
             secretName: {{ include "trow.fullname" . }}-admission
+          {{- end }}
         - name: webhook-cert-translated
           emptyDir: {}
       {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
