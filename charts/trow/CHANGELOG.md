@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## v0.8.0
 
 * Templates:
   * webhooks: switch from daemonset to deployment (+ PDB to ensure at least 1 pod is always running)
