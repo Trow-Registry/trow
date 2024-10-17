@@ -98,7 +98,7 @@ fn verify_user(user_pass: Vec<u8>, user_cfg: &UserConfig) -> bool {
     false
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TrowToken {
     pub user: String,
     pub token: String,

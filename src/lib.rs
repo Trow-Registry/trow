@@ -11,6 +11,7 @@ mod users;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, fs};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::Router;
@@ -130,7 +131,9 @@ impl TrowConfig {
         self
     }
 
-    pub async fn build_app(mut self) -> Result<Router> {
+
+    #[doc(hidden)]
+    pub(crate) async fn build_server_state(mut self) -> Result<Arc<TrowServerState>> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!(
             "Hostname of this registry (for the MutatingWebhook): {:?}",
@@ -189,6 +192,11 @@ impl TrowConfig {
             registry,
             db,
         };
-        Ok(routes::create_app(server_state))
+        Ok(Arc::new(server_state))
+    }
+
+    pub async fn build_app(self) -> Result<Router> {
+        let state = self.build_server_state().await?;
+        Ok(routes::create_app(state))
     }
 }

@@ -1,3 +1,7 @@
+#![cfg(test)]
+
+use std::sync::Arc;
+
 use axum::body::Body;
 use axum::Router;
 use http_body_util::BodyExt;
@@ -9,7 +13,7 @@ use serde::de::DeserializeOwned;
 use test_temp_dir::TestTempDir;
 
 use crate::migrations::Migrator;
-use crate::TrowConfig;
+use crate::{routes, TrowConfig, TrowServerState};
 
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 pub const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
@@ -19,7 +23,7 @@ pub const RANGE_HEADER: &str = "Range";
 pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
     custom_cfg: F,
     temp_dir: Option<&TestTempDir>,
-) -> (DatabaseConnection, Router) {
+) -> (DatabaseConnection, Arc<TrowServerState>, Router) {
     let mut trow_builder = crate::TrowConfig::new();
     let db = Database::connect("sqlite::memory:").await.unwrap();
     Migrator::refresh(&db).await.unwrap();
@@ -29,8 +33,9 @@ pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
     }
 
     custom_cfg(&mut trow_builder);
-    let router = trow_builder.build_app().await.unwrap();
-    (db, router)
+    let state = trow_builder.build_server_state().await.unwrap();
+    let router = routes::create_app(state.clone());
+    (db, state, router)
 }
 
 pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {

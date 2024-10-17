@@ -382,7 +382,7 @@ mod tests {
         "config": {
             "mediaType": "application/vnd.docker.container.image.v1+json",
             "size": 7027,
-            "digest": "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a"
+            "digest": "sha256:3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e5a3b4e"
         },
         "layers": []
     }"#;
