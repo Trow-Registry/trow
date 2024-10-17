@@ -118,7 +118,7 @@ fn add_router_layers<S: Send + Sync + Clone + 'static>(
     app
 }
 
-pub fn create_app(state: super::TrowServerState) -> Router {
+pub fn create_app(state: Arc<super::TrowServerState>) -> Router {
     let mut app = Router::new();
 
     app = app
@@ -135,7 +135,7 @@ pub fn create_app(state: super::TrowServerState) -> Router {
     app = admission::route(app);
 
     app = add_router_layers(app, &state.config.cors);
-    app.with_state(Arc::new(state))
+    app.with_state(state)
 }
 
 /*

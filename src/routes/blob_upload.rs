@@ -335,40 +335,27 @@ mod tests {
     use crate::registry::Digest;
     use crate::{entity, test_utilities};
 
+    use super::*;
+
     #[tokio::test]
     #[tracing_test::traced_test]
-    async fn post_new_upload() {
-        let (db, mut router) = test_utilities::trow_router(|_| {}, None).await;
-        let resp = router
-            .call(
-                Request::post(&format!("/v2/test/blobs/uploads/"))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(
-            resp.status(),
-            StatusCode::ACCEPTED,
-            "resp: {:?}",
-            resp.into_body().collect().await.unwrap().to_bytes()
-        );
-        let resp_headers = resp.headers();
-        let uuid = resp_headers
-            .get(test_utilities::UPLOAD_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
-        let uuid = Uuid::parse_str(uuid).unwrap();
+    async fn test_post_blob_upload_create_new_upload() {
+        let (db, state, _) = test_utilities::trow_router(|_| {}, None).await;
+        let resp = post_blob_upload(
+            TrowToken::default(),
+            State(state),
+            AlwaysHost("trow.io".to_owned()),
+            Query(OptionalDigestQuery::default()),
+            Path("test/blobs".to_owned()),
+            Body::empty()
+        ).await;
 
-        let range = resp_headers
-            .get(test_utilities::RANGE_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
-        assert_eq!(range, "0-0"); // Haven't uploaded anything yet
-
-        let upload = entity::blob_upload::Entity::find_by_id(uuid)
+        let upload = match resp {
+            Ok(Upload::Accepted(upload)) => upload,
+            _ => panic!("Invalid value: {resp:?}")
+        };
+        assert_eq!(upload.range(), (0, 0)); // Haven't uploaded anything yet
+        let upload = entity::blob_upload::Entity::find_by_id(*upload.uuid())
             .one(&db)
             .await
             .unwrap();
@@ -377,8 +364,8 @@ mod tests {
 
     #[tokio::test]
     #[tracing_test::traced_test]
-    async fn upload_with_put() {
-        let (_, mut router) = test_utilities::trow_router(|_| {}, None).await;
+    async fn test_put_blob_upload() {
+        let (_, _, mut router) = test_utilities::trow_router(|_| {}, None).await;
         let repo_name = "test";
         let resp = router
             .call(
@@ -429,8 +416,8 @@ mod tests {
 
     #[tokio::test]
     #[tracing_test::traced_test]
-    async fn upload_with_post() {
-        let (_, router) = test_utilities::trow_router(|_| {}, None).await;
+    async fn test_post_blob_upload_complete_upload() {
+        let (_, _, router) = test_utilities::trow_router(|_| {}, None).await;
         let repo_name = "test";
 
         let config = "{ }\n".as_bytes();
@@ -456,5 +443,41 @@ mod tests {
             .to_str()
             .unwrap();
         assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_patch_blob_upload() {
+        let (db, state, _) = test_utilities::trow_router(|_| {}, None).await;
+        entity::repo::insert_if_not_exists(&db, "germany".to_owned()).await.unwrap();
+        let upload = entity::blob_upload::ActiveModel {
+            offset: Set(7),
+            repo: Set("germany".to_owned()),
+            ..Default::default()
+        };
+        let upload = upload.insert(&db).await.unwrap();
+        state.registry.storage.write_blob_part_stream(&upload.uuid, Body::from("whazaaa").into_data_stream(), None).await.unwrap();
+
+
+        let resp = patch_blob_upload(
+            TrowToken::default(),
+            None,
+            State(state),
+            Path((upload.repo.clone(), upload.uuid.clone())),
+            AlwaysHost("trow.io".to_owned()),
+            Body::from("whaaa so much dataaa")
+        ).await;
+
+        let uploadinfo = match resp {
+            Ok(ui) => ui,
+            _ => panic!("Invalid response: {resp:?}")
+        };
+
+        assert_eq!(
+            uploadinfo.base_url(),
+            "trow.io".to_owned()
+        );
+        assert_eq!(uploadinfo.range(), (0, 7 + 20));
+        assert_eq!(uploadinfo.repo_name(), &upload.repo);
     }
 }

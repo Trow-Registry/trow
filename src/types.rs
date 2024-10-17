@@ -33,7 +33,7 @@ impl<S: AsyncRead> BoundedStream<S> {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct OptionalDigestQuery {
     pub digest: Option<Digest>,
 }
@@ -122,6 +122,10 @@ impl AcceptedUpload {
 
     pub fn base_url(&self) -> &str {
         &self.base_url
+    }
+
+    pub fn uuid(&self) -> &uuid::Uuid {
+        &self.uuid
     }
 }
 
