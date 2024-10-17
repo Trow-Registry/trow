@@ -17,9 +17,9 @@ trow:
   # password: password
 
   ## The Trow validation webhook validates which images are allowed to run on your cluster.
-  ## Note: it runs AFTER the mutatiting webhook.
+  ## Note: it runs AFTER the mutating webhook.
   validationWebhook:
-    enable: false
+    enabled: false
     failurePolicy: Ignore
     ## The validation webhook need to be configured.
     ## Note: it runs AFTER mutation webhooks.
@@ -36,7 +36,7 @@ trow:
   proxyRegistries:
     ## The Trow mutating webhook will automatically rewrite the pod image URLs to use the Trow proxy.
     webhook:
-      enable: false
+      enabled: false
       failurePolicy: Ignore
     config:
       # offline: false
@@ -50,10 +50,33 @@ trow:
   logLevel: info
 
 ## Job to configure the webhooks
-webhookPatch:
-  image:
-    image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230312-helm-chart-4.5.2-28-g66a760794@sha256:01d181618f270f2a96c04006f33b2699ad3ccb02da48d0f89b22abce084b292f
-    pullPolicy: IfNotPresent
+webhooks:
+  ## It is possible to restrict webhook access to some namespaces, ref:
+  ##   https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
+  # namespaceSelector:
+  replicas: 2
+  ## Config to create a TLS cert for the webhooks (required if webhooks are used)
+  tls:
+    ## Create the cert using certmanager
+    certmanager:
+      enabled: false
+      rootCert:
+        # default to be 5y
+        duration: ""
+      admissionCert:
+        # default to be 1y
+        duration: ""
+      # issuerRef:
+      #   name: "issuer"
+      #   kind: "ClusterIssuer"
+    ## Create a self-signed cert using kube-webhook-certgen to patch the webhooks (creates ClusterRole)
+    patch:
+      enabled: true
+      image:
+        image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.4.4@sha256:a9f03b34a3cbfbb26d103a14046ab2c5130a80c3d69d526ff8063d2b37b9fd3f
+        pullPolicy: IfNotPresent
+    ## Use an existing secret that contains tls.crt and tls.key
+    existingSecretRef: ~
 
 imagePullSecrets: []
 nameOverride: ""

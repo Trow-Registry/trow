@@ -1,5 +1,15 @@
 # Changelog
 
+## unreleased
+
+* Templates:
+  * webhooks: switch from daemonset to deployment (+ PDB to ensure at least 1 pod is always running)
+  * rename `enable` to `enabled`
+* `Values.yaml`:
+  * `.webhookPatch` renamed `.webhooks.tls.patch`
+  * add in `.webhooks.tls`: `certmanager` & `existingSecretRef`
+  * add `namespaceSelector` to `.webhooks`
+
 ## v0.7.0
 
 * Renamings in `Values.yaml`:

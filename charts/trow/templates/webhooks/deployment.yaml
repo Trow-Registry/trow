@@ -1,12 +1,13 @@
-{{- if or .Values.trow.validationWebhook.enable .Values.trow.proxyRegistries.webhook.enable }}
+{{- if (include "webhook.enabled" .) }}
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   labels:
     {{- include "webhook.labels" . | nindent 4 }}
   name: {{ include "trow.fullname" . }}-webhook
   namespace: {{ .Release.Namespace }}
 spec:
+  replicas: {{ .Values.webhooks.replicas }}
   selector:
     matchLabels:
       {{- include "webhook.selectorLabels" . | nindent 6 }}
@@ -27,8 +28,8 @@ spec:
           - sh
           - -c
           - |
-            cp /etc/trow/webhook-cert-ecc/cert /etc/trow/webhook-cert && \
-            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/key -out /etc/trow/webhook-cert/key
+            cp /etc/trow/webhook-cert-ecc/tls.crt /etc/trow/webhook-cert/cert && \
+            openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/tls.key -out /etc/trow/webhook-cert/key
         volumeMounts:
         - name: webhook-cert-translated
           mountPath: /etc/trow/webhook-cert
@@ -74,7 +75,13 @@ spec:
       volumes:
         - name: webhook-cert-ecc
           secret:
-            secretName: {{ include "trow.fullname" . }}-admission
+          {{- if (not (empty .Values.webhooks.tls.existingSecretRef)) }}
+            secretName: {{ .Values.webhooks.tls.existingSecretRef }}
+          {{- else if .Values.webhooks.tls.certmanager.enabled }}
+            secretName: {{ include "trow.fullname" . }}-cm-admission
+          {{- else if .Values.webhooks.tls.patch.enabled }}
+            secretName: {{ include "trow.fullname" . }}-patch-admission
+          {{- end }}
         - name: webhook-cert-translated
           emptyDir: {}
       {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
@@ -104,3 +111,14 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 {{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "trow.fullname" . }}-webhook-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "webhook.selectorLabels" . | nindent 6 }}

@@ -79,4 +79,26 @@ Webhook selector labels
 */}}
 {{- define "webhook.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "trow.name" . }}-webhook
+app.kubernetes.io/component: webhooks
+{{- end -}}
+
+{{- define "webhook.enabled" -}}
+{{- $trowWebhooksEnabled := or (default false .Values.trow.validationWebhook.enabled) (default false .Values.trow.proxyRegistries.webhook.enabled) -}}
+{{ ternary "true" "" $trowWebhooksEnabled }}
+{{- end }}
+
+{{/*
+Webhook certificate generation is done either via patch or certmanager
+*/}}
+{{- define "webhook.validateTlsGenValues" -}}
+
+{{- $count := 0 -}}
+{{- if .Values.webhooks.tls.existingSecretRef -}}{{- $count = add $count 1 -}}{{- end -}}
+{{- if .Values.webhooks.tls.certmanager.enabled -}}{{- $count = add $count 1 -}}{{- end -}}
+{{- if .Values.webhooks.tls.patch.enabled -}}{{- $count = add $count 1 -}}{{- end -}}
+
+{{- if ne $count 1 -}}
+{{- fail "Strictly one of existingCertSecret, certmanager.enabled, or patch.enabled must be set" -}}
+{{- end -}}
+
 {{- end -}}
