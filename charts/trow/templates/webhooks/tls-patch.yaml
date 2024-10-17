@@ -69,7 +69,7 @@ spec:
             - create
             - --host={{ include "trow.fullname" . }}-admission,{{ include "trow.fullname" . }}-admission.$(POD_NAMESPACE).svc
             - --namespace=$(POD_NAMESPACE)
-            - --secret-name={{ include "trow.fullname" . }}-admission
+            - --secret-name={{ include "trow.fullname" . }}-patch-admission
             - --cert-name=tls.crt
             - --key-name=tls.key
           env:
@@ -118,7 +118,7 @@ spec:
             - --webhook-name={{ include "trow.fullname" . }}-validation
             - --namespace=$(POD_NAMESPACE)
             - --patch-mutating=false
-            - --secret-name={{ include "trow.fullname" . }}-admission
+            - --secret-name={{ include "trow.fullname" . }}-patch-admission
             - --patch-failure-policy={{ .Values.trow.validationWebhook.failurePolicy }}
           env:
             - name: POD_NAMESPACE
@@ -137,7 +137,7 @@ spec:
             - --webhook-name={{ include "trow.fullname" . }}-mutation
             - --namespace=$(POD_NAMESPACE)
             - --patch-validating=false
-            - --secret-name={{ include "trow.fullname" . }}-admission
+            - --secret-name={{ include "trow.fullname" . }}-patch-admission
             - --patch-failure-policy={{ .Values.trow.proxyRegistries.webhook.failurePolicy }}
           env:
             - name: POD_NAMESPACE

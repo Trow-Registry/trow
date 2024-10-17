@@ -5,7 +5,7 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ include "trow.fullname" . }}-self-signed-issuer
+  name: {{ include "trow.fullname" . }}-cm-admission-self-signed-issuer
   namespace: {{ .Release.Namespace }}
 spec:
   selfSigned: {}
@@ -14,13 +14,13 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "trow.fullname" . }}-root-cert
+  name: {{ include "trow.fullname" . }}-cm-admission-root-cert
   namespace: {{ .Release.Namespace }}
 spec:
-  secretName: {{ include "trow.fullname" . }}-root-cert
+  secretName: {{ include "trow.fullname" . }}-cm-admission-root-cert
   duration: {{ .Values.webhooks.tls.certmanager.rootCert.duration | default "43800h0m0s" | quote }}
   issuerRef:
-    name: {{ include "trow.fullname" . }}-self-signed-issuer
+    name: {{ include "trow.fullname" . }}-cm-admission-self-signed-issuer
   commonName: "ca.webhook.trow"
   isCA: true
   subject:
@@ -31,26 +31,26 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ include "trow.fullname" . }}-root-issuer
+  name: {{ include "trow.fullname" . }}-cm-admission-root-issuer
   namespace: {{ .Release.Namespace }}
 spec:
   ca:
-    secretName: {{ include "trow.fullname" . }}-root-cert
+    secretName: {{ include "trow.fullname" . }}-cm-admission-root-cert
 ---
 # generate a server certificate for the apiservices to use
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "trow.fullname" . }}-webhooks
+  name: {{ include "trow.fullname" . }}-admission
   namespace: {{ .Release.Namespace }}
 spec:
-  secretName: {{ include "trow.fullname" . }}-admission
+  secretName: {{ include "trow.fullname" . }}-cm-admission
   duration: {{ .Values.webhooks.tls.certmanager.admissionCert.duration | default "8760h0m0s" | quote }}
   issuerRef:
     {{- if .Values.webhooks.tls.certmanager.issuerRef }}
     {{- toYaml .Values.webhooks.tls.certmanager.issuerRef | nindent 4 }}
     {{- else }}
-    name: {{ include "trow.fullname" . }}-root-issuer
+    name: {{ include "trow.fullname" . }}-cm-admission-root-issuer
     {{- end }}
   dnsNames:
     - {{ include "trow.fullname" . }}-admission
