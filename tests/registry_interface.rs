@@ -390,37 +390,9 @@ mod interface_tests {
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    async fn get_health(cl: &Router) {
-        let resp = cl
-            .clone()
-            .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-
-        assert_eq!(resp.status(), StatusCode::OK);
-
-        let hr: HealthStatus = common::response_body_json(resp).await;
-
-        assert!(hr.is_healthy);
-    }
-
-    async fn get_readiness(cl: &Router) {
-        let resp = cl
-            .clone()
-            .oneshot(Request::get("/readiness").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-
-        assert_eq!(resp.status(), StatusCode::OK);
-
-        let rr: ReadyStatus = common::response_body_json(resp).await;
-
-        assert!(rr.is_ready);
-    }
-
     #[tokio::test]
     #[tracing_test::traced_test]
-    async fn test_runner() {
+    async fn test_e2e() {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
@@ -432,17 +404,17 @@ mod interface_tests {
         get_non_existent_blob(&trow).await;
 
         println!("Running upload_layer(fifth/fourth/repo/image/test:tag)");
-        common::upload_layer(&trow, "fifth/fourth/repo/image/test", "tag").await;
+        common::upload_fake_image(&trow, "fifth/fourth/repo/image/test", "tag").await;
         println!("Running upload_layer(fourth/repo/image/test:tag)");
-        common::upload_layer(&trow, "fourth/repo/image/test", "tag").await;
+        common::upload_fake_image(&trow, "fourth/repo/image/test", "tag").await;
         println!("Running upload_layer(repo/image/test:tag)");
-        common::upload_layer(&trow, "repo/image/test", "tag").await;
+        common::upload_fake_image(&trow, "repo/image/test", "tag").await;
         println!("Running upload_layer(image/test:latest)");
-        common::upload_layer(&trow, "image/test", "latest").await;
+        common::upload_fake_image(&trow, "image/test", "latest").await;
         println!("Running upload_layer(onename:tag)");
-        common::upload_layer(&trow, "onename", "tag").await;
+        common::upload_fake_image(&trow, "onename", "tag").await;
         println!("Running upload_layer(onename:latest)");
-        common::upload_layer(&trow, "onename", "latest").await;
+        common::upload_fake_image(&trow, "onename", "latest").await;
         println!("Running upload_with_put()");
         upload_with_put(&trow, "puttest").await;
         println!("Running upload_with_post");
@@ -496,8 +468,8 @@ mod interface_tests {
         println!("Running check_tag_list 1");
         check_tag_list(&trow, &tl).await;
 
-        common::upload_layer(&trow, "onename", "three").await;
-        common::upload_layer(&trow, "onename", "four").await;
+        common::upload_fake_image(&trow, "onename", "three").await;
+        common::upload_fake_image(&trow, "onename", "four").await;
 
         // list, in order should be [four, latest, tag, three]
         let mut tl2 = TagList::new("onename".to_string());
@@ -519,11 +491,156 @@ mod interface_tests {
         tl4.insert("three".to_string());
         println!("Running check_tag_list_n_last 4");
         check_tag_list_n_last(&trow, 2, "latest", &tl4).await;
+    }
 
-        println!("Running get_readiness");
-        get_readiness(&trow).await;
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_get_readiness() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+        let trow = start_trow(data_dir).await;
 
-        println!("Running get_health");
-        get_health(&trow).await;
+        let resp = trow
+            .clone()
+            .oneshot(Request::get("/readiness").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let rr: ReadyStatus = common::response_body_json(resp).await;
+
+        assert!(rr.is_ready);
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_get_health() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+        let trow = start_trow(data_dir).await;
+
+        let resp = trow
+            .clone()
+            .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let hr: HealthStatus = common::response_body_json(resp).await;
+
+        assert!(hr.is_healthy);
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_head_manifest_tag() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+        let trow = start_trow(data_dir).await;
+
+        common::upload_fake_image(&trow, "headtest", "headtest1").await;
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::head("/v2/headtest/manifests/headtest1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let digest1 = resp
+            .headers()
+            .get("Docker-Content-Digest")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        common::upload_fake_image(&trow, "headtest", "headtest2").await;
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::head("/v2/headtest/manifests/headtest1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let digest1_bis = resp
+            .headers()
+            .get("Docker-Content-Digest")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(digest1, digest1_bis);
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_patch_with_first_chunk_should_return_202() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+        let trow = start_trow(data_dir).await;
+
+        let test_blob_chunk = "chunk1".as_bytes();
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::post("/v2/patchtest/blobs/uploads/")
+                    .header("Content-Length", "0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let loc = resp.headers().get("Location").unwrap().to_str().unwrap();
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::patch(loc)
+                    .header("Content-Type", "application/octet-stream")
+                    .header("Content-Length", "6")
+                    .header("Content-Range", "0-5")
+                    .body(Body::from(test_blob_chunk))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+        assert_eq!(
+            resp.headers().get("Range").unwrap().to_str().unwrap(),
+            "0-5"
+        );
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_get_blob_upload() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+        let trow = start_trow(data_dir).await;
+
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::post("/v2/patchtest/blobs/uploads/")
+                    .header("Content-Length", "0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let loc = resp.headers().get("Location").unwrap().to_str().unwrap();
+
+        let resp = trow
+            .clone()
+            .oneshot(Request::get(loc).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            resp.headers().get("Range").unwrap().to_str().unwrap(),
+            "0-5"
+        );
     }
 }
