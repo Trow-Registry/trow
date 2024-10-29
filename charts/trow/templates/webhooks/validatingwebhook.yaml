@@ -8,8 +8,8 @@ metadata:
     app.kubernetes.io/component: admission-webhook
   annotations:
   {{- if .Values.webhooks.tls.certmanager.enabled }}
-    certmanager.k8s.io/inject-ca-from: {{ printf "%s/%s-webhooks" (.Release.Namespace) (include "trow.fullname" .) | quote }}
-    cert-manager.io/inject-ca-from: {{ printf "%s/%s-webhooks" (.Release.Namespace) (include "trow.fullname" .) | quote }}
+    certmanager.k8s.io/inject-ca-from: {{ printf "%s/%s-admission" (.Release.Namespace) (include "trow.fullname" .) | quote }}
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s-admission" (.Release.Namespace) (include "trow.fullname" .) | quote }}
   {{- end }}
 webhooks:
   - name: validate.trow.io

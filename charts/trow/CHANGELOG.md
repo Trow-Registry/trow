@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.8.1
+
+Fix `certmanager.k8s.io/inject-ca-from` annotation not correctly referencing the `Certificate`.
+
 ## v0.8.0
 
 * Templates:

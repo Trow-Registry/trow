@@ -5,5 +5,5 @@ type: application
 home: https://trow.io
 kubeVersion: ">= 1.26.0-0"
 
-version: 0.8.0
+version: 0.8.1
 appVersion: 0.6.4
