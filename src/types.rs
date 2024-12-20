@@ -35,7 +35,7 @@ impl<S: AsyncRead> BoundedStream<S> {
 }
 
 #[derive(Clone, Debug, Display, Serialize)]
-#[display(fmt = "{}", _0)]
+#[display("{}", _0)]
 pub struct Uuid(pub String);
 
 #[derive(Deserialize, Debug)]

@@ -10,13 +10,9 @@ sqlite = []
 [dependencies]
 futures = "0.3"
 axum = { version = "0.7.2", features = ["tracing"] }
-# Waiting for an axum-server release: https://github.com/programatik29/axum-server/issues/101
-axum-server = { git = "https://github.com/programatik29/axum-server.git", rev = "134725e", features = [
-    "tls-rustls",
-] }
-# axum-server = { version = "0.5", features = ["tls-rustls"] }
+axum-server = { version = "0.7.1", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.0", features = ["typed-header"] }
-tower = "0.4"
+tower = "0.5"
 tower-http = { version = "0.5", features = ["cors", "normalize-path", "trace"] }
 jsonwebtoken = "9.2"
 rust-argon2 = "2.0"
@@ -25,9 +21,9 @@ serde_json = "1.0"
 serde_derive = "1.0"
 serde_yaml = "0.9.0"
 uuid = { version = "1.3", features = ["v4", "serde"] }
-base64 = "0.22.0"
+base64 = "0.22.1"
 anyhow = "1.0"
-derive_more = "0.99"
+derive_more = {version="1.0", features = ["display"] }
 clap = { version = "4.1.0", features = ["derive"] }
 bytes = "1"
 chrono = { version = "^0.4", features = ["serde"] }
@@ -36,13 +32,14 @@ lazy_static = "1.4.0"
 regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
-thiserror = "1.0"
-kube = { version = "0.91.0", features = ["admission"] }
-k8s-openapi = { version = "0.22.0", features = ["v1_26"] }
-json-patch = "1"
+thiserror = "2.0"
+kube = { version = "0.97.0", features = ["admission"] }
+k8s-openapi = { version = "0.23.0", features = ["v1_28"] }
+json-patch = "3"
+jsonptr = "*"
 tokio = { version = "1", features = ["macros"] }
 tokio-util = { version = "0.7.8", features = ["codec", "compat"] }
-hyper = "1.0"
+hyper = "1.5"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing = "0.1.37"
 paste = "1.0.14"
@@ -73,4 +70,4 @@ wiremock = "0.6.0"
 fastrand = "2.0.1"
 http-body-util = "0.1.1"
 tracing-test = {version="0.2", features = ["no-env-filter"]}
-test-temp-dir = "0.2.1"
+test-temp-dir = "0.3.0"

@@ -126,11 +126,11 @@ mod admission_mutation_tests {
 
             let expected_raw_patch = json_patch::Patch(vec![
                 PatchOperation::Replace(json_patch::ReplaceOperation {
-                    path: "/spec/containers/0/image".to_string(),
+                    path: jsonptr::PointerBuf::parse("/spec/containers/0/image").unwrap(),
                     value: serde_json::Value::String(new_img.to_string()),
                 }),
                 PatchOperation::Replace(json_patch::ReplaceOperation {
-                    path: "/spec/initContainers/0/image".to_string(),
+                    path: jsonptr::PointerBuf::parse("/spec/initContainers/0/image").unwrap(),
                     value: serde_json::Value::String(new_img.to_string()),
                 }),
             ]);
