@@ -54,7 +54,7 @@ fn check_image_is_allowed(
     (is_allowed, match_reason)
 }
 
-fn extract_images(pod: &Pod) -> (Vec<String>, Vec<String>) {
+fn extract_images(pod: &Pod) -> (Vec<String>, Vec<jsonptr::PointerBuf>) {
     let mut images = vec![];
     let mut paths = vec![];
 
@@ -62,14 +62,16 @@ fn extract_images(pod: &Pod) -> (Vec<String>, Vec<String>) {
     for (i, container) in spec.containers.iter().enumerate() {
         if let Some(image) = &container.image {
             images.push(image.clone());
-            paths.push(format!("/spec/containers/{i}/image"));
+            paths.push(jsonptr::PointerBuf::parse(&format!("/spec/containers/{i}/image")).unwrap());
         }
     }
 
     for (i, container) in spec.init_containers.unwrap_or_default().iter().enumerate() {
         if let Some(image) = &container.image {
             images.push(image.clone());
-            paths.push(format!("/spec/initContainers/{i}/image"));
+            paths.push(
+                jsonptr::PointerBuf::parse(&format!("/spec/initContainers/{i}/image")).unwrap(),
+            );
         }
     }
 
