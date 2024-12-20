@@ -69,7 +69,9 @@ fn extract_images(pod: &Pod) -> (Vec<String>, Vec<jsonptr::PointerBuf>) {
     for (i, container) in spec.init_containers.unwrap_or_default().iter().enumerate() {
         if let Some(image) = &container.image {
             images.push(image.clone());
-            paths.push(jsonptr::PointerBuf::parse(&format!("/spec/initContainers/{i}/image")).unwrap());
+            paths.push(
+                jsonptr::PointerBuf::parse(&format!("/spec/initContainers/{i}/image")).unwrap(),
+            );
         }
     }
 

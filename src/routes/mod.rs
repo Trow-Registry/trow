@@ -103,19 +103,20 @@ pub fn create_app(state: super::TrowServerState) -> Router {
                         humansize::BINARY.space_after_value(false),
                     );
                     tracing::info!(
-                        status=body.status().as_str(),
-                        duration_ms=duration.as_millis(),
-                        size=size_str,
+                        status = body.status().as_str(),
+                        duration_ms = duration.as_millis(),
+                        size = size_str,
                         "response sent"
                     );
                 },
             )
-            .on_eos(|_trailers: Option<&hyper::HeaderMap>, stream_duration: Duration, _span: &tracing::Span| {
-                tracing::info!(
-                    duration_ms=stream_duration.as_millis(),
-                    "end of stream"
-                );
-            }),
+            .on_eos(
+                |_trailers: Option<&hyper::HeaderMap>,
+                 stream_duration: Duration,
+                 _span: &tracing::Span| {
+                    tracing::info!(duration_ms = stream_duration.as_millis(), "end of stream");
+                },
+            ),
     );
 
     if let Some(domains) = &state.config.cors {
