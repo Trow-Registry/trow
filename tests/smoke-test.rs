@@ -21,7 +21,6 @@ mod interface_tests {
         pid: Child,
     }
     /// Call out to cargo to start trow.
-    /// Seriously considering moving to docker run.
     async fn start_trow(temp_dir: &Path) -> TrowInstance {
         let mut child = Command::new("cargo")
             .arg("run")
@@ -35,17 +34,21 @@ mod interface_tests {
             .spawn()
             .expect("failed to start");
 
-        let mut timeout = 100;
+        let mut timeout = 50;
         let client = reqwest::Client::new();
         let mut response = client.get(TROW_ADDRESS).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(500));
             response = client.get(TROW_ADDRESS).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
             child.kill().unwrap();
-            panic!("Failed to start Trow");
+            panic!(
+                "Failed to start Trow:\n{:?}\n---\n{:?}",
+                child.stdout.unwrap(),
+                child.stderr.unwrap()
+            );
         }
         TrowInstance { pid: child }
     }
@@ -59,9 +62,9 @@ mod interface_tests {
     }
 
     /**
-     * Run a simple docker push/pull against the registry.
+     * Run a simple podman push/pull against the registry.
      *
-     * This assumes Docker is installed and has a cert for the registry.
+     * This assumes podman is installed and has a cert for the registry.
      * For that reason, it's set to ignored by default and has to be manually enabled.
      *
      */
@@ -75,40 +78,40 @@ mod interface_tests {
         //It might be possible to improve things with a thread_local
         let _trow = start_trow(temp_dir.as_path_untracked()).await;
 
-        println!("Running docker pull alpine:latest");
-        let mut status = Command::new("docker")
-            .args(["pull", "alpine:latest"])
+        println!("Running podman pull alpine:latest");
+        let mut status = Command::new("podman")
+            .args(["pull", "docker.io/library/alpine:latest"])
             .status()
-            .expect("Failed to call docker pull - prereq for smoke test");
+            .expect("Failed to call podman pull - prereq for smoke test");
         assert!(status.success());
 
-        println!("Running docker tag alpine:latest {HOST}/alpine:trow");
+        println!("Running podman tag alpine:latest {HOST}/alpine:trow");
         let image_name = format!("{HOST}/alpine:trow");
-        status = Command::new("docker")
-            .args(["tag", "alpine:latest", &image_name])
+        status = Command::new("podman")
+            .args(["tag", "docker.io/library/alpine:latest", &image_name])
             .status()
-            .expect("Failed to call docker");
+            .expect("Failed to call podman");
         assert!(status.success());
 
-        println!("Running docker push {HOST}/alpine:trow");
-        status = Command::new("docker")
-            .args(["push", &image_name])
+        println!("Running podman push {HOST}/alpine:trow");
+        status = Command::new("podman")
+            .args(["push", &image_name, "--tls-verify=false"])
             .status()
-            .expect("Failed to call docker");
+            .expect("Failed to call podman");
         assert!(status.success());
 
-        println!("Running docker rmi {HOST}/alpine:trow");
-        status = Command::new("docker")
+        println!("Running podman rmi {HOST}/alpine:trow");
+        status = Command::new("podman")
             .args(["rmi", &image_name])
             .status()
-            .expect("Failed to call docker");
+            .expect("Failed to call podman");
         assert!(status.success());
 
-        println!("Running docker pull {HOST}/alpine:trow");
-        status = Command::new("docker")
-            .args(["pull", &image_name])
+        println!("Running podman pull {HOST}/alpine:trow");
+        status = Command::new("podman")
+            .args(["pull", &image_name, "--tls-verify=false"])
             .status()
-            .expect("Failed to call docker");
+            .expect("Failed to call podman");
 
         assert!(status.success());
     }
