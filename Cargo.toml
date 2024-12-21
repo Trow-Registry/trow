@@ -14,7 +14,7 @@ axum = { version = "0.7.2", features = ["tracing"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.0", features = ["typed-header"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.5", features = [
+tower-http = { version = "0.6", features = [
     "cors",
     "normalize-path",
     "trace",
@@ -85,5 +85,5 @@ fastrand = "2.0.1"
 http-body-util = "0.1.1"
 tracing-test = {version="0.2", features = ["no-env-filter"]}
 test-temp-dir = "0.3.0"
-rstest = "0.22.0"
+rstest = "0.23.0"
 async-std = { version = "1.5", features = ["attributes"] }       # needed by rstest
