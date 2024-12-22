@@ -1,5 +1,6 @@
 mod admission;
 mod blob;
+mod blob_upload;
 mod catalog;
 pub mod extracts;
 mod health;
@@ -51,14 +52,15 @@ pub fn create_app(state: super::TrowServerState) -> Router {
     route_7_levels!(
         app,
         "/v2" "/blobs/uploads/",
-        post(blob::post_blob_upload, blob::post_blob_upload_2level, blob::post_blob_upload_3level, blob::post_blob_upload_4level, blob::post_blob_upload_5level, blob::post_blob_upload_6level, blob::post_blob_upload_7level)
+        post(blob_upload::post_blob_upload, blob_upload::post_blob_upload_2level, blob_upload::post_blob_upload_3level, blob_upload::post_blob_upload_4level, blob_upload::post_blob_upload_5level, blob_upload::post_blob_upload_6level, blob_upload::post_blob_upload_7level)
     );
     #[rustfmt::skip]
     route_7_levels!(
         app,
         "/v2" "/blobs/uploads/:uuid",
-        put(blob::put_blob, blob::put_blob_2level, blob::put_blob_3level, blob::put_blob_4level, blob::put_blob_5level, blob::put_blob_6level, blob::put_blob_7level),
-        patch(blob::patch_blob, blob::patch_blob_2level, blob::patch_blob_3level, blob::patch_blob_4level, blob::patch_blob_5level, blob::patch_blob_6level, blob::patch_blob_7level)
+        put(blob_upload::put_blob_upload, blob_upload::put_blob_upload_2level, blob_upload::put_blob_upload_3level, blob_upload::put_blob_upload_4level, blob_upload::put_blob_upload_5level, blob_upload::put_blob_upload_6level, blob_upload::put_blob_upload_7level),
+        patch(blob_upload::patch_blob_upload, blob_upload::patch_blob_upload_2level, blob_upload::patch_blob_upload_3level, blob_upload::patch_blob_upload_4level, blob_upload::patch_blob_upload_5level, blob_upload::patch_blob_upload_6level, blob_upload::patch_blob_upload_7level),
+        get(blob_upload::get_blob_upload, blob_upload::get_blob_upload_2level, blob_upload::get_blob_upload_3level, blob_upload::get_blob_upload_4level, blob_upload::get_blob_upload_5level, blob_upload::get_blob_upload_6level, blob_upload::get_blob_upload_7level)
     );
 
     // catalog
