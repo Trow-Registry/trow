@@ -5,7 +5,6 @@ use axum::extract::{Path, Query, State};
 use axum::routing::get;
 use axum::Router;
 use oci_spec::distribution::{RepositoryList, RepositoryListBuilder, TagList, TagListBuilder};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
@@ -13,7 +12,7 @@ use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::OciJson;
-use crate::{entity, TrowServerState};
+use crate::TrowServerState;
 
 #[derive(Debug, Deserialize)]
 pub struct CatalogListQuery {
@@ -26,12 +25,26 @@ async fn get_catalog(
     State(state): State<Arc<TrowServerState>>,
     Query(query): Query<CatalogListQuery>,
 ) -> Result<OciJson<RepositoryList>, Error> {
-    let mut select = entity::repo::Entity::find().order_by_asc(entity::repo::Column::Name);
-    if let Some(last) = query.last {
-        select = select.filter(entity::repo::Column::Name.gt(last));
-    }
-    let repos = select.limit(query.n).all(&state.db).await?;
-    let raw_repos = repos.into_iter().map(|r| r.name).collect::<Vec<_>>();
+    let mut conn = state.db.acquire().await?;
+    let last_name = match &query.last {
+        Some(l) => l,
+        None => "",
+    };
+    let limit = query.n.unwrap_or(i64::MAX as u64) as i64;
+    let repos = sqlx::query!(
+        r#"
+        SELECT DISTINCT rba.repo_name
+        FROM repo_blob_association rba
+        WHERE rba.repo_name > $1
+        ORDER BY rba.repo_name ASC
+        LIMIT $2
+        "#,
+        last_name,
+        limit
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let raw_repos = repos.into_iter().map(|r| r.repo_name).collect::<Vec<_>>();
 
     Ok(OciJson::new(
         &RepositoryListBuilder::default()
@@ -47,15 +60,27 @@ async fn list_tags(
     Path(repo_name): Path<String>,
     Query(query): Query<CatalogListQuery>,
 ) -> Result<OciJson<TagList>, Error> {
-    let mut select = entity::tag::Entity::find()
-        .column(entity::tag::Column::Tag)
-        .filter(entity::tag::Column::Repo.eq(&repo_name))
-        .order_by_asc(entity::tag::Column::Tag);
-    if let Some(last) = query.last {
-        select = select.filter(entity::tag::Column::Tag.gt(last));
-    }
-    select = select.limit(query.n);
-    let tags = select.all(&state.db).await?;
+    let mut conn = state.db.acquire().await?;
+    let last_tag = match &query.last {
+        Some(l) => l,
+        None => "",
+    };
+    let limit = query.n.unwrap_or(i64::MAX as u64) as i64;
+    let tags = sqlx::query!(
+        r#"
+        SELECT t.tag
+        FROM tag t
+        WHERE t.repo = $1
+            AND t.tag > $2
+        ORDER BY t.tag ASC
+        LIMIT $3
+        "#,
+        repo_name,
+        last_tag,
+        limit
+    )
+    .fetch_all(&mut *conn)
+    .await?;
     let raw_tags = tags.into_iter().map(|t| t.tag).collect::<Vec<_>>();
 
     Ok(OciJson::new(

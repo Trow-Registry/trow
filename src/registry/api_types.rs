@@ -146,8 +146,8 @@ pub enum Status {
     Unavailable(String),
 }
 
-impl From<sea_orm::DbErr> for Status {
-    fn from(err: sea_orm::DbErr) -> Self {
+impl From<sqlx::Error> for Status {
+    fn from(err: sqlx::Error) -> Self {
         event!(Level::ERROR, "Database error: {err:?}");
         Self::Internal(String::new())
     }

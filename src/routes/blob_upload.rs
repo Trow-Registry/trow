@@ -8,10 +8,6 @@ use axum::routing::{post, put};
 use axum::Router;
 use digest::Digest;
 use hyper::StatusCode;
-use sea_orm::{
-    ActiveModelTrait, DatabaseTransaction, EntityTrait, IntoActiveModel, ModelTrait, Set,
-    TransactionTrait,
-};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
@@ -21,54 +17,80 @@ use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
-use crate::{entity, TrowServerState};
+use crate::TrowServerState;
 
 mod utils {
     use std::ops::RangeInclusive;
 
+    use sqlx::{Sqlite, Transaction};
+    use uuid::Uuid;
+
     use super::*;
 
     pub async fn complete_upload(
-        txn: &DatabaseTransaction,
+        txn: &mut Transaction<'static, Sqlite>,
         host: &str,
         registry: &TrowServer,
-        upload: entity::blob_upload::Model,
+        upload_id: &str,
         digest: &Digest,
         data: Body,
         range: Option<RangeInclusive<u64>>,
     ) -> Result<AcceptedUpload, Error> {
-        let repo = upload.repo.clone();
-        let uuid = upload.uuid;
+        let upload = sqlx::query!(
+            r#"
+            SELECT * FROM blob_upload
+            WHERE uuid=$1
+            "#,
+            upload_id,
+        )
+        .fetch_one(&mut **txn)
+        .await?;
+        let upload_id_bin = Uuid::parse_str(upload_id).unwrap();
+
         let size = registry
             .storage
-            .write_blob_part_stream(&uuid, data.into_data_stream(), range)
+            .write_blob_part_stream(&upload_id_bin, data.into_data_stream(), range)
             .await?;
-        let mut active_upload = upload.clone().into_active_model();
-        active_upload.offset = Set(size.total_stored as i32);
-        active_upload.update(txn).await?;
-        registry.storage.complete_blob_write(&uuid, digest).await?;
 
-        upload.delete(txn).await?;
-        entity::blob::ActiveModel {
-            digest: Set(digest.clone()),
-            size: Set(size.total_stored as i32),
-            is_manifest: Set(false),
-            ..Default::default()
-        }
-        .insert(txn)
+        sqlx::query!(
+            r#"
+            DELETE FROM blob_upload
+            WHERE uuid=$1
+            "#,
+            upload.uuid
+        )
+        .execute(&mut **txn)
         .await?;
-        entity::repo_blob_association::ActiveModel {
-            repo_name: Set(repo.clone()),
-            blob_digest: Set(digest.clone()),
-        }
-        .insert(txn)
+
+        let digest_str = digest.as_str();
+        let size_i64 = size.total_stored as i64;
+        sqlx::query!(
+            r#"
+            INSERT INTO blob (digest, size, is_manifest)
+            VALUES ($1, $2, false)
+            "#,
+            digest_str,
+            size_i64
+        )
+        .execute(&mut **txn)
+        .await?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO repo_blob_association
+            VALUES ($1, $2)
+            "#,
+            upload.repo,
+            digest_str,
+        )
+        .execute(&mut **txn)
         .await?;
 
         Ok(AcceptedUpload::new(
             host.to_string(),
             digest.clone(),
-            repo,
-            uuid,
+            upload.repo,
+            upload_id_bin,
             (0, (size.total_stored as u32).saturating_sub(1)), // Note first byte is 0
         ))
     }
@@ -92,21 +114,24 @@ async fn put_blob_upload(
     Query(digest): Query<DigestQuery>,
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
-    let txn = state.db.begin().await?;
-    let upload = match entity::blob_upload::Entity::find_by_id(uuid)
-        .one(&txn)
-        .await?
-    {
-        Some(u) => u,
-        None => return Err(Error::NotFound),
-    };
+    let mut txn = state.db.begin().await?;
+    let uuid_str = uuid.to_string();
+    let upload = sqlx::query!(
+        r#"
+        SELECT * FROM blob_upload
+        WHERE uuid=$1
+        "#,
+        uuid_str,
+    )
+    .fetch_one(&mut *txn)
+    .await?;
     assert_eq!(upload.repo, repo);
 
     let accepted_upload = utils::complete_upload(
-        &txn,
+        &mut txn,
         &host,
         &state.registry,
-        upload,
+        &uuid_str,
         &digest.digest,
         chunk,
         None,
@@ -154,12 +179,17 @@ async fn patch_blob_upload(
     AlwaysHost(host): AlwaysHost,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
-    let txn = state.db.begin().await?;
-    let mut upload = entity::blob_upload::Entity::find_by_id(uuid)
-        .one(&txn)
-        .await?
-        .ok_or(Error::NotFound)?
-        .into_active_model();
+    let mut txn = state.db.begin().await?;
+    let uuid_str = uuid.to_string();
+    sqlx::query!(
+        r#"
+        SELECT * FROM blob_upload
+        WHERE uuid=$1
+        "#,
+        uuid_str,
+    )
+    .fetch_one(&mut *txn)
+    .await?;
 
     let size = state
         .registry
@@ -170,15 +200,24 @@ async fn patch_blob_upload(
             content_info.map(|d| d.range.0..=d.range.1),
         )
         .await?;
+    let total_stored = size.total_stored as u32;
 
-    upload.offset = Set(size.total_stored as i32);
-    txn.commit().await?;
+    sqlx::query!(
+        r#"
+        UPDATE blob_upload
+        SET offset=$1
+        WHERE uuid=$1
+        "#,
+        total_stored,
+    )
+    .execute(&mut *txn)
+    .await?;
 
     Ok(UploadInfo::new(
         host,
-        uuid,
+        uuid_str,
         repo,
-        (0, (size.total_stored as u32).saturating_sub(1)), // Note first byte is 0
+        (0, (total_stored).saturating_sub(1)), // Note first byte is 0
     ))
 }
 
@@ -196,7 +235,7 @@ endpoint_fn_7_levels!(
 /*
 POST /v2/<name>/blobs/uploads/?digest=<digest>
 
-Starting point for an uploading a new image or new version of an image.
+Starting point for uploading a new image or new version of an image.
 
 We respond with details of location and UUID to upload to with patch/put.
 
@@ -211,22 +250,29 @@ async fn post_blob_upload(
     Path(repo_name): Path<String>,
     data: Body,
 ) -> Result<Upload, Error> {
-    let txn = state.db.begin().await?;
-    entity::repo::insert_if_not_exists(&txn, repo_name.clone()).await?;
-    let upload = entity::blob_upload::ActiveModel {
-        repo: Set(repo_name.clone()),
-        offset: Set(0),
-        ..Default::default()
-    };
-    let upload = upload.insert(&txn).await?;
+    let mut txn = state.db.begin().await?;
+
+    // Create new blob upload
+    let upload_uuid = uuid::Uuid::new_v4().to_string();
+    sqlx::query!(
+        r#"
+        INSERT INTO blob_upload (uuid, repo, offset)
+        VALUES ($1, $2, $3)
+        "#,
+        upload_uuid,
+        repo_name,
+        0_i64
+    )
+    .execute(&mut *txn)
+    .await?;
 
     if let Some(digest) = digest.digest {
         // Have a monolithic upload with data
         return match utils::complete_upload(
-            &txn,
+            &mut txn,
             &host.0,
             &state.registry,
-            upload,
+            &upload_uuid,
             &digest,
             data,
             None,
@@ -237,15 +283,15 @@ async fn post_blob_upload(
                 txn.commit().await?;
                 Ok(Upload::Accepted(accepted_upload))
             }
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
         };
     }
-    println!("aaaaa");
+
     txn.commit().await?;
-    println!("bbbb");
+
     Ok(Upload::Info(UploadInfo::new(
         host.0,
-        upload.uuid,
+        upload_uuid,
         repo_name,
         (0, 0),
     )))
@@ -271,22 +317,21 @@ async fn get_blob_upload(
     AlwaysHost(host): AlwaysHost,
     Path((repo_name, upload_id)): Path<(String, uuid::Uuid)>,
 ) -> Result<Response, Error> {
-    // let offset = state
-    //     .registry
-    //     .storage
-    //     .get_upload_status(&repo_name, &upload_id)
-    //     .await
-    //     .map_err(|e| match e {
-    //         StorageBackendError::InvalidName(n) => Error::NameInvalid(n),
-    //         _ => Error::InternalError,
-    //     })?;
-    let offset = 1;
+    let upload_id_str = upload_id.to_string();
+    let offset: i64 = sqlx::query_scalar!(
+        "SELECT offset FROM blob_upload WHERE uuid = $1 AND repo = $2",
+        upload_id_str,
+        repo_name
+    )
+    .fetch_one(&state.db)
+    .await?;
+    let location = format!("{}/v2/{}/blobs/uploads/{}", host, repo_name, upload_id);
 
     Ok(Response::builder()
         .header("Docker-Upload-UUID", upload_id.to_string())
-        .header("Range", format!("0-{offset}"))
+        .header("Range", format!("0-{}", offset - 1)) // Offset is 0-based
         .header("Content-Length", "0")
-        .header("Location", host)
+        .header("Location", location)
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())
         .unwrap())
@@ -328,48 +373,54 @@ mod tests {
     use http_body_util::BodyExt;
     use hyper::Request;
     use reqwest::StatusCode;
-    use sea_orm::EntityTrait;
     use tower::{Service, ServiceExt};
     use uuid::Uuid;
 
-    use crate::registry::Digest;
-    use crate::{entity, test_utilities};
-
     use super::*;
+    use crate::registry::Digest;
+    use crate::test_utilities;
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_create_new_upload() {
-        let (db, state, _) = test_utilities::trow_router(|_| {}, None).await;
+        let (state, _) = test_utilities::trow_router(|_| {}, None).await;
         let resp = post_blob_upload(
             TrowToken::default(),
-            State(state),
+            State(state.clone()),
             AlwaysHost("trow.io".to_owned()),
             Query(OptionalDigestQuery::default()),
             Path("test/blobs".to_owned()),
-            Body::empty()
-        ).await;
+            Body::empty(),
+        )
+        .await;
 
         let upload = match resp {
             Ok(Upload::Accepted(upload)) => upload,
-            _ => panic!("Invalid value: {resp:?}")
+            _ => panic!("Invalid value: {resp:?}"),
         };
         assert_eq!(upload.range(), (0, 0)); // Haven't uploaded anything yet
-        let upload = entity::blob_upload::Entity::find_by_id(*upload.uuid())
-            .one(&db)
-            .await
-            .unwrap();
-        assert!(upload.is_some());
+        let mut conn = state.db.acquire().await.unwrap();
+        let upload_uuid = upload.uuid().to_string();
+        sqlx::query!(
+            r#"
+            SELECT * FROM blob_upload
+            WHERE uuid = $1
+            "#,
+            upload_uuid
+        )
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_put_blob_upload() {
-        let (_, _, mut router) = test_utilities::trow_router(|_| {}, None).await;
+        let (_, mut router) = test_utilities::trow_router(|_| {}, None).await;
         let repo_name = "test";
         let resp = router
             .call(
-                Request::post(&format!("/v2/{repo_name}/blobs/uploads/"))
+                Request::post(format!("/v2/{repo_name}/blobs/uploads/"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -417,7 +468,7 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_complete_upload() {
-        let (_, _, router) = test_utilities::trow_router(|_| {}, None).await;
+        let (_, router) = test_utilities::trow_router(|_| {}, None).await;
         let repo_name = "test";
 
         let config = "{ }\n".as_bytes();
@@ -426,7 +477,7 @@ mod tests {
         let resp = router
             .clone()
             .oneshot(
-                Request::post(&format!(
+                Request::post(format!(
                     "/v2/{}/blobs/uploads/?digest={}",
                     repo_name, digest
                 ))
@@ -448,36 +499,43 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_patch_blob_upload() {
-        let (db, state, _) = test_utilities::trow_router(|_| {}, None).await;
-        entity::repo::insert_if_not_exists(&db, "germany".to_owned()).await.unwrap();
-        let upload = entity::blob_upload::ActiveModel {
-            offset: Set(7),
-            repo: Set("germany".to_owned()),
-            ..Default::default()
-        };
-        let upload = upload.insert(&db).await.unwrap();
-        state.registry.storage.write_blob_part_stream(&upload.uuid, Body::from("whazaaa").into_data_stream(), None).await.unwrap();
-
+        let (state, _) = test_utilities::trow_router(|_| {}, None).await;
+        let upload_uuid = Uuid::new_v4();
+        let upload_uuid_str = upload_uuid.to_string();
+        sqlx::query!(
+            r#"
+            INSERT INTO blob_upload (uuid, offset, repo)
+            VALUES ($1, 7, 'germany')
+            "#,
+            upload_uuid_str
+        )
+        .execute(&mut *state.db.acquire().await.unwrap())
+        .await
+        .unwrap();
+        state
+            .registry
+            .storage
+            .write_blob_part_stream(&upload_uuid, Body::from("whazaaa").into_data_stream(), None)
+            .await
+            .unwrap();
 
         let resp = patch_blob_upload(
             TrowToken::default(),
             None,
             State(state),
-            Path((upload.repo.clone(), upload.uuid.clone())),
+            Path(("germany".to_string(), upload_uuid)),
             AlwaysHost("trow.io".to_owned()),
-            Body::from("whaaa so much dataaa")
-        ).await;
+            Body::from("whaaa so much dataaa"),
+        )
+        .await;
 
         let uploadinfo = match resp {
             Ok(ui) => ui,
-            _ => panic!("Invalid response: {resp:?}")
+            _ => panic!("Invalid response: {resp:?}"),
         };
 
-        assert_eq!(
-            uploadinfo.base_url(),
-            "trow.io".to_owned()
-        );
+        assert_eq!(uploadinfo.base_url(), "trow.io".to_owned());
         assert_eq!(uploadinfo.range(), (0, 7 + 20));
-        assert_eq!(uploadinfo.repo_name(), &upload.repo);
+        assert_eq!(uploadinfo.repo_name(), "germany");
     }
 }

@@ -43,8 +43,8 @@ pub enum RegistryError {
     NotFound,
 }
 
-impl From<sea_orm::DbErr> for RegistryError {
-    fn from(err: sea_orm::DbErr) -> Self {
+impl From<sqlx::Error> for RegistryError {
+    fn from(err: sqlx::Error) -> Self {
         event!(Level::ERROR, "Database error: {err:?}");
         Self::Internal
     }

@@ -44,7 +44,7 @@ mod test {
     fn build_response() -> UploadInfo {
         UploadInfo::new(
             "ftp://darpa.org".to_string(),
-            uuid::Uuid::new_v4(),
+            uuid::Uuid::new_v4().to_string(),
             "moredhel/test".to_owned(),
             (0, 0),
         )

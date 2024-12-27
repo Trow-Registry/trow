@@ -46,7 +46,7 @@ pub struct DigestQuery {
 #[derive(Debug, Serialize)]
 pub struct UploadInfo {
     base_url: String,
-    uuid: uuid::Uuid,
+    uuid: String,
     repo_name: String,
     range: (u32, u32),
 }
@@ -56,7 +56,7 @@ pub struct BlobDeleted {}
 pub struct ManifestDeleted {}
 
 impl UploadInfo {
-    pub fn new(base_url: String, uuid: uuid::Uuid, repo_name: String, range: (u32, u32)) -> Self {
+    pub fn new(base_url: String, uuid: String, repo_name: String, range: (u32, u32)) -> Self {
         Self {
             base_url,
             uuid,
@@ -65,7 +65,7 @@ impl UploadInfo {
         }
     }
 
-    pub fn uuid(&self) -> &uuid::Uuid {
+    pub fn uuid(&self) -> &str {
         &self.uuid
     }
 

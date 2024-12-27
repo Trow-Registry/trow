@@ -78,7 +78,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     let resp = cl
         .clone()
         .oneshot(
-            Request::post(&format!("/v2/{}/blobs/uploads/", name))
+            Request::post(format!("/v2/{}/blobs/uploads/", name))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -112,7 +112,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     let resp = cl
         .clone()
         .oneshot(
-            Request::put(&format!(
+            Request::put(format!(
                 "/v2/{}/blobs/uploads/{}?digest={}",
                 name, uuid, digest
             ))
@@ -127,7 +127,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     let resp = cl
         .clone()
         .oneshot(
-            Request::get(&format!("/v2/{}/blobs/{}", name, digest))
+            Request::get(format!("/v2/{}/blobs/{}", name, digest))
                 .body(Body::empty())
                 .unwrap(),
         )

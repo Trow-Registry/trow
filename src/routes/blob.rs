@@ -4,7 +4,6 @@ use anyhow::Result;
 use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::Router;
-use sea_orm::{EntityTrait, ModelTrait};
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::{BlobReader, Digest};
@@ -12,7 +11,7 @@ use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::BlobDeleted;
-use crate::{entity, TrowServerState};
+use crate::TrowServerState;
 
 /*
 ---
@@ -30,10 +29,18 @@ async fn get_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
-    let _blob = entity::blob::Entity::find_by_id(digest.clone())
-        .one(&state.db)
-        .await?
-        .ok_or(Error::BlobUnknown)?;
+    let mut conn = state.db.acquire().await?;
+    let digest_str = digest.as_str();
+    sqlx::query!(
+        r#"
+        SELECT * FROM blob
+        WHERE digest = $1
+        "#,
+        digest_str
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+
     let stream = match state.registry.storage.get_blob_stream(&repo, &digest).await {
         Ok(stream) => stream,
         Err(_) => return Err(Error::InternalError),
@@ -61,12 +68,21 @@ async fn delete_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobDeleted, Error> {
-    let repo_blob_assoc =
-        entity::repo_blob_association::Entity::find_by_id((repo.clone(), digest.clone()))
-            .one(&state.db)
-            .await?
-            .ok_or(Error::BlobUnknown)?;
-    repo_blob_assoc.delete(&state.db).await?;
+    let mut conn = state.db.acquire().await?;
+    let digest_str = digest.as_str();
+
+    sqlx::query!(
+        r#"
+            DELETE FROM repo_blob_association
+            WHERE repo_name = $1
+                AND blob_digest = $2
+            "#,
+        repo,
+        digest_str
+    )
+    .execute(&mut *conn)
+    .await?;
+    state.registry.storage.delete_blob(&repo, &digest).await?;
 
     Ok(BlobDeleted {})
 }

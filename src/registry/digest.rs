@@ -22,17 +22,9 @@ pub enum DigestError {
     InvalidDigest(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sea_orm::DeriveValueType)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Digest(String);
-
-impl sea_orm::TryFromU64 for Digest {
-    fn try_from_u64(_: u64) -> Result<Self, sea_orm::DbErr> {
-        Err(sea_orm::DbErr::ConvertFromU64(
-            "Fail to construct ActiveEnum from a u64, if your primary key consist of a ActiveEnum field, its auto increment should be set to false."
-        ))
-    }
-}
 
 impl fmt::Display for Digest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

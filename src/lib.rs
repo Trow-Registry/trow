@@ -1,5 +1,4 @@
-mod entity;
-mod migrations;
+mod init_db;
 pub mod registry;
 mod routes;
 #[cfg(test)]
@@ -10,18 +9,15 @@ mod users;
 
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::{env, fs};
 use std::sync::Arc;
+use std::{env, fs};
 
 use anyhow::{Context, Result};
 use axum::Router;
 use registry::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
-use sea_orm::Database;
-use sea_orm_migration::MigratorTrait;
+use sqlx::sqlite::SqlitePool;
 use thiserror::Error;
 use uuid::Uuid;
-
-use crate::migrations::Migrator;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -38,7 +34,7 @@ pub struct NetAddr {
 pub struct TrowServerState {
     pub registry: TrowServer,
     pub config: TrowConfig,
-    pub db: sea_orm::DatabaseConnection,
+    pub db: SqlitePool,
 }
 
 #[derive(Clone, Debug)]
@@ -73,7 +69,7 @@ pub struct TrowConfig {
     user: Option<UserConfig>,
     pub cors: Option<Vec<String>>,
     pub uses_tls: bool,
-    pub db_connection: Option<sea_orm::DatabaseConnection>,
+    pub db_connection: Option<String>,
 }
 
 impl Default for TrowConfig {
@@ -131,9 +127,8 @@ impl TrowConfig {
         self
     }
 
-
     #[doc(hidden)]
-    pub(crate) async fn build_server_state(mut self) -> Result<Arc<TrowServerState>> {
+    pub(crate) async fn build_server_state(self) -> Result<Arc<TrowServerState>> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!(
             "Hostname of this registry (for the MutatingWebhook): {:?}",
@@ -173,19 +168,7 @@ impl TrowConfig {
         );
         let registry = ts_builder.get_server().await?;
 
-        let db = match self.db_connection {
-            Some(conn) => conn,
-            None => {
-                let db_path = std::path::absolute(self.data_dir.join("trow.db")).unwrap();
-                let db_url = format!(
-                    "sqlite://{}?mode=rwc",
-                    db_path.to_str().expect("Invalid path to DB file")
-                );
-                Database::connect(&db_url).await?
-            }
-        };
-        self.db_connection = None;
-        Migrator::up(&db, None).await?;
+        let db = init_db::init_db(&self.db_connection).await?;
 
         let server_state = TrowServerState {
             config: self,

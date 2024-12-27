@@ -152,10 +152,15 @@ impl IntoResponse for Error {
     }
 }
 
-impl From<sea_orm::DbErr> for Error {
-    fn from(err: sea_orm::DbErr) -> Self {
-        event!(Level::ERROR, "DbErr: {err}");
-        Self::InternalError
+impl From<sqlx::Error> for Error {
+    fn from(err: sqlx::Error) -> Self {
+        match err {
+            sqlx::Error::RowNotFound => Self::NotFound,
+            _ => {
+                event!(Level::ERROR, "DbErr: {err}");
+                Self::InternalError
+            }
+        }
     }
 }
 

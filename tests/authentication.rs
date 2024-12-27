@@ -75,7 +75,7 @@ mod authentication_tests {
         let resp = trow
             .clone()
             .oneshot(
-                Request::get(&format!("/v2/{}/manifests/{}", "name", "tag"))
+                Request::get(format!("/v2/{}/manifests/{}", "name", "tag"))
                     .body(Body::empty())
                     .unwrap(),
             )

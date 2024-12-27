@@ -72,7 +72,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::get(&format!("/v2/{name}/manifests/{tag}"))
+                Request::get(format!("/v2/{name}/manifests/{tag}"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -105,7 +105,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::get(&format!("/v2/{name}/manifests/{tag}"))
+                Request::get(format!("/v2/{name}/manifests/{tag}"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -118,7 +118,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::get(&"/v2/_catalog".to_string())
+                Request::get("/v2/_catalog".to_string())
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -133,7 +133,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::get(&format!("/v2/{}/tags/list", tl.repo_name()))
+                Request::get(format!("/v2/{}/tags/list", tl.repo_name()))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -148,7 +148,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::get(&format!(
+                Request::get(format!(
                     "/v2/{}/tags/list?last={}&n={}",
                     tl.repo_name(),
                     last,
@@ -167,7 +167,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::post(&format!("/v2/{name}/blobs/uploads/"))
+                Request::post(format!("/v2/{name}/blobs/uploads/"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -216,7 +216,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::post(&format!("/v2/{}/blobs/uploads/?digest={}", name, digest))
+                Request::post(format!("/v2/{}/blobs/uploads/?digest={}", name, digest))
                     .body(Body::from(config))
                     .unwrap(),
             )
@@ -250,7 +250,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(&format!("/v2/{}/manifests/{}", name, tag))
+                Request::put(format!("/v2/{}/manifests/{}", name, tag))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -287,7 +287,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(&format!("/v2/{}/manifests/{}", name, tag))
+                Request::put(format!("/v2/{}/manifests/{}", name, tag))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -327,7 +327,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(&format!("/v2/{}/manifests/{}", name, tag))
+                Request::put(format!("/v2/{}/manifests/{}", name, tag))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -344,7 +344,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::delete(&format!("/v2/{}/manifests/{}", name, digest))
+                Request::delete(format!("/v2/{}/manifests/{}", name, digest))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -357,7 +357,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::delete(&format!(
+                Request::delete(format!(
                     "/v2/{}/manifests/{}",
                     name, "sha256:9038b92872bc268d5c975e84dd94e69848564b222ad116ee652c62e0c2f894b2"
                 ))
@@ -373,7 +373,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::delete(&format!("/v2/{}/manifests/{}", name, tag))
+                Request::delete(format!("/v2/{}/manifests/{}", name, tag))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -389,7 +389,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::delete(&format!("/v2/{name}/blobs/{config_digest}"))
+                Request::delete(format!("/v2/{name}/blobs/{config_digest}"))
                     .body(Body::empty())
                     .unwrap(),
             )

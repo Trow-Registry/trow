@@ -80,7 +80,7 @@ mod test {
         #[case] expected_allow: bool,
         #[case] response_contains: &str,
     ) {
-        let (_, _, router) = test_utilities::trow_router(
+        let (_, router) = test_utilities::trow_router(
             |builder| {
                 builder.image_validation_config = Some(ImageValidationConfig {
                     default: "Deny".to_string(),
@@ -192,7 +192,7 @@ mod test {
     #[tokio::test]
     async fn mutate_image(#[case] original_image: &str, #[case] new_image_str: Option<&str>) {
         let host = "ftp://trow";
-        let (_, _, router) = test_utilities::trow_router(
+        let (_, router) = test_utilities::trow_router(
             |builder| {
                 builder.proxy_registry_config = Some(RegistryProxiesConfig {
                     offline: false,
