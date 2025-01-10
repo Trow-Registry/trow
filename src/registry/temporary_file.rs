@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures::stream::Stream;
 use futures::StreamExt;
 use tokio::fs::{self, File};
-use tokio::io::{self, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{self, AsyncWriteExt};
 
 /// Designed for downloading files. The [`Drop`] implementation makes sure that
 /// the underlying file is deleted in case of an error.
@@ -24,12 +24,11 @@ impl TemporaryFile {
         Ok(TemporaryFile { file, path })
     }
 
-    pub async fn append(path: PathBuf) -> io::Result<(Self, u64)> {
+    pub async fn append(path: PathBuf) -> io::Result<Self> {
         let mut open_opt = fs::OpenOptions::new();
-        let mut file = open_opt.append(true).create(true).open(&path).await?;
-        let seek_pos = file.seek(io::SeekFrom::Current(0)).await.unwrap();
+        let file = open_opt.append(true).create(true).open(&path).await?;
 
-        Ok((TemporaryFile { file, path }, seek_pos))
+        Ok(TemporaryFile { file, path })
     }
 
     #[allow(unused)]
@@ -56,6 +55,10 @@ impl TemporaryFile {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub async fn metadata(&self) -> io::Result<std::fs::Metadata> {
+        self.file.metadata().await
     }
 
     pub async fn rename(self, new_path: &Path) -> io::Result<()> {

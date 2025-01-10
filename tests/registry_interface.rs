@@ -18,12 +18,10 @@ mod interface_tests {
     use trow::registry::digest;
     use trow::types::{RepoCatalog, TagList};
 
-    use crate::common::{self, response_body_string, DIST_API_HEADER};
+    use crate::common::{self, response_body_string, trow_router, DIST_API_HEADER};
 
     async fn start_trow(data_dir: &Path) -> Router {
-        let mut trow_builder = trow::TrowConfig::new();
-        data_dir.clone_into(&mut trow_builder.data_dir);
-        trow_builder.build_app().await.unwrap()
+        trow_router(data_dir, |_| {}).await
     }
 
     async fn get_main(cl: &Router) {

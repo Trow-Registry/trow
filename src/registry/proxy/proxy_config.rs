@@ -1,6 +1,11 @@
 use anyhow::{anyhow, Result};
+use futures::future::Remote;
+use oci_client::client::ClientProtocol;
+use oci_client::secrets::RegistryAuth;
+use oci_client::RegistryOperation;
 use serde::{Deserialize, Serialize};
 use tracing::{event, Level};
+use sqlx::Sqlite;
 
 use crate::registry::manifest::ManifestReference;
 use crate::registry::proxy::proxy_client::ProxyClient;
@@ -63,26 +68,35 @@ impl RegistryProxiesConfig {
 impl SingleRegistryProxyConfig {
     /// returns the downloaded digest
     /// TO RE-DO !!!
-    pub async fn download_remote_image(
+    pub async fn download_remote_image<C>(
         &self,
         image: &RemoteImage,
         registry: &TrowServer,
-    ) -> Result<Digest> {
+        db: C
+    ) -> Result<Digest>
+    where
+        for<'e> &'e mut C: sqlx::Executor<'e, Database = Sqlite>, {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
 
-        let try_cl = match ProxyClient::try_new(self.clone(), image).await {
-            Ok(cl) => Some(cl),
-            Err(e) => {
-                event!(
-                    Level::WARN,
-                    "Could not create client for proxied registry {}: {:?}",
-                    self.host,
-                    e
-                );
-                None
-            }
+        let mut client_config = oci_client::client::ClientConfig::default();
+        if image.get_host().starts_with("http://") {
+            client_config.protocol = ClientProtocol::Http;
+        }
+        let client = oci_client::Client::new(client_config);
+        let auth = match self.username {
+          Some(u) if u == "AWS" && self.host.contains(".dkr.ecr.") => {
+              let passwd = get_aws_ecr_password_from_env(&self.host)
+                  .await?;
+              RegistryAuth::Basic(u, passwd)
+          },
+          Some(u) => {
+              RegistryAuth::Basic(u, self.password.unwrap_or_default())
+          },
+          None => RegistryAuth::Anonymous
         };
+        client.auth(&image.clone().into(), &auth, RegistryOperation::Pull).await.ok();
+
         let remote_img_ref_digest = image.reference.digest();
         let (local_digest, latest_digest) = match remote_img_ref_digest {
             // The ref is a digest, no need to map tg to digest
@@ -128,8 +142,13 @@ impl SingleRegistryProxyConfig {
             }
             if let Some(cl) = &try_cl {
                 let img_ref_as_digest = image.reference.digest();
+                let mut image_to_dl = image.clone();
+                if img_ref_as_digest.is_none() {
+                    image_to_dl.reference =
+                        ManifestReference::Digest(cl.get_digest_from_remote().await.unwrap());
+                }
                 let manifest_download = cl
-                    .download_manifest_and_layers(registry, image, &repo_name)
+                    .download_manifest_and_layers(registry, &image_to_dl, &repo_name)
                     .await;
                 match (manifest_download, img_ref_as_digest) {
                     (Err(e), _) => {
@@ -160,4 +179,38 @@ impl SingleRegistryProxyConfig {
             image.reference
         ))
     }
+}
+
+
+/// Fetches AWS ECR credentials.
+/// We use the [rusoto ChainProvider](https://docs.rs/rusoto_credential/0.48.0/rusoto_credential/struct.ChainProvider.html)
+/// to fetch AWS credentials.
+async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
+    let region = ecr_host
+        .split('.')
+        .nth(3)
+        .ok_or_else(|| anyhow!("Could not parse region from ECR URL"))?
+        .to_owned();
+    let region = aws_types::region::Region::new(region);
+    let config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+        .region(region)
+        .load()
+        .await;
+    let ecr_clt = aws_sdk_ecr::Client::new(&config);
+    let token_response = ecr_clt.get_authorization_token().send().await?;
+    let token = token_response
+        .authorization_data
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap()
+        .authorization_token
+        .unwrap();
+
+    // The token is base64(username:password). Here, username is "AWS".
+    // To get the password, we trim "AWS:" from the decoded token.
+    let mut auth_str = general_purpose::STANDARD.decode(token)?;
+    auth_str.drain(0..4);
+
+    String::from_utf8(auth_str).context("Could not convert ECR token to valid password")
 }

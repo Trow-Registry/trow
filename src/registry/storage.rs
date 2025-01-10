@@ -181,26 +181,26 @@ impl TrowStorageBackend {
     {
         event!(Level::DEBUG, "Write blob part {upload_id} ({range:?})");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
-        let (mut tmp_file, seek_pos) =
-            TemporaryFile::append(tmp_location.clone())
-                .await
-                .map_err(|e| {
-                    event!(Level::ERROR, "Could not open tmp file: {}", e);
-                    match e.kind() {
-                        io::ErrorKind::NotFound => StorageBackendError::BlobNotFound(tmp_location),
-                        io::ErrorKind::AlreadyExists => StorageBackendError::InvalidContentRange,
-                        _ => StorageBackendError::Io(e),
-                    }
-                })?;
+        let mut tmp_file = TemporaryFile::append(tmp_location.clone())
+            .await
+            .map_err(|e| {
+                event!(Level::ERROR, "Could not open tmp file: {}", e);
+                match e.kind() {
+                    io::ErrorKind::NotFound => StorageBackendError::BlobNotFound(tmp_location),
+                    io::ErrorKind::AlreadyExists => StorageBackendError::InvalidContentRange,
+                    _ => StorageBackendError::Io(e),
+                }
+            })?;
+        let file_size = tmp_file.metadata().await?.len();
         let range_len = range.as_ref().map(|r| r.end() - r.start() + 1);
 
         if let Some(range) = &range {
-            if *range.start() != seek_pos {
+            if *range.start() != file_size {
                 event!(
                     Level::ERROR,
                     "Invalid content-range: start={} file_pos={}",
                     range.start(),
-                    seek_pos
+                    file_size
                 );
                 return Err(StorageBackendError::InvalidContentRange);
             }
@@ -221,7 +221,7 @@ impl TrowStorageBackend {
         tmp_file.untrack();
 
         Ok(Stored {
-            total_stored: bytes_written + seek_pos,
+            total_stored: bytes_written + file_size,
             chunk: bytes_written,
         })
     }

@@ -17,13 +17,15 @@ mod no_cors_tests {
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 
+    use crate::common::trow_router;
+
     const TROW_ADDRESS: &str = "http://127.0.0.1:39368";
 
     async fn start_trow(data_dir: &Path) -> Router {
-        let mut trow_builder = trow::TrowConfig::new();
-        trow_builder.service_name = TROW_ADDRESS.to_string();
-        data_dir.clone_into(&mut trow_builder.data_dir);
-        trow_builder.build_app().await.unwrap()
+        trow_router(data_dir, |cfg| {
+            cfg.service_name = TROW_ADDRESS.to_string();
+        })
+        .await
     }
 
     async fn test_preflight(cl: &Router) {

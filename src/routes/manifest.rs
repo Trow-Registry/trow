@@ -11,7 +11,7 @@ use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::registry::digest;
-use crate::registry::manifest::{OCIManifest, REGEX_TAG};
+use crate::registry::manifest::{ManifestReference, OCIManifest, REGEX_TAG};
 use crate::registry::server::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
@@ -42,29 +42,32 @@ Accept: manifest-version
 async fn get_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, reference)): Path<(String, String)>,
+    Path((repo, raw_reference)): Path<(String, String)>,
 ) -> Result<OciJson<OCIManifest>, Error> {
     let mut db = state.db.acquire().await?;
+    let reference = ManifestReference::try_from_str(&raw_reference).map_err(|e| {
+        Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
+    })?;
 
-    let digest = if REGEX_TAG.is_match(&reference) {
-        let tag = sqlx::query!(
-            r#"
-            select *
-            from tag t
-            where t.repo = $1
-                and t.tag = $2
-            "#,
-            repo,
-            reference
-        )
-        .fetch_one(&mut *db)
-        .await?;
-        tag.manifest_digest
-    } else {
-        let _ = Digest::try_from_raw(&reference)?;
-        reference
+    let mut digest = match &reference {
+        ManifestReference::Tag(_) => {
+            let tag = sqlx::query!(
+                r#"
+                select *
+                from tag t
+                where t.repo = $1
+                    and t.tag = $2
+                "#,
+                repo,
+                raw_reference
+            )
+            .fetch_optional(&mut *db)
+            .await?;
+            tag.map(|t| t.manifest_digest)
+        }
+        ManifestReference::Digest(_) => Some(raw_reference),
     };
-    let _manifest = sqlx::query!(
+    let maybe_manifest = sqlx::query!(
         r#"
             select *
             from blob b
@@ -77,8 +80,25 @@ async fn get_manifest(
         repo,
         digest
     )
-    .fetch_one(&mut *db)
+    .fetch_optional(&mut *db)
     .await?;
+
+    if maybe_manifest.is_none() {
+        if !repo.starts_with(PROXY_DIR) {
+            return Err(Error::ManifestUnknown("".to_string()));
+        }
+        let (proxy_cfg, image) = match state
+            .registry
+            .proxy_registry_config
+            .get_proxy_config(&repo, &reference)
+            .await {
+                Some(cfg) => cfg,
+                None => return Err(Error::NameInvalid(format!("No registered proxy matches {repo}")))
+            };
+        let new_digest = proxy_cfg.download_remote_image(&image, &state.registry).await.map_err(|_| Error::InternalError)?;
+        digest = Some(new_digest.to_string());
+    }
+    let digest = digest.unwrap();
 
     let digest_parsed = Digest::try_from_raw(&digest).unwrap();
     let manifest_raw = state

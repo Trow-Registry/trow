@@ -27,8 +27,10 @@ pub const LOCATION_HEADER: &str = "Location";
 pub const RANGE_HEADER: &str = "Range";
 
 #[allow(dead_code)]
-pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(custom_cfg: F) -> Router {
+pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(temp_dir: &Path, custom_cfg: F) -> Router {
     let mut trow_builder = TrowConfig::new();
+    trow_builder.data_dir = temp_dir.to_owned();
+    trow_builder.db_connection = Some("sqlite::memory:".to_string());
     custom_cfg(&mut trow_builder);
     trow_builder.build_app().await.unwrap()
 }

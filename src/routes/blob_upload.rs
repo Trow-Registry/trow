@@ -9,7 +9,6 @@ use axum::Router;
 use digest::Digest;
 use hyper::StatusCode;
 
-use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::{digest, ContentInfo, TrowServer};
 use crate::routes::macros::route_7_levels;
@@ -29,7 +28,7 @@ mod utils {
 
     pub async fn complete_upload(
         txn: &mut Transaction<'static, Sqlite>,
-        host: &str,
+
         registry: &TrowServer,
         upload_id: &str,
         digest: &Digest,
@@ -87,7 +86,6 @@ mod utils {
         .await?;
 
         Ok(AcceptedUpload::new(
-            host.to_string(),
             digest.clone(),
             upload.repo,
             upload_id_bin,
@@ -110,7 +108,7 @@ async fn put_blob_upload(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, uuid::Uuid)>,
-    AlwaysHost(host): AlwaysHost,
+
     Query(digest): Query<DigestQuery>,
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
@@ -129,7 +127,6 @@ async fn put_blob_upload(
 
     let accepted_upload = utils::complete_upload(
         &mut txn,
-        &host,
         &state.registry,
         &uuid_str,
         &digest.digest,
@@ -147,7 +144,6 @@ endpoint_fn_7_levels!(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid: uuid::Uuid],
-        host: AlwaysHost,
         digest: Query<DigestQuery>,
         chunk: Body
     ) -> Result<AcceptedUpload, Error>
@@ -176,7 +172,6 @@ async fn patch_blob_upload(
     content_info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, uuid::Uuid)>,
-    AlwaysHost(host): AlwaysHost,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
     let mut txn = state.db.begin().await?;
@@ -214,7 +209,6 @@ async fn patch_blob_upload(
     .await?;
 
     Ok(UploadInfo::new(
-        host,
         uuid_str,
         repo,
         (0, (total_stored).saturating_sub(1)), // Note first byte is 0
@@ -227,7 +221,6 @@ endpoint_fn_7_levels!(
         info: Option<ContentInfo>,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid: uuid::Uuid],
-        host: AlwaysHost,
         chunk: Body
     ) -> Result<UploadInfo, Error>
 );
@@ -245,7 +238,7 @@ In this case the whole blob is attached.
 async fn post_blob_upload(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    host: AlwaysHost,
+
     Query(digest): Query<OptionalDigestQuery>,
     Path(repo_name): Path<String>,
     data: Body,
@@ -270,7 +263,6 @@ async fn post_blob_upload(
         // Have a monolithic upload with data
         return match utils::complete_upload(
             &mut txn,
-            &host.0,
             &state.registry,
             &upload_uuid,
             &digest,
@@ -290,7 +282,6 @@ async fn post_blob_upload(
     txn.commit().await?;
 
     Ok(Upload::Info(UploadInfo::new(
-        host.0,
         upload_uuid,
         repo_name,
         (0, 0),
@@ -301,7 +292,6 @@ endpoint_fn_7_levels!(
     post_blob_upload(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>,
-        host: AlwaysHost,
         digest: Query<OptionalDigestQuery>;
         path: [image_name],
         data: Body
@@ -314,7 +304,6 @@ GET /v2/<name>/blobs/uploads/<upload_id>
 async fn get_blob_upload(
     _auth: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    AlwaysHost(host): AlwaysHost,
     Path((repo_name, upload_id)): Path<(String, uuid::Uuid)>,
 ) -> Result<Response, Error> {
     let upload_id_str = upload_id.to_string();
@@ -325,7 +314,7 @@ async fn get_blob_upload(
     )
     .fetch_one(&state.db)
     .await?;
-    let location = format!("{}/v2/{}/blobs/uploads/{}", host, repo_name, upload_id);
+    let location = format!("/v2/{}/blobs/uploads/{}", repo_name, upload_id);
 
     Ok(Response::builder()
         .header("Docker-Upload-UUID", upload_id.to_string())
@@ -340,8 +329,7 @@ async fn get_blob_upload(
 endpoint_fn_7_levels!(
     get_blob_upload(
         auth: TrowToken,
-        state: State<Arc<TrowServerState>>,
-        host: AlwaysHost;
+        state: State<Arc<TrowServerState>>;
         path: [image_name, upload_id: uuid::Uuid]
     ) -> Result<Response, Error>
 );
@@ -387,7 +375,6 @@ mod tests {
         let resp = post_blob_upload(
             TrowToken::default(),
             State(state.clone()),
-            AlwaysHost("trow.io".to_owned()),
             Query(OptionalDigestQuery::default()),
             Path("test/blobs".to_owned()),
             Body::empty(),
@@ -395,7 +382,7 @@ mod tests {
         .await;
 
         let upload = match resp {
-            Ok(Upload::Accepted(upload)) => upload,
+            Ok(Upload::Info(upload)) => upload,
             _ => panic!("Invalid value: {resp:?}"),
         };
         assert_eq!(upload.range(), (0, 0)); // Haven't uploaded anything yet
@@ -524,7 +511,6 @@ mod tests {
             None,
             State(state),
             Path(("germany".to_string(), upload_uuid)),
-            AlwaysHost("trow.io".to_owned()),
             Body::from("whaaa so much dataaa"),
         )
         .await;
@@ -534,8 +520,7 @@ mod tests {
             _ => panic!("Invalid response: {resp:?}"),
         };
 
-        assert_eq!(uploadinfo.base_url(), "trow.io".to_owned());
-        assert_eq!(uploadinfo.range(), (0, 7 + 20));
+        assert_eq!(uploadinfo.range(), (0, 20 + 7 - 1));
         assert_eq!(uploadinfo.repo_name(), "germany");
     }
 }

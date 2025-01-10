@@ -2,15 +2,12 @@ use std::path::PathBuf;
 use std::str;
 
 use anyhow::Result;
-use futures::AsyncRead;
 use tracing::{event, Level};
 
 // use super::manifest::Manifest;
 use super::proxy::RegistryProxiesConfig;
-use super::storage::{StorageBackendError, TrowStorageBackend};
+use super::storage::TrowStorageBackend;
 use super::ImageValidationConfig;
-use crate::registry::digest::Digest;
-use crate::registry::{BlobReader, RegistryError};
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
@@ -47,24 +44,24 @@ impl TrowServer {
         Ok(svc)
     }
 
-    pub async fn get_blob(
-        &self,
-        repo_name: &str,
-        digest: &Digest,
-    ) -> Result<BlobReader<impl AsyncRead>, RegistryError> {
-        event!(
-            Level::DEBUG,
-            "Getting read location for blob {} in {}",
-            digest,
-            repo_name
-        );
-        let stream = match self.storage.get_blob_stream(repo_name, digest).await {
-            Ok(stream) => stream,
-            Err(StorageBackendError::BlobNotFound(_)) => return Err(RegistryError::NotFound),
-            Err(_) => return Err(RegistryError::Internal),
-        };
-        Ok(BlobReader::new(digest.clone(), stream).await)
-    }
+    // pub async fn get_blob(
+    //     &self,
+    //     repo_name: &str,
+    //     digest: &Digest,
+    // ) -> Result<BlobReader<impl AsyncRead>, RegistryError> {
+    //     event!(
+    //         Level::DEBUG,
+    //         "Getting read location for blob {} in {}",
+    //         digest,
+    //         repo_name
+    //     );
+    //     let stream = match self.storage.get_blob_stream(repo_name, digest).await {
+    //         Ok(stream) => stream,
+    //         Err(StorageBackendError::BlobNotFound(_)) => return Err(RegistryError::NotFound),
+    //         Err(_) => return Err(RegistryError::Internal),
+    //     };
+    //     Ok(BlobReader::new(digest.clone(), stream).await)
+    // }
 
     // Readiness check
     pub async fn is_ready(&self) -> bool {

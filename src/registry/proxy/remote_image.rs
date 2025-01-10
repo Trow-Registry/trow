@@ -49,6 +49,15 @@ impl std::default::Default for RemoteImage {
     }
 }
 
+impl Into<oci_client::Reference> for RemoteImage {
+    fn into(self) -> oci_client::Reference {
+        match self.reference {
+            ManifestReference::Digest(d) => oci_client::Reference::with_digest(self.host, self.repo, d.to_string()),
+            ManifestReference::Tag(t) => oci_client::Reference::with_tag(self.host, self.repo, t)
+        }
+    }
+}
+
 impl fmt::Display for RemoteImage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.get_ref())

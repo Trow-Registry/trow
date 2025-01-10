@@ -7,12 +7,7 @@ pub use crate::types::UploadInfo;
 
 impl IntoResponse for UploadInfo {
     fn into_response(self) -> Response {
-        let location_url = format!(
-            "{}/v2/{}/blobs/uploads/{}",
-            self.base_url(),
-            self.repo_name(),
-            self.uuid()
-        );
+        let location_url = format!("/v2/{}/blobs/uploads/{}", self.repo_name(), self.uuid());
         let (left, right) = self.range();
         event!(
             Level::DEBUG,
@@ -43,7 +38,6 @@ mod test {
 
     fn build_response() -> UploadInfo {
         UploadInfo::new(
-            "ftp://darpa.org".to_string(),
             uuid::Uuid::new_v4().to_string(),
             "moredhel/test".to_owned(),
             (0, 0),

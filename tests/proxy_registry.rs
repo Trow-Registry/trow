@@ -15,6 +15,7 @@ mod interface_tests {
     use trow::registry::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common;
+    use crate::common::trow_router;
 
     async fn start_trow(data_dir: &Path) -> Router {
         let config_file = RegistryProxiesConfig {
@@ -44,10 +45,10 @@ mod interface_tests {
             ],
         };
 
-        let mut trow_builder = trow::TrowConfig::new();
-        trow_builder.proxy_registry_config = Some(config_file);
-        data_dir.clone_into(&mut trow_builder.data_dir);
-        trow_builder.build_app().await.unwrap()
+        trow_router(data_dir, |cfg| {
+            cfg.proxy_registry_config = Some(config_file);
+        })
+        .await
     }
 
     async fn get_manifest(cl: &Router, name: &str, tag: &str) -> manifest::OCIManifest {

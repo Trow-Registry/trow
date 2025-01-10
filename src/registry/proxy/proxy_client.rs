@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
@@ -10,6 +11,7 @@ use lazy_static::lazy_static;
 use quoted_string::strip_dquotes;
 use regex::Regex;
 use reqwest::{self, Method, StatusCode};
+use tokio::sync::Mutex;
 use tracing::{event, Level};
 
 use super::create_accept_header;
@@ -50,76 +52,81 @@ impl HttpAuth {
 
 /// Wrapper around `reqwest::Client` that automagically handles authentication
 /// to other container registries
-pub struct ProxyClient {
+pub struct ProxyClient<'a> {
     cl: reqwest::Client,
-    auth: HttpAuth,
-    remote_image: RemoteImage,
+    auth: Mutex<HttpAuth>,
+    proxy_config: &'a SingleRegistryProxyConfig,
 }
 
-impl ProxyClient {
-    pub async fn try_new(
-        mut proxy_cfg: SingleRegistryProxyConfig,
-        remote_image: &RemoteImage,
-    ) -> Result<Self> {
+impl<'a> ProxyClient<'a> {
+    pub async fn try_new(proxy_cfg: &'a SingleRegistryProxyConfig) -> Result<Self> {
         let base_client = reqwest::ClientBuilder::new()
             // .connect_timeout(Duration::from_millis(1000))
             .build()?;
 
-        let authn_header = get_www_authenticate_header(&base_client, remote_image).await?;
-
-        if proxy_cfg.host.contains(".dkr.ecr.")
-            && proxy_cfg.host.contains(".amazonaws.com")
-            && matches!(&proxy_cfg.username, Some(u) if u == "AWS")
-            && proxy_cfg.password.is_none()
-        {
-            let passwd = get_aws_ecr_password_from_env(&proxy_cfg.host)
-                .await
-                .context("Could not fetch password to ECR registry")?;
-            proxy_cfg.password = Some(passwd);
-        }
-
-        let auth = match authn_header {
-            Some(h) if h.starts_with("Basic") => {
-                if proxy_cfg.username.is_none() {
-                    return Err(anyhow!(
-                        "Registry `{}` requires Basic auth but no username was provided",
-                        proxy_cfg.host
-                    ));
-                }
-                HttpAuth::Basic(
-                    proxy_cfg.username.clone().unwrap(),
-                    proxy_cfg.password.clone(),
-                )
-            }
-            Some(h) if h.starts_with("Bearer") => {
-                HttpAuth::bearer(&proxy_cfg, &base_client, &h).await?
-            }
-            None => HttpAuth::None,
-
-            Some(invalid_header) => {
-                return Err(anyhow!(
-                    "Could not parse {AUTHN_HEADER} of registry `{}`: `{}`",
-                    proxy_cfg.host,
-                    invalid_header
-                ))
-            }
-        };
-
         Ok(Self {
             cl: base_client,
-            auth,
-            remote_image: remote_image.clone(),
+            auth: Mutex::new(HttpAuth::None),
+            proxy_config: proxy_cfg,
         })
     }
 
     /// Build a request with added authentication.
     /// The auth method will vary depending on the registry being queried.
-    fn authenticated_request(&self, method: Method, url: &str) -> reqwest::RequestBuilder {
-        let req = self.cl.request(method, url);
-        match &self.auth {
+    async fn authenticated_request(
+        &self,
+        req: reqwest::RequestBuilder,
+    ) -> Result<reqwest::Response> {
+        let req = match &self.auth.lock().await.deref() {
             HttpAuth::Basic(username, password) => req.basic_auth(username, password.to_owned()),
             HttpAuth::Bearer(token) => req.bearer_auth(token),
             HttpAuth::None => req,
+        }
+        .headers(create_accept_header());
+        req.
+        let r = req.try_clone().unwrap().send().await?;
+req.
+        if r.status() == StatusCode::UNAUTHORIZED {
+            let authn_header = r
+                .headers()
+                .get(AUTHN_HEADER)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let auth = if authn_header.starts_with("Basic") {
+                if self.proxy_config.host.contains(".dkr.ecr.")
+                    && self.proxy_config.host.contains(".amazonaws.com")
+                    && matches!(&self.proxy_config.username, Some(u) if u == "AWS")
+                    && self.proxy_config.password.is_none()
+                {
+                    let passwd = get_aws_ecr_password_from_env(&self.proxy_config.host)
+                        .await
+                        .context("Could not fetch password to ECR registry")?;
+                    HttpAuth::Basic(self.proxy_config.username.clone().unwrap(), Some(passwd))
+                } else {
+                    if self.proxy_config.username.is_none() {
+                        return Err(anyhow!(
+                            "Registry `{}` requires Basic auth but no username was provided",
+                            self.proxy_config.host
+                        ));
+                    }
+                    HttpAuth::Basic(
+                        self.proxy_config.username.clone().unwrap(),
+                        self.proxy_config.password.clone(),
+                    )
+                }
+            } else if authn_header.starts_with("Bearer") {
+                HttpAuth::bearer(&self.proxy_config, &self.cl, &authn_header).await?
+            } else {
+                unimplemented!();
+            };
+
+            *self.auth.lock().await = auth;
+            self.authenticated_request(req).await
+        } else {
+            Ok(r)
         }
     }
 
@@ -278,19 +285,16 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String> {
 
 /// Get the WWW-Authenticate header from a registry.
 /// Ok(None) is returned if the registry does not require authentication.
-async fn get_www_authenticate_header(
-    cl: &reqwest::Client,
-    image: &RemoteImage,
-) -> Result<Option<String>> {
+async fn get_www_authenticate_header(cl: &reqwest::Client, url: &str) -> Result<Option<String>> {
     let resp = cl
-        .head(image.get_manifest_url())
+        .head(url)
         .headers(create_accept_header())
         .send()
         .await
         .map_err(|e| {
             anyhow!(
                 "Could not fetch www-authenticate header from {} (failed with: {:?})",
-                &image.get_manifest_url(),
+                url,
                 e
             )
         })?;
