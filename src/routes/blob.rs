@@ -99,7 +99,7 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
     #[rustfmt::skip]
     route_7_levels!(
         app,
-        "/v2" "/blobs/:digest",
+        "/v2" "/blobs/{digest}",
         get(get_blob, get_blob_2level, get_blob_3level, get_blob_4level, get_blob_5level, get_blob_6level, get_blob_7level),
         delete(delete_blob, delete_blob_2level, delete_blob_3level, delete_blob_4level, delete_blob_5level, delete_blob_6level, delete_blob_7level)
     );

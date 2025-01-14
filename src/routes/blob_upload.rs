@@ -6,11 +6,14 @@ use axum::extract::{Path, Query, State};
 use axum::response::Response;
 use axum::routing::{post, put};
 use axum::Router;
+use axum_extra::headers::ContentRange;
+use axum_extra::TypedHeader;
 use digest::Digest;
 use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::{digest, ContentInfo, TrowServer};
+use crate::registry::server::PROXY_DIR;
+use crate::registry::{digest, TrowServer};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -28,7 +31,6 @@ mod utils {
 
     pub async fn complete_upload(
         txn: &mut Transaction<'static, Sqlite>,
-
         registry: &TrowServer,
         upload_id: &str,
         digest: &Digest,
@@ -112,6 +114,9 @@ async fn put_blob_upload(
     Query(digest): Query<DigestQuery>,
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
+    if repo.starts_with(PROXY_DIR) {
+        return Err(Error::UnsupportedForProxiedRepo);
+    }
     let mut txn = state.db.begin().await?;
     let uuid_str = uuid.to_string();
     let upload = sqlx::query!(
@@ -169,7 +174,8 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 */
 async fn patch_blob_upload(
     _auth_user: TrowToken,
-    content_info: Option<ContentInfo>,
+    content_range: Option<TypedHeader<ContentRange>>,
+    // content_length: Option<TypedHeader<ContentLength>>,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, uuid::Uuid)>,
     chunk: Body,
@@ -186,14 +192,15 @@ async fn patch_blob_upload(
     .fetch_one(&mut *txn)
     .await?;
 
+    let content_range = content_range.map(|d| {
+        let r = d.0.bytes_range().unwrap();
+        r.0..=r.1
+    });
+
     let size = state
         .registry
         .storage
-        .write_blob_part_stream(
-            &uuid,
-            chunk.into_data_stream(),
-            content_info.map(|d| d.range.0..=d.range.1),
-        )
+        .write_blob_part_stream(&uuid, chunk.into_data_stream(), content_range)
         .await?;
     let total_stored = size.total_stored as u32;
 
@@ -218,7 +225,7 @@ async fn patch_blob_upload(
 endpoint_fn_7_levels!(
     patch_blob_upload(
         auth_user: TrowToken,
-        info: Option<ContentInfo>,
+        content_range: Option<TypedHeader<ContentRange>>,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid: uuid::Uuid],
         chunk: Body
@@ -238,11 +245,13 @@ In this case the whole blob is attached.
 async fn post_blob_upload(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-
     Query(digest): Query<OptionalDigestQuery>,
     Path(repo_name): Path<String>,
     data: Body,
 ) -> Result<Upload, Error> {
+    if repo_name.starts_with(PROXY_DIR) {
+        return Err(Error::UnsupportedForProxiedRepo);
+    }
     let mut txn = state.db.begin().await?;
 
     // Create new blob upload
@@ -344,7 +353,7 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
     #[rustfmt::skip]
     route_7_levels!(
         app,
-        "/v2" "/blobs/uploads/:uuid",
+        "/v2" "/blobs/uploads/{uuid}",
         put(put_blob_upload, put_blob_upload_2level, put_blob_upload_3level, put_blob_upload_4level, put_blob_upload_5level, put_blob_upload_6level, put_blob_upload_7level),
         patch(patch_blob_upload, patch_blob_upload_2level, patch_blob_upload_3level, patch_blob_upload_4level, patch_blob_upload_5level, patch_blob_upload_6level, patch_blob_upload_7level),
         get(get_blob_upload, get_blob_upload_2level, get_blob_upload_3level, get_blob_upload_4level, get_blob_upload_5level, get_blob_upload_6level, get_blob_upload_7level)

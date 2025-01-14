@@ -1,4 +1,3 @@
-mod proxy_client;
 mod proxy_config;
 mod remote_image;
 

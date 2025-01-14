@@ -1,7 +1,7 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
 mod interface_tests {
 
     use std::path::Path;

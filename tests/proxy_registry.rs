@@ -1,23 +1,26 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
 mod interface_tests {
     use std::fs;
     use std::path::Path;
+    use std::sync::Arc;
 
     use axum::body::Body;
     use axum::Router;
     use hyper::Request;
+    use oci_spec::image::ImageManifest;
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
     use trow::registry::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::TrowServerState;
 
     use crate::common;
     use crate::common::trow_router;
 
-    async fn start_trow(data_dir: &Path) -> Router {
+    async fn start_trow(data_dir: &Path) -> (Arc<TrowServerState>, Router) {
         let config_file = RegistryProxiesConfig {
             offline: false,
             registries: vec![
@@ -51,7 +54,7 @@ mod interface_tests {
         .await
     }
 
-    async fn get_manifest(cl: &Router, name: &str, tag: &str) -> manifest::OCIManifest {
+    async fn get_manifest(cl: &Router, name: &str, tag: &str) -> (manifest::OCIManifest, String) {
         //Might need accept headers here
         let resp = cl
             .clone()
@@ -69,7 +72,14 @@ mod interface_tests {
             name,
             tag
         );
-        common::response_body_json(resp).await
+        let digest = resp
+            .headers()
+            .get("Docker-Content-Digest")
+            .expect("No digest header")
+            .to_str()
+            .unwrap().to_owned();
+        let manifest = common::response_body_json(resp).await;
+        (manifest, digest)
     }
 
     async fn upload_to_nonwritable_repo(cl: &Router, name: &str) {
@@ -82,20 +92,22 @@ mod interface_tests {
             )
             .await
             .expect("Error uploading layer");
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
 
         //Try manifest
-        let mani: manifest::OCIManifest = serde_json::from_str(
+        let mani: ImageManifest = serde_json::from_str(
             r#"{
             "schemaVersion": 2,
             "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
             "config": {
                 "mediaType": "application/vnd.docker.container.image.v1+json",
-                "digest": "fake"
+                "digest": "sha256:5f13f818131e80418214222144b621a5c663da7f898c3ff3434b424252b79dc0",
+                "size": 0
             },
             "layers": [{
                 "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-                "digest": "fake"
+                "digest": "sha256:997890bc85c5796408ceb20b0ca75dabe6fe868136e926d24ad0f36aa424f99d",
+                "size": 0
             }]
         }"#,
         )
@@ -110,7 +122,7 @@ mod interface_tests {
             )
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     #[tokio::test]
@@ -119,7 +131,7 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(data_dir).await.1;
         get_manifest(&trow, "f/docker/amouat/trow", "latest").await;
         get_manifest(&trow, "f/docker/amouat/trow", "latest").await;
     }
@@ -130,7 +142,7 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(data_dir).await.1;
         get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
         get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
     }
@@ -141,7 +153,7 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(data_dir).await.1;
         // This should use same alpine image as base (so partially cached)
         get_manifest(&trow, "f/docker/library/alpine", "3.13.4").await;
         get_manifest(&trow, "f/docker/library/nginx", "1.20.0-alpine").await;
@@ -153,14 +165,16 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let (state, trow) = start_trow(data_dir).await;
         // Special case: docker/library
         // check that it works and that manifests are written in the correct location
         get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
-        assert!(!data_dir.join("./manifests/f/docker/alpine/3.13.4").exists());
-        assert!(data_dir
-            .join("./manifests/f/docker/library/alpine/3.13.4")
-            .exists());
+        let digest = sqlx::query_scalar!("SELECT manifest_digest FROM tag WHERE repo = 'f/docker/library/alpine' AND tag = '3.13.4'")
+            .fetch_one(&mut *state.db.acquire().await.unwrap())
+            .await
+            .expect("Tag not found in database");
+        let file = data_dir.join(format!("./blobs/{digest}"));
+        assert!(file.exists());
     }
 
     #[tokio::test]
@@ -169,7 +183,7 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(data_dir).await.1;
         //Download an amd64 manifest, then the multi platform version of the same manifest
         get_manifest(
             &trow,
@@ -186,7 +200,7 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(data_dir).await.1;
         // test a registry that doesn't require auth
         get_manifest(&trow, "f/quay/openshifttest/scratch", "latest").await;
     }
@@ -196,23 +210,22 @@ mod interface_tests {
     async fn test_get_manifest_proxy_update_latest_tag() {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
+        let (state, trow) = start_trow(data_dir).await;
 
-        let trow = start_trow(data_dir).await;
         // Check that tags get updated to point to latest digest
-        {
-            let man_3_13 = get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
-            fs::copy(
-                data_dir.join("./manifests/f/docker/library/alpine/3.13.4"),
-                data_dir.join("./manifests/f/docker/library/alpine/latest"),
-            )
-            .unwrap();
-            let man_latest = get_manifest(&trow, "f/docker/library/alpine", "latest").await;
-            assert_ne!(
-                serde_json::to_string(&man_3_13).unwrap(),
-                serde_json::to_string(&man_latest).unwrap(),
-                "Trow did not update digest of `latest` tag"
-            );
-        }
+        let (man_3_13, digest_3_13) = get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
+        sqlx::query!("INSERT INTO tag (repo, tag, manifest_digest) VALUES ('f/docker/library/alpine', 'latest', $1)", digest_3_13)
+            .execute(&mut *state.db.acquire().await.unwrap())
+            .await
+            .expect("Failed to insert tag");
+
+        let (man_latest, digest_latest) = get_manifest(&trow, "f/docker/library/alpine", "latest").await;
+        assert_ne!(digest_3_13, digest_latest, "Trow did not update digest of `latest` tag");
+        assert_ne!(
+            serde_json::to_string(&man_3_13).unwrap(),
+            serde_json::to_string(&man_latest).unwrap(),
+            "Trow did not update manifest of `latest` tag"
+        );
     }
 
     #[tokio::test]
@@ -221,7 +234,7 @@ mod interface_tests {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
 
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(data_dir).await.1;
         //test writing manifest to proxy dir isn't allowed
         upload_to_nonwritable_repo(&trow, "f/failthis").await;
     }

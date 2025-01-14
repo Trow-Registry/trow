@@ -27,7 +27,6 @@ pub struct ValidBasicToken {
     user: String,
 }
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for ValidBasicToken
 where
     Arc<TrowServerState>: FromRef<S>,
@@ -186,7 +185,6 @@ impl IntoResponse for TrowToken {
     }
 }
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for TrowToken
 where
     Arc<TrowServerState>: FromRef<S>,
@@ -197,12 +195,12 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let config = &Arc::from_ref(state).config;
         let base_url = match parts
-            .extract_with_state::<Option<AlwaysHost>, _>(state)
+            .extract_with_state::<Result<AlwaysHost, _>, _>(state)
             .await
             .unwrap()
         {
-            Some(AlwaysHost(host)) => host,
-            None => String::new(),
+            Ok(AlwaysHost(host)) => host,
+            Err(_) => String::new(),
         };
 
         if config.user.is_none() {

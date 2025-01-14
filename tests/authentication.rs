@@ -1,7 +1,7 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
 mod authentication_tests {
 
     use std::path::Path;
@@ -22,6 +22,7 @@ mod authentication_tests {
             cfg.with_user("authtest".to_owned(), "authpass");
         })
         .await
+        .1
     }
 
     #[tokio::test]

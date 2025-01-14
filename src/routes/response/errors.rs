@@ -128,6 +128,7 @@ fn format_error_json(
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let json = format!("{}", self);
+        event!(Level::DEBUG, "Error response: {json}");
 
         let status = match self {
             Error::Unsupported | Error::UnsupportedForProxiedRepo => StatusCode::METHOD_NOT_ALLOWED,

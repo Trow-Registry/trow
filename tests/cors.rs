@@ -1,7 +1,7 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
 mod cors_tests {
     use std::path::Path;
 
@@ -29,6 +29,7 @@ mod cors_tests {
             ]);
         })
         .await
+        .1
     }
 
     #[tokio::test]

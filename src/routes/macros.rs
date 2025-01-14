@@ -3,31 +3,31 @@ macro_rules! route_7_levels {
     ($app:ident, $prefix:literal $route:literal, $($method:ident($handler1:expr, $handler2:expr, $handler3:expr, $handler4:expr, $handler5:expr, $handler6:expr, $handler7:expr)),*) => {
         $app = $app
             .route(
-                concat!($prefix, "/:one", $route),
+                concat!($prefix, "/{one}", $route),
                 $($method($handler1)).*
             )
             .route(
-                concat!($prefix, "/:one/:two", $route),
+                concat!($prefix, "/{one}/{two}", $route),
                 $($method($handler2)).*
             )
             .route(
-                concat!($prefix, "/:one/:two/:three", $route),
+                concat!($prefix, "/{one}/{two}/{three}", $route),
                 $($method($handler3)).*,
             )
             .route(
-                concat!($prefix, "/:one/:two/:three/:four", $route),
+                concat!($prefix, "/{one}/{two}/{three}/{four}", $route),
                 $($method($handler4)).*,
             )
             .route(
-                concat!($prefix, "/:one/:two/:three/:four/:five", $route),
+                concat!($prefix, "/{one}/{two}/{three}/{four}/{five}", $route),
                 $($method($handler5)).*,
             )
             .route(
-                concat!($prefix, "/:one/:two/:three/:four/:five/:six", $route),
+                concat!($prefix, "/{one}/{two}/{three}/{four}/{five}/{six}", $route),
                 $($method($handler6)).*,
             )
             .route(
-                concat!($prefix, "/:one/:two/:three/:four/:five/:six/:seven", $route),
+                concat!($prefix, "/{one}/{two}/{three}/{four}/{five}/{six}/{seven}", $route),
                 $($method($handler7)).*,
             )
             ;

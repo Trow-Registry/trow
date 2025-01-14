@@ -1,7 +1,6 @@
-#[cfg(test)]
+#![cfg(test)]
 mod common;
 
-#[cfg(test)]
 mod interface_tests {
     use std::io::BufReader;
     use std::path::Path;
@@ -21,7 +20,7 @@ mod interface_tests {
     use crate::common::{self, response_body_string, trow_router, DIST_API_HEADER};
 
     async fn start_trow(data_dir: &Path) -> Router {
-        trow_router(data_dir, |_| {}).await
+        trow_router(data_dir, |_| {}).await.1
     }
 
     async fn get_main(cl: &Router) {

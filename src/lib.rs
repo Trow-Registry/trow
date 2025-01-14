@@ -1,6 +1,6 @@
 mod init_db;
 pub mod registry;
-mod routes;
+pub mod routes;
 #[cfg(test)]
 pub mod test_utilities;
 pub mod types;
@@ -127,8 +127,9 @@ impl TrowConfig {
         self
     }
 
+    /// Should only be used internally or for integration tests
     #[doc(hidden)]
-    pub(crate) async fn build_server_state(self) -> Result<Arc<TrowServerState>> {
+    pub async fn build_server_state(self) -> Result<Arc<TrowServerState>> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!(
             "Hostname of this registry (for the MutatingWebhook): {:?}",

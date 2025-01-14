@@ -6,6 +6,8 @@ use axum::routing::get;
 use axum::Router;
 use bytes::Buf;
 use digest::Digest;
+use futures::lock::Mutex;
+use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
@@ -44,7 +46,7 @@ async fn get_manifest(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, raw_reference)): Path<(String, String)>,
 ) -> Result<OciJson<OCIManifest>, Error> {
-    let mut db = state.db.acquire().await?;
+    let mut txn = state.db.begin().await?;
     let reference = ManifestReference::try_from_str(&raw_reference).map_err(|e| {
         Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
     })?;
@@ -61,7 +63,7 @@ async fn get_manifest(
                 repo,
                 raw_reference
             )
-            .fetch_optional(&mut *db)
+            .fetch_optional(&mut *txn)
             .await?;
             tag.map(|t| t.manifest_digest)
         }
@@ -80,7 +82,7 @@ async fn get_manifest(
         repo,
         digest
     )
-    .fetch_optional(&mut *db)
+    .fetch_optional(&mut *txn)
     .await?;
 
     if maybe_manifest.is_none() {
@@ -91,11 +93,24 @@ async fn get_manifest(
             .registry
             .proxy_registry_config
             .get_proxy_config(&repo, &reference)
-            .await {
-                Some(cfg) => cfg,
-                None => return Err(Error::NameInvalid(format!("No registered proxy matches {repo}")))
-            };
-        let new_digest = proxy_cfg.download_remote_image(&image, &state.registry).await.map_err(|_| Error::InternalError)?;
+            .await
+        {
+            Some(cfg) => cfg,
+            None => {
+                return Err(Error::NameInvalid(format!(
+                    "No registered proxy matches {repo}"
+                )))
+            }
+        };
+        let wrapped_txn = Arc::new(Mutex::new(&mut *txn));
+        let new_digest = proxy_cfg
+            .download_remote_image(&image, &state.registry, wrapped_txn.clone())
+            .await
+            .map_err(|e| {
+                event!(Level::ERROR, "Error downloading image: {e}");
+                Error::InternalError
+            })?;
+        // let txn = wrapped_txn.into_inner();
         digest = Some(new_digest.to_string());
     }
     let digest = digest.unwrap();
@@ -292,7 +307,7 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
     #[rustfmt::skip]
     route_7_levels!(
         app,
-        "/v2" "/manifests/:reference",
+        "/v2" "/manifests/{reference}",
         get(get_manifest, get_manifest_2level, get_manifest_3level, get_manifest_4level, get_manifest_5level, get_manifest_6level, get_manifest_7level),
         put(put_image_manifest, put_image_manifest_2level, put_image_manifest_3level, put_image_manifest_4level, put_image_manifest_5level, put_image_manifest_6level, put_image_manifest_7level),
         delete(delete_image_manifest, delete_image_manifest_2level, delete_image_manifest_3level, delete_image_manifest_4level, delete_image_manifest_5level, delete_image_manifest_6level, delete_image_manifest_7level)

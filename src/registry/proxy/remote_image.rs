@@ -30,7 +30,7 @@ const fn get_image_ref_regex() -> &'static str {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RemoteImage {
     /// `http` or `https`
-    scheme: &'static str,
+    pub scheme: &'static str,
     /// Including port, docker.io by default
     host: String,
     repo: String,
@@ -49,11 +49,13 @@ impl std::default::Default for RemoteImage {
     }
 }
 
-impl Into<oci_client::Reference> for RemoteImage {
-    fn into(self) -> oci_client::Reference {
-        match self.reference {
-            ManifestReference::Digest(d) => oci_client::Reference::with_digest(self.host, self.repo, d.to_string()),
-            ManifestReference::Tag(t) => oci_client::Reference::with_tag(self.host, self.repo, t)
+impl From<RemoteImage> for oci_client::Reference {
+    fn from(val: RemoteImage) -> Self {
+        match val.reference {
+            ManifestReference::Digest(d) => {
+                oci_client::Reference::with_digest(val.host, val.repo, d.to_string())
+            }
+            ManifestReference::Tag(t) => oci_client::Reference::with_tag(val.host, val.repo, t),
         }
     }
 }

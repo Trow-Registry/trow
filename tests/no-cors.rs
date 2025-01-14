@@ -1,7 +1,6 @@
-#[cfg(test)]
+#![cfg(test)]
 mod common;
 
-#[cfg(test)]
 mod no_cors_tests {
 
     use std::path::Path;
@@ -26,6 +25,7 @@ mod no_cors_tests {
             cfg.service_name = TROW_ADDRESS.to_string();
         })
         .await
+        .1
     }
 
     async fn test_preflight(cl: &Router) {

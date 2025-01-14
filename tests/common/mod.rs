@@ -1,6 +1,10 @@
+#![cfg(test)]
+#![allow(dead_code)] // Rustup thinks everything in here is dead code
+
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::Router;
@@ -14,28 +18,27 @@ use serde::Serialize;
 use tower::ServiceExt;
 use trow::registry::digest::Digest;
 use trow::registry::manifest;
-use trow::TrowConfig;
+use trow::{routes, TrowConfig, TrowServerState};
 
-/* None of these are dead code, they are called from tests */
-#[allow(dead_code)]
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
-#[allow(dead_code)]
 pub const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
-#[allow(dead_code)]
 pub const LOCATION_HEADER: &str = "Location";
-#[allow(dead_code)]
 pub const RANGE_HEADER: &str = "Range";
 
-#[allow(dead_code)]
-pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(temp_dir: &Path, custom_cfg: F) -> Router {
+pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
+    temp_dir: &Path,
+    custom_cfg: F,
+) -> (Arc<TrowServerState>, Router) {
     let mut trow_builder = TrowConfig::new();
-    trow_builder.data_dir = temp_dir.to_owned();
     trow_builder.db_connection = Some("sqlite::memory:".to_string());
+    trow_builder.data_dir = temp_dir.to_owned();
     custom_cfg(&mut trow_builder);
-    trow_builder.build_app().await.unwrap()
+    let state = trow_builder.build_server_state().await.unwrap();
+    let router = routes::create_app(state.clone());
+
+    (state, router)
 }
 
-#[allow(dead_code)]
 pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     let mut blob = Vec::with_capacity(size);
     for _ in 0..size {
@@ -57,13 +60,11 @@ pub async fn response_body_vec(resp: Response<Body>) -> Vec<u8> {
     buf
 }
 
-#[allow(dead_code)]
 pub async fn response_body_string(resp: Response<Body>) -> String {
     let vec = response_body_vec(resp).await;
     String::from_utf8(vec).unwrap()
 }
 
-#[allow(dead_code)]
 pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {
     let reader = resp
         .into_body()
@@ -75,7 +76,6 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
     serde_json::from_reader(reader).unwrap()
 }
 
-#[allow(dead_code)]
 pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     let resp = cl
         .clone()
@@ -187,7 +187,6 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     assert_eq!(&location, &manifest_addr);
 }
 
-#[allow(dead_code)]
 /// Returns a temporary file filled with `contents`
 pub fn get_file<T: Serialize>(dir: &Path, contents: T) -> PathBuf {
     let rnum: u16 = rand::thread_rng().gen();
