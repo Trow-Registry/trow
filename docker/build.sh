@@ -5,6 +5,7 @@ set -eo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
+docker="$(command -v docker 2> /dev/null || echo "podman")"
 REPO="ghcr.io/trow-registry/trow-dev"
 VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 
@@ -12,7 +13,7 @@ TAG="$VERSION"
 IMAGE="$REPO:$TAG"
 DATE="$(date --rfc-3339=seconds)"
 
-docker build \
+$docker build \
   --build-arg VCS_REF="$(git rev-parse HEAD)" \
   --build-arg VCS_BRANCH="$(git symbolic-ref --short HEAD)" \
   --build-arg REPO="$REPO" \

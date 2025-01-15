@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.5
+# syntax=docker/dockerfile:1
 
 #Note we build on host plaftform and cross-compile to target arch
 FROM --platform=$BUILDPLATFORM rust:bookworm as cross
@@ -20,18 +20,22 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt update && \
     apt-get install -y unzip openssl protobuf-compiler $(cat /.compiler)
 
-COPY Cargo.toml .
-COPY Cargo.lock .
-COPY .cargo/config.toml .cargo/config.toml
-COPY src src
+COPY . .
+
+RUN cargo install sqlx-cli --no-default-features --features sqlite
 
 # Get rid of the "cp" when cargo build --out is stable
-RUN --mount=type=bind,source=./target,target=./target \
+RUN --mount=type=cache,target=./target \
+    cargo sqlx database setup && \
     cargo build --release --target $(cat /.platform) && \
     cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
 
+
+
 FROM debian:bookworm-slim
-RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
+RUN groupadd -r -g 2000 trow &&\
+    useradd -r -g trow -u 2000 trow
+
 
 # Note that certs are needed for proxying
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -39,10 +43,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends openssl ca-certificates
 
-RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
+RUN mkdir -p /data /certs &&\
+    chown -R trow /data /certs
 # keep this late for concurrency
 COPY --from=cross /usr/src/trow/trow /trow
-RUN chown -R trow /data /certs
 USER trow
 ENTRYPOINT ["/trow"]
 
