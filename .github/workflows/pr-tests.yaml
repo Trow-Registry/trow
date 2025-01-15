@@ -19,6 +19,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.7
+      - name: Setup cargo-sqlx
+        run: cargo install sqlx-cli
+      - name: Setup sqlx database
+        run: mkdir -p target && cargo sqlx database setup
+
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Run Trow test suite
@@ -41,6 +46,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.7
+      - name: Setup cargo-sqlx
+        run: cargo install sqlx-cli
+      - name: Setup sqlx database
+        run: mkdir -p target && cargo sqlx database setup
       - name: Build
         run: |
           cargo build

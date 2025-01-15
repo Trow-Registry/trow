@@ -1,11 +1,39 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -exo pipefail
 
 # change to directory with script so we know where project root is
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
 GH_REPO="ghcr.io/trow-registry/trow"
+
+# Check if cargo-sqlx is installed
+if ! command -v cargo-sqlx >/dev/null 2>&1; then
+    echo "→ sqlx-cli not found. Installing..."
+    if ! cargo install sqlx-cli; then
+        echo "Error: Failed to install sqlx-cli"
+        exit 1
+    fi
+    echo "→ sqlx-cli installed successfully"
+else
+    echo "→ sqlx-cli is already installed"
+fi
+
+# Check if development database exists
+DB_PATH="$src_dir/target/dev.db"
+if [ ! -f "$DB_PATH" ]; then
+    echo "→ Development database not found. Setting up..."
+    cd "$src_dir/.."
+    mkdir -p target
+    if ! cargo sqlx database setup; then
+        echo "Error: Failed to setup database"
+        exit 1
+    fi
+    cd "$src_dir"
+    echo "→ Database setup completed"
+else
+    echo "→ Development database already exists at $DB_PATH"
+fi
 
 # Use trow-multi builder if it exists, otherwise create it
 if ! docker buildx ls | grep -s trow-multi ;

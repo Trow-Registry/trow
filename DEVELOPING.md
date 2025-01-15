@@ -3,7 +3,7 @@
 ## sqlx setup
 
 To develop, build and test Trow, an sqlx development database is required.
-The TL;DR is `cargo sqlx database setup`, more information can be found at
+The TL;DR is `mkdir -p target && cargo sqlx database setup`, more information can be found at
 <https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md>.
 
 ## Using Docker/Podman

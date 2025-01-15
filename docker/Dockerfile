@@ -26,7 +26,7 @@ COPY .cargo/config.toml .cargo/config.toml
 COPY src src
 
 # Get rid of the "cp" when cargo build --out is stable
-RUN --mount=type=cache,target=./target \
+RUN --mount=type=bind,source=./target,target=./target \
     cargo build --release --target $(cat /.platform) && \
     cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
 
