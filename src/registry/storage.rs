@@ -98,8 +98,8 @@ impl TrowStorageBackend {
         Ok(tokio::fs::read(&path).await?.into())
     }
 
-    pub async fn get_blob_stream<'a>(
-        &'a self,
+    pub async fn get_blob_stream(
+        &self,
         repo_name: &str,
         digest: &Digest,
     ) -> Result<BoundedStream<impl futures::AsyncRead>, StorageBackendError> {
@@ -113,8 +113,8 @@ impl TrowStorageBackend {
         Ok(BoundedStream::new(size, file.compat()))
     }
 
-    pub async fn write_blob_stream<'a, S, E>(
-        &'a self,
+    pub async fn write_blob_stream<S, E>(
+        &self,
         digest: &Digest,
         stream: S,
         verify: bool,
@@ -169,8 +169,8 @@ impl TrowStorageBackend {
 
     /// Writes part of a blob to disk.
     /// Upload then needs to be "completed"
-    pub async fn write_blob_part_stream<'a, S, E>(
-        &'a self,
+    pub async fn write_blob_part_stream<S, E>(
+        &self,
         upload_id: &uuid::Uuid,
         stream: S,
         range: Option<RangeInclusive<u64>>,

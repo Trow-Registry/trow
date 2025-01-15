@@ -64,6 +64,7 @@ mod test {
         ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig,
     };
     use crate::test_utilities;
+    use crate::test_utilities::test_temp_dir;
 
     #[rstest::rstest]
     #[case::explicit_allow("trow.test/am/test:tag", true, "")]
@@ -80,6 +81,7 @@ mod test {
         #[case] expected_allow: bool,
         #[case] response_contains: &str,
     ) {
+        let tmp_dir = test_temp_dir!();
         let (_, router) = test_utilities::trow_router(
             |builder| {
                 builder.image_validation_config = Some(ImageValidationConfig {
@@ -93,7 +95,7 @@ mod test {
                     deny: vec!["localhost:8000/secret/".to_string()],
                 })
             },
-            None,
+            &tmp_dir,
         )
         .await;
 
@@ -191,6 +193,7 @@ mod test {
     #[case::invalid_image("http://invalid.com/DANCE", None)]
     #[tokio::test]
     async fn mutate_image(#[case] original_image: &str, #[case] new_image_str: Option<&str>) {
+        let tmp_dir = test_temp_dir!();
         let host = "ftp://trow";
         let (_, router) = test_utilities::trow_router(
             |builder| {
@@ -215,7 +218,7 @@ mod test {
                 });
                 builder.service_name = host.to_string();
             },
-            None,
+            &tmp_dir,
         )
         .await;
 

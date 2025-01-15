@@ -65,7 +65,13 @@ where
             return Err((StatusCode::UNAUTHORIZED, ()));
         }
 
-        match base64_engine::STANDARD.decode(&auth_strings[1]) {
+        event!(
+            Level::DEBUG,
+            "Attempting to decode auth string {}",
+            auth_strings[1]
+        );
+
+        match base64_engine::STANDARD_NO_PAD.decode(&auth_strings[1]) {
             Ok(user_pass) => {
                 if verify_user(user_pass, user_cfg) {
                     Ok(ValidBasicToken {
@@ -160,7 +166,7 @@ pub fn new(
     let token = encode(
         &Header::default(),
         &payload,
-        &EncodingKey::from_secret(config.token_secret.as_bytes()),
+        &EncodingKey::from_secret(&config.token_secret),
     )?;
 
     Ok(TrowToken {
@@ -222,15 +228,14 @@ where
         let token = authorization.token();
 
         // parse for bearer token
-        let tok_priv_key = DecodingKey::from_base64_secret(&config.token_secret).map_err(|e| {
-            event!(Level::WARN, "Failed to decode secret: {}", e);
-            Authenticate::new(base_url.clone())
-        })?;
+        let tok_priv_key = DecodingKey::from_secret(&config.token_secret);
+        let mut validation = Validation::default();
+        validation.set_audience(&["Trow Registry"]);
 
-        let dec_token = match decode::<TokenClaim>(token, &tok_priv_key, &Validation::default()) {
+        let dec_token = match decode::<TokenClaim>(token, &tok_priv_key, &validation) {
             Ok(td) => td.claims,
-            Err(_) => {
-                event!(Level::WARN, "Failed to decode user token");
+            Err(e) => {
+                event!(Level::WARN, "Failed to decode user token: {e}");
                 return Err(Authenticate::new(base_url));
             }
         };

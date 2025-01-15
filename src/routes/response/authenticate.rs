@@ -1,8 +1,8 @@
-use axum::body;
-use axum::http::StatusCode;
+use axum::http::HeaderValue;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
+use crate::routes::response::errors::Error;
 /*
  * Generate a WWW-Authenticate header
  */
@@ -20,18 +20,17 @@ impl Authenticate {
 impl IntoResponse for Authenticate {
     fn into_response(self) -> Response {
         let realm = self.base_url;
-        Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
-            .header(
-                "WWW-Authenticate",
-                format!(
-                    "Bearer realm=\"{}/login\",service=\"trow_registry\",scope=\"push/pull\"",
-                    realm
-                ),
-            )
-            .header("Content-Type", "application/json")
-            .body(body::Body::empty())
-            .unwrap()
-            .into_response()
+
+        let mut response = Error::Unauthorized.into_response();
+        response.headers_mut().insert(
+            "WWW-Authenticate",
+            HeaderValue::from_str(&format!(
+                "Bearer realm=\"{}/login\",service=\"trow_registry\",scope=\"push/pull\"",
+                realm
+            ))
+            .unwrap(),
+        );
+
+        response
     }
 }

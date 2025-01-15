@@ -6,7 +6,6 @@ use axum::routing::get;
 use axum::Router;
 use bytes::Buf;
 use digest::Digest;
-use futures::lock::Mutex;
 use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
@@ -46,49 +45,12 @@ async fn get_manifest(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, raw_reference)): Path<(String, String)>,
 ) -> Result<OciJson<OCIManifest>, Error> {
-    let mut txn = state.db.begin().await?;
+    let mut db = state.db.acquire().await?;
     let reference = ManifestReference::try_from_str(&raw_reference).map_err(|e| {
         Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
     })?;
-
-    let mut digest = match &reference {
-        ManifestReference::Tag(_) => {
-            let tag = sqlx::query!(
-                r#"
-                select *
-                from tag t
-                where t.repo = $1
-                    and t.tag = $2
-                "#,
-                repo,
-                raw_reference
-            )
-            .fetch_optional(&mut *txn)
-            .await?;
-            tag.map(|t| t.manifest_digest)
-        }
-        ManifestReference::Digest(_) => Some(raw_reference),
-    };
-    let maybe_manifest = sqlx::query!(
-        r#"
-            select *
-            from blob b
-            inner join repo_blob_association rba
-                on rba.blob_digest = b.digest
-            where b.digest = $2
-                and b.is_manifest is true
-                and rba.repo_name = $1
-        "#,
-        repo,
-        digest
-    )
-    .fetch_optional(&mut *txn)
-    .await?;
-
-    if maybe_manifest.is_none() {
-        if !repo.starts_with(PROXY_DIR) {
-            return Err(Error::ManifestUnknown("".to_string()));
-        }
+    // let mut digest = None;
+    let digest = if repo.starts_with(PROXY_DIR) {
         let (proxy_cfg, image) = match state
             .registry
             .proxy_registry_config
@@ -102,18 +64,62 @@ async fn get_manifest(
                 )))
             }
         };
-        let wrapped_txn = Arc::new(Mutex::new(&mut *txn));
+
         let new_digest = proxy_cfg
-            .download_remote_image(&image, &state.registry, wrapped_txn.clone())
+            .download_remote_image(&image, &state.registry, &state.db)
             .await
             .map_err(|e| {
                 event!(Level::ERROR, "Error downloading image: {e}");
                 Error::InternalError
             })?;
-        // let txn = wrapped_txn.into_inner();
-        digest = Some(new_digest.to_string());
-    }
-    let digest = digest.unwrap();
+        new_digest.to_string()
+    } else {
+        let digest = match &reference {
+            ManifestReference::Tag(_) => {
+                let tag = sqlx::query!(
+                    r#"
+                select *
+                from tag t
+                where t.repo = $1
+                    and t.tag = $2
+                "#,
+                    repo,
+                    raw_reference
+                )
+                .fetch_optional(&mut *db)
+                .await?;
+                match tag {
+                    Some(t) => t.manifest_digest,
+                    None => {
+                        return Err(Error::ManifestUnknown(format!(
+                            "Unknown tag: {raw_reference}"
+                        )))
+                    }
+                }
+            }
+            ManifestReference::Digest(_) => raw_reference,
+        };
+        let maybe_manifest = sqlx::query!(
+            r#"
+            select *
+            from blob b
+            inner join repo_blob_association rba
+                on rba.blob_digest = b.digest
+            where b.digest = $2
+                and b.is_manifest is true
+                and rba.repo_name = $1
+        "#,
+            repo,
+            digest
+        )
+        .fetch_optional(&mut *db)
+        .await?;
+
+        if maybe_manifest.is_none() {
+            return Err(Error::ManifestUnknown("".to_string()));
+        }
+        digest
+    };
 
     let digest_parsed = Digest::try_from_raw(&digest).unwrap();
     let manifest_raw = state

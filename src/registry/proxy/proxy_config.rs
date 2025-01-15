@@ -1,7 +1,7 @@
 use std::ops::DerefMut;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aws_config::BehaviorVersion;
 use aws_sdk_ecr::config::http::HttpResponse;
 use aws_sdk_ecr::error::SdkError;
@@ -14,8 +14,7 @@ use oci_client::client::ClientProtocol;
 use oci_client::secrets::RegistryAuth;
 use oci_client::Reference;
 use serde::{Deserialize, Serialize};
-use sqlx::error::DatabaseError;
-use sqlx::Sqlite;
+use sqlx::{Sqlite, SqlitePool};
 use tracing::{event, Level};
 
 use crate::registry::manifest::{ManifestReference, OCIManifest};
@@ -75,6 +74,17 @@ impl RegistryProxiesConfig {
         None
     }
 }
+use crate::registry::digest::DigestError;
+
+#[derive(Debug, thiserror::Error)]
+pub enum DownloadRemoteImageError {
+    #[error("DatabaseError: {0}")]
+    DbError(#[from] sqlx::Error),
+    #[error("Invalid digest: {0}")]
+    InvalidDigest(#[from] DigestError),
+    #[error("Failed to download image")]
+    DownloadAttemptsFailed,
+}
 
 impl SingleRegistryProxyConfig {
     async fn setup_client(&self, insecure: bool) -> Result<(oci_client::Client, RegistryAuth)> {
@@ -98,16 +108,13 @@ impl SingleRegistryProxyConfig {
     }
 
     /// returns the downloaded digest
-    /// TO RE-DO !!!
-    pub async fn download_remote_image<C>(
+    pub async fn download_remote_image(
         &self,
         image: &RemoteImage,
         registry: &TrowServer,
-        db: Arc<Mutex<&mut C>>,
-    ) -> Result<Digest>
-    where
-        for<'e> &'e mut C: sqlx::Executor<'e, Database = Sqlite>,
-    {
+        db: &SqlitePool,
+    ) -> Result<Digest, DownloadRemoteImageError> {
+        let mut txn = db.begin().await?;
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
         event!(Level::DEBUG, "Downloading proxied image {}", repo_name);
@@ -130,7 +137,7 @@ impl SingleRegistryProxyConfig {
                     repo_name,
                     t
                 )
-                .fetch_optional(&mut **db.lock().await.deref_mut())
+                .fetch_optional(&mut *txn)
                 .await?;
                 if let Some((cl, auth)) = &try_cl {
                     match cl.fetch_manifest_digest(&image_ref, auth).await {
@@ -149,7 +156,7 @@ impl SingleRegistryProxyConfig {
             }
         };
 
-        for (i, mani_digest) in digests.into_iter().enumerate() {
+        for mani_digest in digests.into_iter() {
             let mani_digest_str = mani_digest.as_str();
             let have_manifest = sqlx::query_scalar!(
                 r#"
@@ -160,7 +167,7 @@ impl SingleRegistryProxyConfig {
                 "#,
                 mani_digest_str
             )
-            .fetch_one(&mut **db.lock().await.deref_mut())
+            .fetch_one(&mut *txn)
             .await?
                 == 1;
             if have_manifest {
@@ -172,18 +179,17 @@ impl SingleRegistryProxyConfig {
                 let manifest_download = download_manifest_and_layers(
                     cl,
                     auth,
-                    db.clone(),
+                    Arc::new(Mutex::new(&mut *txn)),
                     &registry.storage,
                     &ref_to_dl,
                     &repo_name,
                 )
                 .await;
 
-                match (manifest_download.err(), image_ref.tag()) {
-                    (Some(e), _) => {
-                        event!(Level::WARN, "Failed to download proxied image: {}", e)
-                    }
-                    (None, Some(tag)) => {
+                if let Err(e) = manifest_download {
+                    event!(Level::WARN, "Failed to download proxied image: {}", e)
+                } else {
+                    if let Some(tag) = image_ref.tag() {
                         sqlx::query!(
                             r#"
                             INSERT INTO tag (repo, tag, manifest_digest)
@@ -194,19 +200,16 @@ impl SingleRegistryProxyConfig {
                             tag,
                             mani_digest_str
                         )
-                        .execute(&mut **db.lock().await.deref_mut())
+                        .execute(&mut *txn)
                         .await?;
-                        return Ok(mani_digest);
                     }
-                    (None, None) => return Ok(mani_digest),
+                    txn.commit().await?;
+                    return Ok(mani_digest);
                 }
             }
         }
-        Err(anyhow!(
-            "Could not fetch manifest for proxied image {}:{}",
-            repo_name,
-            image.reference
-        ))
+
+        Err(DownloadRemoteImageError::DownloadAttemptsFailed)
     }
 }
 
@@ -291,7 +294,7 @@ where
         {
             Err(sqlx::Error::Database(e)) if e.is_unique_violation() => true,
             Err(e) => return Err(e.into()),
-            _ => false,
+            Ok(_) => false,
         };
 
         if !already_has_blob {
@@ -344,28 +347,36 @@ where
     })?;
 
     let manifest_size = raw_manifest.len() as i64;
-    sqlx::query!(
+    let already_has_manifest = match sqlx::query!(
         "INSERT INTO blob (digest, is_manifest, size) VALUES ($1, TRUE, $2);",
         digest,
         manifest_size
     )
     .execute(&mut **db.lock().await.deref_mut())
-    .await?;
+    .await
+    {
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => true,
+        Err(e) => return Err(e.into()),
+        Ok(_) => false,
+    };
+
     sqlx::query!(
-        "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2);",
+        "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
         local_repo_name,
         digest,
     )
     .execute(&mut **db.lock().await.deref_mut())
     .await?;
 
-    storage
-        .write_image_manifest(
-            Bytes::from(raw_manifest),
-            local_repo_name,
-            &Digest::try_from_raw(&digest).unwrap(),
-        )
-        .await?;
+    if !already_has_manifest {
+        storage
+            .write_image_manifest(
+                Bytes::from(raw_manifest),
+                local_repo_name,
+                &Digest::try_from_raw(&digest).unwrap(),
+            )
+            .await?;
+    }
 
     match manifest {
         OCIManifest::List(m) => {

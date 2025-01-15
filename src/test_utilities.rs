@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -19,14 +17,10 @@ pub const RANGE_HEADER: &str = "Range";
 
 pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
     custom_cfg: F,
-    temp_dir: Option<&TestTempDir>,
+    temp_dir: &TestTempDir,
 ) -> (Arc<TrowServerState>, Router) {
     let mut trow_builder = crate::TrowConfig::new();
-    trow_builder.db_connection = Some("sqlite::memory:".to_string());
-    if let Some(dir) = temp_dir {
-        trow_builder.data_dir = dir.as_path_untracked().to_owned();
-    }
-
+    trow_builder.data_dir = temp_dir.as_path_untracked().to_owned();
     custom_cfg(&mut trow_builder);
     let state = trow_builder.build_server_state().await.unwrap();
     let router = routes::create_app(state.clone());
@@ -43,3 +37,23 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
         .reader();
     serde_json::from_reader(reader).unwrap()
 }
+
+/// test_temp_dir if thread name != module path, which is the case in parametrized tests
+pub fn test_temp_dir_from_thread_name(mod_path: &str) -> TestTempDir {
+    let path = {
+        let (crate_, _) = mod_path.split_once("::").unwrap();
+        let thread = std::thread::current();
+        let thread = thread.name().unwrap();
+        let (t_mod, fn_) = thread.rsplit_once("::").unwrap();
+        Ok::<_, anyhow::Error>(format!("{crate_}::{t_mod}::{fn_}"))
+    }
+    .expect("unable to calculate complete test function path");
+
+    test_temp_dir::TestTempDir::from_complete_item_path(&path)
+}
+
+macro_rules! test_temp_dir { {} => {
+    $crate::test_utilities::test_temp_dir_from_thread_name(module_path!())
+} }
+
+pub(crate) use test_temp_dir;

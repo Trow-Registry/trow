@@ -31,12 +31,14 @@ async fn get_blob(
 ) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
     let mut conn = state.db.acquire().await?;
     let digest_str = digest.as_str();
-    sqlx::query!(
+    sqlx::query_scalar!(
         r#"
-        SELECT * FROM blob
-        WHERE digest = $1
+        SELECT digest FROM blob
+        JOIN repo_blob_association ON blob.digest = repo_blob_association.blob_digest
+        WHERE digest = $1 AND repo_name = $2
         "#,
-        digest_str
+        digest_str,
+        repo
     )
     .fetch_one(&mut *conn)
     .await?;

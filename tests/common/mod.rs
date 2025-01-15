@@ -30,7 +30,6 @@ pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
     custom_cfg: F,
 ) -> (Arc<TrowServerState>, Router) {
     let mut trow_builder = TrowConfig::new();
-    trow_builder.db_connection = Some("sqlite::memory:".to_string());
     trow_builder.data_dir = temp_dir.to_owned();
     custom_cfg(&mut trow_builder);
     let state = trow_builder.build_server_state().await.unwrap();

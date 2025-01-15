@@ -65,7 +65,7 @@ pub struct TrowConfig {
     pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
     pub dry_run: bool,
-    pub token_secret: String,
+    pub token_secret: Vec<u8>,
     user: Option<UserConfig>,
     pub cors: Option<Vec<String>>,
     pub uses_tls: bool,
@@ -87,7 +87,7 @@ impl TrowConfig {
             proxy_registry_config: None,
             image_validation_config: None,
             dry_run: false,
-            token_secret: Uuid::new_v4().to_string(),
+            token_secret: Uuid::new_v4().as_bytes().to_vec(),
             user: None,
             cors: None,
             uses_tls: false,
@@ -169,7 +169,16 @@ impl TrowConfig {
         );
         let registry = ts_builder.get_server().await?;
 
-        let db = init_db::init_db(&self.db_connection).await?;
+        let db_in_memory = self.db_connection == Some(":memory:".to_string());
+        let db_file = match (&self.db_connection, db_in_memory) {
+            (Some(conn), false) => conn.clone(),
+            _ => {
+                let mut p = self.data_dir.clone();
+                p.push("trow.db");
+                p.to_string_lossy().to_string()
+            }
+        };
+        let db = init_db::init_db(&db_file, db_in_memory).await?;
 
         let server_state = TrowServerState {
             config: self,

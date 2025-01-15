@@ -3,7 +3,7 @@
 mod common;
 
 mod interface_tests {
-    use std::fs;
+
     use std::path::Path;
     use std::sync::Arc;
 
@@ -77,7 +77,8 @@ mod interface_tests {
             .get("Docker-Content-Digest")
             .expect("No digest header")
             .to_str()
-            .unwrap().to_owned();
+            .unwrap()
+            .to_owned();
         let manifest = common::response_body_json(resp).await;
         (manifest, digest)
     }
@@ -219,8 +220,12 @@ mod interface_tests {
             .await
             .expect("Failed to insert tag");
 
-        let (man_latest, digest_latest) = get_manifest(&trow, "f/docker/library/alpine", "latest").await;
-        assert_ne!(digest_3_13, digest_latest, "Trow did not update digest of `latest` tag");
+        let (man_latest, digest_latest) =
+            get_manifest(&trow, "f/docker/library/alpine", "latest").await;
+        assert_ne!(
+            digest_3_13, digest_latest,
+            "Trow did not update digest of `latest` tag"
+        );
         assert_ne!(
             serde_json::to_string(&man_3_13).unwrap(),
             serde_json::to_string(&man_latest).unwrap(),

@@ -53,6 +53,11 @@ mod utils {
             .write_blob_part_stream(&upload_id_bin, data.into_data_stream(), range)
             .await?;
 
+        registry
+            .storage
+            .complete_blob_write(&upload_id_bin, digest)
+            .await?;
+
         sqlx::query!(
             r#"
             DELETE FROM blob_upload
@@ -215,6 +220,8 @@ async fn patch_blob_upload(
     .execute(&mut *txn)
     .await?;
 
+    txn.commit().await?;
+
     Ok(UploadInfo::new(
         uuid_str,
         repo,
@@ -370,6 +377,7 @@ mod tests {
     use http_body_util::BodyExt;
     use hyper::Request;
     use reqwest::StatusCode;
+    use test_temp_dir::test_temp_dir;
     use tower::{Service, ServiceExt};
     use uuid::Uuid;
 
@@ -380,7 +388,8 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_create_new_upload() {
-        let (state, _) = test_utilities::trow_router(|_| {}, None).await;
+        let tmp_dir = test_temp_dir!();
+        let (state, _) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
         let resp = post_blob_upload(
             TrowToken::default(),
             State(state.clone()),
@@ -412,7 +421,8 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_put_blob_upload() {
-        let (_, mut router) = test_utilities::trow_router(|_| {}, None).await;
+        let tmp_dir = test_temp_dir!();
+        let (_, mut router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
         let repo_name = "test";
         let resp = router
             .call(
@@ -464,7 +474,8 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_complete_upload() {
-        let (_, router) = test_utilities::trow_router(|_| {}, None).await;
+        let tmp_dir = test_temp_dir!();
+        let (_, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
         let repo_name = "test";
 
         let config = "{ }\n".as_bytes();
@@ -495,7 +506,8 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_patch_blob_upload() {
-        let (state, _) = test_utilities::trow_router(|_| {}, None).await;
+        let tmp_dir = test_temp_dir!();
+        let (state, _) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
         let upload_uuid = Uuid::new_v4();
         let upload_uuid_str = upload_uuid.to_string();
         sqlx::query!(
