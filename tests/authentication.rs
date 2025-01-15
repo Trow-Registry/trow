@@ -26,6 +26,7 @@ mod authentication_tests {
     }
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn test_auth_redir() {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
