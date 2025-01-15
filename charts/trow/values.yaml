@@ -49,7 +49,7 @@ trow:
   ## For more info on log levels see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html
   logLevel: info
 
-## Job to configure the webhooks
+## General configuration for the validation and mutating webhooks
 webhooks:
   ## It is possible to restrict webhook access to some namespaces, ref:
   ##   https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
