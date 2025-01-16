@@ -142,6 +142,17 @@ jobs:
         run: |
           kubectl wait pod/trow-test-0 --for condition=ready --timeout=300s
           docker push 127.0.0.1/test/nginx:alpine
+      - if: always()
+        name: Export pod logs
+        run: .github/workflows/config/export-pod-logs.sh
+      - if: always()
+        name: Upload pod logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pod-logs-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ./pod_logs/*.txt
+          retention-days: 2
+          compression-level: 9
 
 
   typos:
