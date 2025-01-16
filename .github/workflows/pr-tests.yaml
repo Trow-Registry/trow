@@ -30,7 +30,7 @@ jobs:
 
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # older ubuntu == older glibc
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
@@ -83,6 +83,8 @@ jobs:
           ID=$(docker run -d -e RUST_LOG=debug --name trow -p 8000:8000 trow:onpr)
           IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $ID)
           echo "container-ip=$IP" >> $GITHUB_OUTPUT
+          echo "ID=$ID   IP=$IP"
+          docker logs $ID
       - name: Test connectivity
         run: curl "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
       - name: Run OCI Distribution Spec conformance tests
