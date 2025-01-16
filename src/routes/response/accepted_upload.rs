@@ -7,12 +7,7 @@ use crate::types::AcceptedUpload;
 
 impl IntoResponse for AcceptedUpload {
     fn into_response(self) -> Response {
-        let location = format!(
-            "{}/v2/{}/blobs/{}",
-            self.base_url(),
-            self.repo_name(),
-            self.digest()
-        );
+        let location = format!("/v2/{}/blobs/{}", self.repo_name(), self.digest());
         event!(Level::DEBUG, "accepted upload response");
         let (left, right) = self.range();
         Response::builder()
@@ -32,20 +27,18 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::registry::{Digest, DigestAlgorithm};
-    use crate::types::{AcceptedUpload, Uuid};
+    use crate::registry::Digest;
+    use crate::types::AcceptedUpload;
 
     #[tokio::test]
     async fn test_resp() {
         let accepted_upload = AcceptedUpload::new(
-            "http://trowuw".to_string(),
-            Digest {
-                algo: DigestAlgorithm::Sha256,
-                hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
-                    .to_string(),
-            },
+            Digest::try_from_raw(
+                "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec",
+            )
+            .unwrap(),
             "moredhel/test".to_owned(),
-            Uuid("whatever".to_owned()),
+            uuid::Uuid::new_v4(),
             (0, 0),
         );
 

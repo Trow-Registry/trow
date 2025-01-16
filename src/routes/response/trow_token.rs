@@ -1,4 +1,5 @@
 use std::ops::Add;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::extract::{FromRef, FromRequestParts};
@@ -17,7 +18,7 @@ use uuid::Uuid;
 
 use super::authenticate::Authenticate;
 use crate::routes::extracts::AlwaysHost;
-use crate::{TrowConfig, UserConfig};
+use crate::{TrowConfig, TrowServerState, UserConfig};
 
 const TOKEN_DURATION: u64 = 3600;
 const AUTHORIZATION: &str = "authorization";
@@ -26,16 +27,15 @@ pub struct ValidBasicToken {
     user: String,
 }
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for ValidBasicToken
 where
-    TrowConfig: FromRef<S>,
+    Arc<TrowServerState>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = (StatusCode, ());
 
-    async fn from_request_parts(req: &mut Parts, config: &S) -> Result<Self, Self::Rejection> {
-        let config = TrowConfig::from_ref(config);
+    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let config = &Arc::from_ref(state).config;
 
         let user_cfg = match config.user {
             Some(ref user_cfg) => user_cfg,
@@ -64,6 +64,12 @@ where
             //TODO: This probably isn't right, maybe check if bearer?
             return Err((StatusCode::UNAUTHORIZED, ()));
         }
+
+        event!(
+            Level::DEBUG,
+            "Attempting to decode auth string {}",
+            auth_strings[1]
+        );
 
         match base64_engine::STANDARD.decode(&auth_strings[1]) {
             Ok(user_pass) => {
@@ -97,7 +103,7 @@ fn verify_user(user_pass: Vec<u8>, user_cfg: &UserConfig) -> bool {
     false
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TrowToken {
     pub user: String,
     pub token: String,
@@ -160,7 +166,7 @@ pub fn new(
     let token = encode(
         &Header::default(),
         &payload,
-        &EncodingKey::from_secret(config.token_secret.as_bytes()),
+        &EncodingKey::from_secret(&config.token_secret),
     )?;
 
     Ok(TrowToken {
@@ -185,23 +191,22 @@ impl IntoResponse for TrowToken {
     }
 }
 
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for TrowToken
 where
-    TrowConfig: FromRef<S>,
+    Arc<TrowServerState>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = Authenticate;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let config = TrowConfig::from_ref(state);
+        let config = &Arc::from_ref(state).config;
         let base_url = match parts
-            .extract_with_state::<Option<AlwaysHost>, _>(state)
+            .extract_with_state::<Result<AlwaysHost, _>, _>(state)
             .await
             .unwrap()
         {
-            Some(AlwaysHost(host)) => host,
-            None => String::new(),
+            Ok(AlwaysHost(host)) => host,
+            Err(_) => String::new(),
         };
 
         if config.user.is_none() {
@@ -223,15 +228,14 @@ where
         let token = authorization.token();
 
         // parse for bearer token
-        let tok_priv_key = DecodingKey::from_base64_secret(&config.token_secret).map_err(|e| {
-            event!(Level::WARN, "Failed to decode secret: {}", e);
-            Authenticate::new(base_url.clone())
-        })?;
+        let tok_priv_key = DecodingKey::from_secret(&config.token_secret);
+        let mut validation = Validation::default();
+        validation.set_audience(&["Trow Registry"]);
 
-        let dec_token = match decode::<TokenClaim>(token, &tok_priv_key, &Validation::default()) {
+        let dec_token = match decode::<TokenClaim>(token, &tok_priv_key, &validation) {
             Ok(td) => td.claims,
-            Err(_) => {
-                event!(Level::WARN, "Failed to decode user token");
+            Err(e) => {
+                event!(Level::WARN, "Failed to decode user token: {e}");
                 return Err(Authenticate::new(base_url));
             }
         };

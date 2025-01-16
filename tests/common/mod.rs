@@ -1,6 +1,10 @@
+#![cfg(test)]
+#![allow(dead_code)] // Rustup thinks everything in here is dead code
+
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::Router;
@@ -14,19 +18,26 @@ use serde::Serialize;
 use tower::ServiceExt;
 use trow::registry::digest::Digest;
 use trow::registry::manifest;
+use trow::{routes, TrowConfig, TrowServerState};
 
-/* None of these are dead code, they are called from tests */
-#[allow(dead_code)]
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
-#[allow(dead_code)]
 pub const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";
-#[allow(dead_code)]
 pub const LOCATION_HEADER: &str = "Location";
-#[allow(dead_code)]
 pub const RANGE_HEADER: &str = "Range";
 
-#[cfg(test)]
-#[allow(dead_code)]
+pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
+    temp_dir: &Path,
+    custom_cfg: F,
+) -> (Arc<TrowServerState>, Router) {
+    let mut trow_builder = TrowConfig::new();
+    trow_builder.data_dir = temp_dir.to_owned();
+    custom_cfg(&mut trow_builder);
+    let state = trow_builder.build_server_state().await.unwrap();
+    let router = routes::create_app(state.clone());
+
+    (state, router)
+}
+
 pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     let mut blob = Vec::with_capacity(size);
     for _ in 0..size {
@@ -35,8 +46,6 @@ pub fn gen_rand_blob(size: usize) -> Vec<u8> {
     blob
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
 pub async fn response_body_vec(resp: Response<Body>) -> Vec<u8> {
     let mut buf = Vec::new();
     resp.into_body()
@@ -50,15 +59,11 @@ pub async fn response_body_vec(resp: Response<Body>) -> Vec<u8> {
     buf
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
 pub async fn response_body_string(resp: Response<Body>) -> String {
     let vec = response_body_vec(resp).await;
     String::from_utf8(vec).unwrap()
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
 pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {
     let reader = resp
         .into_body()
@@ -70,15 +75,12 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
     serde_json::from_reader(reader).unwrap()
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
-    use crate::common;
-
+/// Returns (blob-digest, manifest-digest)
+pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, Digest) {
     let resp = cl
         .clone()
         .oneshot(
-            Request::post(&format!("/v2/{}/blobs/uploads/", name))
+            Request::post(format!("/v2/{}/blobs/uploads/", name))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -108,13 +110,13 @@ pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
     let range = resp.headers().get(RANGE_HEADER).unwrap().to_str().unwrap();
     assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
 
-    let digest = Digest::digest_sha256(BufReader::new(blob.as_slice())).unwrap();
+    let blob_digest = Digest::digest_sha256(BufReader::new(blob.as_slice())).unwrap();
     let resp = cl
         .clone()
         .oneshot(
-            Request::put(&format!(
+            Request::put(format!(
                 "/v2/{}/blobs/uploads/{}?digest={}",
-                name, uuid, digest
+                name, uuid, blob_digest
             ))
             .body(Body::empty())
             .unwrap(),
@@ -127,7 +129,7 @@ pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
     let resp = cl
         .clone()
         .oneshot(
-            Request::get(&format!("/v2/{}/blobs/{}", name, digest))
+            Request::get(format!("/v2/{}/blobs/{}", name, blob_digest))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -140,52 +142,59 @@ pub async fn upload_layer(cl: &Router, name: &str, tag: &str) {
         .unwrap()
         .to_str()
         .unwrap();
-    assert_eq!(digest.to_string(), digest_header);
-    let body = common::response_body_vec(resp).await;
+    assert_eq!(blob_digest.to_string(), digest_header);
+    let body = response_body_vec(resp).await;
     assert_eq!(blob, body);
 
     //Upload manifest
     //For time being use same blob for config and layer
-    let config = manifest::Object {
-        media_type: "application/vnd.docker.container.image.v1+json".to_owned(),
-        size: Some(blob.len() as u64),
-        digest: digest.to_string(),
-    };
-    let layer = manifest::Object {
-        media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_owned(),
-        size: Some(blob.len() as u64),
-        digest: digest.to_string(),
-    };
-    let layers = vec![layer];
-    let mani = manifest::OCIManifestV2 {
-        schema_version: 2,
-        media_type: Some("application/vnd.docker.distribution.manifest.v2+json".to_owned()),
-        config,
-        layers,
-    };
+    let blob_size = blob.len();
+    let raw_manifest = format!(
+        r#"{{
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "config": {{
+            "mediaType": "application/vnd.docker.container.image.v1+json",
+            "size": {blob_size},
+            "digest": "{blob_digest}"
+        }},
+        "layers": [{{
+            "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+            "size": {blob_size},
+            "digest": "{blob_digest}"
+        }}]
+    }}"#
+    );
+    let manifest_digest = Digest::digest_sha256(BufReader::new(raw_manifest.as_bytes())).unwrap();
+    let _: manifest::OCIManifest = serde_json::from_str(&raw_manifest).unwrap();
+
     let manifest_addr = format!("/v2/{}/manifests/{}", name, tag);
     let resp = cl
         .clone()
         .oneshot(
             Request::put(&manifest_addr)
-                .body(Body::from(serde_json::to_vec(&mani).unwrap()))
+                .body(Body::from(raw_manifest))
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED);
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "response: {}",
+        response_body_string(resp).await
+    );
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();
     assert_eq!(&location, &manifest_addr);
+    (blob_digest, manifest_digest)
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
 /// Returns a temporary file filled with `contents`
 pub fn get_file<T: Serialize>(dir: &Path, contents: T) -> PathBuf {
     let rnum: u16 = rand::thread_rng().gen();
     let path = dir.join(rnum.to_string());
     let mut file = File::create(&path).unwrap();
-    file.write_all(serde_yaml::to_string(&contents).unwrap().as_bytes())
+    file.write_all(serde_yaml_ng::to_string(&contents).unwrap().as_bytes())
         .unwrap();
     file.flush().unwrap();
 

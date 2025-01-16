@@ -1,7 +1,7 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
 mod cli {
     use predicates::prelude::*;
     use test_temp_dir::test_temp_dir;

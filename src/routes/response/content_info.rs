@@ -1,15 +1,14 @@
-use axum::extract::FromRequestParts;
+use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use tracing::{event, Level};
 
 use crate::registry::blob_storage::ContentInfo;
-use crate::response::errors::Error;
+use crate::routes::response::errors::Error;
 
 /**
  * ContentInfo should always be wrapped an Option in routes to avoid failure returns.
  */
-#[axum::async_trait]
 impl<S> FromRequestParts<S> for ContentInfo
 where
     S: Send + Sync,
@@ -64,5 +63,24 @@ where
             StatusCode::BAD_REQUEST,
             Error::BlobUploadInvalid("Invalid Content-Range".to_string()),
         ))
+    }
+}
+
+impl<S> OptionalFromRequestParts<S> for ContentInfo
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, Error);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        // TODO: better handle this
+        Ok(
+            <Self as FromRequestParts<S>>::from_request_parts(parts, state)
+                .await
+                .ok(),
+        )
     }
 }

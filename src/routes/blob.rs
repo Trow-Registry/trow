@@ -1,19 +1,16 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use axum::body::Body;
-use axum::extract::{Path, Query, State};
-use digest::Digest;
-use tracing::{event, Level};
+use axum::extract::{Path, State};
+use axum::routing::get;
+use axum::Router;
 
-use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
-use crate::registry::storage::StorageBackendError;
-use crate::registry::{digest, BlobReader, ContentInfo, StorageDriverError};
-use crate::response::errors::Error;
-use crate::response::trow_token::TrowToken;
-use crate::response::upload_info::UploadInfo;
-use crate::types::{AcceptedUpload, BlobDeleted, DigestQuery, Upload, Uuid};
+use crate::registry::{BlobReader, Digest};
+use crate::routes::macros::route_7_levels;
+use crate::routes::response::errors::Error;
+use crate::routes::response::trow_token::TrowToken;
+use crate::types::BlobDeleted;
 use crate::TrowServerState;
 
 /*
@@ -25,232 +22,40 @@ digest - unique identifier for the blob to be downloaded
 
 # Responses
 200 - blob is downloaded
-307 - redirect to another service for downloading[1]
+307 - redirect to another service for downloading (docker API, not OCI)
  */
-pub async fn get_blob(
+async fn get_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((one, digest)): Path<(String, String)>,
+    Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
-    let digest = match Digest::try_from_raw(&digest) {
-        Ok(d) => d,
-        Err(e) => {
-            event!(Level::ERROR, "Error parsing digest: {}", e);
-            return Err(Error::DigestInvalid);
-        }
-    };
+    let mut conn = state.db.acquire().await?;
+    let digest_str = digest.as_str();
+    sqlx::query_scalar!(
+        r#"
+        SELECT digest FROM blob
+        JOIN repo_blob_association ON blob.digest = repo_blob_association.blob_digest
+        WHERE digest = $1 AND repo_name = $2
+        "#,
+        digest_str,
+        repo
+    )
+    .fetch_one(&mut *conn)
+    .await?;
 
-    match state.registry.get_blob(&one, &digest).await {
-        Ok(r) => Ok(r),
-        Err(e) => {
-            event!(Level::ERROR, "Error getting blob: {}", e);
-            Err(Error::NotFound)
-        }
-    }
+    let stream = match state.registry.storage.get_blob_stream(&repo, &digest).await {
+        Ok(stream) => stream,
+        Err(_) => return Err(Error::InternalError),
+    };
+    Ok(BlobReader::new(digest, stream).await)
 }
 
 endpoint_fn_7_levels!(
     get_blob(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
-        path: [image_name, digest]
+        path: [image_name, digest: Digest]
     ) -> Result<BlobReader<impl futures::AsyncRead>, Error>
-);
-
-/*
----
-Monolithic Upload
-PUT /v2/<name>/blobs/uploads/<uuid>?digest=<digest>
-Content-Length: <size of layer>
-Content-Type: application/octet-stream
-
-<Layer Binary Data>
----
-Completes the upload.
-*/
-pub async fn put_blob(
-    _auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    Path((repo, uuid)): Path<(String, String)>,
-    AlwaysHost(host): AlwaysHost,
-    Query(digest): Query<DigestQuery>,
-    chunk: Body,
-) -> Result<AcceptedUpload, Error> {
-    let digest = match digest.digest {
-        Some(d) => d,
-        None => return Err(Error::DigestInvalid),
-    };
-
-    let size = match state
-        .registry
-        .store_blob_chunk(&repo, &uuid, None, chunk)
-        .await
-    {
-        Ok(stored) => stored.total_stored,
-        Err(StorageDriverError::InvalidName(name)) => return Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidContentRange) => {
-            return Err(Error::BlobUploadInvalid(
-                "Invalid Content Range".to_string(),
-            ))
-        }
-        Err(e) => {
-            event!(Level::ERROR, "Error storing blob chunk: {}", e);
-            return Err(Error::InternalError);
-        }
-    };
-
-    let digest_obj = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
-    state
-        .registry
-        .complete_and_verify_blob_upload(&repo, &uuid, &digest_obj)
-        .await
-        .map_err(|e| match e {
-            StorageDriverError::InvalidDigest => Error::DigestInvalid,
-            e => {
-                event!(Level::ERROR, "Error completing blob upload: {}", e);
-                Error::InternalError
-            }
-        })?;
-
-    Ok(AcceptedUpload::new(
-        host,
-        digest_obj,
-        repo,
-        Uuid(uuid),
-        (0, (size as u32).saturating_sub(1)), // Note first byte is 0
-    ))
-}
-
-endpoint_fn_7_levels!(
-    put_blob(
-        auth_user: TrowToken,
-        state: State<Arc<TrowServerState>>;
-        path: [image_name, uuid],
-        host: AlwaysHost,
-        digest: Query<DigestQuery>,
-        chunk: Body
-    ) -> Result<AcceptedUpload, Error>
-);
-
-/*
-
----
-Chunked Upload
-
-PATCH /v2/<name>/blobs/uploads/<uuid>
-Content-Length: <size of chunk>
-Content-Range: <start of range>-<end of range>
-Content-Type: application/octet-stream
-
-<Layer Chunk Binary Data>
----
-
-Uploads a blob or chunk of a blob.
-
-Checks UUID. Returns UploadInfo with range set to correct position.
-
-*/
-pub async fn patch_blob(
-    _auth_user: TrowToken,
-    content_info: Option<ContentInfo>,
-    State(state): State<Arc<TrowServerState>>,
-    Path((repo, uuid)): Path<(String, String)>,
-    AlwaysHost(host): AlwaysHost,
-    chunk: Body,
-) -> Result<UploadInfo, Error> {
-    match state
-        .registry
-        .store_blob_chunk(&repo, &uuid, content_info, chunk)
-        .await
-    {
-        Ok(stored) => {
-            let repo_name = repo;
-            let uuid = Uuid(uuid);
-            Ok(UploadInfo::new(
-                host,
-                uuid,
-                repo_name,
-                (0, (stored.total_stored as u32).saturating_sub(1)), // First byte is 0
-            ))
-        }
-        Err(StorageDriverError::InvalidName(name)) => Err(Error::NameInvalid(name)),
-        Err(StorageDriverError::InvalidContentRange) => Err(Error::BlobUploadInvalid(
-            "Invalid Content Range".to_string(),
-        )),
-        Err(_) => Err(Error::InternalError),
-    }
-}
-
-endpoint_fn_7_levels!(
-    patch_blob(
-        auth_user: TrowToken,
-        info: Option<ContentInfo>,
-        state: State<Arc<TrowServerState>>;
-        path: [image_name, uuid],
-        host: AlwaysHost,
-        chunk: Body
-    ) -> Result<UploadInfo, Error>
-);
-
-/*
-POST /v2/<name>/blobs/uploads/?digest=<digest>
-
-Starting point for an uploading a new image or new version of an image.
-
-We respond with details of location and UUID to upload to with patch/put.
-
-No data is being transferred _unless_ the request ends with "?digest".
-In this case the whole blob is attached.
-*/
-pub async fn post_blob_upload(
-    auth_user: TrowToken,
-    State(state): State<Arc<TrowServerState>>,
-    host: AlwaysHost,
-    Query(digest): Query<DigestQuery>,
-    Path(repo_name): Path<String>,
-    data: Body,
-) -> Result<Upload, Error> {
-    let uuid = state
-        .registry
-        .storage
-        .request_blob_upload(&repo_name)
-        .await
-        .map_err(|e| match e {
-            StorageBackendError::InvalidName(n) => Error::NameInvalid(n),
-            _ => Error::InternalError,
-        })?;
-
-    if digest.digest.is_some() {
-        // Have a monolithic upload with data
-        return put_blob(
-            auth_user,
-            State(state),
-            Path((repo_name, uuid)),
-            host,
-            Query(digest),
-            data,
-        )
-        .await
-        .map(Upload::Accepted);
-    }
-
-    Ok(Upload::Info(UploadInfo::new(
-        host.0,
-        Uuid(uuid),
-        repo_name.clone(),
-        (0, 0),
-    )))
-}
-
-endpoint_fn_7_levels!(
-    post_blob_upload(
-        auth_user: TrowToken,
-        state: State<Arc<TrowServerState>>,
-        host: AlwaysHost,
-        digest: Query<DigestQuery>;
-        path: [image_name],
-        data: Body
-    ) -> Result<Upload, Error>
 );
 
 /**
@@ -260,17 +65,27 @@ endpoint_fn_7_levels!(
  * TODO: This should probably be denied if the blob is referenced by any manifests
  * (manifest should be deleted first)
  */
-pub async fn delete_blob(
+async fn delete_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((one, digest)): Path<(String, String)>,
+    Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobDeleted, Error> {
-    let digest = Digest::try_from_raw(&digest).map_err(|_| Error::DigestInvalid)?;
-    state
-        .registry
-        .delete_blob(&one, &digest)
-        .await
-        .map_err(|_| Error::NotFound)?;
+    let mut conn = state.db.acquire().await?;
+    let digest_str = digest.as_str();
+
+    sqlx::query!(
+        r#"
+            DELETE FROM repo_blob_association
+            WHERE repo_name = $1
+                AND blob_digest = $2
+            "#,
+        repo,
+        digest_str
+    )
+    .execute(&mut *conn)
+    .await?;
+    state.registry.storage.delete_blob(&repo, &digest).await?;
+
     Ok(BlobDeleted {})
 }
 
@@ -278,6 +93,17 @@ endpoint_fn_7_levels!(
     delete_blob(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>;
-    path: [image_name, digest]
+    path: [image_name, digest: Digest]
     ) -> Result<BlobDeleted, Error>
 );
+
+pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {
+    #[rustfmt::skip]
+    route_7_levels!(
+        app,
+        "/v2" "/blobs/{digest}",
+        get(get_blob, get_blob_2level, get_blob_3level, get_blob_4level, get_blob_5level, get_blob_6level, get_blob_7level),
+        delete(delete_blob, delete_blob_2level, delete_blob_3level, delete_blob_4level, delete_blob_5level, delete_blob_6level, delete_blob_7level)
+    );
+    app
+}

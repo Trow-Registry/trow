@@ -1,8 +1,8 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
-mod interface_tests {
+mod smoke_test {
 
     use std::path::Path;
     use std::process::{Child, Command};

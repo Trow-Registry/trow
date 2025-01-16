@@ -1,7 +1,9 @@
-# syntax=docker/dockerfile:1.5
+# syntax=docker/dockerfile:1
 
 FROM debian:bookworm-slim
-RUN groupadd -r -g 333333 trow && useradd -r -g trow -u 333333 trow
+
+RUN groupadd -r -g 2000 trow &&\
+    useradd -r -g trow -u 2000 trow
 
 # Note that certs are needed for proxying
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -9,9 +11,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends openssl ca-certificates
 
-RUN mkdir --parents /data/layers && mkdir /data/scratch && mkdir /certs
+RUN mkdir -p /data && mkdir /certs &&\
+    chown -R trow /data /certs
 # On the host, you need to: cp target/debug/trow .
 COPY ./trow /trow
-RUN chown -R trow /data /certs
 USER trow
 ENTRYPOINT ["env", "RUST_LOG=info", "/trow"]

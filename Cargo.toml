@@ -6,35 +6,40 @@ edition = "2021"
 
 [features]
 sqlite = []
+test-utils = []
 
 [dependencies]
 futures = "0.3"
-axum = { version = "0.7.2", features = ["tracing"] }
+axum = { version = "0.8.1", features = ["tracing"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls"] }
-axum-extra = { version = "0.9.0", features = ["typed-header"] }
-tower = "0.5"
-tower-http = { version = "0.5", features = ["cors", "normalize-path", "trace"] }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = [
+    "cors",
+    "normalize-path",
+    "trace",
+    "set-header",
+] }
 jsonwebtoken = "9.2"
 rust-argon2 = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_derive = "1.0"
-serde_yaml = "0.9.0"
+serde_yaml_ng = "0.10"
 uuid = { version = "1.3", features = ["v4", "serde"] }
 base64 = "0.22.1"
 anyhow = "1.0"
-derive_more = {version="1.0", features = ["display"] }
+derive_more = { version = "1.0", features = ["display"] }
 clap = { version = "4.1.0", features = ["derive"] }
 bytes = "1"
 chrono = { version = "^0.4", features = ["serde"] }
-# rusqlite = "0.28.0"
 lazy_static = "1.4.0"
 regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
 thiserror = "2.0"
-kube = { version = "0.97.0", features = ["admission"] }
-k8s-openapi = { version = "0.23.0", features = ["v1_28"] }
+kube = { version = "0.98.0", features = ["admission"] }
+k8s-openapi = { version = "0.24.0", features = ["v1_29"] }
 json-patch = "3"
 jsonptr = "*"
 tokio = { version = "1", features = ["macros"] }
@@ -52,14 +57,17 @@ reqwest = { version = "0.12", features = [
 prometheus = "0.13"
 fs3 = "0.5.0"
 quoted-string = "0.6.1"
-aws-config = "1.0.3"
-aws-types = "1.0.3"
+aws-config = "1.5.0"
+aws-types = "1.3.0"
 aws-sdk-ecr = "1.5.0"
 const_format = "0.2.24"
 async-trait = "0.1.74"
 walkdir = "2.0"
 rand = "0.8"
 humansize = "2.1"
+sqlx = { version = "0.8", features = ["runtime-tokio", "migrate", "sqlite"] }
+oci-spec = "0.7.0"
+oci-client = "0.14.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -69,5 +77,10 @@ libc = "0.2"
 wiremock = "0.6.0"
 fastrand = "2.0.1"
 http-body-util = "0.1.1"
-tracing-test = {version="0.2", features = ["no-env-filter"]}
+tracing-test = { version = "0.2", features = ["no-env-filter"] }
 test-temp-dir = "0.3.0"
+rstest = "0.24.0"
+async-std = { version = "1.5", features = ["attributes"] }       # needed by rstest
+
+[profile.dev.build-override]
+opt-level = 3

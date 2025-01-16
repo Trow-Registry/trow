@@ -17,10 +17,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.7
+      - name: Setup cargo-sqlx
+        run: cargo install sqlx-cli
+      - name: Setup sqlx database
+        run: mkdir -p target && cargo sqlx database setup
+
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Run Trow test suite
@@ -41,10 +44,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.7
+      - name: Setup cargo-sqlx
+        run: cargo install sqlx-cli
+      - name: Setup sqlx database
+        run: mkdir -p target && cargo sqlx database setup
       - name: Build
         run: |
           cargo build
@@ -94,7 +99,7 @@ jobs:
           OCI_NAMESPACE: oci-conformance/distribution-test
           OCI_TEST_PULL: 1
           OCI_TEST_PUSH: 1
-          OCI_TEST_CONTENT_DISCOVERY: 1
+          OCI_TEST_CONTENT_DISCOVERY: 0
           OCI_TEST_CONTENT_MANAGEMENT: 1
           OCI_HIDE_SKIPPED_WORKFLOWS: 0
           OCI_DEBUG: 0

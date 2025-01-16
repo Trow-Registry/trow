@@ -1,5 +1,4 @@
 use std::io::Read;
-use std::str::FromStr;
 use std::{fmt, io};
 
 use lazy_static::lazy_static;
@@ -23,88 +22,54 @@ pub enum DigestError {
     InvalidDigest(String),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy, Default)]
-pub enum DigestAlgorithm {
-    #[default]
-    Sha256,
-    Sha512,
-}
-
-impl std::str::FromStr for DigestAlgorithm {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "sha256" => Ok(DigestAlgorithm::Sha256),
-            "sha512" => Ok(DigestAlgorithm::Sha512),
-            "SHA256" => Ok(DigestAlgorithm::Sha256),
-            "SHA512" => Ok(DigestAlgorithm::Sha512),
-            _ => Err(format!("'{}' is not a valid DigestAlgorithm", s)),
-        }
-    }
-}
-
-impl std::fmt::Display for DigestAlgorithm {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl DigestAlgorithm {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DigestAlgorithm::Sha256 => "sha256",
-            DigestAlgorithm::Sha512 => "sha512",
-        }
-    }
-}
-
-// This contains the algorithm and the hashed value
-#[derive(Debug, PartialEq, Clone, Serialize)]
-pub struct Digest {
-    pub algo: DigestAlgorithm,
-    pub hash: String,
-}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Digest(String);
 
 impl fmt::Display for Digest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.algo, self.hash)
+        write!(f, "{}", self.0)
+    }
+}
+
+impl AsRef<String> for Digest {
+    fn as_ref(&self) -> &String {
+        &self.0
     }
 }
 
 impl Digest {
     pub fn try_from_raw(digest_str: &str) -> Result<Digest, DigestError> {
-        let algo_digest = digest_str
-            .split(':')
-            .map(String::from)
-            .collect::<Vec<String>>();
+        let sep_loc = match digest_str.find(':') {
+            Some(loc) => loc,
+            None => {
+                return Err(DigestError::InvalidDigest(
+                    "separator ':' not found".to_owned(),
+                ))
+            }
+        };
+        let digest_str = digest_str.to_lowercase();
+        let algo = &digest_str[..sep_loc];
+        let hash = &digest_str[sep_loc + 1..];
 
-        // check that we have both parts: algo and digest
-        if algo_digest.len() != 2 {
+        if !REGEX_DIGEST.is_match(hash) {
+            return Err(DigestError::InvalidDigest(format!("Invalid hash: {hash}")));
+        }
+        if !["sha256", "sha512"].contains(&algo) {
             return Err(DigestError::InvalidDigest(format!(
-                "Digest cannot be split into components: {digest_str}"
+                "Invalid algo: `{algo}`"
             )));
         }
 
-        // Do a simple verification
-        let algo = String::from(&algo_digest[0]);
-        let hash = String::from(&algo_digest[1]);
-
-        if !REGEX_DIGEST.is_match(&hash) {
-            return Err(DigestError::InvalidDigest(format!("Invalid hash: {hash}")));
-        }
-
-        let algo_enum =
-            DigestAlgorithm::from_str(algo.as_str()).map_err(DigestError::InvalidDigest)?;
-
-        Ok(Digest {
-            algo: algo_enum,
-            hash,
-        })
+        Ok(Self(digest_str))
     }
 
-    pub fn algo_str(&self) -> &'static str {
-        self.algo.as_str()
+    pub fn algo_str(&self) -> &str {
+        &self.0[..6]
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.0[7..]
     }
 
     pub fn digest_sha256<R: Read>(mut reader: R) -> io::Result<Digest> {
@@ -122,14 +87,18 @@ impl Digest {
         }
         let hash = hex::encode(digest.finalize());
         let algo = match <D as OutputSizeUser>::output_size() {
-            32 => Ok(DigestAlgorithm::Sha256),
-            64 => Ok(DigestAlgorithm::Sha512),
+            32 => Ok("sha256"),
+            64 => Ok("sha512"),
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Invalid digest size",
             )),
         }?;
-        Ok(Self { algo, hash })
+        Ok(Self(format!("{algo}:{hash}")))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -137,18 +106,14 @@ impl Digest {
 mod test {
     use std::io::BufReader;
 
-    use crate::registry::digest::{Digest, DigestAlgorithm};
+    use crate::registry::digest::Digest;
 
     #[test]
     fn sha256_digest_test() {
         let result = Digest::digest_sha256(BufReader::new("hello world".as_bytes())).unwrap();
         assert_eq!(
-            result,
-            Digest {
-                algo: DigestAlgorithm::Sha256,
-                hash: "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
-                    .to_string()
-            }
+            &result.0,
+            "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
         );
     }
 
@@ -156,12 +121,8 @@ mod test {
     fn sha256_digest_empty_test() {
         let result = Digest::digest_sha256(BufReader::new("".as_bytes())).unwrap();
         assert_eq!(
-            result,
-            Digest {
-                algo: DigestAlgorithm::Sha256,
-                hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                    .to_string()
-            }
+            result.0,
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string()
         );
     }
 
@@ -172,22 +133,22 @@ mod test {
         ))
         .unwrap();
         assert_eq!(
-            result,
-            Digest {
-                algo: DigestAlgorithm::Sha256,
-                hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
-                    .to_string()
-            }
+            result.0,
+            "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec".to_string()
         );
     }
 
     #[test]
     fn digest_to_string() {
-        let digest = Digest {
-            algo: DigestAlgorithm::Sha256,
-            hash: "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec".to_string(),
-        };
-
+        let digest = Digest::try_from_raw(
+            "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec",
+        )
+        .unwrap();
+        assert_eq!(
+            digest.hash(),
+            "05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
+        );
+        assert_eq!(digest.algo_str(), "sha256");
         assert_eq!(
             digest.to_string(),
             "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"

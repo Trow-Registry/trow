@@ -1,9 +1,9 @@
-pub mod response;
-#[allow(clippy::too_many_arguments)]
-mod routes;
-pub mod types;
-
+mod init_db;
 pub mod registry;
+pub mod routes;
+#[cfg(test)]
+pub mod test_utilities;
+pub mod types;
 #[cfg(feature = "sqlite")]
 mod users;
 
@@ -13,9 +13,9 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use anyhow::{Context, Result};
-use axum::extract::FromRef;
 use axum::Router;
 use registry::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
+use sqlx::sqlite::SqlitePool;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -34,12 +34,7 @@ pub struct NetAddr {
 pub struct TrowServerState {
     pub registry: TrowServer,
     pub config: TrowConfig,
-}
-
-impl FromRef<Arc<TrowServerState>> for TrowConfig {
-    fn from_ref(state: &Arc<TrowServerState>) -> Self {
-        state.config.clone()
-    }
+    pub db: SqlitePool,
 }
 
 #[derive(Clone, Debug)]
@@ -63,17 +58,18 @@ struct UserConfig {
     hash_encoded: String, //Surprised not bytes
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct TrowConfig {
     pub data_dir: PathBuf,
     pub service_name: String,
     pub proxy_registry_config: Option<RegistryProxiesConfig>,
     pub image_validation_config: Option<ImageValidationConfig>,
     pub dry_run: bool,
-    pub token_secret: String,
+    pub token_secret: Vec<u8>,
     user: Option<UserConfig>,
     pub cors: Option<Vec<String>>,
     pub uses_tls: bool,
+    pub db_connection: Option<String>,
 }
 
 impl Default for TrowConfig {
@@ -91,10 +87,11 @@ impl TrowConfig {
             proxy_registry_config: None,
             image_validation_config: None,
             dry_run: false,
-            token_secret: Uuid::new_v4().to_string(),
+            token_secret: Uuid::new_v4().as_bytes().to_vec(),
             user: None,
             cors: None,
             uses_tls: false,
+            db_connection: None,
         }
     }
 
@@ -102,7 +99,7 @@ impl TrowConfig {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
             .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml::from_str::<RegistryProxiesConfig>(&config_str)
+        let config = serde_yaml_ng::from_str::<RegistryProxiesConfig>(&config_str)
             .with_context(|| format!("Could not parse file `{}`", config_file))?;
         self.proxy_registry_config = Some(config);
         Ok(self)
@@ -112,7 +109,7 @@ impl TrowConfig {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
             .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml::from_str::<ImageValidationConfig>(&config_str)
+        let config = serde_yaml_ng::from_str::<ImageValidationConfig>(&config_str)
             .with_context(|| format!("Could not parse file `{}`", config_file))?;
         self.image_validation_config = Some(config);
         Ok(self)
@@ -130,7 +127,9 @@ impl TrowConfig {
         self
     }
 
-    pub async fn build_app(&self) -> Result<Router> {
+    /// Should only be used internally or for integration tests
+    #[doc(hidden)]
+    pub async fn build_server_state(self) -> Result<Arc<TrowServerState>> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!(
             "Hostname of this registry (for the MutatingWebhook): {:?}",
@@ -168,12 +167,29 @@ impl TrowConfig {
             self.proxy_registry_config.clone(),
             self.image_validation_config.clone(),
         );
-        let registry = ts_builder.get_server()?;
+        let registry = ts_builder.get_server().await?;
+
+        let db_in_memory = self.db_connection == Some(":memory:".to_string());
+        let db_file = match (&self.db_connection, db_in_memory) {
+            (Some(conn), false) => conn.clone(),
+            _ => {
+                let mut p = self.data_dir.clone();
+                p.push("trow.db");
+                p.to_string_lossy().to_string()
+            }
+        };
+        let db = init_db::init_db(&db_file, db_in_memory).await?;
 
         let server_state = TrowServerState {
-            config: self.clone(),
+            config: self,
             registry,
+            db,
         };
-        Ok(routes::create_app(server_state))
+        Ok(Arc::new(server_state))
+    }
+
+    pub async fn build_app(self) -> Result<Router> {
+        let state = self.build_server_state().await?;
+        Ok(routes::create_app(state))
     }
 }

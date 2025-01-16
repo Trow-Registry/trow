@@ -1,7 +1,7 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
 mod cors_tests {
     use std::path::Path;
 
@@ -15,18 +15,21 @@ mod cors_tests {
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 
+    use crate::common::trow_router;
+
     const HOST: &str = "127.0.0.1:39368";
 
     async fn start_trow(data_dir: &Path) -> Router {
-        let mut trow_builder = trow::TrowConfig::new();
-        trow_builder.service_name = HOST.to_string();
-        data_dir.clone_into(&mut trow_builder.data_dir);
-        trow_builder.with_user("authtest".to_owned(), "authpass");
-        trow_builder.cors = Some(vec![
-            "http://extrality.ai:8973".to_string(),
-            "https://example.com".to_string(),
-        ]);
-        trow_builder.build_app().await.unwrap()
+        trow_router(data_dir, |cfg| {
+            cfg.service_name = HOST.to_string();
+            cfg.with_user("authtest".to_owned(), "authpass");
+            cfg.cors = Some(vec![
+                "http://extrality.ai:8973".to_string(),
+                "https://example.com".to_string(),
+            ]);
+        })
+        .await
+        .1
     }
 
     #[tokio::test]

@@ -1,7 +1,7 @@
-#[cfg(test)]
+#![cfg(test)]
+
 mod common;
 
-#[cfg(test)]
 mod authentication_tests {
 
     use std::path::Path;
@@ -15,14 +15,18 @@ mod authentication_tests {
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 
+    use crate::common::trow_router;
+
     async fn start_trow(data_dir: &Path) -> Router {
-        let mut trow_builder = trow::TrowConfig::new();
-        data_dir.clone_into(&mut trow_builder.data_dir);
-        trow_builder.with_user("authtest".to_owned(), "authpass");
-        trow_builder.build_app().await.unwrap()
+        trow_router(data_dir, |cfg| {
+            cfg.with_user("authtest".to_owned(), "authpass");
+        })
+        .await
+        .1
     }
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn test_auth_redir() {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
@@ -75,7 +79,7 @@ mod authentication_tests {
         let resp = trow
             .clone()
             .oneshot(
-                Request::get(&format!("/v2/{}/manifests/{}", "name", "tag"))
+                Request::get(format!("/v2/{}/manifests/{}", "name", "tag"))
                     .body(Body::empty())
                     .unwrap(),
             )

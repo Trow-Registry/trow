@@ -17,7 +17,6 @@
 data/
 out/
 certs/
-protoc/
 install/self-cert/ca.crt
 install/self-cert/domain.key
 
