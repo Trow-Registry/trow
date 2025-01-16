@@ -80,10 +80,7 @@ mod utils {
         .await?;
 
         sqlx::query!(
-            r#"
-            INSERT INTO repo_blob_association
-            VALUES ($1, $2)
-            "#,
+            "INSERT INTO repo_blob_association VALUES ($1, $2) ON CONFLICT DO NOTHING",
             upload.repo,
             digest_str,
         )
@@ -94,7 +91,7 @@ mod utils {
             digest.clone(),
             upload.repo,
             upload_id_bin,
-            (0, (size.total_stored as u32).saturating_sub(1)), // Note first byte is 0
+            (0, size.total_stored.saturating_sub(1)), // Note first byte is 0
         ))
     }
 }
@@ -198,14 +195,10 @@ async fn patch_blob_upload(
         .storage
         .write_blob_part_stream(&uuid, chunk.into_data_stream(), content_range)
         .await?;
-    let total_stored = size.total_stored as u32;
-
+    let total_stored = size.total_stored as i64;
     sqlx::query!(
-        r#"
-        UPDATE blob_upload
-        SET offset=$1
-        WHERE uuid=$1
-        "#,
+        "UPDATE blob_upload SET offset=$2 WHERE uuid=$1",
+        uuid_str,
         total_stored,
     )
     .execute(&mut *state.db.acquire().await?)
@@ -214,7 +207,7 @@ async fn patch_blob_upload(
     Ok(UploadInfo::new(
         uuid_str,
         repo,
-        (0, (total_stored).saturating_sub(1)), // Note first byte is 0
+        (0, (size.total_stored).saturating_sub(1)), // Note first byte is 0
     ))
 }
 
@@ -317,7 +310,7 @@ async fn get_blob_upload(
 
     Ok(Response::builder()
         .header("Docker-Upload-UUID", upload_id.to_string())
-        .header("Range", format!("0-{}", offset - 1)) // Offset is 0-based
+        .header("Range", format!("0-{}", (offset as u64).saturating_sub(1)))
         .header("Content-Length", "0")
         .header("Location", location)
         .status(StatusCode::NO_CONTENT)

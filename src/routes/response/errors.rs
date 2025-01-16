@@ -23,6 +23,7 @@ pub enum Error {
     DigestInvalid,
     NotFound,
     UnsupportedForProxiedRepo,
+    UnsatisfiableRange,
 }
 
 // Create ErrorMsg struct that serializes to json of appropriate type
@@ -83,6 +84,12 @@ impl fmt::Display for Error {
                 Some(json!({ "Repository": name })),
             ),
             Error::NotFound => format_error_json(f, "NOT_FOUND", "Not Found", None),
+            Error::UnsatisfiableRange => format_error_json(
+                f,
+                "UNSATISFIABLE_RANGE",
+                "The range specified in the request header cannot be satisfied by the current blob.",
+                None,
+            ),
         }
     }
 }
@@ -141,6 +148,7 @@ impl IntoResponse for Error {
                 StatusCode::BAD_REQUEST
             }
             Error::NotFound => StatusCode::NOT_FOUND,
+            Error::UnsatisfiableRange => StatusCode::RANGE_NOT_SATISFIABLE,
         };
         Response::builder()
             .header(header::CONTENT_TYPE, "application/json")
@@ -167,7 +175,11 @@ impl From<sqlx::Error> for Error {
 impl From<StorageBackendError> for Error {
     fn from(err: StorageBackendError) -> Self {
         tracing::error!("StorageBackendError: {err}");
-        Self::InternalError
+        match err {
+            StorageBackendError::BlobNotFound(_) => Self::BlobUnknown,
+            StorageBackendError::InvalidContentRange => Self::UnsatisfiableRange,
+            _ => Self::InternalError,
+        }
     }
 }
 

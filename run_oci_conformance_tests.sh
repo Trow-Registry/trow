@@ -14,6 +14,9 @@ export OCI_NAMESPACE="oci-conformance/distribution-test"
 export OCI_TEST_PULL=1
 export OCI_TEST_PUSH=1
 export OCI_TEST_CONTENT_MANAGEMENT=1
+export OCI_TEST_CONTENT_DISCOVERY=1
+export OCI_TEST_CONTENT_MANAGEMENT=1
+export OCI_HIDE_SKIPPED_WORKFLOWS=0
 
 echo "Checking conformance against https://github.com/opencontainers/distribution-spec/blob/main/spec.md"
 ./conformance.test

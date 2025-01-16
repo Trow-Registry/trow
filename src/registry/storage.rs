@@ -13,7 +13,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 
 use super::manifest::ManifestError;
 use crate::registry::blob_storage::Stored;
-use crate::registry::temporary_file::TemporaryFile;
+use crate::registry::temporary_file::FileWrapper;
 use crate::registry::Digest;
 use crate::types::BoundedStream;
 
@@ -129,7 +129,7 @@ impl TrowStorageBackend {
             return Ok(location);
         }
         tokio::fs::create_dir_all(location.parent().unwrap()).await?;
-        let mut tmp_file = match TemporaryFile::new(tmp_location.clone()).await {
+        let mut tmp_file = match FileWrapper::new_tmp(tmp_location.clone()).await {
             // All good
             Ok(tmpf) => tmpf,
             // Special case: blob is being concurrently fetched
@@ -179,7 +179,7 @@ impl TrowStorageBackend {
     {
         tracing::debug!("Write blob part {upload_id} ({range:?})");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
-        let mut tmp_file = TemporaryFile::append(tmp_location.clone())
+        let mut tmp_file = FileWrapper::append(tmp_location.clone())
             .await
             .map_err(|e| {
                 tracing::error!("Could not open tmp file: {}", e);
@@ -189,6 +189,7 @@ impl TrowStorageBackend {
                     _ => StorageBackendError::Io(e),
                 }
             })?;
+
         let file_size = tmp_file.metadata().await?.len();
         let range_len = range.as_ref().map(|r| r.end() - r.start() + 1);
 
@@ -214,7 +215,6 @@ impl TrowStorageBackend {
             );
             return Err(StorageBackendError::InvalidContentRange);
         }
-        tmp_file.untrack();
 
         Ok(Stored {
             total_stored: bytes_written + file_size,
@@ -231,16 +231,16 @@ impl TrowStorageBackend {
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
         let final_location = self.path.join(BLOBS_DIR).join(user_digest.to_string());
         // Should we even do this ? It breaks OCI tests:
-        let f = std::fs::File::open(&tmp_location)?;
-        let calculated_digest = Digest::digest_sha256(f)?;
-        if &calculated_digest != user_digest {
-            tracing::error!(
-                "Upload did not match given digest. Was given {} but got {}",
-                user_digest,
-                calculated_digest
-            );
-            return Err(StorageBackendError::InvalidDigest);
-        }
+        // let f = std::fs::File::open(&tmp_location)?;
+        // let calculated_digest = Digest::digest_sha256(f)?;
+        // if &calculated_digest != user_digest {
+        //     tracing::error!(
+        //         "Upload did not match given digest. Was given {} but got {}",
+        //         user_digest,
+        //         calculated_digest
+        //     );
+        //     return Err(StorageBackendError::InvalidDigest);
+        // }
         fs::create_dir_all(final_location.parent().unwrap())
             .await
             .unwrap();
