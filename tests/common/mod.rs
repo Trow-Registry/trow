@@ -75,7 +75,8 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
     serde_json::from_reader(reader).unwrap()
 }
 
-pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
+/// Returns (blob-digest, manifest-digest)
+pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, Digest) {
     let resp = cl
         .clone()
         .oneshot(
@@ -109,13 +110,13 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     let range = resp.headers().get(RANGE_HEADER).unwrap().to_str().unwrap();
     assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
 
-    let digest = Digest::digest_sha256(BufReader::new(blob.as_slice())).unwrap();
+    let blob_digest = Digest::digest_sha256(BufReader::new(blob.as_slice())).unwrap();
     let resp = cl
         .clone()
         .oneshot(
             Request::put(format!(
                 "/v2/{}/blobs/uploads/{}?digest={}",
-                name, uuid, digest
+                name, uuid, blob_digest
             ))
             .body(Body::empty())
             .unwrap(),
@@ -128,7 +129,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     let resp = cl
         .clone()
         .oneshot(
-            Request::get(format!("/v2/{}/blobs/{}", name, digest))
+            Request::get(format!("/v2/{}/blobs/{}", name, blob_digest))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -141,7 +142,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
         .unwrap()
         .to_str()
         .unwrap();
-    assert_eq!(digest.to_string(), digest_header);
+    assert_eq!(blob_digest.to_string(), digest_header);
     let body = response_body_vec(resp).await;
     assert_eq!(blob, body);
 
@@ -155,23 +156,24 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
         "config": {{
             "mediaType": "application/vnd.docker.container.image.v1+json",
             "size": {blob_size},
-            "digest": "{digest}"
+            "digest": "{blob_digest}"
         }},
         "layers": [{{
             "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
             "size": {blob_size},
-            "digest": "{digest}"
+            "digest": "{blob_digest}"
         }}]
     }}"#
     );
-    let mani: manifest::OCIManifest = serde_json::from_str(&raw_manifest).unwrap();
+    let manifest_digest = Digest::digest_sha256(BufReader::new(raw_manifest.as_bytes())).unwrap();
+    let _: manifest::OCIManifest = serde_json::from_str(&raw_manifest).unwrap();
 
     let manifest_addr = format!("/v2/{}/manifests/{}", name, tag);
     let resp = cl
         .clone()
         .oneshot(
             Request::put(&manifest_addr)
-                .body(Body::from(serde_json::to_vec(&mani).unwrap()))
+                .body(Body::from(raw_manifest))
                 .unwrap(),
         )
         .await
@@ -184,6 +186,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) {
     );
     let location = resp.headers().get("Location").unwrap().to_str().unwrap();
     assert_eq!(&location, &manifest_addr);
+    (blob_digest, manifest_digest)
 }
 
 /// Returns a temporary file filled with `contents`

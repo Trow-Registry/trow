@@ -6,14 +6,12 @@ use axum::extract::{Path, Query, State};
 use axum::response::Response;
 use axum::routing::{post, put};
 use axum::Router;
-use axum_extra::headers::ContentRange;
-use axum_extra::TypedHeader;
 use digest::Digest;
 use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::{digest, TrowServer};
+use crate::registry::{digest, ContentInfo, TrowServer};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -24,13 +22,13 @@ use crate::TrowServerState;
 mod utils {
     use std::ops::RangeInclusive;
 
-    use sqlx::{Sqlite, Transaction};
+    use sqlx::SqlitePool;
     use uuid::Uuid;
 
     use super::*;
 
     pub async fn complete_upload(
-        txn: &mut Transaction<'static, Sqlite>,
+        db: &SqlitePool,
         registry: &TrowServer,
         upload_id: &str,
         digest: &Digest,
@@ -44,7 +42,7 @@ mod utils {
             "#,
             upload_id,
         )
-        .fetch_one(&mut **txn)
+        .fetch_one(&mut *db.acquire().await?)
         .await?;
         let upload_id_bin = Uuid::parse_str(upload_id).unwrap();
 
@@ -65,7 +63,7 @@ mod utils {
             "#,
             upload.uuid
         )
-        .execute(&mut **txn)
+        .execute(&mut *db.acquire().await?)
         .await?;
 
         let digest_str = digest.as_str();
@@ -73,12 +71,12 @@ mod utils {
         sqlx::query!(
             r#"
             INSERT INTO blob (digest, size, is_manifest)
-            VALUES ($1, $2, false)
+            VALUES ($1, $2, false) ON CONFLICT (digest) DO NOTHING
             "#,
             digest_str,
             size_i64
         )
-        .execute(&mut **txn)
+        .execute(&mut *db.acquire().await?)
         .await?;
 
         sqlx::query!(
@@ -89,7 +87,7 @@ mod utils {
             upload.repo,
             digest_str,
         )
-        .execute(&mut **txn)
+        .execute(&mut *db.acquire().await?)
         .await?;
 
         Ok(AcceptedUpload::new(
@@ -122,7 +120,6 @@ async fn put_blob_upload(
     if repo.starts_with(PROXY_DIR) {
         return Err(Error::UnsupportedForProxiedRepo);
     }
-    let mut txn = state.db.begin().await?;
     let uuid_str = uuid.to_string();
     let upload = sqlx::query!(
         r#"
@@ -131,12 +128,12 @@ async fn put_blob_upload(
         "#,
         uuid_str,
     )
-    .fetch_one(&mut *txn)
+    .fetch_one(&mut *state.db.acquire().await?)
     .await?;
     assert_eq!(upload.repo, repo);
 
     let accepted_upload = utils::complete_upload(
-        &mut txn,
+        &state.db,
         &state.registry,
         &uuid_str,
         &digest.digest,
@@ -144,7 +141,6 @@ async fn put_blob_upload(
         None,
     )
     .await?;
-    txn.commit().await?;
 
     Ok(accepted_upload)
 }
@@ -179,13 +175,11 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 */
 async fn patch_blob_upload(
     _auth_user: TrowToken,
-    content_range: Option<TypedHeader<ContentRange>>,
-    // content_length: Option<TypedHeader<ContentLength>>,
+    content_info: Option<ContentInfo>,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, uuid::Uuid)>,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
-    let mut txn = state.db.begin().await?;
     let uuid_str = uuid.to_string();
     sqlx::query!(
         r#"
@@ -194,14 +188,10 @@ async fn patch_blob_upload(
         "#,
         uuid_str,
     )
-    .fetch_one(&mut *txn)
+    .fetch_one(&mut *state.db.acquire().await?)
     .await?;
 
-    let content_range = content_range.map(|d| {
-        let r = d.0.bytes_range().unwrap();
-        r.0..=r.1
-    });
-
+    let content_range = content_info.map(|ci| ci.range.0..=ci.range.1);
     let size = state
         .registry
         .storage
@@ -217,10 +207,8 @@ async fn patch_blob_upload(
         "#,
         total_stored,
     )
-    .execute(&mut *txn)
+    .execute(&mut *state.db.acquire().await?)
     .await?;
-
-    txn.commit().await?;
 
     Ok(UploadInfo::new(
         uuid_str,
@@ -232,7 +220,7 @@ async fn patch_blob_upload(
 endpoint_fn_7_levels!(
     patch_blob_upload(
         auth_user: TrowToken,
-        content_range: Option<TypedHeader<ContentRange>>,
+        content_info: Option<ContentInfo>,
         state: State<Arc<TrowServerState>>;
         path: [image_name, uuid: uuid::Uuid],
         chunk: Body
@@ -259,7 +247,6 @@ async fn post_blob_upload(
     if repo_name.starts_with(PROXY_DIR) {
         return Err(Error::UnsupportedForProxiedRepo);
     }
-    let mut txn = state.db.begin().await?;
 
     // Create new blob upload
     let upload_uuid = uuid::Uuid::new_v4().to_string();
@@ -272,13 +259,13 @@ async fn post_blob_upload(
         repo_name,
         0_i64
     )
-    .execute(&mut *txn)
+    .execute(&mut *state.db.acquire().await?)
     .await?;
 
     if let Some(digest) = digest.digest {
         // Have a monolithic upload with data
         return match utils::complete_upload(
-            &mut txn,
+            &state.db,
             &state.registry,
             &upload_uuid,
             &digest,
@@ -287,15 +274,10 @@ async fn post_blob_upload(
         )
         .await
         {
-            Ok(accepted_upload) => {
-                txn.commit().await?;
-                Ok(Upload::Accepted(accepted_upload))
-            }
+            Ok(accepted_upload) => Ok(Upload::Accepted(accepted_upload)),
             Err(e) => Err(e),
         };
     }
-
-    txn.commit().await?;
 
     Ok(Upload::Info(UploadInfo::new(
         upload_uuid,

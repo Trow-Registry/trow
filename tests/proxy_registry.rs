@@ -2,7 +2,7 @@
 
 mod common;
 
-mod interface_tests {
+mod proxy_registry {
 
     use std::path::Path;
     use std::sync::Arc;

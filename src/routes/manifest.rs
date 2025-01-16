@@ -45,11 +45,10 @@ async fn get_manifest(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, raw_reference)): Path<(String, String)>,
 ) -> Result<OciJson<OCIManifest>, Error> {
-    let mut db = state.db.acquire().await?;
     let reference = ManifestReference::try_from_str(&raw_reference).map_err(|e| {
         Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
     })?;
-    // let mut digest = None;
+
     let digest = if repo.starts_with(PROXY_DIR) {
         let (proxy_cfg, image) = match state
             .registry
@@ -76,20 +75,15 @@ async fn get_manifest(
     } else {
         let digest = match &reference {
             ManifestReference::Tag(_) => {
-                let tag = sqlx::query!(
-                    r#"
-                select *
-                from tag t
-                where t.repo = $1
-                    and t.tag = $2
-                "#,
+                let tdigest = sqlx::query_scalar!(
+                    "SELECT t.manifest_digest FROM tag t WHERE t.repo = $1 AND t.tag = $2",
                     repo,
                     raw_reference
                 )
-                .fetch_optional(&mut *db)
+                .fetch_optional(&mut *state.db.acquire().await?)
                 .await?;
-                match tag {
-                    Some(t) => t.manifest_digest,
+                match tdigest {
+                    Some(d) => d,
                     None => {
                         return Err(Error::ManifestUnknown(format!(
                             "Unknown tag: {raw_reference}"
@@ -101,18 +95,16 @@ async fn get_manifest(
         };
         let maybe_manifest = sqlx::query!(
             r#"
-            select *
-            from blob b
-            inner join repo_blob_association rba
-                on rba.blob_digest = b.digest
-            where b.digest = $2
-                and b.is_manifest is true
-                and rba.repo_name = $1
-        "#,
+            SELECT * FROM blob b
+            INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest
+            WHERE b.digest = $2
+                AND b.is_manifest is true
+                AND rba.repo_name = $1
+            "#,
             repo,
             digest
         )
-        .fetch_optional(&mut *db)
+        .fetch_optional(&mut *state.db.acquire().await?)
         .await?;
 
         if maybe_manifest.is_none() {
@@ -127,7 +119,7 @@ async fn get_manifest(
         .storage
         .get_manifest(&repo, &digest_parsed)
         .await?;
-    // txn.commit().await?;
+
     let manifest_parsed: OCIManifest = serde_json::from_slice(&manifest_raw)
         .map_err(|e| Error::ManifestInvalid(format!("serialization error: {e}")))?;
     let content_type = manifest_parsed
@@ -179,21 +171,18 @@ async fn put_image_manifest(
     let manifest_parsed = serde_json::from_slice::<'_, OCIManifest>(&manifest_bytes)
         .map_err(|e| Error::ManifestInvalid(format!("{e}")))?;
     let assets = manifest_parsed.get_local_asset_digests();
-    let mut txn = state.db.begin().await?;
 
     for digest in assets {
+        event!(Level::DEBUG, "Checking asset: {repo_name} {digest}");
         let res = sqlx::query!(
             r#"
-            select *
-            from blob b
-            join repo_blob_association rba on rba.blob_digest = b.digest
-            where b.digest = $1
-                and rba.repo_name = $2
-            "#,
+            SELECT b.digest FROM blob b
+            INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest
+            WHERE b.digest = $1 AND rba.repo_name = $2"#,
             digest,
             repo_name
         )
-        .fetch_optional(&mut *txn)
+        .fetch_optional(&mut *state.db.acquire().await?)
         .await?;
         if res.is_none() {
             return Err(Error::ManifestInvalid(format!("Asset not found: {digest}")));
@@ -205,6 +194,13 @@ async fn put_image_manifest(
     if !is_tag && computed_digest_str != reference {
         return Err(Error::ManifestInvalid("Digest does not match".to_string()));
     }
+
+    state
+        .registry
+        .storage
+        .write_image_manifest(manifest_bytes, &repo_name, &computed_digest)
+        .await?;
+
     sqlx::query!(
         r#"
         INSERT INTO blob (digest, size, is_manifest)
@@ -214,7 +210,7 @@ async fn put_image_manifest(
         computed_digest_str,
         size
     )
-    .execute(&mut *txn)
+    .execute(&mut *state.db.acquire().await?)
     .await?;
     sqlx::query!(
         r#"
@@ -225,7 +221,7 @@ async fn put_image_manifest(
         repo_name,
         computed_digest_str
     )
-    .execute(&mut *txn)
+    .execute(&mut *state.db.acquire().await?)
     .await?;
 
     if is_tag {
@@ -240,15 +236,9 @@ async fn put_image_manifest(
             repo_name,
             computed_digest_str,
         )
-        .execute(&mut *txn)
+        .execute(&mut *state.db.acquire().await?)
         .await?;
     }
-    state
-        .registry
-        .storage
-        .write_image_manifest(manifest_bytes, &repo_name, &computed_digest)
-        .await?;
-    txn.commit().await?;
 
     Ok(VerifiedManifest::new(
         Some(host),
@@ -275,29 +265,43 @@ DELETE /v2/<name>/manifests/<reference>
 async fn delete_image_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, digest)): Path<(String, Digest)>,
+    Path((repo, reference)): Path<(String, String)>,
 ) -> Result<ManifestDeleted, Error> {
     if repo.starts_with(PROXY_DIR) {
         return Err(Error::UnsupportedForProxiedRepo);
     }
     // irh, Digest is not doing validation it seems ?
-    if REGEX_TAG.is_match(digest.as_str()) {
-        return Err(Error::Unsupported);
+    if REGEX_TAG.is_match(&reference) {
+        sqlx::query!(
+            r#"DELETE FROM tag WHERE repo = $1 AND tag = $2"#,
+            repo,
+            reference
+        )
+        .execute(&mut *state.db.acquire().await?)
+        .await?;
+    } else {
+        let digest = Digest::try_from_raw(&reference)?;
+        let res = sqlx::query!(
+            "DELETE FROM repo_blob_association WHERE repo_name = $1 AND blob_digest = $2",
+            repo,
+            reference
+        )
+        .execute(&mut *state.db.acquire().await?)
+        .await?;
+
+        if res.rows_affected() > 0 {
+            let remaining_assoc = sqlx::query_scalar!(
+                "SELECT COUNT(*) FROM repo_blob_association WHERE blob_digest = $1",
+                reference
+            )
+            .fetch_one(&mut *state.db.acquire().await?)
+            .await?;
+
+            if remaining_assoc == 0 {
+                state.registry.storage.delete_blob(&repo, &digest).await?;
+            }
+        }
     }
-    let digest_str = digest.as_str();
-    let mut conn = state.db.acquire().await?;
-    sqlx::query!(
-        r#"
-        DELETE FROM repo_blob_association
-        WHERE repo_name = $1
-            AND blob_digest = $2
-        "#,
-        repo,
-        digest_str
-    )
-    .execute(&mut *conn)
-    .await?;
-    state.registry.storage.delete_blob(&repo, &digest).await?;
 
     Ok(ManifestDeleted {})
 }
@@ -305,7 +309,7 @@ endpoint_fn_7_levels!(
     delete_image_manifest(
     auth_user: TrowToken,
     state: State<Arc<TrowServerState>>;
-    path: [image_name, digest: Digest]
+    path: [image_name, digest: String]
     ) -> Result<ManifestDeleted, Error>
 );
 

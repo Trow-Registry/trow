@@ -1,9 +1,8 @@
 #![cfg(test)]
 mod common;
 
-mod interface_tests {
+mod registry_interface {
     use std::io::BufReader;
-    use std::path::Path;
 
     use axum::body::Body;
     use axum::http::HeaderValue;
@@ -11,7 +10,7 @@ mod interface_tests {
     use hyper::Request;
     use oci_spec::image::ImageManifest;
     use reqwest::StatusCode;
-    use test_temp_dir::test_temp_dir;
+    use test_temp_dir::{test_temp_dir, TestTempDir};
     use tower::ServiceExt;
     use trow::registry::api_types::{HealthStatus, ReadyStatus};
     use trow::registry::digest;
@@ -19,8 +18,8 @@ mod interface_tests {
 
     use crate::common::{self, response_body_string, trow_router, DIST_API_HEADER};
 
-    async fn start_trow(data_dir: &Path) -> Router {
-        trow_router(data_dir, |_| {}).await.1
+    async fn start_trow(data_dir: &TestTempDir) -> Router {
+        trow_router(data_dir.as_path_untracked(), |_| {}).await.1
     }
 
     async fn get_main(cl: &Router) {
@@ -160,7 +159,7 @@ mod interface_tests {
         assert_eq!(tl, &tl_resp);
     }
 
-    async fn upload_with_put(cl: &Router, name: &str) {
+    async fn upload_blob_with_put(cl: &Router, name: &str) {
         let resp = cl
             .clone()
             .oneshot(
@@ -206,16 +205,19 @@ mod interface_tests {
         assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
-    async fn upload_with_post(cl: &Router, name: &str) {
-        let config = "{ }\n".as_bytes();
-        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+    async fn upload_blob_with_post(cl: &Router, repo_name: &str) {
+        let blob_content = "{ }\n".as_bytes();
+        let digest = digest::Digest::digest_sha256(BufReader::new(blob_content)).unwrap();
 
         let resp = cl
             .clone()
             .oneshot(
-                Request::post(format!("/v2/{}/blobs/uploads/?digest={}", name, digest))
-                    .body(Body::from(config))
-                    .unwrap(),
+                Request::post(format!(
+                    "/v2/{}/blobs/uploads/?digest={}",
+                    repo_name, digest
+                ))
+                .body(Body::from(blob_content))
+                .unwrap(),
             )
             .await
             .unwrap();
@@ -226,12 +228,12 @@ mod interface_tests {
             .unwrap()
             .to_str()
             .unwrap();
-        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
+        assert_eq!(range, format!("0-{}", (blob_content.len() - 1))); //note first byte is 0, hence len - 1
     }
 
     async fn push_oci_manifest(cl: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
-        let config = "{}\n".as_bytes();
+        let config = "{ }\n".as_bytes();
         let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
 
         let manifest = format!(
@@ -297,10 +299,16 @@ mod interface_tests {
         digest.to_string()
     }
 
-    async fn push_oci_manifest_with_foreign_blob(cl: &Router, name: &str, tag: &str) -> String {
+    async fn push_oci_manifest_with_foreign_blob(
+        cl: &Router,
+        repo_name: &str,
+        tag: &str,
+    ) -> String {
         //Note config was uploaded as blob in earlier test
-        let config = "{}\n".as_bytes();
+        let config = "{ }\n".as_bytes();
         let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+
+        upload_blob_with_post(cl, repo_name).await;
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -324,7 +332,7 @@ mod interface_tests {
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(format!("/v2/{}/manifests/{}", name, tag))
+                Request::put(format!("/v2/{}/manifests/{}", repo_name, tag))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -337,11 +345,24 @@ mod interface_tests {
         digest.to_string()
     }
 
-    async fn delete_manifest(cl: &Router, name: &str, digest: &str) {
+    async fn delete_manifest(cl: &Router, repo: &str, reference: &str) {
         let resp = cl
             .clone()
             .oneshot(
-                Request::delete(format!("/v2/{}/manifests/{}", name, digest))
+                Request::delete(format!("/v2/{}/manifests/{}", repo, reference))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    }
+
+    async fn delete_blob(cl: &Router, repo: &str, digest: &str) {
+        let resp = cl
+            .clone()
+            .oneshot(
+                Request::delete(format!("/v2/{}/blobs/{}", repo, digest))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -366,144 +387,193 @@ mod interface_tests {
         // If it doesn't exist, that's kinda the same as deleted, right?
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
-    async fn attempt_delete_by_tag(cl: &Router, name: &str, tag: &str) {
-        let resp = cl
-            .clone()
-            .oneshot(
-                Request::delete(format!("/v2/{}/manifests/{}", name, tag))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
-    }
 
-    async fn delete_config_blob(cl: &Router, name: &str) {
-        //Deletes blob uploaded in config test
-        let config = "{}\n".as_bytes();
-        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
-        let resp = cl
-            .clone()
-            .oneshot(
-                Request::delete(format!("/v2/{name}/blobs/{config_digest}"))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_get_non_existent_blob() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        get_non_existent_blob(&trow).await;
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
-    async fn test_e2e() {
+    async fn upload_image() {
         let tmp_dir = test_temp_dir!();
-        let data_dir = tmp_dir.as_path_untracked();
-
-        let trow = start_trow(data_dir).await;
-
-        println!("Running get_main()");
-        get_main(&trow).await;
-        println!("Running get_blob()");
-        get_non_existent_blob(&trow).await;
-
-        println!("Running upload_layer(fifth/fourth/repo/image/test:tag)");
+        let trow = start_trow(&tmp_dir).await;
         common::upload_fake_image(&trow, "fifth/fourth/repo/image/test", "tag").await;
-        println!("Running upload_layer(fourth/repo/image/test:tag)");
-        common::upload_fake_image(&trow, "fourth/repo/image/test", "tag").await;
-        println!("Running upload_layer(repo/image/test:tag)");
-        common::upload_fake_image(&trow, "repo/image/test", "tag").await;
-        println!("Running upload_layer(image/test:latest)");
-        common::upload_fake_image(&trow, "image/test", "latest").await;
-        println!("Running upload_layer(onename:tag)");
-        common::upload_fake_image(&trow, "onename", "tag").await;
-        println!("Running upload_layer(onename:latest)");
-        common::upload_fake_image(&trow, "onename", "latest").await;
-        println!("Running upload_with_put()");
-        upload_with_put(&trow, "puttest").await;
-        println!("Running upload_with_post");
-        upload_with_post(&trow, "posttest").await;
-        println!("Running push_oci_manifest()");
-        let manifest_digest = push_oci_manifest(&trow, "puttest", "puttest1").await;
-        println!("Running push_manifest_list()");
-        let digest_manifest_list =
-            push_manifest_list(&trow, &manifest_digest, "listtest", "listtest1").await;
-        println!("Running get_manifest(puttest:puttest1)");
-        get_manifest(&trow, "puttest", "puttest1", Some(354)).await;
-        println!("Running get_manifest(puttest:digest)");
-        get_manifest(&trow, "puttest", &manifest_digest, Some(354)).await;
-        println!("Running delete_manifest(puttest:digest)");
-        delete_manifest(&trow, "puttest", &manifest_digest).await;
-        println!("Running delete_manifest(listtest)");
-        delete_manifest(&trow, "listtest", &digest_manifest_list).await;
-        println!("Running delete_non_existent_manifest(onename)");
-        delete_non_existent_manifest(&trow, "onename").await;
-        println!("Running attempt_delete_by_tag(onename:tag)");
-        attempt_delete_by_tag(&trow, "onename", "tag").await;
-        println!("Running get_non_existent_manifest(puttest:puttest1)");
-        get_non_existent_manifest(&trow, "puttest", "puttest1").await;
+    }
 
-        println!("Running push_oci_manifest_with_foreign_blob()");
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn blob_upload_with_put() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        upload_blob_with_put(&trow, "puttest").await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn blob_upload_with_post() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        upload_blob_with_post(&trow, "posttest").await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_push_oci_manifest() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        upload_blob_with_post(&trow, "puttest").await;
+        push_oci_manifest(&trow, "puttest", "puttest1").await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_push_manifest_list() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        upload_blob_with_post(&trow, "listtest").await;
+        let digest = push_oci_manifest(&trow, "listtest", "noooo").await;
+        push_manifest_list(&trow, &digest, "listtest", "listtest1").await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_get_manifest() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        common::upload_fake_image(&trow, "get/manifest", "1").await;
+        get_manifest(&trow, "get/manifest", "1", Some(570)).await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_delete_manifest_digest() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        let (_, man_digest) = common::upload_fake_image(&trow, "delete/manifest", "1").await;
+        delete_manifest(&trow, "delete/manifest", man_digest.as_str()).await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_delete_non_existent_manifest() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        delete_non_existent_manifest(&trow, "delete/nonexistent").await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_delete_by_tag() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        common::upload_fake_image(&trow, "delete/tag", "tag").await;
+        delete_manifest(&trow, "delete/tag", "tag").await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_get_non_existent_manifest() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        get_non_existent_manifest(&trow, "nonexistent", "nonexistent").await;
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_push_oci_manifest_with_foreign_blob() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
         let digest = push_oci_manifest_with_foreign_blob(&trow, "foreigntest", "blobtest1").await;
         delete_manifest(&trow, "foreigntest", &digest).await;
+    }
 
-        println!("Running delete_config_blob");
-        delete_config_blob(&trow, "puttest").await;
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_root_routes() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        get_main(&trow).await;
+    }
 
-        println!("Running get_manifest(onename:tag)");
-        get_manifest(&trow, "onename", "tag", None).await;
-        println!("Running get_manifest(image/test:latest)");
-        get_manifest(&trow, "image/test", "latest", None).await;
-        println!("Running get_manifest(repo/image/test:tag)");
-        get_manifest(&trow, "repo/image/test", "tag", None).await;
-
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_catalog() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+        let repos = [
+            "fifth/fourth/repo/image/test",
+            "fourth/repo/image/test",
+            "repo/image/test",
+            "image/test",
+            "onename",
+        ];
         let mut rc = RepoCatalog::new();
-        rc.insert("fifth/fourth/repo/image/test".to_string());
-        rc.insert("fourth/repo/image/test".to_string());
-        rc.insert("repo/image/test".to_string());
-        rc.insert("image/test".to_string());
-        rc.insert("onename".to_string());
+        for r in repos.iter() {
+            common::upload_fake_image(&trow, r, "tag").await;
+            rc.insert(r.to_string());
+        }
 
-        println!("Running check_repo_catalog");
+        common::upload_fake_image(&trow, "todeletetag", "1").await;
+        delete_manifest(&trow, "todeletetag", "1").await;
+        rc.insert("todeletetag".to_string());
+
+        let (blob_digest, man_digest) =
+            common::upload_fake_image(&trow, "todeletedigest", "1").await;
+        delete_manifest(&trow, "todeletedigest", man_digest.as_str()).await;
+        delete_blob(&trow, "todeletedigest", blob_digest.as_str()).await;
+
         check_repo_catalog(&trow, &rc).await;
+    }
 
-        let mut tl = TagList::new("repo/image/test".to_string());
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_tag_list() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
+
+        common::upload_fake_image(&trow, "taglist", "tag").await;
+        common::upload_fake_image(&trow, "taglist", "latest").await;
+        common::upload_fake_image(&trow, "taglist", "tag").await;
+        common::upload_fake_image(&trow, "taglist", "three").await;
+
+        let mut tl = TagList::new("taglist".to_string());
+        tl.insert("latest".to_string());
         tl.insert("tag".to_string());
-        println!("Running check_tag_list 1");
+        tl.insert("three".to_string());
         check_tag_list(&trow, &tl).await;
+    }
 
-        common::upload_fake_image(&trow, "onename", "three").await;
-        common::upload_fake_image(&trow, "onename", "four").await;
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_tag_list_n_last() {
+        let tmp_dir = test_temp_dir!();
+        let trow = start_trow(&tmp_dir).await;
 
-        // list, in order should be [four, latest, tag, three]
-        let mut tl2 = TagList::new("onename".to_string());
-        tl2.insert("four".to_string());
-        tl2.insert("latest".to_string());
+        common::upload_fake_image(&trow, "taglistnlast", "tag").await;
+        common::upload_fake_image(&trow, "taglistnlast", "latest").await;
+        common::upload_fake_image(&trow, "taglistnlast", "tag").await;
+        common::upload_fake_image(&trow, "taglistnlast", "three").await;
+
+        let mut tl = TagList::new("taglistnlast".to_string());
+        tl.insert("latest".to_string());
+        tl.insert("tag".to_string());
+        check_tag_list_n_last(&trow, 2, "", &tl).await;
+
+        let mut tl2 = TagList::new("taglistnlast".to_string());
         tl2.insert("tag".to_string());
         tl2.insert("three".to_string());
-        println!("Running check_tag_list 2");
-        check_tag_list(&trow, &tl2).await;
-
-        let mut tl3 = TagList::new("onename".to_string());
-        tl3.insert("four".to_string());
-        tl3.insert("latest".to_string());
-        println!("Running check_tag_list_n_last 3");
-        check_tag_list_n_last(&trow, 2, "", &tl3).await;
-
-        let mut tl4 = TagList::new("onename".to_string());
-        tl4.insert("tag".to_string());
-        tl4.insert("three".to_string());
-        println!("Running check_tag_list_n_last 4");
-        check_tag_list_n_last(&trow, 2, "latest", &tl4).await;
+        check_tag_list_n_last(&trow, 2, "latest", &tl2).await;
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_readiness() {
         let tmp_dir = test_temp_dir!();
-        let data_dir = tmp_dir.as_path_untracked();
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(&tmp_dir).await;
 
         let resp = trow
             .clone()
@@ -522,8 +592,7 @@ mod interface_tests {
     #[tracing_test::traced_test]
     async fn test_get_health() {
         let tmp_dir = test_temp_dir!();
-        let data_dir = tmp_dir.as_path_untracked();
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(&tmp_dir).await;
 
         let resp = trow
             .clone()
@@ -542,8 +611,7 @@ mod interface_tests {
     #[tracing_test::traced_test]
     async fn test_head_manifest_tag() {
         let tmp_dir = test_temp_dir!();
-        let data_dir = tmp_dir.as_path_untracked();
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(&tmp_dir).await;
 
         common::upload_fake_image(&trow, "headtest", "headtest1").await;
         let resp = trow
@@ -585,8 +653,7 @@ mod interface_tests {
     #[tracing_test::traced_test]
     async fn test_patch_with_first_chunk_should_return_202() {
         let tmp_dir = test_temp_dir!();
-        let data_dir = tmp_dir.as_path_untracked();
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(&tmp_dir).await;
 
         let test_blob_chunk = "chunk1".as_bytes();
         let resp = trow
@@ -623,8 +690,7 @@ mod interface_tests {
     #[tracing_test::traced_test]
     async fn test_get_blob_upload() {
         let tmp_dir = test_temp_dir!();
-        let data_dir = tmp_dir.as_path_untracked();
-        let trow = start_trow(data_dir).await;
+        let trow = start_trow(&tmp_dir).await;
 
         let resp = trow
             .clone()

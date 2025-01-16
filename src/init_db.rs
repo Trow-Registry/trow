@@ -6,6 +6,7 @@ pub async fn init_db(filename: &str, in_memory: bool) -> Result<SqlitePool> {
         .filename(filename)
         .create_if_missing(true)
         .in_memory(in_memory)
+        .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
         .foreign_keys(true);
 

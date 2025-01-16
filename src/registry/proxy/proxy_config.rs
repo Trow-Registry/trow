@@ -1,6 +1,3 @@
-use std::ops::DerefMut;
-use std::sync::Arc;
-
 use anyhow::Result;
 use aws_config::BehaviorVersion;
 use aws_sdk_ecr::config::http::HttpResponse;
@@ -9,12 +6,11 @@ use aws_sdk_ecr::operation::get_authorization_token::GetAuthorizationTokenError;
 use base64::Engine;
 use bytes::Bytes;
 use futures::future::try_join_all;
-use futures::lock::Mutex;
 use oci_client::client::ClientProtocol;
 use oci_client::secrets::RegistryAuth;
 use oci_client::Reference;
 use serde::{Deserialize, Serialize};
-use sqlx::{Sqlite, SqlitePool};
+use sqlx::SqlitePool;
 use tracing::{event, Level};
 
 use crate::registry::manifest::{ManifestReference, OCIManifest};
@@ -114,7 +110,6 @@ impl SingleRegistryProxyConfig {
         registry: &TrowServer,
         db: &SqlitePool,
     ) -> Result<Digest, DownloadRemoteImageError> {
-        let mut txn = db.begin().await?;
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
         event!(Level::DEBUG, "Downloading proxied image {}", repo_name);
@@ -137,7 +132,7 @@ impl SingleRegistryProxyConfig {
                     repo_name,
                     t
                 )
-                .fetch_optional(&mut *txn)
+                .fetch_optional(&mut *db.acquire().await?)
                 .await?;
                 if let Some((cl, auth)) = &try_cl {
                     match cl.fetch_manifest_digest(&image_ref, auth).await {
@@ -167,7 +162,7 @@ impl SingleRegistryProxyConfig {
                 "#,
                 mani_digest_str
             )
-            .fetch_one(&mut *txn)
+            .fetch_one(&mut *db.acquire().await?)
             .await?
                 == 1;
             if have_manifest {
@@ -179,7 +174,7 @@ impl SingleRegistryProxyConfig {
                 let manifest_download = download_manifest_and_layers(
                     cl,
                     auth,
-                    Arc::new(Mutex::new(&mut *txn)),
+                    db.clone(),
                     &registry.storage,
                     &ref_to_dl,
                     &repo_name,
@@ -200,10 +195,9 @@ impl SingleRegistryProxyConfig {
                             tag,
                             mani_digest_str
                         )
-                        .execute(&mut *txn)
+                        .execute(&mut *db.acquire().await?)
                         .await?;
                     }
-                    txn.commit().await?;
                     return Ok(mani_digest);
                 }
             }
@@ -261,41 +255,30 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPass
 
 /// `ref_` MUST reference a digest (*not* a tag)
 // #[async_recursion]
-async fn download_manifest_and_layers<C>(
+async fn download_manifest_and_layers(
     cl: &oci_client::Client,
     auth: &RegistryAuth,
-    db: Arc<Mutex<&mut C>>,
+    db: SqlitePool,
     storage: &TrowStorageBackend,
     ref_: &Reference,
     local_repo_name: &str,
-) -> Result<()>
-where
-    for<'e> &'e mut C: sqlx::Executor<'e, Database = Sqlite>,
-{
-    async fn download_blob<C>(
+) -> Result<()> {
+    async fn download_blob(
         cl: &oci_client::Client,
-        db: Arc<Mutex<&mut C>>,
+        db: SqlitePool,
         storage: &TrowStorageBackend,
         ref_: &Reference,
         layer_digest: &str,
         local_repo_name: &str,
-    ) -> Result<()>
-    where
-        for<'e> &'e mut C: sqlx::Executor<'e, Database = Sqlite>,
-    {
+    ) -> Result<()> {
         event!(Level::TRACE, "Downloading blob {}", layer_digest);
-        let already_has_blob = match sqlx::query!(
-            "INSERT INTO blob (digest, is_manifest, size) VALUES ($1, FALSE, $2);",
+        let already_has_blob = sqlx::query_scalar!(
+            "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = $1);",
             layer_digest,
-            0
         )
-        .execute(&mut **db.lock().await.deref_mut())
-        .await
-        {
-            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => true,
-            Err(e) => return Err(e.into()),
-            Ok(_) => false,
-        };
+        .fetch_one(&mut *db.acquire().await?)
+        .await?
+            == 1;
 
         if !already_has_blob {
             let stream = cl.pull_blob_stream(ref_, layer_digest).await?;
@@ -304,11 +287,11 @@ where
                 .await?;
             let size = path.metadata().unwrap().len() as i64;
             sqlx::query!(
-                "UPDATE blob SET size = $1 WHERE digest = $2;",
-                size,
-                layer_digest
+                "INSERT INTO blob (digest, is_manifest, size) VALUES ($1, FALSE, $2) ON CONFLICT DO NOTHING;",
+                layer_digest,
+                size
             )
-            .execute(&mut **db.lock().await.deref_mut())
+            .execute(&mut *db.acquire().await?)
             .await?;
         }
         sqlx::query!(
@@ -316,7 +299,7 @@ where
             local_repo_name,
             layer_digest
         )
-        .execute(&mut **db.lock().await.deref_mut())
+        .execute(&mut *db.acquire().await?)
         .await?;
         let parent_digest = ref_.digest().unwrap();
         sqlx::query!(
@@ -324,7 +307,7 @@ where
                 parent_digest,
                 layer_digest
             )
-            .execute(&mut **db.lock().await.deref_mut())
+            .execute(&mut *db.acquire().await?)
             .await?;
 
         Ok(())
@@ -352,7 +335,7 @@ where
         digest,
         manifest_size
     )
-    .execute(&mut **db.lock().await.deref_mut())
+    .execute(&mut *db.acquire().await?)
     .await
     {
         Err(sqlx::Error::Database(e)) if e.is_unique_violation() => true,
@@ -365,7 +348,7 @@ where
         local_repo_name,
         digest,
     )
-    .execute(&mut **db.lock().await.deref_mut())
+    .execute(&mut *db.acquire().await?)
     .await?;
 
     if !already_has_manifest {

@@ -2,7 +2,7 @@
 
 mod common;
 
-mod interface_tests {
+mod smoke_test {
 
     use std::path::Path;
     use std::process::{Child, Command};

@@ -72,7 +72,7 @@ async fn list_tags(
         FROM tag t
         WHERE t.repo = $1
             AND t.tag > $2
-        ORDER BY t.tag ASC
+        ORDER BY t.tag COLLATE NOCASE ASC
         LIMIT $3
         "#,
         repo_name,
