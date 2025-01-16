@@ -87,8 +87,7 @@ impl<T> IntoResponse for OciJson<T> {
         headers
             .entry(header::CONTENT_LENGTH)
             .or_insert(HeaderValue::from(self.content_length));
-        println!("resp: {:?}\n\n---", self.response.headers());
-        println!();
+        tracing::trace!(response_headers = ?self.response.headers(), "OciJson response");
         self.response
     }
 }

@@ -1,7 +1,6 @@
 use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
-use tracing::{event, Level};
 
 use crate::registry::blob_storage::ContentInfo;
 use crate::routes::response::errors::Error;
@@ -16,53 +15,40 @@ where
     type Rejection = (StatusCode, Error);
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let length = match parts.headers.get("Content-Length") {
-            Some(l) => match l.to_str().map(|s| s.parse::<u64>()) {
-                Ok(Ok(i)) => i,
-                _ => {
-                    event!(
-                        Level::WARN,
-                        "Received request with invalid Content-Length header"
-                    );
-                    return Err((
-                        StatusCode::BAD_REQUEST,
-                        Error::BlobUploadInvalid("Invalid Content-Length".to_string()),
-                    ));
-                }
-            },
-            None => {
-                // This probably just means we don't have ContentInfo
-                // Should be caught by an option in the RequestGuard
-                return Err((
+        let err = |msg: &str, optional: bool| {
+            if optional {
+                Err((StatusCode::BAD_REQUEST, Error::NotFound))
+            } else {
+                Err((
                     StatusCode::BAD_REQUEST,
-                    Error::BlobUploadInvalid("Expected Content-Length header".to_string()),
-                ));
+                    Error::BlobUploadInvalid(msg.to_string()),
+                ))
             }
         };
 
-        if let Some(r) = parts.headers.get("Content-Range") {
-            if let Ok(range) = r.to_str() {
-                let parts: Vec<&str> = range.split('-').collect();
-                if parts.len() == 2 {
-                    if let Ok(l) = parts[0].parse::<u64>() {
-                        if let Ok(r) = parts[1].parse::<u64>() {
-                            return Ok(ContentInfo {
-                                length,
-                                range: (l, r),
-                            });
-                        }
-                    }
-                }
-            }
+        let length = match parts.headers.get("Content-Length") {
+            Some(l) => match l.to_str().map(|s| s.parse::<u64>()) {
+                Ok(Ok(i)) => i,
+                _ => return err("Invalid Content-Length", false),
+            },
+            None => return err("Expected Content-Length header", true),
+        };
+
+        let range = match parts.headers.get("Content-Range") {
+            Some(r) => match r.to_str().map(|head| {
+                head.split_once('-')
+                    .map(|(start, end)| (start.parse(), end.parse()))
+            }) {
+                Ok(Some((Ok(start), Ok(end)))) => (start, end),
+                _ => return err("Invalid Content-Range", false),
+            },
+            None => return err("Expected Content-Range header", true),
+        };
+        if length != range.1 - range.0 + 1 {
+            return err("Content-Length and Content-Range don't match", false);
         }
-        event!(
-            Level::WARN,
-            "Received request with invalid Content-Range header"
-        );
-        Err((
-            StatusCode::BAD_REQUEST,
-            Error::BlobUploadInvalid("Invalid Content-Range".to_string()),
-        ))
+
+        Ok(Self { length, range })
     }
 }
 
@@ -76,11 +62,10 @@ where
         parts: &mut Parts,
         state: &S,
     ) -> Result<Option<Self>, Self::Rejection> {
-        // TODO: better handle this
-        Ok(
-            <Self as FromRequestParts<S>>::from_request_parts(parts, state)
-                .await
-                .ok(),
-        )
+        match <Self as FromRequestParts<S>>::from_request_parts(parts, state).await {
+            Ok(ci) => Ok(Some(ci)),
+            Err((_, Error::NotFound)) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }

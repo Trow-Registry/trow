@@ -11,24 +11,33 @@ use tokio::io::{self, AsyncWriteExt};
 /// the underlying file is deleted in case of an error.
 /// Intended use: create the [`TemporaryFile`], write to it, then move
 /// the underlying file to its final destination.
-pub struct TemporaryFile {
+pub struct FileWrapper {
     file: File,
     path: PathBuf,
+    temporary: bool,
 }
 
-impl TemporaryFile {
-    pub async fn new(path: PathBuf) -> io::Result<Self> {
+impl FileWrapper {
+    pub async fn new_tmp(path: PathBuf) -> io::Result<Self> {
         let mut open_opt = fs::OpenOptions::new();
         let file = open_opt.create_new(true).write(true).open(&path).await?;
 
-        Ok(TemporaryFile { file, path })
+        Ok(FileWrapper {
+            file,
+            path,
+            temporary: true,
+        })
     }
 
     pub async fn append(path: PathBuf) -> io::Result<Self> {
         let mut open_opt = fs::OpenOptions::new();
         let file = open_opt.append(true).create(true).open(&path).await?;
 
-        Ok(TemporaryFile { file, path })
+        Ok(FileWrapper {
+            file,
+            path,
+            temporary: false,
+        })
     }
 
     #[allow(unused)]
@@ -64,16 +73,14 @@ impl TemporaryFile {
     pub async fn rename(self, new_path: &Path) -> io::Result<()> {
         tokio::fs::rename(&self.path, new_path).await
     }
-
-    pub fn untrack(mut self) {
-        self.path = PathBuf::new();
-    }
 }
 
 /// Special drop to ensure that the file is removed
-impl Drop for TemporaryFile {
+impl Drop for FileWrapper {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        if self.temporary {
+            let _ = std::fs::remove_file(&self.path);
+        }
     }
 }
 
@@ -90,9 +97,13 @@ mod test {
     async fn test_temporary_file() {
         let dir = test_temp_dir!();
         let path = dir.subdir_untracked("test.txt");
-        let mut file = TemporaryFile::new(path.clone()).await.unwrap();
+        let mut file = FileWrapper::new_tmp(path.clone()).await.unwrap();
         assert!(
-            TemporaryFile::new(path.clone()).await.err().unwrap().kind()
+            FileWrapper::new_tmp(path.clone())
+                .await
+                .err()
+                .unwrap()
+                .kind()
                 == io::ErrorKind::AlreadyExists,
             "The same file cannot be opened for writing twice !"
         );
@@ -110,7 +121,7 @@ mod test {
 
         let futures = (0..2).map(|_| {
             async {
-                let mut file = match TemporaryFile::new(path.clone()).await {
+                let mut file = match FileWrapper::new_tmp(path.clone()).await {
                     Ok(f) => f,
                     Err(_) => return Err(()) as Result<(), ()>,
                 };
@@ -137,12 +148,12 @@ mod test {
         let tmp_path = tmp_dir.as_path_untracked();
         let file_path = tmp_path.join("test.txt");
 
-        let mut file = TemporaryFile::new(file_path.clone()).await.unwrap();
+        let mut file = FileWrapper::new_tmp(file_path.clone()).await.unwrap();
         file.write_all(DUMMY_DATA).await.unwrap();
         assert_eq!(fs::read(file.path()).await.unwrap(), DUMMY_DATA);
         drop(file);
 
-        let mut file = TemporaryFile::new(file_path.clone()).await.unwrap();
+        let mut file = FileWrapper::new_tmp(file_path.clone()).await.unwrap();
         let dummy_stream = futures::stream::iter(DUMMY_DATA.chunks(4).map(|b| Ok(Bytes::from(b))));
         file.write_stream::<_, reqwest::Error>(dummy_stream)
             .await

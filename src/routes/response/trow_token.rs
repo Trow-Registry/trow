@@ -13,7 +13,6 @@ use base64::Engine as _;
 use headers::HeaderMapExt;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use tracing::{event, Level};
 use uuid::Uuid;
 
 use super::authenticate::Authenticate;
@@ -40,7 +39,7 @@ where
         let user_cfg = match config.user {
             Some(ref user_cfg) => user_cfg,
             None => {
-                event!(Level::WARN, "Attempted login, but no users are configured");
+                tracing::warn!("Attempted login, but no users are configured");
                 return Err((StatusCode::UNAUTHORIZED, ()));
             }
         };
@@ -65,11 +64,7 @@ where
             return Err((StatusCode::UNAUTHORIZED, ()));
         }
 
-        event!(
-            Level::DEBUG,
-            "Attempting to decode auth string {}",
-            auth_strings[1]
-        );
+        tracing::debug!("Attempting to decode auth string {}", auth_strings[1]);
 
         match base64_engine::STANDARD.decode(&auth_strings[1]) {
             Ok(user_pass) => {
@@ -235,7 +230,7 @@ where
         let dec_token = match decode::<TokenClaim>(token, &tok_priv_key, &validation) {
             Ok(td) => td.claims,
             Err(e) => {
-                event!(Level::WARN, "Failed to decode user token: {e}");
+                tracing::warn!("Failed to decode user token: {e}");
                 return Err(Authenticate::new(base_url));
             }
         };

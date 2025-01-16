@@ -52,8 +52,14 @@ pub fn test_temp_dir_from_thread_name(mod_path: &str) -> TestTempDir {
     test_temp_dir::TestTempDir::from_complete_item_path(&path)
 }
 
+macro_rules! resp_header {
+    ($name:expr, $value:expr) => {
+        $name.headers().get($value).unwrap().to_str().unwrap()
+    };
+}
+
 macro_rules! test_temp_dir { {} => {
     $crate::test_utilities::test_temp_dir_from_thread_name(module_path!())
 } }
 
-pub(crate) use test_temp_dir;
+pub(crate) use {resp_header, test_temp_dir};

@@ -9,7 +9,6 @@ use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
 use clap::builder::ArgPredicate;
 use clap::Parser;
-use tracing::{event, Level};
 use trow::{TlsConfig, TrowConfig};
 
 #[derive(Parser, Debug)]
@@ -189,7 +188,7 @@ async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> any
     let handle = axum_server::Handle::new();
     tokio::spawn(shutdown_signal(handle.clone()));
 
-    event!(Level::INFO, "Starting server on {}", addr);
+    tracing::info!("Starting server on {}", addr);
     if let Some(ref tls) = tls {
         if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
             return Err(anyhow!(
@@ -199,6 +198,7 @@ async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> any
             ));
         }
         let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file).await?;
+
         axum_server::bind_rustls(addr, config)
             .handle(handle)
             .serve(app.into_make_service())

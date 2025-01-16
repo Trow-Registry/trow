@@ -47,7 +47,7 @@ pub struct DigestQuery {
 pub struct UploadInfo {
     uuid: String,
     repo_name: String,
-    range: (u32, u32),
+    range: (u64, u64),
 }
 
 pub struct BlobDeleted {}
@@ -55,7 +55,7 @@ pub struct BlobDeleted {}
 pub struct ManifestDeleted {}
 
 impl UploadInfo {
-    pub fn new(uuid: String, repo_name: String, range: (u32, u32)) -> Self {
+    pub fn new(uuid: String, repo_name: String, range: (u64, u64)) -> Self {
         Self {
             uuid,
             repo_name,
@@ -71,7 +71,7 @@ impl UploadInfo {
         &self.repo_name
     }
 
-    pub fn range(&self) -> (u32, u32) {
+    pub fn range(&self) -> (u64, u64) {
         self.range
     }
 }
@@ -81,11 +81,11 @@ pub struct AcceptedUpload {
     digest: Digest,
     repo_name: String,
     uuid: uuid::Uuid,
-    range: (u32, u32),
+    range: (u64, u64),
 }
 
 impl AcceptedUpload {
-    pub fn new(digest: Digest, repo_name: String, uuid: uuid::Uuid, range: (u32, u32)) -> Self {
+    pub fn new(digest: Digest, repo_name: String, uuid: uuid::Uuid, range: (u64, u64)) -> Self {
         Self {
             digest,
             repo_name,
@@ -102,7 +102,7 @@ impl AcceptedUpload {
         &self.repo_name
     }
 
-    pub fn range(&self) -> (u32, u32) {
+    pub fn range(&self) -> (u64, u64) {
         self.range
     }
 

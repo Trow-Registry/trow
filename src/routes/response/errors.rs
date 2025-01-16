@@ -5,7 +5,6 @@ use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tracing::{event, Level};
 
 use crate::registry::digest::DigestError;
 use crate::registry::StorageBackendError;
@@ -24,6 +23,7 @@ pub enum Error {
     DigestInvalid,
     NotFound,
     UnsupportedForProxiedRepo,
+    UnsatisfiableRange,
 }
 
 // Create ErrorMsg struct that serializes to json of appropriate type
@@ -84,6 +84,12 @@ impl fmt::Display for Error {
                 Some(json!({ "Repository": name })),
             ),
             Error::NotFound => format_error_json(f, "NOT_FOUND", "Not Found", None),
+            Error::UnsatisfiableRange => format_error_json(
+                f,
+                "UNSATISFIABLE_RANGE",
+                "The range specified in the request header cannot be satisfied by the current blob.",
+                None,
+            ),
         }
     }
 }
@@ -128,7 +134,7 @@ fn format_error_json(
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let json = format!("{}", self);
-        event!(Level::DEBUG, "Error response: {json}");
+        tracing::debug!("Error response: {json}");
 
         let status = match self {
             Error::Unsupported | Error::UnsupportedForProxiedRepo => StatusCode::METHOD_NOT_ALLOWED,
@@ -142,6 +148,7 @@ impl IntoResponse for Error {
                 StatusCode::BAD_REQUEST
             }
             Error::NotFound => StatusCode::NOT_FOUND,
+            Error::UnsatisfiableRange => StatusCode::RANGE_NOT_SATISFIABLE,
         };
         Response::builder()
             .header(header::CONTENT_TYPE, "application/json")
@@ -158,7 +165,7 @@ impl From<sqlx::Error> for Error {
         match err {
             sqlx::Error::RowNotFound => Self::NotFound,
             _ => {
-                event!(Level::ERROR, "DbErr: {err}");
+                tracing::error!("DbErr: {err}");
                 Self::InternalError
             }
         }
@@ -167,14 +174,18 @@ impl From<sqlx::Error> for Error {
 
 impl From<StorageBackendError> for Error {
     fn from(err: StorageBackendError) -> Self {
-        event!(Level::ERROR, "StorageBackendError: {err}");
-        Self::InternalError
+        tracing::error!("StorageBackendError: {err}");
+        match err {
+            StorageBackendError::BlobNotFound(_) => Self::BlobUnknown,
+            StorageBackendError::InvalidContentRange => Self::UnsatisfiableRange,
+            _ => Self::InternalError,
+        }
     }
 }
 
 impl From<DigestError> for Error {
     fn from(err: DigestError) -> Self {
-        event!(Level::WARN, "DigestError: {err}");
+        tracing::warn!("DigestError: {err}");
         match err {
             DigestError::InvalidDigest(_) => Self::DigestInvalid,
         }

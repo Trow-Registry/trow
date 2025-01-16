@@ -1,14 +1,13 @@
 use axum::body;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use tracing::{event, Level};
 
 use crate::types::AcceptedUpload;
 
 impl IntoResponse for AcceptedUpload {
     fn into_response(self) -> Response {
         let location = format!("/v2/{}/blobs/{}", self.repo_name(), self.digest());
-        event!(Level::DEBUG, "accepted upload response");
+        tracing::debug!("accepted upload response");
         let (left, right) = self.range();
         Response::builder()
             .status(StatusCode::CREATED)
