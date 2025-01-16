@@ -5,7 +5,6 @@ use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tracing::{event, Level};
 
 use crate::registry::digest::DigestError;
 use crate::registry::StorageBackendError;
@@ -128,7 +127,7 @@ fn format_error_json(
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let json = format!("{}", self);
-        event!(Level::DEBUG, "Error response: {json}");
+        tracing::debug!("Error response: {json}");
 
         let status = match self {
             Error::Unsupported | Error::UnsupportedForProxiedRepo => StatusCode::METHOD_NOT_ALLOWED,
@@ -158,7 +157,7 @@ impl From<sqlx::Error> for Error {
         match err {
             sqlx::Error::RowNotFound => Self::NotFound,
             _ => {
-                event!(Level::ERROR, "DbErr: {err}");
+                tracing::error!("DbErr: {err}");
                 Self::InternalError
             }
         }
@@ -167,14 +166,14 @@ impl From<sqlx::Error> for Error {
 
 impl From<StorageBackendError> for Error {
     fn from(err: StorageBackendError) -> Self {
-        event!(Level::ERROR, "StorageBackendError: {err}");
+        tracing::error!("StorageBackendError: {err}");
         Self::InternalError
     }
 }
 
 impl From<DigestError> for Error {
     fn from(err: DigestError) -> Self {
-        event!(Level::WARN, "DigestError: {err}");
+        tracing::warn!("DigestError: {err}");
         match err {
             DigestError::InvalidDigest(_) => Self::DigestInvalid,
         }

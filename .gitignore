@@ -27,3 +27,4 @@ tmp/
 .idea
 .vs
 .DS_Store
+conformance.test

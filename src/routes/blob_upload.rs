@@ -142,6 +142,7 @@ async fn put_blob_upload(
     )
     .await?;
 
+    // missing location header
     Ok(accepted_upload)
 }
 
@@ -365,8 +366,9 @@ mod tests {
 
     use super::*;
     use crate::registry::Digest;
-    use crate::test_utilities;
+    use crate::test_utilities::{self, resp_header};
 
+    // POST blob upload
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_create_new_upload() {
@@ -400,6 +402,7 @@ mod tests {
         .unwrap();
     }
 
+    // POST followed by a single PUT
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_put_blob_upload() {
@@ -420,39 +423,36 @@ mod tests {
             "resp: {:?}",
             resp.into_body().collect().await.unwrap().to_bytes()
         );
-        let resp_headers = resp.headers();
-        let uuid = resp_headers
-            .get(test_utilities::UPLOAD_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
 
-        let range = resp_headers
-            .get(test_utilities::RANGE_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
+        let uuid = resp_header!(resp, test_utilities::UPLOAD_HEADER);
+        let range = resp_header!(resp, test_utilities::RANGE_HEADER);
+        let location = resp_header!(resp, test_utilities::LOCATION_HEADER);
         assert_eq!(range, "0-0"); // Haven't uploaded anything yet
+        assert_eq!(
+            location,
+            format!("/v2/{}/blobs/uploads/{}", repo_name, uuid)
+        );
 
-        //used by oci_manifest_test
-        let config = "{}\n".as_bytes();
-        let digest = Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let blob = "super secret blob".as_bytes();
+        let digest = Digest::digest_sha256(BufReader::new(blob)).unwrap();
         let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", repo_name, uuid, digest);
 
         let resp = router
-            .call(Request::put(loc).body(Body::from(config)).unwrap())
+            .call(Request::put(loc).body(Body::from(blob)).unwrap())
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
+
         let range = resp
             .headers()
             .get(test_utilities::RANGE_HEADER)
             .unwrap()
             .to_str()
             .unwrap();
-        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
+        assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
     }
 
+    /// A single POST
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_complete_upload() {
@@ -485,6 +485,7 @@ mod tests {
         assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
+    // POST (skipped) then PATCH
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_patch_blob_upload() {

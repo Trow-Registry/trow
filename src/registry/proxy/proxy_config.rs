@@ -11,7 +11,6 @@ use oci_client::secrets::RegistryAuth;
 use oci_client::Reference;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use tracing::{event, Level};
 
 use crate::registry::manifest::{ManifestReference, OCIManifest};
 use crate::registry::proxy::remote_image::RemoteImage;
@@ -112,7 +111,7 @@ impl SingleRegistryProxyConfig {
     ) -> Result<Digest, DownloadRemoteImageError> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
-        event!(Level::DEBUG, "Downloading proxied image {}", repo_name);
+        tracing::debug!("Downloading proxied image {}", repo_name);
 
         let image_ref: Reference = image.clone().into();
         let try_cl = self.setup_client(image.scheme == "http").await.ok();
@@ -141,7 +140,7 @@ impl SingleRegistryProxyConfig {
                                 digests.push(Digest::try_from_raw(&d)?);
                             }
                         }
-                        Err(e) => event!(Level::WARN, "Failed to fetch manifest digest: {}", e),
+                        Err(e) => tracing::warn!("Failed to fetch manifest digest: {}", e),
                     }
                 }
                 if let Some(local_digest) = local_digest {
@@ -182,7 +181,7 @@ impl SingleRegistryProxyConfig {
                 .await;
 
                 if let Err(e) = manifest_download {
-                    event!(Level::WARN, "Failed to download proxied image: {}", e)
+                    tracing::warn!("Failed to download proxied image: {}", e)
                 } else {
                     if let Some(tag) = image_ref.tag() {
                         sqlx::query!(
@@ -271,7 +270,7 @@ async fn download_manifest_and_layers(
         layer_digest: &str,
         local_repo_name: &str,
     ) -> Result<()> {
-        event!(Level::TRACE, "Downloading blob {}", layer_digest);
+        tracing::trace!("Downloading blob {}", layer_digest);
         let already_has_blob = sqlx::query_scalar!(
             "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = $1);",
             layer_digest,
@@ -320,7 +319,7 @@ async fn download_manifest_and_layers(
         oci_client::manifest::OCI_IMAGE_INDEX_MEDIA_TYPE,
     ];
 
-    event!(Level::DEBUG, "Downloading manifest + layers for {}", ref_);
+    tracing::debug!("Downloading manifest + layers for {}", ref_);
 
     let (raw_manifest, digest) = cl
         .pull_manifest_raw(ref_, auth, MIME_TYPES_DISTRIBUTION_MANIFEST)

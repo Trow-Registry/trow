@@ -1,7 +1,6 @@
 use axum::body::Body;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use tracing::{event, Level};
 
 pub use crate::types::UploadInfo;
 
@@ -9,13 +8,7 @@ impl IntoResponse for UploadInfo {
     fn into_response(self) -> Response {
         let location_url = format!("/v2/{}/blobs/uploads/{}", self.repo_name(), self.uuid());
         let (left, right) = self.range();
-        event!(
-            Level::DEBUG,
-            "Range: {}-{}, Length: {}",
-            left,
-            right,
-            right - left
-        );
+        tracing::debug!("Range: {}-{}, Length: {}", left, right, right - left);
 
         Response::builder()
             .header("Docker-Upload-UUID", self.uuid().to_string())

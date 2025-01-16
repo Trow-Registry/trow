@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::str;
 
 use anyhow::Result;
-use tracing::{event, Level};
 
 // use super::manifest::Manifest;
 use super::proxy::RegistryProxiesConfig;
@@ -68,7 +67,7 @@ impl TrowServer {
         match self.storage.is_ready().await {
             Ok(()) => true,
             Err(e) => {
-                event!(Level::ERROR, "Storage backend not ready: {e}");
+                tracing::error!("Storage backend not ready: {e}");
                 false
             }
         }

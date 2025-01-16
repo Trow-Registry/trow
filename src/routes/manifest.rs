@@ -6,7 +6,6 @@ use axum::routing::get;
 use axum::Router;
 use bytes::Buf;
 use digest::Digest;
-use tracing::{event, Level};
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
@@ -46,7 +45,8 @@ async fn get_manifest(
     Path((repo, raw_reference)): Path<(String, String)>,
 ) -> Result<OciJson<OCIManifest>, Error> {
     let reference = ManifestReference::try_from_str(&raw_reference).map_err(|e| {
-        Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
+        // Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
+        Error::ManifestUnknown(format!("Invalid reference: {raw_reference} ({e:?})"))
     })?;
 
     let digest = if repo.starts_with(PROXY_DIR) {
@@ -68,7 +68,7 @@ async fn get_manifest(
             .download_remote_image(&image, &state.registry, &state.db)
             .await
             .map_err(|e| {
-                event!(Level::ERROR, "Error downloading image: {e}");
+                tracing::error!("Error downloading image: {e}");
                 Error::InternalError
             })?;
         new_digest.to_string()
@@ -108,7 +108,7 @@ async fn get_manifest(
         .await?;
 
         if maybe_manifest.is_none() {
-            return Err(Error::ManifestUnknown("".to_string()));
+            return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
         }
         digest
     };
@@ -173,7 +173,7 @@ async fn put_image_manifest(
     let assets = manifest_parsed.get_local_asset_digests();
 
     for digest in assets {
-        event!(Level::DEBUG, "Checking asset: {repo_name} {digest}");
+        tracing::debug!("Checking asset: {repo_name} {digest}");
         let res = sqlx::query!(
             r#"
             SELECT b.digest FROM blob b

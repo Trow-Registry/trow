@@ -10,7 +10,6 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Duration;
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use tracing::{event, Level};
 
 use super::manifest::ManifestError;
 use crate::registry::blob_storage::Stored;
@@ -63,8 +62,7 @@ impl TrowStorageBackend {
         match std::fs::create_dir_all(&path) {
             Ok(_) => Ok(()),
             Err(e) => {
-                event!(
-                    Level::ERROR,
+                tracing::error!(
                     r#"
                     Failed to create directory required by trow {:?}
                     Please check the parent directory is writable by the trow user.
@@ -89,7 +87,7 @@ impl TrowStorageBackend {
         repo: &str,
         digest: &Digest,
     ) -> Result<Bytes, StorageBackendError> {
-        event!(Level::DEBUG, "Get manifest {repo}:{digest}");
+        tracing::debug!("Get manifest {repo}:{digest}");
         let path = self.path.join(BLOBS_DIR).join(digest.as_str());
         if !path.exists() {
             return Err(StorageBackendError::BlobNotFound(path));
@@ -103,10 +101,10 @@ impl TrowStorageBackend {
         repo_name: &str,
         digest: &Digest,
     ) -> Result<BoundedStream<impl futures::AsyncRead>, StorageBackendError> {
-        event!(Level::DEBUG, "Get blob {repo_name}:{digest}");
+        tracing::debug!("Get blob {repo_name}:{digest}");
         let path = self.path.join(BLOBS_DIR).join(digest.to_string());
         let file = tokio::fs::File::open(&path).await.map_err(|e| {
-            event!(Level::ERROR, "Could not open blob: {}", e);
+            tracing::error!("Could not open blob: {}", e);
             StorageBackendError::BlobNotFound(path)
         })?;
         let size = file.metadata().await?.len() as usize;
@@ -123,11 +121,11 @@ impl TrowStorageBackend {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        event!(Level::DEBUG, "Write blob {digest}");
+        tracing::debug!("Write blob {digest}");
         let tmp_location = self.path.join(UPLOADS_DIR).join(digest.to_string());
         let location = self.path.join(BLOBS_DIR).join(digest.to_string());
         if location.exists() {
-            event!(Level::INFO, "Blob already exists");
+            tracing::info!("Blob already exists");
             return Ok(location);
         }
         tokio::fs::create_dir_all(location.parent().unwrap()).await?;
@@ -136,7 +134,7 @@ impl TrowStorageBackend {
             Ok(tmpf) => tmpf,
             // Special case: blob is being concurrently fetched
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                event!(Level::INFO, "Waiting for concurrently fetched blob");
+                tracing::info!("Waiting for concurrently fetched blob");
                 while tmp_location.exists() {
                     // wait for download to be done (temp file to be moved)
                     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -179,12 +177,12 @@ impl TrowStorageBackend {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        event!(Level::DEBUG, "Write blob part {upload_id} ({range:?})");
+        tracing::debug!("Write blob part {upload_id} ({range:?})");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
         let mut tmp_file = TemporaryFile::append(tmp_location.clone())
             .await
             .map_err(|e| {
-                event!(Level::ERROR, "Could not open tmp file: {}", e);
+                tracing::error!("Could not open tmp file: {}", e);
                 match e.kind() {
                     io::ErrorKind::NotFound => StorageBackendError::BlobNotFound(tmp_location),
                     io::ErrorKind::AlreadyExists => StorageBackendError::InvalidContentRange,
@@ -196,8 +194,7 @@ impl TrowStorageBackend {
 
         if let Some(range) = &range {
             if *range.start() != file_size {
-                event!(
-                    Level::ERROR,
+                tracing::error!(
                     "Invalid content-range: start={} file_pos={}",
                     range.start(),
                     file_size
@@ -210,8 +207,7 @@ impl TrowStorageBackend {
         })? as u64;
 
         if matches!(range_len, Some(len) if len != bytes_written) {
-            event!(
-                Level::ERROR,
+            tracing::error!(
                 "Invalid content-length: expected={} actual={}",
                 range_len.unwrap(),
                 bytes_written
@@ -231,15 +227,14 @@ impl TrowStorageBackend {
         upload_id: &uuid::Uuid,
         user_digest: &Digest,
     ) -> Result<(), StorageBackendError> {
-        event!(Level::DEBUG, "Complete blob write {upload_id}");
+        tracing::debug!("Complete blob write {upload_id}");
         let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
         let final_location = self.path.join(BLOBS_DIR).join(user_digest.to_string());
         // Should we even do this ? It breaks OCI tests:
         let f = std::fs::File::open(&tmp_location)?;
         let calculated_digest = Digest::digest_sha256(f)?;
         if &calculated_digest != user_digest {
-            event!(
-                Level::ERROR,
+            tracing::error!(
                 "Upload did not match given digest. Was given {} but got {}",
                 user_digest,
                 calculated_digest
@@ -261,7 +256,7 @@ impl TrowStorageBackend {
         repo_name: &str,
         digest: &Digest,
     ) -> Result<PathBuf, StorageBackendError> {
-        event!(Level::DEBUG, "Write image manifest {repo_name}:{digest}");
+        tracing::debug!("Write image manifest {repo_name}:{digest}");
         let manifest_stream = bytes_to_stream(manifest);
         let location = self
             .write_blob_stream(digest, pin!(manifest_stream), true)
@@ -275,7 +270,7 @@ impl TrowStorageBackend {
         repo: &str,
         digest: &Digest,
     ) -> Result<(), StorageBackendError> {
-        event!(Level::DEBUG, "Delete blob {repo}:{digest}");
+        tracing::debug!("Delete blob {repo}:{digest}");
         let blob_path = self.path.join(BLOBS_DIR).join(digest.as_str());
         tokio::fs::remove_file(blob_path).await?;
         Ok(())

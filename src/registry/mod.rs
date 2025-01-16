@@ -17,7 +17,6 @@ pub use proxy::{RegistryProxiesConfig, SingleRegistryProxyConfig};
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;
-use tracing::{event, Level};
 
 pub mod blob_storage;
 #[allow(dead_code)]
@@ -45,7 +44,7 @@ pub enum RegistryError {
 
 impl From<sqlx::Error> for RegistryError {
     fn from(err: sqlx::Error) -> Self {
-        event!(Level::ERROR, "Database error: {err:?}");
+        tracing::error!("Database error: {err:?}");
         Self::Internal
     }
 }
@@ -55,7 +54,7 @@ impl From<StorageBackendError> for RegistryError {
         match err {
             StorageBackendError::BlobNotFound(_) => Self::NotFound,
             StorageBackendError::Internal(e) => {
-                event!(Level::ERROR, "Internal storage error: {e}");
+                tracing::error!("Internal storage error: {e}");
                 Self::Internal
             }
             StorageBackendError::InvalidContentRange => Self::InvalidContentRange,
@@ -63,7 +62,7 @@ impl From<StorageBackendError> for RegistryError {
             StorageBackendError::InvalidManifest(_msg) => Self::InvalidManifest,
             StorageBackendError::InvalidName(name) => Self::InvalidName(name),
             StorageBackendError::Io(e) => {
-                event!(Level::ERROR, "Internal IO error: {e:?}");
+                tracing::error!("Internal IO error: {e:?}");
                 Self::Internal
             }
             StorageBackendError::Unsupported => Self::Unsupported,

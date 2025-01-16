@@ -25,11 +25,12 @@ binary will be written to `/target/debug/trow`.
 To execute the binary, you can run `cargo run`, which will first recompile Trow if anything has
 changed.
 
-## Running OCI conformance tests locally
+### Testing Trow
 
-```bash
-CONT=$(podman create ghcr.io/opencontainers/distribution-spec/conformance:v1.1.0)
-podman cp $CONT:/conformance.test .
-podman rm $CONT
-OCI_ROOT_URL="http://127.0.0.1:8000" OCI_TEST_PULL=1 ./conformance.test
-```
+There are multiple ways to test Trow:
+
+* `cargo test`
+  * `cargo test --lib --bins` to run only unit tests
+  * `cargo test --test '*'` to run only integration tests
+* `cargo test -- --ignored` to run the smoke tests
+* `./run_oci_conformance_tests.sh` to run the OCI conformance tests
