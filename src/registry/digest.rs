@@ -100,6 +100,10 @@ impl Digest {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
 }
 
 #[cfg(test)]

@@ -70,8 +70,8 @@ mod utils {
         let size_i64 = size.total_stored as i64;
         sqlx::query!(
             r#"
-            INSERT INTO blob (digest, size, is_manifest)
-            VALUES ($1, $2, false) ON CONFLICT (digest) DO NOTHING
+            INSERT INTO blob (digest, size)
+            VALUES ($1, $2) ON CONFLICT (digest) DO NOTHING
             "#,
             digest_str,
             size_i64

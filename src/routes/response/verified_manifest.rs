@@ -13,13 +13,14 @@ impl IntoResponse for VerifiedManifest {
             self.repo_name(),
             self.tag()
         );
-        Response::builder()
+        let mut rbuilder = Response::builder()
             .header("Location", location)
             .header("Docker-Content-Digest", self.digest().to_string())
-            .status(StatusCode::CREATED)
-            .body(body::Body::empty())
-            .unwrap()
-            .into_response()
+            .status(StatusCode::CREATED);
+        if let Some(subject) = self.subject() {
+            rbuilder = rbuilder.header("OCI-Subject", subject);
+        }
+        rbuilder.body(body::Body::empty()).unwrap().into_response()
     }
 }
 
@@ -41,6 +42,26 @@ mod test {
             )
             .unwrap(),
             "ref".to_string(),
+            None,
+        )
+        .into_response();
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    #[test]
+    fn with_subject() {
+        let response = VerifiedManifest::new(
+            Some("https://extrality.ai".to_string()),
+            "repo_name".to_string(),
+            Digest::try_from_raw(
+                "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec",
+            )
+            .unwrap(),
+            "ref".to_string(),
+            Some(
+                "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec"
+                    .to_string(),
+            ),
         )
         .into_response();
         assert_eq!(response.status(), StatusCode::CREATED);

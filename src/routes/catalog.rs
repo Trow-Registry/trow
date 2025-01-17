@@ -51,6 +51,7 @@ async fn get_catalog(
             .repositories(raw_repos)
             .build()
             .unwrap(),
+        true,
     ))
 }
 
@@ -89,6 +90,7 @@ async fn list_tags(
             .tags(raw_tags)
             .build()
             .unwrap(),
+        true,
     ))
 }
 endpoint_fn_7_levels!(

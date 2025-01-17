@@ -5,6 +5,7 @@ mod blob_upload;
 mod catalog;
 mod health;
 mod manifest;
+mod manifest_referrers;
 mod readiness;
 
 // helpers
@@ -131,6 +132,7 @@ pub fn create_app(state: Arc<super::TrowServerState>) -> Router {
     app = blob_upload::route(app);
     app = catalog::route(app);
     app = manifest::route(app);
+    app = manifest_referrers::route(app);
     app = admission::route(app);
 
     app = add_router_layers(app, &state.config.cors);

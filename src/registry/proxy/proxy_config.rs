@@ -4,7 +4,6 @@ use aws_sdk_ecr::config::http::HttpResponse;
 use aws_sdk_ecr::error::SdkError;
 use aws_sdk_ecr::operation::get_authorization_token::GetAuthorizationTokenError;
 use base64::Engine;
-use bytes::Bytes;
 use futures::future::try_join_all;
 use oci_client::client::ClientProtocol;
 use oci_client::secrets::RegistryAuth;
@@ -79,6 +78,14 @@ pub enum DownloadRemoteImageError {
     InvalidDigest(#[from] DigestError),
     #[error("Failed to download image")]
     DownloadAttemptsFailed,
+    #[error("Manifest JSON is not canonicalized")]
+    ManifestNotCanonicalized,
+    #[error("OCI client error: {0}")]
+    OciClientError(#[from] oci_client::errors::OciDistributionError),
+    #[error("Storage backend error: {0}")]
+    StorageError(#[from] crate::registry::storage::StorageBackendError),
+    #[error("Could not deserialize manifest: {0}")]
+    ManifestDeserializationError(#[from] serde_json::Error),
 }
 
 impl SingleRegistryProxyConfig {
@@ -108,7 +115,7 @@ impl SingleRegistryProxyConfig {
         image: &RemoteImage,
         registry: &TrowServer,
         db: &SqlitePool,
-    ) -> Result<Digest, DownloadRemoteImageError> {
+    ) -> Result<(String, OCIManifest), DownloadRemoteImageError> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
         tracing::debug!("Downloading proxied image {}", repo_name);
@@ -152,20 +159,15 @@ impl SingleRegistryProxyConfig {
 
         for mani_digest in digests.into_iter() {
             let mani_digest_str = mani_digest.as_str();
-            let have_manifest = sqlx::query_scalar!(
-                r#"
-                SELECT EXISTS(
-                    SELECT 1 FROM blob
-                    WHERE digest = $1 AND is_manifest = 1
-                )
-                "#,
+            let try_raw_manifest = sqlx::query_scalar!(
+                "SELECT content FROM manifest WHERE digest = $1",
                 mani_digest_str
             )
-            .fetch_one(&mut *db.acquire().await?)
-            .await?
-                == 1;
-            if have_manifest {
-                return Ok(mani_digest);
+            .fetch_optional(&mut *db.acquire().await?)
+            .await?;
+            if let Some(raw_manifest) = try_raw_manifest {
+                let manifest = serde_json::from_slice::<'_, OCIManifest>(&raw_manifest)?;
+                return Ok((mani_digest.to_string(), manifest));
             }
             if let Some((cl, auth)) = &try_cl {
                 let ref_to_dl = image_ref.clone_with_digest(mani_digest.to_string());
@@ -180,24 +182,23 @@ impl SingleRegistryProxyConfig {
                 )
                 .await;
 
-                if let Err(e) = manifest_download {
-                    tracing::warn!("Failed to download proxied image: {}", e)
-                } else {
-                    if let Some(tag) = image_ref.tag() {
-                        sqlx::query!(
-                            r#"
-                            INSERT INTO tag (repo, tag, manifest_digest)
-                            VALUES ($1, $2, $3)
-                            ON CONFLICT (repo, tag) DO UPDATE SET manifest_digest = $3
-                            "#,
-                            repo_name,
-                            tag,
-                            mani_digest_str
-                        )
-                        .execute(&mut *db.acquire().await?)
-                        .await?;
+                match manifest_download {
+                    Err(e) => tracing::warn!("Failed to download proxied image: {}", e),
+                    Ok(manifest) => {
+                        if let Some(tag) = image_ref.tag() {
+                            sqlx::query!(
+                                r#"INSERT INTO tag (repo, tag, manifest_digest)
+                                VALUES ($1, $2, $3)
+                                ON CONFLICT (repo, tag) DO UPDATE SET manifest_digest = $3"#,
+                                repo_name,
+                                tag,
+                                mani_digest_str
+                            )
+                            .execute(&mut *db.acquire().await?)
+                            .await?;
+                        }
+                        return Ok((mani_digest.to_string(), manifest));
                     }
-                    return Ok(mani_digest);
                 }
             }
         }
@@ -252,8 +253,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPass
     Ok(String::from_utf8(auth_str)?)
 }
 
-/// `ref_` MUST reference a digest (*not* a tag)
-// #[async_recursion]
+/// `ref_` MUST reference a digest (_not_ a tag)
 async fn download_manifest_and_layers(
     cl: &oci_client::Client,
     auth: &RegistryAuth,
@@ -261,7 +261,7 @@ async fn download_manifest_and_layers(
     storage: &TrowStorageBackend,
     ref_: &Reference,
     local_repo_name: &str,
-) -> Result<()> {
+) -> Result<OCIManifest, DownloadRemoteImageError> {
     async fn download_blob(
         cl: &oci_client::Client,
         db: SqlitePool,
@@ -269,7 +269,7 @@ async fn download_manifest_and_layers(
         ref_: &Reference,
         layer_digest: &str,
         local_repo_name: &str,
-    ) -> Result<()> {
+    ) -> Result<(), DownloadRemoteImageError> {
         tracing::trace!("Downloading blob {}", layer_digest);
         let already_has_blob = sqlx::query_scalar!(
             "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = $1);",
@@ -286,7 +286,7 @@ async fn download_manifest_and_layers(
                 .await?;
             let size = path.metadata().unwrap().len() as i64;
             sqlx::query!(
-                "INSERT INTO blob (digest, is_manifest, size) VALUES ($1, FALSE, $2) ON CONFLICT DO NOTHING;",
+                "INSERT INTO blob (digest, size) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
                 layer_digest,
                 size
             )
@@ -327,20 +327,18 @@ async fn download_manifest_and_layers(
     let manifest: OCIManifest = serde_json::from_slice(&raw_manifest).map_err(|e| {
         oci_client::errors::OciDistributionError::ManifestParsingError(e.to_string())
     })?;
+    if serde_json_canonicalizer::to_vec(&manifest).unwrap() != raw_manifest {
+        return Err(DownloadRemoteImageError::ManifestNotCanonicalized);
+    }
 
-    let manifest_size = raw_manifest.len() as i64;
-    let already_has_manifest = match sqlx::query!(
-        "INSERT INTO blob (digest, is_manifest, size) VALUES ($1, TRUE, $2);",
+    sqlx::query!(
+        "INSERT INTO manifest (digest, content) VALUES ($1, jsonb($2)) ON CONFLICT DO NOTHING",
         digest,
-        manifest_size
+        raw_manifest
     )
     .execute(&mut *db.acquire().await?)
-    .await
-    {
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => true,
-        Err(e) => return Err(e.into()),
-        Ok(_) => false,
-    };
+    .await?;
+    // let already_has_manifest = res.rows_affected() > 0;
 
     sqlx::query!(
         "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
@@ -350,17 +348,7 @@ async fn download_manifest_and_layers(
     .execute(&mut *db.acquire().await?)
     .await?;
 
-    if !already_has_manifest {
-        storage
-            .write_image_manifest(
-                Bytes::from(raw_manifest),
-                local_repo_name,
-                &Digest::try_from_raw(&digest).unwrap(),
-            )
-            .await?;
-    }
-
-    match manifest {
+    match &manifest {
         OCIManifest::List(m) => {
             let images_to_dl = m
                 .manifests()
@@ -381,5 +369,5 @@ async fn download_manifest_and_layers(
         }
     }
 
-    Ok(())
+    Ok(manifest)
 }

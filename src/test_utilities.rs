@@ -3,7 +3,6 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::Router;
 use http_body_util::BodyExt;
-use hyper::body::Buf;
 use hyper::Response;
 use serde::de::DeserializeOwned;
 use test_temp_dir::TestTempDir;
@@ -28,14 +27,20 @@ pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
 }
 
 pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {
-    let reader = resp
+    let buf = resp
         .into_body()
         .collect()
         .await
         .unwrap()
-        .aggregate()
-        .reader();
-    serde_json::from_reader(reader).unwrap()
+        .to_bytes()
+        .to_vec();
+    match serde_json::from_slice(&buf) {
+        Ok(val) => val,
+        Err(err) => {
+            let text = String::from_utf8_lossy(&buf);
+            panic!("unable to deserialize response body: {err:?} {text}");
+        }
+    }
 }
 
 /// test_temp_dir if thread name != module path, which is the case in parametrized tests
