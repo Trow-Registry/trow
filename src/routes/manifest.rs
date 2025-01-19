@@ -11,7 +11,9 @@ use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::registry::digest;
-use crate::registry::manifest::{ManifestReference, OCIManifest, REGEX_TAG};
+use crate::registry::manifest::{
+    layer_is_distributable, ManifestReference, OCIManifest, REGEX_TAG,
+};
 use crate::registry::server::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
@@ -49,7 +51,7 @@ async fn get_manifest(
         Error::ManifestUnknown(format!("Invalid reference: {raw_reference} ({e:?})"))
     })?;
 
-    let (digest, manifest) = if repo.starts_with(PROXY_DIR) {
+    let digest = if repo.starts_with(PROXY_DIR) {
         let (proxy_cfg, image) = match state
             .registry
             .proxy_registry_config
@@ -92,9 +94,9 @@ async fn get_manifest(
             }
             ManifestReference::Digest(_) => raw_reference,
         };
-        let maybe_manifest = sqlx::query!(
+        let maybe_digest = sqlx::query_scalar!(
             r#"
-            SELECT m.content, m.digest
+            SELECT m.digest
             FROM manifest m
             INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
             WHERE m.digest = $2 AND rba.repo_name = $1
@@ -105,28 +107,28 @@ async fn get_manifest(
         .fetch_optional(&mut *state.db.acquire().await?)
         .await?;
 
-        match maybe_manifest {
-            Some(raw_manifest) => {
-                let manifest = serde_json::from_slice::<'_, OCIManifest>(&raw_manifest.content)
-                    .map_err(|e| Error::ManifestInvalid(format!("serialization error: {e}")))?;
-                (digest, manifest)
-            }
+        match maybe_digest {
+            Some(d) => d,
             None => {
                 return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
             }
         }
     };
 
-    let digest_parsed = Digest::try_from_raw(&digest).unwrap();
-    let content_type = manifest
-        .media_type()
-        .as_ref()
-        .map(|mt| mt.to_string())
-        .unwrap_or("application/json".to_string());
+    let res = sqlx::query!(
+        r#"
+        SELECT m.json ->> 'mediaType' as "media_type: String", m.blob
+        FROM manifest m
+        WHERE m.digest = $1
+        "#,
+        digest
+    )
+    .fetch_one(&mut *state.db.acquire().await?)
+    .await?;
 
-    Ok(OciJson::new(&manifest, false)
-        .set_digest(&digest_parsed)
-        .set_content_type(&content_type))
+    Ok(OciJson::new_raw(res.blob.into())
+        .set_digest(digest)
+        .set_content_type(&res.media_type.unwrap_or("application/json".to_owned())))
 }
 
 endpoint_fn_7_levels!(
@@ -168,9 +170,14 @@ async fn put_image_manifest(
         .to_vec();
     let manifest_parsed = serde_json::from_slice::<'_, OCIManifest>(&manifest_bytes)
         .map_err(|e| Error::ManifestInvalid(format!("{e}")))?;
+
     match &manifest_parsed {
         OCIManifest::List(m) => {
-            let assets = m.manifests().iter().map(|m| m.digest().as_ref());
+            let assets = m
+                .manifests()
+                .iter()
+                .filter(|l| layer_is_distributable(l.media_type()))
+                .map(|m| m.digest().as_ref());
             for digest in assets {
                 let res = sqlx::query!(
                     r"SELECT m.digest FROM manifest m
@@ -189,7 +196,11 @@ async fn put_image_manifest(
             }
         }
         OCIManifest::V2(m) => {
-            let assets = m.layers().iter().map(|l| l.digest().as_ref());
+            let assets = m
+                .layers()
+                .iter()
+                .filter(|l| layer_is_distributable(l.media_type()))
+                .map(|l| l.digest().as_ref());
             for digest in assets {
                 let res = sqlx::query!(
                     r"SELECT b.digest FROM blob b
@@ -211,13 +222,15 @@ async fn put_image_manifest(
     let computed_digest = Digest::digest_sha256(manifest_bytes.clone().reader()).unwrap();
     let computed_digest_str = computed_digest.as_str();
     if !is_tag && computed_digest_str != reference {
-        return Err(Error::ManifestInvalid("Digest does not match".to_string()));
+        return Err(Error::ManifestInvalid(
+            "Given digest does not match".to_string(),
+        ));
     }
 
     sqlx::query!(
         r#"
-        INSERT INTO manifest (digest, content)
-        VALUES ($1, $2)
+        INSERT INTO manifest (digest, json, blob)
+        VALUES ($1, jsonb($2), $2)
         ON CONFLICT (digest) DO NOTHING
         "#,
         computed_digest_str,

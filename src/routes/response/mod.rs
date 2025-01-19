@@ -21,9 +21,7 @@ use std::marker::PhantomData;
 use axum::body::Body;
 use axum::http::{header, HeaderValue};
 use axum::response::{IntoResponse, Response};
-use bytes::Buf;
-
-use crate::registry::Digest;
+use bytes::Bytes;
 
 #[derive(Debug, Default)]
 pub struct OciJson<T> {
@@ -36,33 +34,34 @@ impl<T> OciJson<T>
 where
     T: serde::Serialize,
 {
-    pub fn new(content: &T, compute_digest: bool) -> Self {
-        let body_vec = serde_json_canonicalizer::to_vec(content).unwrap();
-        let digest = if compute_digest {
-            Some(Digest::digest_sha256(body_vec.reader()).unwrap())
-        } else {
-            None
-        };
+    pub fn new(content: &T) -> Self {
+        let body_bytes = serde_json::to_vec(content).unwrap();
+        let content_length = body_bytes.len();
+        let response = Response::new(Body::from(body_bytes));
 
-        let content_length = body_vec.len();
-        let response = Response::new(Body::from(body_vec));
-
-        let s = Self {
+        Self {
             response,
             content_length,
             content_type: PhantomData,
-        };
-        if let Some(digest) = digest {
-            s.set_digest(&digest)
-        } else {
-            s
         }
     }
 
-    pub fn set_digest(mut self, digest: &Digest) -> Self {
+    /// To work around the fact that manifests cannot be serialized/deserialized
+    /// or their digest might not match
+    pub fn new_raw(content: Bytes) -> Self {
+        let content_length = content.len();
+        let response = Response::new(Body::from(content));
+        Self {
+            response,
+            content_length,
+            content_type: PhantomData,
+        }
+    }
+
+    pub fn set_digest<D: AsRef<str>>(mut self, digest: D) -> Self {
         self.response.headers_mut().insert(
             "Docker-Content-Digest",
-            HeaderValue::from_str(digest.as_str()).unwrap(),
+            HeaderValue::from_str(digest.as_ref()).unwrap(),
         );
         self
     }

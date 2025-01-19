@@ -139,17 +139,24 @@ impl TrowStorageBackend {
                     // wait for download to be done (temp file to be moved)
                     tokio::time::sleep(Duration::from_millis(200)).await;
                 }
-                // TODO
-                return Ok(location);
+                if location.exists() {
+                    return Ok(location);
+                } else {
+                    return Err(StorageBackendError::BlobNotFound(location));
+                }
             }
             Err(e) => {
-                return Err(e.into());
+                return Err(StorageBackendError::Io(e));
             }
         };
         tmp_file.write_stream(stream).await?;
         if verify {
             let reader = std::fs::File::open(tmp_file.path()).map_err(|e| {
-                StorageBackendError::Internal(Cow::Owned(format!("Could not open tmp file: {e}")))
+                StorageBackendError::Internal(Cow::Owned(format!(
+                    "Could not open tmp file {}: {}",
+                    tmp_file.path().display(),
+                    e
+                )))
             })?;
             let tmp_digest = Digest::digest_sha256(reader).map_err(|e| {
                 StorageBackendError::Internal(Cow::Owned(format!(
@@ -182,7 +189,7 @@ impl TrowStorageBackend {
         let mut tmp_file = FileWrapper::append(tmp_location.clone())
             .await
             .map_err(|e| {
-                tracing::error!("Could not open tmp file: {}", e);
+                tracing::error!("Could not open tmp file {}: {}", tmp_location.display(), e);
                 match e.kind() {
                     io::ErrorKind::NotFound => StorageBackendError::BlobNotFound(tmp_location),
                     io::ErrorKind::AlreadyExists => StorageBackendError::InvalidContentRange,

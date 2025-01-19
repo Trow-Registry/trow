@@ -170,12 +170,10 @@ mod proxy_registry {
         // Special case: docker/library
         // check that it works and that manifests are written in the correct location
         get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
-        let digest = sqlx::query_scalar!("SELECT manifest_digest FROM tag WHERE repo = 'f/docker/library/alpine' AND tag = '3.13.4'")
+        sqlx::query_scalar!("SELECT manifest_digest FROM tag WHERE repo = 'f/docker/library/alpine' AND tag = '3.13.4'")
             .fetch_one(&mut *state.db.acquire().await.unwrap())
             .await
             .expect("Tag not found in database");
-        let file = data_dir.join(format!("./blobs/{digest}"));
-        assert!(file.exists());
     }
 
     #[tokio::test]

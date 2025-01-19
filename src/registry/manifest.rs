@@ -134,13 +134,7 @@ impl OCIManifest {
                 let mut digests: Vec<String> = m2
                     .layers()
                     .iter()
-                    .filter(|l| {
-                        l.media_type()
-                            != &MediaType::Other(
-                                "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
-                                    .to_string(),
-                            )
-                    })
+                    .filter(|l| layer_is_distributable(l.media_type()))
                     .map(|x| x.digest().to_string())
                     .collect();
                 digests.push(m2.config().digest().to_string());
@@ -164,6 +158,17 @@ impl OCIManifest {
             OCIManifest::List(list) => list.media_type(),
         }
     }
+}
+
+pub fn layer_is_distributable(layer: &MediaType) -> bool {
+    let non_distributable = [
+        MediaType::ImageLayerNonDistributable,
+        MediaType::ImageLayerNonDistributableGzip,
+        MediaType::ImageLayerNonDistributableZstd,
+        MediaType::Other("application/vnd.docker.image.rootfs.foreign.diff.tar.gzip".to_string()),
+    ];
+
+    !non_distributable.contains(layer)
 }
 
 #[cfg(test)]

@@ -115,7 +115,7 @@ impl SingleRegistryProxyConfig {
         image: &RemoteImage,
         registry: &TrowServer,
         db: &SqlitePool,
-    ) -> Result<(String, OCIManifest), DownloadRemoteImageError> {
+    ) -> Result<String, DownloadRemoteImageError> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
         tracing::debug!("Downloading proxied image {}", repo_name);
@@ -159,15 +159,14 @@ impl SingleRegistryProxyConfig {
 
         for mani_digest in digests.into_iter() {
             let mani_digest_str = mani_digest.as_str();
-            let try_raw_manifest = sqlx::query_scalar!(
-                "SELECT content FROM manifest WHERE digest = $1",
+            let has_manifest = sqlx::query_scalar!(
+                r#"SELECT EXISTS(SELECT 1 FROM manifest WHERE digest = $1)"#,
                 mani_digest_str
             )
-            .fetch_optional(&mut *db.acquire().await?)
+            .fetch_one(&mut *db.acquire().await?)
             .await?;
-            if let Some(raw_manifest) = try_raw_manifest {
-                let manifest = serde_json::from_slice::<'_, OCIManifest>(&raw_manifest)?;
-                return Ok((mani_digest.to_string(), manifest));
+            if has_manifest == 1 {
+                return Ok(mani_digest.to_string());
             }
             if let Some((cl, auth)) = &try_cl {
                 let ref_to_dl = image_ref.clone_with_digest(mani_digest.to_string());
@@ -184,7 +183,7 @@ impl SingleRegistryProxyConfig {
 
                 match manifest_download {
                     Err(e) => tracing::warn!("Failed to download proxied image: {}", e),
-                    Ok(manifest) => {
+                    Ok(()) => {
                         if let Some(tag) = image_ref.tag() {
                             sqlx::query!(
                                 r#"INSERT INTO tag (repo, tag, manifest_digest)
@@ -197,7 +196,7 @@ impl SingleRegistryProxyConfig {
                             .execute(&mut *db.acquire().await?)
                             .await?;
                         }
-                        return Ok((mani_digest.to_string(), manifest));
+                        return Ok(mani_digest.to_string());
                     }
                 }
             }
@@ -261,7 +260,7 @@ async fn download_manifest_and_layers(
     storage: &TrowStorageBackend,
     ref_: &Reference,
     local_repo_name: &str,
-) -> Result<OCIManifest, DownloadRemoteImageError> {
+) -> Result<(), DownloadRemoteImageError> {
     async fn download_blob(
         cl: &oci_client::Client,
         db: SqlitePool,
@@ -300,14 +299,6 @@ async fn download_manifest_and_layers(
         )
         .execute(&mut *db.acquire().await?)
         .await?;
-        let parent_digest = ref_.digest().unwrap();
-        sqlx::query!(
-                "INSERT INTO blob_blob_association (parent_digest, child_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
-                parent_digest,
-                layer_digest
-            )
-            .execute(&mut *db.acquire().await?)
-            .await?;
 
         Ok(())
     }
@@ -327,18 +318,14 @@ async fn download_manifest_and_layers(
     let manifest: OCIManifest = serde_json::from_slice(&raw_manifest).map_err(|e| {
         oci_client::errors::OciDistributionError::ManifestParsingError(e.to_string())
     })?;
-    if serde_json_canonicalizer::to_vec(&manifest).unwrap() != raw_manifest {
-        return Err(DownloadRemoteImageError::ManifestNotCanonicalized);
-    }
 
     sqlx::query!(
-        "INSERT INTO manifest (digest, content) VALUES ($1, jsonb($2)) ON CONFLICT DO NOTHING",
+        "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING",
         digest,
         raw_manifest
     )
     .execute(&mut *db.acquire().await?)
     .await?;
-    // let already_has_manifest = res.rows_affected() > 0;
 
     sqlx::query!(
         "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
@@ -369,5 +356,5 @@ async fn download_manifest_and_layers(
         }
     }
 
-    Ok(manifest)
+    Ok(())
 }

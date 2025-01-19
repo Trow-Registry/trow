@@ -7,19 +7,8 @@ CREATE TABLE "manifest" (
     "digest" TEXT NOT NULL PRIMARY KEY,
     -- "size" INTEGER NOT NULL,
     "last_accessed" INTEGER NOT NULL DEFAULT (unixepoch()),
-    "content" BLOB NOT NULL
-) STRICT;
-CREATE TABLE "blob_blob_association" (
-    "parent_digest" TEXT NOT NULL,
-    "parent_is_manifest" INTEGER NOT NULL,
-    "child_digest" TEXT NOT NULL,
-    PRIMARY KEY ("parent_digest", "child_digest")
-    -- FOREIGN KEY ("parent_digest")
-    --     REFERENCES "blob" ("digest")
-    --     ON DELETE CASCADE
-    --     ON UPDATE CASCADE,
-    -- FOREIGN KEY ("child_digest")
-    --     REFERENCES "blob" ("digest")
+    "json" BLOB NOT NULL,
+    "blob" BLOB NOT NULL
 ) STRICT;
 CREATE TABLE "blob_upload" (
     "uuid" TEXT NOT NULL PRIMARY KEY,

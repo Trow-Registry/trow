@@ -39,16 +39,16 @@ async fn get_referrers(
     if repo.starts_with(PROXY_DIR) {
         return Err(Error::UnsupportedForProxiedRepo);
     }
-    println!("0");
     let _ = Digest::try_from_raw(&digest)?;
-    println!("1: {repo} {digest}");
     let referrers = sqlx::query!(
         r#"
-        SELECT json(m.content) as "content: Json<OCIManifest>", m.digest
+        SELECT json(m.json) as "content!: Json<OCIManifest>",
+            m.digest,
+            length(m.blob) as "size!: i64"
         FROM manifest m
         INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
         WHERE rba.repo_name = $1
-            AND (m.content -> 'subject' ->> 'digest') = $2
+            AND (m.json -> 'subject' ->> 'digest') = $2
         "#,
         repo,
         digest
@@ -56,27 +56,18 @@ async fn get_referrers(
     .fetch_all(&mut *state.db.acquire().await?)
     .await?;
 
-    println!("2: {referrers:?}");
     let mut descriptors = vec![];
     for row in referrers {
-        let parsed_manifest = row
-            .content
-            .ok_or_else(|| {
-                Error::ManifestInvalid(format!("deserialization error for {}", row.digest))
-            })?
-            .0;
+        let parsed_manifest = row.content.0;
 
         let mediatype = parsed_manifest
             .media_type()
             .clone()
             .unwrap_or(MediaType::ImageConfig);
-        let size = serde_json_canonicalizer::to_vec(&parsed_manifest)
-            .unwrap()
-            .len();
 
         let mut descriptor = Descriptor::new(
             mediatype,
-            size as u64,
+            row.size as u64,
             oci_spec::image::Digest::from_str(&row.digest).unwrap(),
         );
         descriptor.set_artifact_type(parsed_manifest.artifact_type());
@@ -89,7 +80,7 @@ async fn get_referrers(
     response_manifest.set_media_type(Some(MediaType::ImageIndex));
     let content_type = response_manifest.media_type().as_ref().unwrap().as_ref();
 
-    Ok(OciJson::new(&response_manifest, false).set_content_type(content_type))
+    Ok(OciJson::new(&response_manifest).set_content_type(content_type))
 }
 
 endpoint_fn_7_levels!(
@@ -130,9 +121,9 @@ mod tests {
         let tmp_dir = test_temp_dir!();
         let (state, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
 
-        let man_referred = serde_json_canonicalizer::to_vec(&ImageIndex::default()).unwrap();
+        let man_referred = serde_json::to_vec(&ImageIndex::default()).unwrap();
         let man_referred_digest = Digest::digest_sha256(man_referred.reader()).unwrap();
-        let subj = serde_json_canonicalizer::to_vec(
+        let subj = serde_json::to_vec(
             &ImageManifestBuilder::default()
                 .schema_version(2u32)
                 .layers([])
@@ -154,7 +145,8 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let nosubj = serde_json_canonicalizer::to_vec(
+        let subj_digest = Digest::digest_sha256(subj.reader()).unwrap();
+        let nosubj = serde_json::to_vec(
             &ImageManifestBuilder::default()
                 .schema_version(2u32)
                 .layers([])
@@ -175,7 +167,7 @@ mod tests {
         for man in [man_referred, subj, nosubj] {
             let digest = Digest::digest_sha256(man.reader()).unwrap().to_string();
             sqlx::query!(
-                "INSERT INTO manifest (digest, content) VALUES ($1, jsonb($2))",
+                "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
                 digest,
                 man,
             )
@@ -211,9 +203,6 @@ mod tests {
             descriptors[0].media_type().clone(),
             MediaType::ImageManifest
         );
-        assert_eq!(
-            descriptors[0].digest().as_ref(),
-            "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
-        );
+        assert_eq!(descriptors[0].digest().as_ref(), subj_digest.as_str());
     }
 }
