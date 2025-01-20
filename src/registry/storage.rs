@@ -34,27 +34,17 @@ pub enum StorageBackendError {
     Io(#[from] io::Error),
 }
 
-static BLOBS_DIR: &str = "blobs";
-static UPLOADS_DIR: &str = "scratch";
-
-/// Current storage structure:
-/// - /blobs/sha256/<digest>: is a blob (manifests are treated as blobs)
-/// - /manifests/<image-name..>/<tag>: file containing a list of manifest digests
-/// - /scratch/<uuid>: is a blob being uploaded
-///
-/// TODO future structure:
-/// - /blobs/sha256/<digest>: contains blobs
-/// - /uploads/<uuid>: is a blob being uploaded
 #[derive(Clone, Debug)]
 pub struct TrowStorageBackend {
-    path: PathBuf,
+    blobs_dir: PathBuf,
+    uploads_dir: PathBuf,
 }
 
 impl TrowStorageBackend {
-    fn init_create_path(root: &Path, dir: &str) -> Result<(), StorageBackendError> {
+    fn init_create_path(root: &Path, dir: &str) -> Result<PathBuf, StorageBackendError> {
         let path = root.join(dir);
         match std::fs::create_dir_all(&path) {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(path),
             Err(e) => {
                 tracing::error!(
                     r#"
@@ -70,10 +60,13 @@ impl TrowStorageBackend {
     }
 
     pub fn new(path: PathBuf) -> Result<Self, StorageBackendError> {
-        Self::init_create_path(&path, BLOBS_DIR)?;
-        Self::init_create_path(&path, UPLOADS_DIR)?;
+        let blobs_dir = Self::init_create_path(&path, "blobs")?;
+        let uploads_dir = Self::init_create_path(&path, "uploads")?;
 
-        Ok(Self { path })
+        Ok(Self {
+            blobs_dir,
+            uploads_dir,
+        })
     }
 
     pub async fn get_blob_stream(
@@ -82,7 +75,7 @@ impl TrowStorageBackend {
         digest: &Digest,
     ) -> Result<BoundedStream<impl futures::AsyncRead>, StorageBackendError> {
         tracing::debug!("Get blob {repo_name}:{digest}");
-        let path = self.path.join(BLOBS_DIR).join(digest.to_string());
+        let path = self.blobs_dir.join(digest.to_string());
         let file = tokio::fs::File::open(&path).await.map_err(|e| {
             tracing::error!("Could not open blob: {}", e);
             StorageBackendError::BlobNotFound(path)
@@ -102,13 +95,12 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         tracing::debug!("Write blob {digest}");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(digest.to_string());
-        let location = self.path.join(BLOBS_DIR).join(digest.to_string());
+        let tmp_location = self.uploads_dir.join(digest.as_str());
+        let location = self.blobs_dir.join(digest.as_str());
         if location.exists() {
-            tracing::info!("Blob already exists");
+            tracing::info!(digest = digest.as_str(), "Blob already exists");
             return Ok(location);
         }
-        tokio::fs::create_dir_all(location.parent().unwrap()).await?;
         let mut tmp_file = match FileWrapper::new_tmp(tmp_location.clone()).await {
             // All good
             Ok(tmpf) => tmpf,
@@ -126,6 +118,7 @@ impl TrowStorageBackend {
                 }
             }
             Err(e) => {
+                tracing::error!("Could not open {}", tmp_location.display());
                 return Err(StorageBackendError::Io(e));
             }
         };
@@ -157,7 +150,7 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         tracing::debug!("Write blob part {upload_id} ({range:?})");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
+        let tmp_location = self.uploads_dir.join(upload_id.to_string());
         let mut tmp_file = FileWrapper::append(tmp_location.clone())
             .await
             .map_err(|e| {
@@ -207,8 +200,8 @@ impl TrowStorageBackend {
         user_digest: &Digest,
     ) -> Result<(), StorageBackendError> {
         tracing::debug!("Complete blob write {upload_id}");
-        let tmp_location = self.path.join(UPLOADS_DIR).join(upload_id.to_string());
-        let final_location = self.path.join(BLOBS_DIR).join(user_digest.to_string());
+        let tmp_location = self.uploads_dir.join(upload_id.to_string());
+        let final_location = self.blobs_dir.join(user_digest.as_str());
         // Should we even do this ? It breaks OCI tests:
         // let f = std::fs::File::open(&tmp_location)?;
         // let calculated_digest = Digest::digest_sha256(f)?;
@@ -235,13 +228,13 @@ impl TrowStorageBackend {
         digest: &Digest,
     ) -> Result<(), StorageBackendError> {
         tracing::debug!("Delete blob {repo}:{digest}");
-        let blob_path = self.path.join(BLOBS_DIR).join(digest.as_str());
+        let blob_path = self.blobs_dir.join(digest.as_str());
         tokio::fs::remove_file(blob_path).await?;
         Ok(())
     }
 
     pub async fn is_ready(&self) -> Result<(), StorageBackendError> {
-        let path = self.path.join("fs-ready");
+        let path = self.uploads_dir.join("fs-ready");
         let mut file = tokio::fs::File::create(path).await?;
         let size = file.write(b"Hello World").await?;
         if size != 11 {
@@ -282,7 +275,8 @@ mod tests {
     fn trow_storage_backend_new() {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
-        assert!(store.path.join("blobs").exists());
+        assert!(store.blobs_dir.exists());
+        assert!(store.uploads_dir.exists());
         drop(dir);
     }
 
@@ -300,8 +294,7 @@ mod tests {
         assert_eq!(
             location,
             store
-                .path
-                .join("blobs")
+                .blobs_dir
                 .join("sha256:123456789101112131415161718192021")
         );
         drop(dir);
