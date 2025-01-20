@@ -4,7 +4,6 @@ use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::Router;
-use bytes::Buf;
 use digest::Digest;
 
 use super::extracts::AlwaysHost;
@@ -219,7 +218,7 @@ async fn put_image_manifest(
             }
         }
     }
-    let computed_digest = Digest::digest_sha256(manifest_bytes.clone().reader()).unwrap();
+    let computed_digest = Digest::digest_sha256_slice(&manifest_bytes);
     let computed_digest_str = computed_digest.as_str();
     if !is_tag && computed_digest_str != reference {
         return Err(Error::ManifestInvalid(

@@ -5,7 +5,9 @@ use bytes::Bytes;
 use futures::stream::Stream;
 use futures::StreamExt;
 use tokio::fs::{self, File};
-use tokio::io::{self, AsyncWriteExt};
+use tokio::io::{self, AsyncSeekExt, AsyncWriteExt};
+
+use super::Digest;
 
 /// Designed for downloading files. The [`Drop`] implementation makes sure that
 /// the underlying file is deleted in case of an error.
@@ -20,7 +22,12 @@ pub struct FileWrapper {
 impl FileWrapper {
     pub async fn new_tmp(path: PathBuf) -> io::Result<Self> {
         let mut open_opt = fs::OpenOptions::new();
-        let file = open_opt.create_new(true).write(true).open(&path).await?;
+        let file = open_opt
+            .create_new(true)
+            .write(true)
+            .read(true)
+            .open(&path)
+            .await?;
 
         Ok(FileWrapper {
             file,
@@ -62,6 +69,12 @@ impl FileWrapper {
         Ok(len)
     }
 
+    pub async fn digest(&mut self) -> io::Result<Digest> {
+        self.file.seek(std::io::SeekFrom::Start(0)).await?;
+        Digest::digest_sha256(&mut self.file).await
+    }
+
+    #[allow(unused)]
     pub fn path(&self) -> &Path {
         &self.path
     }

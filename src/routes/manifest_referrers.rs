@@ -106,7 +106,6 @@ mod tests {
     use std::str::FromStr;
 
     use axum::body::Body;
-    use bytes::Buf;
     use hyper::{Request, StatusCode};
     use oci_spec::image::{Descriptor, ImageIndex, ImageManifestBuilder, MediaType};
     use test_temp_dir::test_temp_dir;
@@ -122,7 +121,7 @@ mod tests {
         let (state, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
 
         let man_referred = serde_json::to_vec(&ImageIndex::default()).unwrap();
-        let man_referred_digest = Digest::digest_sha256(man_referred.reader()).unwrap();
+        let man_referred_digest = Digest::digest_sha256_slice(&man_referred);
         let subj = serde_json::to_vec(
             &ImageManifestBuilder::default()
                 .schema_version(2u32)
@@ -145,7 +144,7 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let subj_digest = Digest::digest_sha256(subj.reader()).unwrap();
+        let subj_digest = Digest::digest_sha256_slice(&subj);
         let nosubj = serde_json::to_vec(
             &ImageManifestBuilder::default()
                 .schema_version(2u32)
@@ -165,7 +164,7 @@ mod tests {
         .unwrap();
 
         for man in [man_referred, subj, nosubj] {
-            let digest = Digest::digest_sha256(man.reader()).unwrap().to_string();
+            let digest = Digest::digest_sha256_slice(&man).to_string();
             sqlx::query!(
                 "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
                 digest,

@@ -59,7 +59,6 @@ impl From<StorageBackendError> for RegistryError {
             }
             StorageBackendError::InvalidContentRange => Self::InvalidContentRange,
             StorageBackendError::InvalidDigest => Self::InvalidDigest,
-            StorageBackendError::InvalidManifest(_msg) => Self::InvalidManifest,
             StorageBackendError::InvalidName(name) => Self::InvalidName(name),
             StorageBackendError::Io(e) => {
                 tracing::error!("Internal IO error: {e:?}");

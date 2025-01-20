@@ -2,7 +2,6 @@
 mod common;
 
 mod registry_interface {
-    use std::io::BufReader;
 
     use axum::body::Body;
     use axum::http::HeaderValue;
@@ -187,7 +186,7 @@ mod registry_interface {
 
         //used by oci_manifest_test
         let config = "{}\n".as_bytes();
-        let digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let digest = digest::Digest::digest_sha256_slice(config);
         let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", name, uuid, digest);
 
         let resp = cl
@@ -207,7 +206,7 @@ mod registry_interface {
 
     async fn upload_blob_with_post(cl: &Router, repo_name: &str) {
         let blob_content = "{ }\n".as_bytes();
-        let digest = digest::Digest::digest_sha256(BufReader::new(blob_content)).unwrap();
+        let digest = digest::Digest::digest_sha256_slice(blob_content);
 
         let resp = cl
             .clone()
@@ -234,7 +233,7 @@ mod registry_interface {
     async fn push_oci_manifest(cl: &Router, name: &str, tag: &str) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{ }\n".as_bytes();
-        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256_slice(config);
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -258,7 +257,7 @@ mod registry_interface {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        let digest = digest::Digest::digest_sha256_slice(manifest.as_bytes());
         digest.to_string()
     }
 
@@ -295,7 +294,7 @@ mod registry_interface {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        let digest = digest::Digest::digest_sha256_slice(manifest.as_bytes());
         digest.to_string()
     }
 
@@ -306,7 +305,7 @@ mod registry_interface {
     ) -> String {
         //Note config was uploaded as blob in earlier test
         let config = "{ }\n".as_bytes();
-        let config_digest = digest::Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let config_digest = digest::Digest::digest_sha256_slice(config);
 
         upload_blob_with_post(cl, repo_name).await;
 
@@ -341,7 +340,7 @@ mod registry_interface {
         assert_eq!(resp.status(), StatusCode::CREATED);
 
         // Try pulling by digest
-        let digest = digest::Digest::digest_sha256(BufReader::new(manifest.as_bytes())).unwrap();
+        let digest = digest::Digest::digest_sha256_slice(manifest.as_bytes());
         digest.to_string()
     }
 

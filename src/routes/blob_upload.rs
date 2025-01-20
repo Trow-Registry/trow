@@ -347,8 +347,6 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
 #[cfg(test)]
 mod tests {
 
-    use std::io::BufReader;
-
     use axum::body::Body;
     use http_body_util::BodyExt;
     use hyper::Request;
@@ -427,7 +425,7 @@ mod tests {
         );
 
         let blob = "super secret blob".as_bytes();
-        let digest = Digest::digest_sha256(BufReader::new(blob)).unwrap();
+        let digest = Digest::digest_sha256_slice(blob);
         let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", repo_name, uuid, digest);
 
         let resp = router
@@ -454,7 +452,7 @@ mod tests {
         let repo_name = "test";
 
         let config = "{ }\n".as_bytes();
-        let digest = Digest::digest_sha256(BufReader::new(config)).unwrap();
+        let digest = Digest::digest_sha256_slice(config);
 
         let resp = router
             .clone()
