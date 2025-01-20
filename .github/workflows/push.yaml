@@ -20,6 +20,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Configure git identity
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
