@@ -33,6 +33,11 @@ RUN --mount=type=cache,target=./target \
 
 
 FROM debian:bookworm-slim
+
+LABEL org.opencontainers.image.source="https://github.com/trow-registry/trow"
+LABEL org.opencontainers.image.description="Caching Container Registry and Image Management for Kubernetes Clusters"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
 RUN groupadd -r -g 2000 trow &&\
     useradd -r -g trow -u 2000 trow
 
