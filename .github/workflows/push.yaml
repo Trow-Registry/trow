@@ -4,26 +4,76 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'charts/**'
+      - '.github/workflows/push.yaml'
+  workflow_dispatch:
 
 jobs:
-  release-helm:
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-      - name: Set up Helm
+
+      - name: Install Helm
         uses: azure/setup-helm@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.6.0
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if chart version exists
+        id: check-version
+        run: |
+          # Extract chart name and version
+          CHART_NAME=$(yq eval '.name' ./charts/trow/Chart.yaml)
+          CHART_VERSION=$(yq eval '.version' ./charts/trow/Chart.yaml)
+
+          # Set output variables
+          echo "chart_name=${CHART_NAME}" >> $GITHUB_OUTPUT
+          echo "chart_version=${CHART_VERSION}" >> $GITHUB_OUTPUT
+
+          # Try to pull the existing version
+          if helm pull oci://ghcr.io/trow-registry/charts/${CHART_NAME} --version ${CHART_VERSION} 2>/dev/null; then
+            echo "Version ${CHART_VERSION} of chart already exists in registry"
+            echo "exists=true" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "Version ${CHART_VERSION} of chart does not exist in registry"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Helm dependencies
+        if: steps.check-version.outputs.exists == 'false'
+        run: |
+          cd ./charts/trow
+          helm dependency update
+
+      - name: Package Helm chart
+        if: steps.check-version.outputs.exists == 'false'
+        run: |
+          helm package ./charts/trow
+
+      - name: Push Helm chart
+        if: steps.check-version.outputs.exists == 'false'
+        run: |
+          # Push to GHCR using OCI format
+          helm push ${{ steps.check-version.outputs.chart_name }}-${{ steps.check-version.outputs.chart_version }}.tgz \
+            oci://ghcr.io/trow-registry/charts
+
+      - name: Create and push tag
+        if: steps.check-version.outputs.exists == 'false'
+        run: |
+          TAG_NAME="chart-v${{ steps.check-version.outputs.chart_version }}"
+          git tag -a "$TAG_NAME" -m "Release chart version ${{ steps.check-version.outputs.chart_version }}"
+          git push origin "$TAG_NAME"
