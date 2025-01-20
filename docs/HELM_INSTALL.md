@@ -2,16 +2,10 @@
 
 Use the following instructions to install Trow via [Helm](https://helm.sh).
 
-## Add the Trow Helm Repo
-
-```bash
-helm repo add trow https://trow.io
-```
-
 ## Install Trow with Helm
 
 ```bash
-helm install trow trow/trow
+helm install trow oci://ghcr.io/trow-registry/charts/trow
 ```
 ## Notes on installation
 
@@ -45,7 +39,6 @@ an annotation with the name of the certificate e.g:
 # values.yaml
 ingress:
     enabled: true
-    gke: true
     annotations:
         networking.gke.io/managed-certificates: trow-certificate
 ```
