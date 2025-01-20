@@ -1,6 +1,6 @@
 [package]
 name = "trow"
-version = "0.6.4"
+version = "0.7.0-rc1"
 authors = []
 edition = "2021"
 
