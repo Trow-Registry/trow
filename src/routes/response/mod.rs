@@ -23,8 +23,6 @@ use axum::http::{header, HeaderValue};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 
-use crate::registry::Digest;
-
 #[derive(Debug, Default)]
 pub struct OciJson<T> {
     response: Response<Body>,
@@ -60,10 +58,10 @@ where
         }
     }
 
-    pub fn set_digest(mut self, digest: &Digest) -> Self {
+    pub fn set_digest<D: AsRef<str>>(mut self, digest: D) -> Self {
         self.response.headers_mut().insert(
             "Docker-Content-Digest",
-            HeaderValue::from_str(digest.as_str()).unwrap(),
+            HeaderValue::from_str(digest.as_ref()).unwrap(),
         );
         self
     }

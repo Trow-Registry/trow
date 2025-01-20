@@ -4,14 +4,15 @@ use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::Router;
-use bytes::Buf;
 use digest::Digest;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::registry::digest;
-use crate::registry::manifest::{ManifestReference, OCIManifest, REGEX_TAG};
+use crate::registry::manifest::{
+    layer_is_distributable, ManifestReference, OCIManifest, REGEX_TAG,
+};
 use crate::registry::server::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
@@ -25,7 +26,7 @@ Pulling an image
 GET /v2/<name>/manifests/<reference>
 
 # Parameters
-name - The name of the image
+name - The namespace of the repository
 reference - either a tag or a digest
 
 # Client Headers
@@ -64,14 +65,13 @@ async fn get_manifest(
             }
         };
 
-        let new_digest = proxy_cfg
+        proxy_cfg
             .download_remote_image(&image, &state.registry, &state.db)
             .await
             .map_err(|e| {
                 tracing::error!("Error downloading image: {e}");
                 Error::InternalError
-            })?;
-        new_digest.to_string()
+            })?
     } else {
         let digest = match &reference {
             ManifestReference::Tag(_) => {
@@ -93,13 +93,12 @@ async fn get_manifest(
             }
             ManifestReference::Digest(_) => raw_reference,
         };
-        let maybe_manifest = sqlx::query!(
+        let maybe_digest = sqlx::query_scalar!(
             r#"
-            SELECT * FROM blob b
-            INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest
-            WHERE b.digest = $2
-                AND b.is_manifest is true
-                AND rba.repo_name = $1
+            SELECT m.digest
+            FROM manifest m
+            INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
+            WHERE m.digest = $2 AND rba.repo_name = $1
             "#,
             repo,
             digest
@@ -107,29 +106,28 @@ async fn get_manifest(
         .fetch_optional(&mut *state.db.acquire().await?)
         .await?;
 
-        if maybe_manifest.is_none() {
-            return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
+        match maybe_digest {
+            Some(d) => d,
+            None => {
+                return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
+            }
         }
-        digest
     };
 
-    let digest_parsed = Digest::try_from_raw(&digest).unwrap();
-    let manifest_raw = state
-        .registry
-        .storage
-        .get_manifest(&repo, &digest_parsed)
-        .await?;
+    let res = sqlx::query!(
+        r#"
+        SELECT m.json ->> 'mediaType' as "media_type: String", m.blob
+        FROM manifest m
+        WHERE m.digest = $1
+        "#,
+        digest
+    )
+    .fetch_one(&mut *state.db.acquire().await?)
+    .await?;
 
-    let manifest_parsed: OCIManifest = serde_json::from_slice(&manifest_raw)
-        .map_err(|e| Error::ManifestInvalid(format!("serialization error: {e}")))?;
-    let content_type = manifest_parsed
-        .media_type()
-        .as_ref()
-        .map(|mt| mt.to_string())
-        .unwrap_or("application/json".to_string());
-    Ok(OciJson::new_raw(manifest_raw)
-        .set_digest(&digest_parsed)
-        .set_content_type(&content_type))
+    Ok(OciJson::new_raw(res.blob.into())
+        .set_digest(digest)
+        .set_content_type(&res.media_type.unwrap_or("application/json".to_owned())))
 }
 
 endpoint_fn_7_levels!(
@@ -167,48 +165,75 @@ async fn put_image_manifest(
             Error::ManifestInvalid(format!(
                 "Manifest is bigger than limit of {MANIFEST_BODY_SIZE_LIMIT_MB}MiB"
             ))
-        })?;
+        })?
+        .to_vec();
     let manifest_parsed = serde_json::from_slice::<'_, OCIManifest>(&manifest_bytes)
         .map_err(|e| Error::ManifestInvalid(format!("{e}")))?;
-    let assets = manifest_parsed.get_local_asset_digests();
 
-    for digest in assets {
-        tracing::debug!("Checking asset: {repo_name} {digest}");
-        let res = sqlx::query!(
-            r#"
-            SELECT b.digest FROM blob b
-            INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest
-            WHERE b.digest = $1 AND rba.repo_name = $2"#,
-            digest,
-            repo_name
-        )
-        .fetch_optional(&mut *state.db.acquire().await?)
-        .await?;
-        if res.is_none() {
-            return Err(Error::ManifestInvalid(format!("Asset not found: {digest}")));
+    match &manifest_parsed {
+        OCIManifest::List(m) => {
+            let assets = m
+                .manifests()
+                .iter()
+                .filter(|l| layer_is_distributable(l.media_type()))
+                .map(|m| m.digest().as_ref());
+            for digest in assets {
+                let res = sqlx::query!(
+                    r"SELECT m.digest FROM manifest m
+                    INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
+                    WHERE m.digest = $1 AND rba.repo_name = $2",
+                    digest,
+                    repo_name
+                )
+                .fetch_optional(&mut *state.db.acquire().await?)
+                .await?;
+                if res.is_none() {
+                    return Err(Error::ManifestInvalid(format!(
+                        "Manifest asset not found: {digest}"
+                    )));
+                }
+            }
+        }
+        OCIManifest::V2(m) => {
+            let assets = m
+                .layers()
+                .iter()
+                .filter(|l| layer_is_distributable(l.media_type()))
+                .map(|l| l.digest().as_ref());
+            for digest in assets {
+                let res = sqlx::query!(
+                    r"SELECT b.digest FROM blob b
+                    INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest
+                    WHERE b.digest = $1 AND rba.repo_name = $2",
+                    digest,
+                    repo_name
+                )
+                .fetch_optional(&mut *state.db.acquire().await?)
+                .await?;
+                if res.is_none() {
+                    return Err(Error::ManifestInvalid(format!(
+                        "Blob asset not found: {digest}"
+                    )));
+                }
+            }
         }
     }
-    let size = manifest_bytes.len() as i64;
-    let computed_digest = Digest::digest_sha256(manifest_bytes.clone().reader()).unwrap();
+    let computed_digest = Digest::digest_sha256_slice(&manifest_bytes);
     let computed_digest_str = computed_digest.as_str();
     if !is_tag && computed_digest_str != reference {
-        return Err(Error::ManifestInvalid("Digest does not match".to_string()));
+        return Err(Error::ManifestInvalid(
+            "Given digest does not match".to_string(),
+        ));
     }
-
-    state
-        .registry
-        .storage
-        .write_image_manifest(manifest_bytes, &repo_name, &computed_digest)
-        .await?;
 
     sqlx::query!(
         r#"
-        INSERT INTO blob (digest, size, is_manifest)
-        VALUES ($1, $2, true)
+        INSERT INTO manifest (digest, json, blob)
+        VALUES ($1, jsonb($2), $2)
         ON CONFLICT (digest) DO NOTHING
         "#,
         computed_digest_str,
-        size
+        manifest_bytes
     )
     .execute(&mut *state.db.acquire().await?)
     .await?;
@@ -240,11 +265,15 @@ async fn put_image_manifest(
         .await?;
     }
 
+    // check if the manifest has a Subject field, if so return the header OCI-Subject
+    let subject = manifest_parsed.subject().map(|s| s.digest().to_string());
+
     Ok(VerifiedManifest::new(
         Some(host),
         repo_name,
         computed_digest,
         reference,
+        subject,
     ))
 }
 endpoint_fn_7_levels!(
@@ -281,10 +310,11 @@ async fn delete_image_manifest(
         .await?;
     } else {
         let digest = Digest::try_from_raw(&reference)?;
+        let digest_str = digest.as_str();
         let res = sqlx::query!(
             "DELETE FROM repo_blob_association WHERE repo_name = $1 AND blob_digest = $2",
             repo,
-            reference
+            digest_str
         )
         .execute(&mut *state.db.acquire().await?)
         .await?;
@@ -292,13 +322,15 @@ async fn delete_image_manifest(
         if res.rows_affected() > 0 {
             let remaining_assoc = sqlx::query_scalar!(
                 "SELECT COUNT(*) FROM repo_blob_association WHERE blob_digest = $1",
-                reference
+                digest_str
             )
             .fetch_one(&mut *state.db.acquire().await?)
             .await?;
 
             if remaining_assoc == 0 {
-                state.registry.storage.delete_blob(&repo, &digest).await?;
+                sqlx::query!("DELETE FROM manifest where digest = $1", digest_str)
+                    .execute(&mut *state.db.acquire().await?)
+                    .await?;
             }
         }
     }

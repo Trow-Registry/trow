@@ -123,16 +123,28 @@ pub struct VerifiedManifest {
     repo_name: String,
     digest: Digest,
     tag: String,
+    subject: Option<String>,
 }
 
 impl VerifiedManifest {
-    pub fn new(base_url: Option<String>, repo_name: String, digest: Digest, tag: String) -> Self {
+    pub fn new(
+        base_url: Option<String>,
+        repo_name: String,
+        digest: Digest,
+        tag: String,
+        subject: Option<String>,
+    ) -> Self {
         Self {
             base_url,
             repo_name,
             digest,
             tag,
+            subject,
         }
+    }
+
+    pub fn subject(&self) -> Option<&String> {
+        self.subject.as_ref()
     }
 
     pub fn digest(&self) -> &str {

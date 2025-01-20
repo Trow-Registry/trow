@@ -1,4 +1,3 @@
-use std::io::Read;
 use std::{fmt, io};
 
 use lazy_static::lazy_static;
@@ -7,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::digest::OutputSizeUser;
 use sha2::{Digest as ShaDigest, Sha256};
 use thiserror::Error;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 // Buffer size for SHA2 hashing
 const BUFFER_SIZE: usize = 1024 * 1024;
@@ -72,17 +72,24 @@ impl Digest {
         &self.0[7..]
     }
 
-    pub fn digest_sha256<R: Read>(mut reader: R) -> io::Result<Digest> {
-        Self::digest::<Sha256, _>(&mut reader)
+    pub async fn digest_sha256<R: AsyncRead + Unpin>(mut reader: R) -> io::Result<Digest> {
+        Self::digest::<Sha256, _>(&mut reader).await
+    }
+
+    pub fn digest_sha256_slice(slice: &[u8]) -> Digest {
+        let hash = hex::encode(Sha256::digest(slice));
+        Self(format!("sha256:{hash}"))
     }
 
     #[allow(clippy::self_named_constructors)]
-    pub fn digest<D: ShaDigest + Default, R: Read>(reader: &mut R) -> io::Result<Digest> {
+    pub async fn digest<D: ShaDigest + Default, R: AsyncRead + Unpin>(
+        reader: &mut R,
+    ) -> io::Result<Digest> {
         let mut digest = D::default();
-        let mut buffer = [0u8; BUFFER_SIZE];
+        let mut buffer = vec![0u8; BUFFER_SIZE];
         let mut n = BUFFER_SIZE;
         while n == BUFFER_SIZE {
-            n = reader.read(&mut buffer)?;
+            n = reader.read(&mut buffer).await?;
             digest.update(&buffer[..n]);
         }
         let hash = hex::encode(digest.finalize());
@@ -100,17 +107,20 @@ impl Digest {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use std::io::BufReader;
 
     use crate::registry::digest::Digest;
 
     #[test]
     fn sha256_digest_test() {
-        let result = Digest::digest_sha256(BufReader::new("hello world".as_bytes())).unwrap();
+        let result = Digest::digest_sha256_slice("hello world".as_bytes());
         assert_eq!(
             &result.0,
             "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
@@ -119,7 +129,7 @@ mod test {
 
     #[test]
     fn sha256_digest_empty_test() {
-        let result = Digest::digest_sha256(BufReader::new("".as_bytes())).unwrap();
+        let result = Digest::digest_sha256_slice("".as_bytes());
         assert_eq!(
             result.0,
             "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string()
@@ -128,10 +138,8 @@ mod test {
 
     #[test]
     fn sha256_digest_brown_fox_test() {
-        let result = Digest::digest_sha256(BufReader::new(
-            "the quick brown fox jumps over the lazy dog".as_bytes(),
-        ))
-        .unwrap();
+        let result =
+            Digest::digest_sha256_slice("the quick brown fox jumps over the lazy dog".as_bytes());
         assert_eq!(
             result.0,
             "sha256:05c6e08f1d9fdafa03147fcb8f82f124c76d2f70e3d989dc8aadb5e7d7450bec".to_string()

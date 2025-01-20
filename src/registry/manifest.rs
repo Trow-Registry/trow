@@ -1,8 +1,9 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use anyhow::Result;
 use lazy_static::lazy_static;
-use oci_spec::image::{ImageIndex, ImageManifest, MediaType};
+use oci_spec::image::{Descriptor, ImageIndex, ImageManifest, MediaType};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -101,6 +102,30 @@ pub mod manifest_media_type {
 }
 
 impl OCIManifest {
+    #[inline]
+    pub fn subject(&self) -> Option<Descriptor> {
+        match self {
+            OCIManifest::V2(m2) => m2.subject(),
+            OCIManifest::List(list) => list.subject(),
+        }
+        .clone()
+    }
+    #[inline]
+    pub fn artifact_type(&self) -> Option<MediaType> {
+        match self {
+            OCIManifest::V2(m2) => m2.artifact_type(),
+            OCIManifest::List(list) => list.artifact_type(),
+        }
+        .clone()
+    }
+    #[inline]
+    pub fn annotations(&self) -> &Option<HashMap<String, String>> {
+        match self {
+            OCIManifest::V2(m2) => m2.annotations(),
+            OCIManifest::List(list) => list.annotations(),
+        }
+    }
+
     /// Returns a Vector of the digests of all assets referenced in the Manifest
     /// With the exception of digests for "foreign blobs"
     pub fn get_local_asset_digests(&self) -> Vec<String> {
@@ -109,13 +134,7 @@ impl OCIManifest {
                 let mut digests: Vec<String> = m2
                     .layers()
                     .iter()
-                    .filter(|l| {
-                        l.media_type()
-                            != &MediaType::Other(
-                                "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
-                                    .to_string(),
-                            )
-                    })
+                    .filter(|l| layer_is_distributable(l.media_type()))
                     .map(|x| x.digest().to_string())
                     .collect();
                 digests.push(m2.config().digest().to_string());
@@ -139,6 +158,17 @@ impl OCIManifest {
             OCIManifest::List(list) => list.media_type(),
         }
     }
+}
+
+pub fn layer_is_distributable(layer: &MediaType) -> bool {
+    let non_distributable = [
+        MediaType::ImageLayerNonDistributable,
+        MediaType::ImageLayerNonDistributableGzip,
+        MediaType::ImageLayerNonDistributableZstd,
+        MediaType::Other("application/vnd.docker.image.rootfs.foreign.diff.tar.gzip".to_string()),
+    ];
+
+    !non_distributable.contains(layer)
 }
 
 #[cfg(test)]

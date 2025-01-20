@@ -2,7 +2,7 @@
 #![allow(dead_code)] // Rustup thinks everything in here is dead code
 
 use std::fs::File;
-use std::io::{BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -110,7 +110,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, D
     let range = resp.headers().get(RANGE_HEADER).unwrap().to_str().unwrap();
     assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
 
-    let blob_digest = Digest::digest_sha256(BufReader::new(blob.as_slice())).unwrap();
+    let blob_digest = Digest::digest_sha256_slice(blob.as_slice());
     let resp = cl
         .clone()
         .oneshot(
@@ -165,7 +165,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, D
         }}]
     }}"#
     );
-    let manifest_digest = Digest::digest_sha256(BufReader::new(raw_manifest.as_bytes())).unwrap();
+    let manifest_digest = Digest::digest_sha256_slice(raw_manifest.as_bytes());
     let _: manifest::OCIManifest = serde_json::from_str(&raw_manifest).unwrap();
 
     let manifest_addr = format!("/v2/{}/manifests/{}", name, tag);

@@ -65,7 +65,7 @@ async-trait = "0.1.74"
 walkdir = "2.0"
 rand = "0.8"
 humansize = "2.1"
-sqlx = { version = "0.8", features = ["runtime-tokio", "migrate", "sqlite"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "migrate", "sqlite", "json"] }
 oci-spec = "0.7.0"
 oci-client = "0.14.0"
 
