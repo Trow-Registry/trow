@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 #Note we build on host plaftform and cross-compile to target arch
-FROM --platform=$BUILDPLATFORM rust:bookworm as cross
+FROM --platform=$BUILDPLATFORM rust:bookworm AS cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
@@ -24,9 +24,12 @@ COPY . .
 
 RUN cargo install sqlx-cli --no-default-features --features sqlite
 
+RUN --mount=type=cache,target=./target \
+    rm target/dev.db* && \
+    cargo sqlx database setup
+
 # Get rid of the "cp" when cargo build --out is stable
 RUN --mount=type=cache,target=./target \
-    cargo sqlx database setup && \
     cargo build --release --target $(cat /.platform) && \
     cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
 

@@ -49,11 +49,12 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing = "0.1.37"
 paste = "1.0.14"
 async-recursion = "1.0"
-reqwest = { version = "0.12", features = [
+reqwest = { version = "0.12", default-features = false, features = [
+    "http2",
     "json",
-    "stream",
     "rustls-tls",
-], default-features = false }
+    "stream",
+] }
 prometheus = "0.13"
 fs3 = "0.5.0"
 quoted-string = "0.6.1"
@@ -65,9 +66,16 @@ async-trait = "0.1.74"
 walkdir = "2.0"
 rand = "0.8"
 humansize = "2.1"
-sqlx = { version = "0.8", features = ["runtime-tokio", "migrate", "sqlite", "json"] }
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "migrate",
+    "sqlite",
+    "json",
+] }
 oci-spec = "0.7.0"
-oci-client = "0.14.0"
+oci-client = { version = "0.14.0", default-features = false, features = [
+    "rustls-tls",
+] }
 
 [dev-dependencies]
 assert_cmd = "2.0"
