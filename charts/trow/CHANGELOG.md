@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.0 (unreleased)
+
+* The chart is now pulled via OCI (`oci://ghcr.io/trow-registry/charts/trow`)
+* Upgrade trow to `v0.7.0`
+
 ## v0.8.1
 
 Fix `certmanager.k8s.io/inject-ca-from` annotation not correctly referencing the `Certificate`.

@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.7.0 (unreleased)
+
+### BREAKING
+
+Trow now uses a database to store the registry state.
+Currently no migration is provided, the `data/` directory needs to be wiped.
+
+### Features
+
+* Trow now uses a database (sqlite) to store the registry state
+* Support for the referrers API
+
+### Fixes
+
+* Fix authentication always failing (`invalid username/password`)
+
 ## v0.6.4
 
 Allow mutating webhook to ignore some repos (fix chicken and egg problem)
