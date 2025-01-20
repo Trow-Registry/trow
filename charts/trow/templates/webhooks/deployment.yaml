@@ -60,16 +60,10 @@ spec:
         - name: webhook-cert-translated
           mountPath: /etc/trow/webhook-cert
           readOnly: true
-      {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
-        - name: trow-proxy-cfg
-          mountPath: /etc/trow/proxy-registries.yaml
-          subPath: proxy-registries.yaml
-          readOnly: true
-      {{- end}}
-      {{- if (not (empty .Values.trow.validationWebhook.config)) }}
-        - name: trow-validation-cfg
-          mountPath: /etc/trow/validation.yaml
-          subPath: validation.yaml
+      {{- if include "trow.hasConfigFile" . }}
+        - name: trow-cfg
+          mountPath: /etc/trow/config.yaml
+          subPath: config.yaml
           readOnly: true
       {{- end}}
       volumes:
@@ -84,20 +78,11 @@ spec:
           {{- end }}
         - name: webhook-cert-translated
           emptyDir: {}
-      {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
-        - name: trow-proxy-cfg
+      {{- if include "trow.hasConfig" . }}
+        - name: trow-cfg
           secret:
-            secretName: {{ include "trow.fullname" . }}-proxy-cfg
+            secretName: {{ include "trow.fullname" . }}-cfg
       {{- end }}
-      {{- if (not (empty .Values.trow.validationWebhook.config)) }}
-        - name: trow-validation-cfg
-          configMap:
-            name: {{ include "trow.fullname" . }}-validation-cfg
-      {{- end }}
-      securityContext:
-        runAsUser: 333333
-        runAsGroup: 333333
-        fsGroup: 333333
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

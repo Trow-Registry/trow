@@ -4,9 +4,8 @@ use std::str;
 use anyhow::Result;
 
 // use super::manifest::Manifest;
-use super::proxy::RegistryProxiesConfig;
 use super::storage::TrowStorageBackend;
-use super::ImageValidationConfig;
+use super::ConfigFile;
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
@@ -23,21 +22,13 @@ pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are conside
 #[derive(Clone, Debug)]
 pub struct TrowServer {
     pub storage: TrowStorageBackend,
-    pub proxy_registry_config: RegistryProxiesConfig,
-    pub image_validation_config: Option<ImageValidationConfig>,
+    pub config: ConfigFile,
 }
 
 impl TrowServer {
-    pub fn new(
-        data_path: PathBuf,
-        proxy_registry_config: Option<RegistryProxiesConfig>,
-        image_validation_config: Option<ImageValidationConfig>,
-    ) -> Result<Self> {
-        let proxy_registry_config = proxy_registry_config.unwrap_or_default();
-
+    pub fn new(data_path: PathBuf, config: Option<ConfigFile>) -> Result<Self> {
         let svc = Self {
-            proxy_registry_config,
-            image_validation_config,
+            config: config.unwrap_or_default(),
             storage: TrowStorageBackend::new(data_path)?,
         };
         Ok(svc)

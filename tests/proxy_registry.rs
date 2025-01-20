@@ -21,35 +21,38 @@ mod proxy_registry {
     use crate::common::trow_router;
 
     async fn start_trow(data_dir: &Path) -> (Arc<TrowServerState>, Router) {
-        let config_file = RegistryProxiesConfig {
-            offline: false,
-            registries: vec![
-                SingleRegistryProxyConfig {
-                    alias: "docker".to_string(),
-                    host: "registry-1.docker.io".to_string(),
-                    username: None,
-                    password: None,
-                    ignore_repos: vec![],
-                },
-                SingleRegistryProxyConfig {
-                    alias: "nvcr".to_string(),
-                    host: "nvcr.io".to_string(),
-                    username: None,
-                    password: None,
-                    ignore_repos: vec![],
-                },
-                SingleRegistryProxyConfig {
-                    alias: "quay".to_string(),
-                    host: "quay.io".to_string(),
-                    username: None,
-                    password: None,
-                    ignore_repos: vec![],
-                },
-            ],
+        let config_file = trow::registry::ConfigFile {
+            registry_proxies: RegistryProxiesConfig {
+                offline: false,
+                registries: vec![
+                    SingleRegistryProxyConfig {
+                        alias: "docker".to_string(),
+                        host: "registry-1.docker.io".to_string(),
+                        username: None,
+                        password: None,
+                        ignore_repos: vec![],
+                    },
+                    SingleRegistryProxyConfig {
+                        alias: "nvcr".to_string(),
+                        host: "nvcr.io".to_string(),
+                        username: None,
+                        password: None,
+                        ignore_repos: vec![],
+                    },
+                    SingleRegistryProxyConfig {
+                        alias: "quay".to_string(),
+                        host: "quay.io".to_string(),
+                        username: None,
+                        password: None,
+                        ignore_repos: vec![],
+                    },
+                ],
+            },
+            ..Default::default()
         };
 
         trow_router(data_dir, |cfg| {
-            cfg.proxy_registry_config = Some(config_file);
+            cfg.config_file = Some(config_file);
         })
         .await
     }

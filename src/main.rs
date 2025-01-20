@@ -68,13 +68,9 @@ struct Args {
     #[arg(long, short = 'P', requires_if(ArgPredicate::IsPresent, "user"))]
     password: Option<String>,
 
-    /// Load a YAML file containing the config to validate container images through an admission webhook.
+    /// Load a YAML file containing the image validation and proxy registry config.
     #[arg(long)]
-    image_validation_config_file: Option<String>,
-
-    /// Load a YAML file containing the config to proxy repos at f/<registry_alias>/<repo_name> to <registry>/<repo_name>.
-    #[arg(long)]
-    proxy_registry_config_file: Option<String>,
+    config_file: Option<String>,
 
     /// Enable Cross-Origin Resource Sharing(CORS) requests.
     #[arg(long, value_delimiter(','))]
@@ -115,15 +111,9 @@ async fn main() {
         builder.with_user(user, &pass);
     }
 
-    if let Some(config_file) = args.proxy_registry_config_file {
-        if let Err(e) = builder.with_proxy_registries(config_file) {
+    if let Some(config_file) = args.config_file {
+        if let Err(e) = builder.with_config(config_file) {
             eprintln!("Failed to load proxy registry config file: {:#}", e);
-            std::process::exit(1);
-        }
-    }
-    if let Some(config_file) = args.image_validation_config_file {
-        if let Err(e) = builder.with_image_validation(config_file) {
-            eprintln!("Failed to load image validation config file: {:#}", e);
             std::process::exit(1);
         }
     }

@@ -14,10 +14,12 @@ use std::{env, fs};
 
 use anyhow::{Context, Result};
 use axum::Router;
-use registry::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
+use registry::TrowServer;
 use sqlx::sqlite::SqlitePool;
 use thiserror::Error;
 use uuid::Uuid;
+
+use crate::registry::ConfigFile;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -62,8 +64,7 @@ struct UserConfig {
 pub struct TrowConfig {
     pub data_dir: PathBuf,
     pub service_name: String,
-    pub proxy_registry_config: Option<RegistryProxiesConfig>,
-    pub image_validation_config: Option<ImageValidationConfig>,
+    pub config_file: Option<ConfigFile>,
     pub dry_run: bool,
     pub token_secret: Vec<u8>,
     user: Option<UserConfig>,
@@ -84,8 +85,7 @@ impl TrowConfig {
         Self {
             data_dir: PathBuf::from_str("./data").unwrap(),
             service_name: "http://trow".to_string(),
-            proxy_registry_config: None,
-            image_validation_config: None,
+            config_file: None,
             dry_run: false,
             token_secret: Uuid::new_v4().as_bytes().to_vec(),
             user: None,
@@ -95,23 +95,13 @@ impl TrowConfig {
         }
     }
 
-    pub fn with_proxy_registries(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
+    pub fn with_config(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)
             .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml_ng::from_str::<RegistryProxiesConfig>(&config_str)
+        let config = serde_yaml_ng::from_str::<ConfigFile>(&config_str)
             .with_context(|| format!("Could not parse file `{}`", config_file))?;
-        self.proxy_registry_config = Some(config);
-        Ok(self)
-    }
-
-    pub fn with_image_validation(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
-        let config_file = config_file.as_ref();
-        let config_str = fs::read_to_string(config_file)
-            .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml_ng::from_str::<ImageValidationConfig>(&config_str)
-            .with_context(|| format!("Could not parse file `{}`", config_file))?;
-        self.image_validation_config = Some(config);
+        self.config_file = Some(config);
         Ok(self)
     }
 
@@ -135,22 +125,24 @@ impl TrowConfig {
             "Hostname of this registry (for the MutatingWebhook): {:?}",
             self.service_name
         );
-        match self.image_validation_config {
-            Some(ref config) => {
-                println!("Image validation webhook configured:");
-                println!("  Default action: {}", config.default);
-                println!("  Allowed prefixes: {:?}", config.allow);
-                println!("  Denied prefixes: {:?}", config.deny);
+        if let Some(config) = &self.config_file {
+            match &config.image_validation {
+                Some(cfg) => {
+                    println!("Image validation webhook configured:");
+                    println!("  Default action: {}", cfg.default);
+                    println!("  Allowed prefixes: {:?}", cfg.allow);
+                    println!("  Denied prefixes: {:?}", cfg.deny);
+                }
+                None => println!("Image validation webhook not configured"),
             }
-            None => println!("Image validation webhook not configured"),
-        }
-        if let Some(proxy_config) = &self.proxy_registry_config {
-            println!("Proxy registries configured:");
-            for config in &proxy_config.registries {
-                println!("  - {}: {}", config.alias, config.host);
+            if !config.registry_proxies.registries.is_empty() {
+                println!("Proxy registries configured:");
+                for config in &config.registry_proxies.registries {
+                    println!("  - {}: {}", config.alias, config.host);
+                }
+            } else {
+                println!("Proxy registries not configured");
             }
-        } else {
-            println!("Proxy registries not configured");
         }
 
         if self.cors.is_some() {
@@ -162,12 +154,7 @@ impl TrowConfig {
             std::process::exit(0);
         }
 
-        let ts_builder = registry::build_server(
-            self.data_dir.clone(),
-            self.proxy_registry_config.clone(),
-            self.image_validation_config.clone(),
-        );
-        let registry = ts_builder.get_server().await?;
+        let registry = TrowServer::new(self.data_dir.clone(), self.config_file.clone())?;
 
         let db_in_memory = self.db_connection == Some(":memory:".to_string());
         let db_file = match (&self.db_connection, db_in_memory) {

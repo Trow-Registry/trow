@@ -53,7 +53,8 @@ async fn get_manifest(
     let digest = if repo.starts_with(PROXY_DIR) {
         let (proxy_cfg, image) = match state
             .registry
-            .proxy_registry_config
+            .config
+            .registry_proxies
             .get_proxy_config(&repo, &reference)
             .await
         {
