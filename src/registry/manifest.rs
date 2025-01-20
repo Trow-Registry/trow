@@ -145,6 +145,7 @@ impl OCIManifest {
                 // We could recurse into the manifests, but they should have been checked already.
                 list.manifests()
                     .iter()
+                    .filter(|l| layer_is_distributable(l.media_type()))
                     .map(|x| x.digest().to_string())
                     .collect()
             }

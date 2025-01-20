@@ -256,10 +256,6 @@ impl TrowStorageBackend {
     }
 }
 
-// fn is_proxy_repo(repo_name: &str) -> bool {
-//     repo_name.starts_with(PROXY_DIR)
-// }
-
 #[cfg(test)]
 mod tests {
 
