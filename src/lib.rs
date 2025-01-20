@@ -125,24 +125,29 @@ impl TrowConfig {
             "Hostname of this registry (for the MutatingWebhook): {:?}",
             self.service_name
         );
-        if let Some(config) = &self.config_file {
-            match &config.image_validation {
-                Some(cfg) => {
-                    println!("Image validation webhook configured:");
-                    println!("  Default action: {}", cfg.default);
-                    println!("  Allowed prefixes: {:?}", cfg.allow);
-                    println!("  Denied prefixes: {:?}", cfg.deny);
-                }
-                None => println!("Image validation webhook not configured"),
+        match &self.config_file {
+            Some(ConfigFile {
+                image_validation: Some(cfg),
+                ..
+            }) => {
+                println!("Image validation webhook configured:");
+                println!("  Default action: {}", cfg.default);
+                println!("  Allowed prefixes: {:?}", cfg.allow);
+                println!("  Denied prefixes: {:?}", cfg.deny);
             }
-            if !config.registry_proxies.registries.is_empty() {
+            _ => println!("Image validation webhook not configured"),
+        }
+        match &self.config_file {
+            Some(ConfigFile {
+                registry_proxies: cfg,
+                ..
+            }) if !cfg.registries.is_empty() => {
                 println!("Proxy registries configured:");
-                for config in &config.registry_proxies.registries {
+                for config in &cfg.registries {
                     println!("  - {}: {}", config.alias, config.host);
                 }
-            } else {
-                println!("Proxy registries not configured");
             }
+            _ => println!("Proxy registries not configured"),
         }
 
         if self.cors.is_some() {

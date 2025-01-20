@@ -78,7 +78,7 @@ spec:
           {{- end }}
         - name: webhook-cert-translated
           emptyDir: {}
-      {{- if include "trow.hasConfig" . }}
+      {{- if include "trow.hasConfigFile" . }}
         - name: trow-cfg
           secret:
             secretName: {{ include "trow.fullname" . }}-cfg

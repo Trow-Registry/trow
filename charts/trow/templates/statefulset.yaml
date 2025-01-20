@@ -72,7 +72,7 @@ spec:
           secret:
             secretName: {{ include "trow.fullname" . }}-password
       {{- end}}
-      {{- if include "trow.hasConfig" . }}
+      {{- if include "trow.hasConfigFile" . }}
         - name: trow-cfg
           secret:
             secretName: {{ include "trow.fullname" . }}-cfg
