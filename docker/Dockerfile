@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends openssl ca-certificates
 
-RUN mkdir -p /data /certs &&\
+RUN mkdir -p /data/blobs /data/scratch /certs &&\
     chown -R trow /data /certs
 # keep this late for concurrency
 COPY --from=cross /usr/src/trow/trow /trow

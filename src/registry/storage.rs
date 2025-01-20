@@ -37,7 +37,7 @@ pub enum StorageBackendError {
 #[derive(Clone, Debug)]
 pub struct TrowStorageBackend {
     blobs_dir: PathBuf,
-    uploads_dir: PathBuf,
+    scratch_dir: PathBuf,
 }
 
 impl TrowStorageBackend {
@@ -61,11 +61,11 @@ impl TrowStorageBackend {
 
     pub fn new(path: PathBuf) -> Result<Self, StorageBackendError> {
         let blobs_dir = Self::init_create_path(&path, "blobs")?;
-        let uploads_dir = Self::init_create_path(&path, "uploads")?;
+        let scratch_dir = Self::init_create_path(&path, "scratch")?;
 
         Ok(Self {
             blobs_dir,
-            uploads_dir,
+            scratch_dir,
         })
     }
 
@@ -95,7 +95,7 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         tracing::debug!("Write blob {digest}");
-        let tmp_location = self.uploads_dir.join(digest.as_str());
+        let tmp_location = self.scratch_dir.join(digest.as_str());
         let location = self.blobs_dir.join(digest.as_str());
         if location.exists() {
             tracing::info!(digest = digest.as_str(), "Blob already exists");
@@ -150,7 +150,7 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         tracing::debug!("Write blob part {upload_id} ({range:?})");
-        let tmp_location = self.uploads_dir.join(upload_id.to_string());
+        let tmp_location = self.scratch_dir.join(upload_id.to_string());
         let mut tmp_file = FileWrapper::append(tmp_location.clone())
             .await
             .map_err(|e| {
@@ -200,7 +200,7 @@ impl TrowStorageBackend {
         user_digest: &Digest,
     ) -> Result<(), StorageBackendError> {
         tracing::debug!("Complete blob write {upload_id}");
-        let tmp_location = self.uploads_dir.join(upload_id.to_string());
+        let tmp_location = self.scratch_dir.join(upload_id.to_string());
         let final_location = self.blobs_dir.join(user_digest.as_str());
         // Should we even do this ? It breaks OCI tests:
         // let f = std::fs::File::open(&tmp_location)?;
@@ -234,7 +234,7 @@ impl TrowStorageBackend {
     }
 
     pub async fn is_ready(&self) -> Result<(), StorageBackendError> {
-        let path = self.uploads_dir.join("fs-ready");
+        let path = self.scratch_dir.join("fs-ready");
         let mut file = tokio::fs::File::create(path).await?;
         let size = file.write(b"Hello World").await?;
         if size != 11 {
@@ -256,10 +256,6 @@ impl TrowStorageBackend {
     }
 }
 
-// fn is_proxy_repo(repo_name: &str) -> bool {
-//     repo_name.starts_with(PROXY_DIR)
-// }
-
 #[cfg(test)]
 mod tests {
 
@@ -276,7 +272,7 @@ mod tests {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         assert!(store.blobs_dir.exists());
-        assert!(store.uploads_dir.exists());
+        assert!(store.scratch_dir.exists());
         drop(dir);
     }
 
