@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
-use futures::AsyncRead;
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncRead;
 
 use crate::registry::Digest;
 

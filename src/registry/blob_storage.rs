@@ -1,4 +1,4 @@
-use futures::AsyncRead;
+use tokio::io::AsyncRead;
 
 use super::Digest;
 use crate::types::BoundedStream;
@@ -26,7 +26,7 @@ pub struct Stored {
     pub chunk: u64,
 }
 
-impl<S: futures::AsyncRead + Send> BlobReader<S> {
+impl<S: tokio::io::AsyncRead + Send> BlobReader<S> {
     pub async fn new(digest: Digest, file: BoundedStream<S>) -> Self {
         let file_size = file.size() as u64;
         Self {

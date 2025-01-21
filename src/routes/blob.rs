@@ -27,7 +27,7 @@ async fn get_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, Digest)>,
-) -> Result<BlobReader<impl futures::AsyncRead>, Error> {
+) -> Result<BlobReader<impl tokio::io::AsyncRead>, Error> {
     let mut conn = state.db.acquire().await?;
     let digest_str = digest.as_str();
     sqlx::query_scalar!(
@@ -54,7 +54,7 @@ endpoint_fn_7_levels!(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
         path: [image_name, digest: Digest]
-    ) -> Result<BlobReader<impl futures::AsyncRead>, Error>
+    ) -> Result<BlobReader<impl tokio::io::AsyncRead>, Error>
 );
 
 /**
