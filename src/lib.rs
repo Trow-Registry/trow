@@ -12,9 +12,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
 
-use anyhow::{Context, Result};
 use axum::Router;
-use registry::TrowServer;
+use registry::{StorageBackendError, TrowServer};
 use sqlx::sqlite::SqlitePool;
 use thiserror::Error;
 use uuid::Uuid;
@@ -79,6 +78,18 @@ impl Default for TrowConfig {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum TrowConfigError {
+    #[error("Could not read file: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Could not parse config file: {0}")]
+    SerdeError(#[from] serde_yaml_ng::Error),
+    #[error("Could not setup database: {0}")]
+    DbSetupError(#[from] sqlx::migrate::MigrateError),
+    #[error("Could not setup storage backend: {0}")]
+    StorageBackendSetupError(#[from] StorageBackendError),
+}
+
 impl TrowConfig {
     #[allow(clippy::too_many_arguments)]
     pub fn new() -> Self {
@@ -95,12 +106,13 @@ impl TrowConfig {
         }
     }
 
-    pub fn with_config(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
+    pub fn with_config(
+        &mut self,
+        config_file: impl AsRef<str>,
+    ) -> Result<&mut Self, TrowConfigError> {
         let config_file = config_file.as_ref();
-        let config_str = fs::read_to_string(config_file)
-            .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml_ng::from_str::<ConfigFile>(&config_str)
-            .with_context(|| format!("Could not parse file `{}`", config_file))?;
+        let config_str = fs::read_to_string(config_file)?;
+        let config = serde_yaml_ng::from_str::<ConfigFile>(&config_str)?;
         self.config_file = Some(config);
         Ok(self)
     }
@@ -119,7 +131,7 @@ impl TrowConfig {
 
     /// Should only be used internally or for integration tests
     #[doc(hidden)]
-    pub async fn build_server_state(self) -> Result<Arc<TrowServerState>> {
+    pub async fn build_server_state(self) -> Result<Arc<TrowServerState>, TrowConfigError> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!(
             "Hostname of this registry (for the MutatingWebhook): {:?}",
@@ -180,7 +192,7 @@ impl TrowConfig {
         Ok(Arc::new(server_state))
     }
 
-    pub async fn build_app(self) -> Result<Router> {
+    pub async fn build_app(self) -> Result<Router, TrowConfigError> {
         let state = self.build_server_state().await?;
         Ok(routes::create_app(state))
     }

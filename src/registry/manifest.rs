@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use anyhow::Result;
 use lazy_static::lazy_static;
 use oci_spec::image::{Descriptor, ImageIndex, ImageManifest, MediaType};
 use regex::Regex;

@@ -4,7 +4,6 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::anyhow;
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
 use clap::builder::ArgPredicate;
@@ -141,7 +140,19 @@ async fn main() {
     });
 }
 
-async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> anyhow::Result<()> {
+#[derive(thiserror::Error, Debug)]
+pub enum ServeAppError {
+    #[error("Failed to load TLS certificate and key: {0}")]
+    TlsInvalidPemFiles(std::io::Error),
+    #[error("Could not serve app: {0}")]
+    ServeError(std::io::Error),
+}
+
+async fn serve_app(
+    app: Router,
+    addr: SocketAddr,
+    tls: Option<TlsConfig>,
+) -> Result<(), ServeAppError> {
     async fn shutdown_signal(handle: axum_server::Handle) {
         use std::time::Duration;
 
@@ -180,24 +191,20 @@ async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> any
 
     tracing::info!("Starting server on {}", addr);
     if let Some(ref tls) = tls {
-        if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
-            return Err(anyhow!(
-                "Could not find TLS certificate and key at {} and {}",
-                tls.cert_file,
-                tls.key_file
-            ));
-        }
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-        let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file).await?;
+        let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file)
+            .await
+            .map_err(ServeAppError::TlsInvalidPemFiles)?;
         axum_server::bind_rustls(addr, config)
             .handle(handle)
             .serve(app.into_make_service())
-            .await?;
+            .await
     } else {
         axum_server::bind(addr)
             .handle(handle)
             .serve(app.into_make_service())
-            .await?;
-    };
+            .await
+    }
+    .map_err(ServeAppError::ServeError)?;
     Ok(())
 }

@@ -1,11 +1,9 @@
 use std::path::PathBuf;
 use std::str;
 
-use anyhow::Result;
-
 // use super::manifest::Manifest;
 use super::storage::TrowStorageBackend;
-use super::ConfigFile;
+use super::{ConfigFile, StorageBackendError};
 
 pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
@@ -26,32 +24,16 @@ pub struct TrowServer {
 }
 
 impl TrowServer {
-    pub fn new(data_path: PathBuf, config: Option<ConfigFile>) -> Result<Self> {
+    pub fn new(
+        data_path: PathBuf,
+        config: Option<ConfigFile>,
+    ) -> Result<Self, StorageBackendError> {
         let svc = Self {
             config: config.unwrap_or_default(),
             storage: TrowStorageBackend::new(data_path)?,
         };
         Ok(svc)
     }
-
-    // pub async fn get_blob(
-    //     &self,
-    //     repo_name: &str,
-    //     digest: &Digest,
-    // ) -> Result<BlobReader<impl AsyncRead>, RegistryError> {
-    //     event!(
-    //         Level::DEBUG,
-    //         "Getting read location for blob {} in {}",
-    //         digest,
-    //         repo_name
-    //     );
-    //     let stream = match self.storage.get_blob_stream(repo_name, digest).await {
-    //         Ok(stream) => stream,
-    //         Err(StorageBackendError::BlobNotFound(_)) => return Err(RegistryError::NotFound),
-    //         Err(_) => return Err(RegistryError::Internal),
-    //     };
-    //     Ok(BlobReader::new(digest.clone(), stream).await)
-    // }
 
     // Readiness check
     pub async fn is_ready(&self) -> bool {

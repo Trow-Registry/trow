@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::response::Response;

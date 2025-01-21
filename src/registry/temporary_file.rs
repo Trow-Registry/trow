@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
 use bytes::Bytes;
 use futures::stream::Stream;
 use futures::StreamExt;

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use aws_config::BehaviorVersion;
 use aws_sdk_ecr::config::http::HttpResponse;
 use aws_sdk_ecr::error::SdkError;
@@ -86,10 +85,15 @@ pub enum DownloadRemoteImageError {
     StorageError(#[from] crate::registry::storage::StorageBackendError),
     #[error("Could not deserialize manifest: {0}")]
     ManifestDeserializationError(#[from] serde_json::Error),
+    #[error("Could not get AWS ECR password: {0}")]
+    EcrLoginError(#[from] EcrPasswordError),
 }
 
 impl SingleRegistryProxyConfig {
-    async fn setup_client(&self, insecure: bool) -> Result<(oci_client::Client, RegistryAuth)> {
+    async fn setup_client(
+        &self,
+        insecure: bool,
+    ) -> Result<(oci_client::Client, RegistryAuth), DownloadRemoteImageError> {
         let mut client_config = oci_client::client::ClientConfig::default();
         if insecure {
             client_config.protocol = ClientProtocol::Http;

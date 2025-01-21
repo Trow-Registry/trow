@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use axum::extract::{Json, State};
 use axum::routing::post;
 use axum::Router;
