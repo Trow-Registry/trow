@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE blob_upload SET offset=$2 WHERE uuid=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "5b1fee3de30caf6ee09051e5687225954ed8c324d68b4d7770ea562efad6cbfa"
+}

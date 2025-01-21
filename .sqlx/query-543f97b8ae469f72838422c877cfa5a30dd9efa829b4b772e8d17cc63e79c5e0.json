@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = $1);",
+  "describe": {
+    "columns": [
+      {
+        "name": "EXISTS(SELECT 1 FROM blob WHERE digest = $1)",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "543f97b8ae469f72838422c877cfa5a30dd9efa829b4b772e8d17cc63e79c5e0"
+}

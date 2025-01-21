@@ -23,7 +23,8 @@ jobs:
         run: cargo install sqlx-cli
       - name: Setup sqlx database
         run: mkdir -p target && cargo sqlx database setup
-
+      - name: Check .sqlx folder
+        run: cargo sqlx prepare --check
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Run Trow test suite

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO tag\n            VALUES ($1, $2, $3)\n            ON CONFLICT (repo, tag) DO UPDATE\n                SET manifest_digest = EXCLUDED.manifest_digest\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "cadea914666e8098da27954a0676df24bf55ae4ef462f72183a0a27e01eebb28"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT b.digest FROM blob b\n                    INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest\n                    WHERE b.digest = $1 AND rba.repo_name = $2",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "747da150f0274908e1f2b5289463eae7e504e07d4c79491b8ccf3feaa7030002"
+}

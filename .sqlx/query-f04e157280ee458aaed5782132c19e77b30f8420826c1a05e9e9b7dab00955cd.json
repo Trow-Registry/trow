@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT offset FROM blob_upload WHERE uuid = $1 AND repo = $2",
+  "describe": {
+    "columns": [
+      {
+        "name": "offset",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f04e157280ee458aaed5782132c19e77b30f8420826c1a05e9e9b7dab00955cd"
+}

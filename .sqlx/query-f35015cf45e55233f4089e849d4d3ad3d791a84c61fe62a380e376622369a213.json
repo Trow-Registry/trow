@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT m.digest\n            FROM manifest m\n            INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest\n            WHERE m.digest = $2 AND rba.repo_name = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f35015cf45e55233f4089e849d4d3ad3d791a84c61fe62a380e376622369a213"
+}

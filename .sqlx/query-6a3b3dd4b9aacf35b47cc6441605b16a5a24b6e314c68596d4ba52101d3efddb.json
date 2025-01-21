@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT m.json ->> 'mediaType' as \"media_type: String\", m.blob\n        FROM manifest m\n        WHERE m.digest = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "media_type: String",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "blob",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "6a3b3dd4b9aacf35b47cc6441605b16a5a24b6e314c68596d4ba52101d3efddb"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM tag WHERE repo = $1 AND tag = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8c968aad4827d0e4c9c17247788493019869821ecf089d0235cc6f2a4aa3a767"
+}

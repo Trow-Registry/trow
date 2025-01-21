@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT digest FROM blob\n        JOIN repo_blob_association ON blob.digest = repo_blob_association.blob_digest\n        WHERE digest = $1 AND repo_name = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "db9b192cdb02d0cc0db32e78dda997d0041b24ba8e9b09a9bfe619f0e4025264"
+}

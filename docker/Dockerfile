@@ -1,31 +1,26 @@
 # syntax=docker/dockerfile:1
 
+# Cross compiling from host platfrom instead of using qemu
 FROM --platform=$BUILDPLATFORM rust:bookworm AS cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
 
-ENV PKG_CONFIG_SYSROOT_DIR=/
+ENV PKG_CONFIG_SYSROOT_DIR=/ \
+    SQLX_OFFLINE=true
 
 RUN --mount=type=bind,source=docker/platform.sh,target=/platform.sh \
     /platform.sh
 
-RUN rustup component add rustfmt
 RUN rustup target add $(cat /.platform)
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean &&\
     apt-get update &&\
-    apt-get install -y unzip openssl protobuf-compiler $(cat /.compiler)
+    apt-get install -y unzip openssl $(cat /.compiler)
 
 COPY . .
-
-RUN cargo install sqlx-cli --no-default-features --features sqlite
-
-RUN --mount=type=cache,target=./target \
-    rm target/dev.db* &&\
-    cargo sqlx database setup
 
 # Get rid of the "cp" when cargo build --out is stable
 RUN --mount=type=cache,target=./target \

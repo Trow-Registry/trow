@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO blob (digest, size)\n            VALUES ($1, $2) ON CONFLICT (digest) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8a2c277d6932b7bce55c6abacf6eeb64fe533696ce7ce1be15a3e41137b7286e"
+}

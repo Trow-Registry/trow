@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM blob_upload\n            WHERE uuid=$1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9ddd82bd8ade2bfbcf836b010fb55e375fa3f1a7b6d6563069f29fe4c4c92058"
+}
