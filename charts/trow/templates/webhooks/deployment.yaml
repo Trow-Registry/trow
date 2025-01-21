@@ -44,11 +44,8 @@ spec:
           - "--tls=/etc/trow/webhook-cert/cert,/etc/trow/webhook-cert/key"
           - "-n"
           - {{ .Values.trow.domain | quote }}
-          {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
-          - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
-          {{- end }}
-          {{- if (not (empty .Values.trow.validationWebhook.config)) }}
-          - "--image-validation-config-file=/etc/trow/validation.yaml"
+          {{- if include "trow.hasConfigFile" . }}
+          - "--config-file=/etc/trow/config.yaml"
           {{- end }}
         env:
         - name: RUST_LOG

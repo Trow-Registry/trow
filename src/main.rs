@@ -187,8 +187,8 @@ async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> any
                 tls.key_file
             ));
         }
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file).await?;
-
         axum_server::bind_rustls(addr, config)
             .handle(handle)
             .serve(app.into_make_service())
