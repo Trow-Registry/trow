@@ -4398,7 +4398,7 @@ dependencies = [
 
 [[package]]
 name = "trow"
-version = "0.7.0-rc1"
+version = "0.7.0-rc2"
 dependencies = [
  "assert_cmd",
  "async-std",
