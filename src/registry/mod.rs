@@ -6,14 +6,12 @@ pub mod server;
 mod storage;
 mod temporary_file;
 
-use std::path::PathBuf;
-
 pub use admission::ImageValidationConfig;
-use anyhow::Result;
 pub use blob_storage::{BlobReader, ContentInfo, UploadInfo};
 pub use digest::Digest;
 pub use manifest_storage::ManifestReader;
 pub use proxy::{RegistryProxiesConfig, SingleRegistryProxyConfig};
+use serde::Deserializer;
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;
@@ -22,6 +20,23 @@ pub mod blob_storage;
 #[allow(dead_code)]
 pub mod digest;
 pub mod manifest_storage;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct ConfigFile {
+    #[serde(deserialize_with = "de_unwrap_or_default")]
+    pub registry_proxies: RegistryProxiesConfig,
+    pub image_validation: Option<ImageValidationConfig>,
+}
+
+fn de_unwrap_or_default<'de, T, D>(d: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or_default())
+}
 
 // Storage Driver Error
 #[derive(Error, Debug)]
@@ -66,33 +81,5 @@ impl From<StorageBackendError> for RegistryError {
             }
             StorageBackendError::Unsupported => Self::Unsupported,
         }
-    }
-}
-
-pub struct TrowServerBuilder {
-    data_path: PathBuf,
-    proxy_registry_config: Option<RegistryProxiesConfig>,
-    image_validation_config: Option<ImageValidationConfig>,
-}
-
-pub fn build_server(
-    data_path: PathBuf,
-    proxy_registry_config: Option<RegistryProxiesConfig>,
-    image_validation_config: Option<ImageValidationConfig>,
-) -> TrowServerBuilder {
-    TrowServerBuilder {
-        data_path,
-        proxy_registry_config,
-        image_validation_config,
-    }
-}
-
-impl TrowServerBuilder {
-    pub async fn get_server(self) -> Result<TrowServer> {
-        TrowServer::new(
-            self.data_path,
-            self.proxy_registry_config,
-            self.image_validation_config,
-        )
     }
 }

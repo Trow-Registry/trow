@@ -34,11 +34,8 @@ spec:
           - "--password"
           - "file:///etc/trow/pass"
           {{- end }}
-          {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
-          - "--proxy-registry-config-file=/etc/trow/proxy-registries.yaml"
-          {{- end }}
-          {{- if (not (empty .Values.trow.validationWebhook.config)) }}
-          - "--image-validation-config-file=/etc/trow/validation.yaml"
+          {{- if or (not (empty .Values.trow.proxyRegistries.config)) (not (empty .Values.trow.validationWebhook.config)) }}
+          - "--config-file=/etc/trow/config.yaml"
           {{- end }}
         env:
         - name: RUST_LOG
@@ -55,16 +52,10 @@ spec:
           subPath: pass
           readOnly: true
       {{- end}}
-      {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
-        - name: trow-proxy-cfg
-          mountPath: /etc/trow/proxy-registries.yaml
-          subPath: proxy-registries.yaml
-          readOnly: true
-      {{- end}}
-      {{- if (not (empty .Values.trow.validationWebhook.config)) }}
-        - name: trow-validation-cfg
-          mountPath: /etc/trow/validation.yaml
-          subPath: validation.yaml
+      {{- if include "trow.hasConfigFile" . }}
+        - name: trow-cfg
+          mountPath: /etc/trow/config.yaml
+          subPath: config.yaml
           readOnly: true
       {{- end}}
       {{- with .Values.resources }}
@@ -81,15 +72,10 @@ spec:
           secret:
             secretName: {{ include "trow.fullname" . }}-password
       {{- end}}
-      {{- if (not (empty .Values.trow.proxyRegistries.config)) }}
-        - name: trow-proxy-cfg
+      {{- if include "trow.hasConfigFile" . }}
+        - name: trow-cfg
           secret:
-            secretName: {{ include "trow.fullname" . }}-proxy-cfg
-      {{- end }}
-      {{- if (not (empty .Values.trow.validationWebhook.config)) }}
-        - name: trow-validation-cfg
-          configMap:
-            name: {{ include "trow.fullname" . }}-validation-cfg
+            secretName: {{ include "trow.fullname" . }}-cfg
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

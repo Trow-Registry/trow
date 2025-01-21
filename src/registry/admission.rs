@@ -82,7 +82,7 @@ impl TrowServer {
     pub async fn validate_admission(&self, ar: &AdmissionRequest<Pod>) -> AdmissionResponse {
         let resp = AdmissionResponse::from(ar);
 
-        if self.image_validation_config.is_none() {
+        if self.config.image_validation.is_none() {
             return resp.deny("Image validation not configured");
         }
         let pod = match &ar.object {
@@ -96,7 +96,7 @@ impl TrowServer {
 
         for image_raw in images {
             let (v, r) =
-                check_image_is_allowed(&image_raw, self.image_validation_config.as_ref().unwrap());
+                check_image_is_allowed(&image_raw, self.config.image_validation.as_ref().unwrap());
             if !v {
                 valid = false;
                 reasons.push(format!("{image_raw}: {r}"));
@@ -117,7 +117,7 @@ impl TrowServer {
         host_name: &str,
     ) -> AdmissionResponse {
         let resp = AdmissionResponse::from(ar);
-        let proxy_config = &self.proxy_registry_config;
+        let proxy_config = &self.config.registry_proxies;
         let pod = match &ar.object {
             Some(pod) => pod,
             None => {

@@ -1,12 +1,19 @@
 use std::borrow::Cow;
 use std::fmt;
 
-use anyhow::{anyhow, Result};
 use const_format::formatcp;
 use lazy_static::lazy_static;
 
-use crate::registry::digest::Digest;
+use crate::registry::digest::{Digest, DigestError};
 use crate::registry::manifest::ManifestReference;
+
+#[derive(thiserror::Error, Debug)]
+pub enum RemoteImageError {
+    #[error("Invalid image ref: {0}")]
+    InvalidImageReference(String),
+    #[error("Invalid digest: {0}")]
+    InvalidDigest(#[from] DigestError),
+}
 
 /// The regex validates an image reference.
 /// It returns `name`, `tag` and `digest`.
@@ -122,7 +129,7 @@ impl RemoteImage {
 
     /// Note: this uses the same validation rules as the Docker engine.
     /// Schemes (`http`, `https`) are not supported here.
-    pub fn try_from_str(image_ref: &str) -> Result<Self> {
+    pub fn try_from_str(image_ref: &str) -> Result<Self, RemoteImageError> {
         lazy_static! {
             static ref RE: regex::Regex = regex::RegexBuilder::new(get_image_ref_regex())
                 .size_limit(1024*1024) // 1MB limit (complex regex can explode in size)
@@ -132,7 +139,7 @@ impl RemoteImage {
 
         let captures = RE
             .captures(image_ref)
-            .ok_or_else(|| anyhow!("Invalid image ref: `{}`", image_ref))?;
+            .ok_or_else(|| RemoteImageError::InvalidImageReference(image_ref.to_string()))?;
 
         let name = captures.name("name").unwrap().as_str();
 

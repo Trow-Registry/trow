@@ -1,7 +1,7 @@
-use anyhow::Result;
+use sqlx::migrate::MigrateError;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
-pub async fn init_db(filename: &str, in_memory: bool) -> Result<SqlitePool> {
+pub async fn init_db(filename: &str, in_memory: bool) -> Result<SqlitePool, MigrateError> {
     let options = SqliteConnectOptions::new()
         .filename(filename)
         .create_if_missing(true)

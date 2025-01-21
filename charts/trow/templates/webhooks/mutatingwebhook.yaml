@@ -31,7 +31,7 @@ webhooks:
     failurePolicy: Ignore
     clientConfig:
       service:
-        name: {{ include "trow.fullname" . }}-admission
+        name: {{ include "trow.fullname" . }}-webhooks
         path: "/mutate-image"
         namespace: {{ .Release.Namespace }}
 {{ end }}

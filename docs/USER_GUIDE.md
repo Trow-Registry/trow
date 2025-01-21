@@ -32,22 +32,23 @@ Backing up the Trow registry can be done by copying the data directory (`/data` 
 ## Proxying other registries (and MutatingWebhook)
 
 Trow can be configured as a proxy cache for other registries by passing the argument
-`--proxy-registry-config-file` on start-up. Any repositories under `f/{alias}/` will automatically be pulled
+`--config-file` on start-up. Any repositories under `f/{alias}/` will automatically be pulled
 from the matching registry. For example, if we start Trow with:
 
 ```yaml
 # proxy.yaml
-registries:
-  - alias: docker
-    host: registry-1.docker.io
-  - alias: my-custom-registry
-    host: my_custom_registry.example.com
-    username: toto
-    password: pass1234
+registry_proxies:
+  registries:
+    - alias: docker
+      host: registry-1.docker.io
+    - alias: my-custom-registry
+      host: my_custom_registry.example.com
+      username: toto
+      password: pass1234
 ```
 
 ```
-$ trow --proxy-registry-config-file ./proxy.yaml
+$ trow --config-file ./proxy.yaml
 Starting Trow 0.6.0 on 0.0.0.0:8000
 Hostname of this registry (for the MutatingWebhook): "0.0.0.0:8000"
 Image validation webhook not configured
@@ -86,16 +87,17 @@ The validating webhook can be configured using `--image-validation-config-file` 
 
 ```yaml
 # validation.yaml
-default: Deny
-allow:
-  - my-trow-domain.trow.io/
-  - k8s.gcr.io/
-deny:
-  - my-trow-domain.trow.io/my-secret-image
+image_validation:
+  default: Deny
+  allow:
+    - my-trow-domain.trow.io/
+    - k8s.gcr.io/
+  deny:
+    - my-trow-domain.trow.io/my-secret-image
 ```
 
 ```console
-$ ./trow --image-validation-config-file ./validation.yaml
+$ ./trow --config-file ./validation.yaml
 Starting Trow 0.6.0 on 0.0.0.0:8000
 Hostname of this registry (for the MutatingWebhook): "0.0.0.0"
 Image validation webhook configured:

@@ -50,9 +50,8 @@ pub fn test_temp_dir_from_thread_name(mod_path: &str) -> TestTempDir {
         let thread = std::thread::current();
         let thread = thread.name().unwrap();
         let (t_mod, fn_) = thread.rsplit_once("::").unwrap();
-        Ok::<_, anyhow::Error>(format!("{crate_}::{t_mod}::{fn_}"))
-    }
-    .expect("unable to calculate complete test function path");
+        format!("{crate_}::{t_mod}::{fn_}")
+    };
 
     test_temp_dir::TestTempDir::from_complete_item_path(&path)
 }

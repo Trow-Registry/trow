@@ -4,7 +4,6 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::anyhow;
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
 use clap::builder::ArgPredicate;
@@ -68,13 +67,9 @@ struct Args {
     #[arg(long, short = 'P', requires_if(ArgPredicate::IsPresent, "user"))]
     password: Option<String>,
 
-    /// Load a YAML file containing the config to validate container images through an admission webhook.
+    /// Load a YAML file containing the image validation and proxy registry config.
     #[arg(long)]
-    image_validation_config_file: Option<String>,
-
-    /// Load a YAML file containing the config to proxy repos at f/<registry_alias>/<repo_name> to <registry>/<repo_name>.
-    #[arg(long)]
-    proxy_registry_config_file: Option<String>,
+    config_file: Option<String>,
 
     /// Enable Cross-Origin Resource Sharing(CORS) requests.
     #[arg(long, value_delimiter(','))]
@@ -115,15 +110,9 @@ async fn main() {
         builder.with_user(user, &pass);
     }
 
-    if let Some(config_file) = args.proxy_registry_config_file {
-        if let Err(e) = builder.with_proxy_registries(config_file) {
+    if let Some(config_file) = args.config_file {
+        if let Err(e) = builder.with_config(config_file) {
             eprintln!("Failed to load proxy registry config file: {:#}", e);
-            std::process::exit(1);
-        }
-    }
-    if let Some(config_file) = args.image_validation_config_file {
-        if let Err(e) = builder.with_image_validation(config_file) {
-            eprintln!("Failed to load image validation config file: {:#}", e);
             std::process::exit(1);
         }
     }
@@ -151,7 +140,19 @@ async fn main() {
     });
 }
 
-async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> anyhow::Result<()> {
+#[derive(thiserror::Error, Debug)]
+pub enum ServeAppError {
+    #[error("Failed to load TLS certificate and key: {0}")]
+    TlsInvalidPemFiles(std::io::Error),
+    #[error("Could not serve app: {0}")]
+    ServeError(std::io::Error),
+}
+
+async fn serve_app(
+    app: Router,
+    addr: SocketAddr,
+    tls: Option<TlsConfig>,
+) -> Result<(), ServeAppError> {
     async fn shutdown_signal(handle: axum_server::Handle) {
         use std::time::Duration;
 
@@ -190,24 +191,20 @@ async fn serve_app(app: Router, addr: SocketAddr, tls: Option<TlsConfig>) -> any
 
     tracing::info!("Starting server on {}", addr);
     if let Some(ref tls) = tls {
-        if !(Path::new(&tls.cert_file).is_file() && Path::new(&tls.key_file).is_file()) {
-            return Err(anyhow!(
-                "Could not find TLS certificate and key at {} and {}",
-                tls.cert_file,
-                tls.key_file
-            ));
-        }
-        let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file).await?;
-
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let config = RustlsConfig::from_pem_file(&tls.cert_file, &tls.key_file)
+            .await
+            .map_err(ServeAppError::TlsInvalidPemFiles)?;
         axum_server::bind_rustls(addr, config)
             .handle(handle)
             .serve(app.into_make_service())
-            .await?;
+            .await
     } else {
         axum_server::bind(addr)
             .handle(handle)
             .serve(app.into_make_service())
-            .await?;
-    };
+            .await
+    }
+    .map_err(ServeAppError::ServeError)?;
     Ok(())
 }

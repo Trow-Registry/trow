@@ -12,12 +12,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
 
-use anyhow::{Context, Result};
 use axum::Router;
-use registry::{ImageValidationConfig, RegistryProxiesConfig, TrowServer};
+use registry::{StorageBackendError, TrowServer};
 use sqlx::sqlite::SqlitePool;
 use thiserror::Error;
 use uuid::Uuid;
+
+use crate::registry::ConfigFile;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -62,8 +63,7 @@ struct UserConfig {
 pub struct TrowConfig {
     pub data_dir: PathBuf,
     pub service_name: String,
-    pub proxy_registry_config: Option<RegistryProxiesConfig>,
-    pub image_validation_config: Option<ImageValidationConfig>,
+    pub config_file: Option<ConfigFile>,
     pub dry_run: bool,
     pub token_secret: Vec<u8>,
     user: Option<UserConfig>,
@@ -78,14 +78,25 @@ impl Default for TrowConfig {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum TrowConfigError {
+    #[error("Could not read file: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Could not parse config file: {0}")]
+    SerdeError(#[from] serde_yml::Error),
+    #[error("Could not setup database: {0}")]
+    DbSetupError(#[from] sqlx::migrate::MigrateError),
+    #[error("Could not setup storage backend: {0}")]
+    StorageBackendSetupError(#[from] StorageBackendError),
+}
+
 impl TrowConfig {
     #[allow(clippy::too_many_arguments)]
     pub fn new() -> Self {
         Self {
             data_dir: PathBuf::from_str("./data").unwrap(),
             service_name: "http://trow".to_string(),
-            proxy_registry_config: None,
-            image_validation_config: None,
+            config_file: None,
             dry_run: false,
             token_secret: Uuid::new_v4().as_bytes().to_vec(),
             user: None,
@@ -95,23 +106,14 @@ impl TrowConfig {
         }
     }
 
-    pub fn with_proxy_registries(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
+    pub fn with_config(
+        &mut self,
+        config_file: impl AsRef<str>,
+    ) -> Result<&mut Self, TrowConfigError> {
         let config_file = config_file.as_ref();
-        let config_str = fs::read_to_string(config_file)
-            .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml_ng::from_str::<RegistryProxiesConfig>(&config_str)
-            .with_context(|| format!("Could not parse file `{}`", config_file))?;
-        self.proxy_registry_config = Some(config);
-        Ok(self)
-    }
-
-    pub fn with_image_validation(&mut self, config_file: impl AsRef<str>) -> Result<&mut Self> {
-        let config_file = config_file.as_ref();
-        let config_str = fs::read_to_string(config_file)
-            .with_context(|| format!("Could not read file `{}`", config_file))?;
-        let config = serde_yaml_ng::from_str::<ImageValidationConfig>(&config_str)
-            .with_context(|| format!("Could not parse file `{}`", config_file))?;
-        self.image_validation_config = Some(config);
+        let config_str = fs::read_to_string(config_file)?;
+        let config = serde_yml::from_str::<ConfigFile>(&config_str)?;
+        self.config_file = Some(config);
         Ok(self)
     }
 
@@ -129,28 +131,35 @@ impl TrowConfig {
 
     /// Should only be used internally or for integration tests
     #[doc(hidden)]
-    pub async fn build_server_state(self) -> Result<Arc<TrowServerState>> {
+    pub async fn build_server_state(self) -> Result<Arc<TrowServerState>, TrowConfigError> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!(
             "Hostname of this registry (for the MutatingWebhook): {:?}",
             self.service_name
         );
-        match self.image_validation_config {
-            Some(ref config) => {
+        match &self.config_file {
+            Some(ConfigFile {
+                image_validation: Some(cfg),
+                ..
+            }) => {
                 println!("Image validation webhook configured:");
-                println!("  Default action: {}", config.default);
-                println!("  Allowed prefixes: {:?}", config.allow);
-                println!("  Denied prefixes: {:?}", config.deny);
+                println!("  Default action: {}", cfg.default);
+                println!("  Allowed prefixes: {:?}", cfg.allow);
+                println!("  Denied prefixes: {:?}", cfg.deny);
             }
-            None => println!("Image validation webhook not configured"),
+            _ => println!("Image validation webhook not configured"),
         }
-        if let Some(proxy_config) = &self.proxy_registry_config {
-            println!("Proxy registries configured:");
-            for config in &proxy_config.registries {
-                println!("  - {}: {}", config.alias, config.host);
+        match &self.config_file {
+            Some(ConfigFile {
+                registry_proxies: cfg,
+                ..
+            }) if !cfg.registries.is_empty() => {
+                println!("Proxy registries configured:");
+                for config in &cfg.registries {
+                    println!("  - {}: {}", config.alias, config.host);
+                }
             }
-        } else {
-            println!("Proxy registries not configured");
+            _ => println!("Proxy registries not configured"),
         }
 
         if self.cors.is_some() {
@@ -162,12 +171,7 @@ impl TrowConfig {
             std::process::exit(0);
         }
 
-        let ts_builder = registry::build_server(
-            self.data_dir.clone(),
-            self.proxy_registry_config.clone(),
-            self.image_validation_config.clone(),
-        );
-        let registry = ts_builder.get_server().await?;
+        let registry = TrowServer::new(self.data_dir.clone(), self.config_file.clone())?;
 
         let db_in_memory = self.db_connection == Some(":memory:".to_string());
         let db_file = match (&self.db_connection, db_in_memory) {
@@ -188,7 +192,7 @@ impl TrowConfig {
         Ok(Arc::new(server_state))
     }
 
-    pub async fn build_app(self) -> Result<Router> {
+    pub async fn build_app(self) -> Result<Router, TrowConfigError> {
         let state = self.build_server_state().await?;
         Ok(routes::create_app(state))
     }

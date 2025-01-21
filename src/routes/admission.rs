@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use axum::extract::{Json, State};
 use axum::routing::post;
 use axum::Router;
@@ -61,7 +60,7 @@ mod test {
     use tower::ServiceExt;
 
     use crate::registry::{
-        ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig,
+        ConfigFile, ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig,
     };
     use crate::test_utilities;
     use crate::test_utilities::test_temp_dir;
@@ -84,15 +83,18 @@ mod test {
         let tmp_dir = test_temp_dir!();
         let (_, router) = test_utilities::trow_router(
             |builder| {
-                builder.image_validation_config = Some(ImageValidationConfig {
-                    default: "Deny".to_string(),
-                    allow: vec![
-                        "registry-1.docker.io".to_string(),
-                        "localhost:8000".to_string(),
-                        "trow.test".to_string(),
-                        "k8s.gcr.io".to_string(),
-                    ],
-                    deny: vec!["localhost:8000/secret/".to_string()],
+                builder.config_file = Some(ConfigFile {
+                    image_validation: Some(ImageValidationConfig {
+                        default: "Deny".to_string(),
+                        allow: vec![
+                            "registry-1.docker.io".to_string(),
+                            "localhost:8000".to_string(),
+                            "trow.test".to_string(),
+                            "k8s.gcr.io".to_string(),
+                        ],
+                        deny: vec!["localhost:8000/secret/".to_string()],
+                    }),
+                    ..Default::default()
                 })
             },
             &tmp_dir,
@@ -197,24 +199,27 @@ mod test {
         let host = "ftp://trow";
         let (_, router) = test_utilities::trow_router(
             |builder| {
-                builder.proxy_registry_config = Some(RegistryProxiesConfig {
-                    offline: false,
-                    registries: vec![
-                        SingleRegistryProxyConfig {
-                            alias: "docker".to_string(),
-                            host: "registry-1.docker.io".to_string(),
-                            username: None,
-                            password: None,
-                            ignore_repos: vec!["library/milk".to_string()],
-                        },
-                        SingleRegistryProxyConfig {
-                            alias: "ecr".to_string(),
-                            host: "1234.dkr.ecr.saturn-5.amazonaws.com".to_string(),
-                            username: Some("AWS".to_string()),
-                            password: None,
-                            ignore_repos: vec![],
-                        },
-                    ],
+                builder.config_file = Some(ConfigFile {
+                    registry_proxies: RegistryProxiesConfig {
+                        offline: false,
+                        registries: vec![
+                            SingleRegistryProxyConfig {
+                                alias: "docker".to_string(),
+                                host: "registry-1.docker.io".to_string(),
+                                username: None,
+                                password: None,
+                                ignore_repos: vec!["library/milk".to_string()],
+                            },
+                            SingleRegistryProxyConfig {
+                                alias: "ecr".to_string(),
+                                host: "1234.dkr.ecr.saturn-5.amazonaws.com".to_string(),
+                                username: Some("AWS".to_string()),
+                                password: None,
+                                ignore_repos: vec![],
+                            },
+                        ],
+                    },
+                    ..Default::default()
                 });
                 builder.service_name = host.to_string();
             },

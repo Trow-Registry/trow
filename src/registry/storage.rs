@@ -6,9 +6,8 @@ use std::{io, str};
 use bytes::Bytes;
 use futures::Stream;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::time::Duration;
-use tokio_util::compat::TokioAsyncReadCompatExt;
 
 use crate::registry::blob_storage::Stored;
 use crate::registry::temporary_file::FileWrapper;
@@ -73,7 +72,7 @@ impl TrowStorageBackend {
         &self,
         repo_name: &str,
         digest: &Digest,
-    ) -> Result<BoundedStream<impl futures::AsyncRead>, StorageBackendError> {
+    ) -> Result<BoundedStream<impl AsyncRead>, StorageBackendError> {
         tracing::debug!("Get blob {repo_name}:{digest}");
         let path = self.blobs_dir.join(digest.to_string());
         let file = tokio::fs::File::open(&path).await.map_err(|e| {
@@ -81,7 +80,7 @@ impl TrowStorageBackend {
             StorageBackendError::BlobNotFound(path)
         })?;
         let size = file.metadata().await?.len() as usize;
-        Ok(BoundedStream::new(size, file.compat()))
+        Ok(BoundedStream::new(size, file))
     }
 
     pub async fn write_blob_stream<S, E>(
@@ -255,10 +254,6 @@ impl TrowStorageBackend {
         Ok(())
     }
 }
-
-// fn is_proxy_repo(repo_name: &str) -> bool {
-//     repo_name.starts_with(PROXY_DIR)
-// }
 
 #[cfg(test)]
 mod tests {

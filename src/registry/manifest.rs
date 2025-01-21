@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use anyhow::Result;
 use lazy_static::lazy_static;
 use oci_spec::image::{Descriptor, ImageIndex, ImageManifest, MediaType};
 use regex::Regex;
@@ -145,6 +144,7 @@ impl OCIManifest {
                 // We could recurse into the manifests, but they should have been checked already.
                 list.manifests()
                     .iter()
+                    .filter(|l| layer_is_distributable(l.media_type()))
                     .map(|x| x.digest().to_string())
                     .collect()
             }

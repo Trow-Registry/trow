@@ -1,6 +1,6 @@
 [package]
 name = "trow"
-version = "0.7.0-rc1"
+version = "0.7.0-rc2"
 authors = []
 edition = "2021"
 
@@ -25,10 +25,9 @@ rust-argon2 = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_derive = "1.0"
-serde_yaml_ng = "0.10"
+serde_yml = "0.0.12"
 uuid = { version = "1.3", features = ["v4", "serde"] }
 base64 = "0.22.1"
-anyhow = "1.0"
 derive_more = { version = "1.0", features = ["display"] }
 clap = { version = "4.1.0", features = ["derive"] }
 bytes = "1"
@@ -48,22 +47,16 @@ hyper = "1.5"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing = "0.1.37"
 paste = "1.0.14"
-async-recursion = "1.0"
 reqwest = { version = "0.12", default-features = false, features = [
-    "http2",
     "json",
     "rustls-tls",
     "stream",
 ] }
 prometheus = "0.13"
-fs3 = "0.5.0"
-quoted-string = "0.6.1"
 aws-config = "1.5.0"
 aws-types = "1.3.0"
 aws-sdk-ecr = "1.5.0"
 const_format = "0.2.24"
-async-trait = "0.1.74"
-walkdir = "2.0"
 rand = "0.8"
 humansize = "2.1"
 sqlx = { version = "0.8", features = [
@@ -76,6 +69,7 @@ oci-spec = "0.7.0"
 oci-client = { version = "0.14.0", default-features = false, features = [
     "rustls-tls",
 ] }
+rustls = "0.23"
 
 [dev-dependencies]
 assert_cmd = "2.0"

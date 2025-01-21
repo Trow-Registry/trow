@@ -1,4 +1,3 @@
-use anyhow::Result;
 use aws_config::BehaviorVersion;
 use aws_sdk_ecr::config::http::HttpResponse;
 use aws_sdk_ecr::error::SdkError;
@@ -86,10 +85,15 @@ pub enum DownloadRemoteImageError {
     StorageError(#[from] crate::registry::storage::StorageBackendError),
     #[error("Could not deserialize manifest: {0}")]
     ManifestDeserializationError(#[from] serde_json::Error),
+    #[error("Could not get AWS ECR password: {0}")]
+    EcrLoginError(#[from] EcrPasswordError),
 }
 
 impl SingleRegistryProxyConfig {
-    async fn setup_client(&self, insecure: bool) -> Result<(oci_client::Client, RegistryAuth)> {
+    async fn setup_client(
+        &self,
+        insecure: bool,
+    ) -> Result<(oci_client::Client, RegistryAuth), DownloadRemoteImageError> {
         let mut client_config = oci_client::client::ClientConfig::default();
         if insecure {
             client_config.protocol = ClientProtocol::Http;
@@ -207,7 +211,7 @@ impl SingleRegistryProxyConfig {
 }
 
 #[derive(thiserror::Error, Debug)]
-enum EcrPasswordError {
+pub enum EcrPasswordError {
     #[error("Could not parse region from ECR URL")]
     InvalidRegion,
     #[error("Could not decode ECR token: {0}")]
@@ -336,21 +340,21 @@ async fn download_manifest_and_layers(
     .await?;
 
     match &manifest {
-        OCIManifest::List(m) => {
-            let images_to_dl = m
-                .manifests()
+        OCIManifest::List(_) => {
+            let images_to_dl = manifest
+                .get_local_asset_digests()
                 .iter()
-                .map(|m| ref_.clone_with_digest(m.digest().as_ref().to_string()))
+                .map(|digest| ref_.clone_with_digest(digest.to_string()))
                 .collect::<Vec<_>>();
             let futures = images_to_dl.iter().map(|img| {
                 download_manifest_and_layers(cl, auth, db.clone(), storage, img, local_repo_name)
             });
             try_join_all(futures).await?;
         }
-        OCIManifest::V2(m) => {
-            let layer_digests = m.layers().iter().map(|layer| layer.digest().as_ref());
+        OCIManifest::V2(_) => {
+            let layer_digests = manifest.get_local_asset_digests();
             let futures = layer_digests
-                .clone()
+                .iter()
                 .map(|l| download_blob(cl, db.clone(), storage, ref_, l, local_repo_name));
             try_join_all(futures).await?;
         }
