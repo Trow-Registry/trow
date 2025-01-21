@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "trow.fullname" . }}-admission
+  name: {{ include "trow.fullname" . }}-webhooks-patch
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
@@ -23,43 +23,43 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name:  {{ include "trow.fullname" . }}-admission
+  name:  {{ include "trow.fullname" . }}-webhooks-patch
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
   labels:
     {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: admission-webhook
+    app.kubernetes.io/component: webhooks
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "trow.fullname" . }}-admission
+  name: {{ include "trow.fullname" . }}-webhooks-patch
 subjects:
   - kind: ServiceAccount
-    name: {{ include "trow.fullname" . }}-admission
+    name: {{ include "trow.fullname" . }}-webhooks-patch
     namespace: {{ .Release.Namespace | quote }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "trow.fullname" . }}-admission-create
+  name: {{ include "trow.fullname" . }}-webhooks-tls-create
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
   labels:
     {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: admission-webhook
+    app.kubernetes.io/component: webhooks
 spec:
 {{- if .Capabilities.APIVersions.Has "batch/v1alpha1" }}
   ttlSecondsAfterFinished: 0
 {{- end }}
   template:
     metadata:
-      name: {{ include "trow.fullname" . }}-admission-create
+      name: {{ include "trow.fullname" . }}-webhooks-tls-create
       labels:
         {{- include "trow.labels" . | nindent 8 }}
-        app.kubernetes.io/component: admission-webhook
+        app.kubernetes.io/component: webhooks
     spec:
       containers:
         - name: create
@@ -67,9 +67,9 @@ spec:
           imagePullPolicy: {{ .Values.webhooks.tls.patch.image.pullPolicy }}
           args:
             - create
-            - --host={{ include "trow.fullname" . }}-admission,{{ include "trow.fullname" . }}-admission.$(POD_NAMESPACE).svc
+            - --host={{ include "trow.fullname" . }}-webhooks,{{ include "trow.fullname" . }}-webhooks.$(POD_NAMESPACE).svc
             - --namespace=$(POD_NAMESPACE)
-            - --secret-name={{ include "trow.fullname" . }}-patch-admission
+            - --secret-name={{ include "trow.fullname" . }}-patch-webhooks
             - --cert-name=tls.crt
             - --key-name=tls.key
           env:
@@ -80,7 +80,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
       restartPolicy: OnFailure
-      serviceAccountName: {{ include "trow.fullname" . }}-admission
+      serviceAccountName: {{ include "trow.fullname" . }}-webhooks-patch
       securityContext:
         runAsNonRoot: true
         runAsUser: 2000
@@ -89,24 +89,24 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "trow.fullname" . }}-admission-patch
+  name: {{ include "trow.fullname" . }}-webhooks-patch
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
   labels:
     {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: admission-webhook
+    app.kubernetes.io/component: webhooks
 spec:
 {{- if .Capabilities.APIVersions.Has "batch/v1alpha1" }}
   ttlSecondsAfterFinished: 0
 {{- end }}
   template:
     metadata:
-      name: {{ include "trow.fullname" . }}-admission-patch
+      name: {{ include "trow.fullname" . }}-webhooks-patch
       labels:
         {{- include "trow.labels" . | nindent 8 }}
-        app.kubernetes.io/component: admission-webhook
+        app.kubernetes.io/component: webhooks-webhook
     spec:
       containers:
       {{- if .Values.trow.validationWebhook.enabled }}
@@ -118,7 +118,7 @@ spec:
             - --webhook-name={{ include "trow.fullname" . }}-validation
             - --namespace=$(POD_NAMESPACE)
             - --patch-mutating=false
-            - --secret-name={{ include "trow.fullname" . }}-patch-admission
+            - --secret-name={{ include "trow.fullname" . }}-patch-webhooks
             - --patch-failure-policy={{ .Values.trow.validationWebhook.failurePolicy }}
           env:
             - name: POD_NAMESPACE
@@ -137,7 +137,7 @@ spec:
             - --webhook-name={{ include "trow.fullname" . }}-mutation
             - --namespace=$(POD_NAMESPACE)
             - --patch-validating=false
-            - --secret-name={{ include "trow.fullname" . }}-patch-admission
+            - --secret-name={{ include "trow.fullname" . }}-patch-webhooks
             - --patch-failure-policy={{ .Values.trow.proxyRegistries.webhook.failurePolicy }}
           env:
             - name: POD_NAMESPACE
@@ -148,7 +148,7 @@ spec:
             allowPrivilegeEscalation: false
       {{- end }}
       restartPolicy: OnFailure
-      serviceAccountName: {{ include "trow.fullname" . }}-admission
+      serviceAccountName: {{ include "trow.fullname" . }}-webhooks-patch
       securityContext:
         runAsNonRoot: true
         runAsUser: 2000
@@ -157,14 +157,14 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name:  {{ include "trow.fullname" . }}-admission
+  name:  {{ include "trow.fullname" . }}-webhooks-tls-create
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
   labels:
     {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: admission-webhook
+    app.kubernetes.io/component: webhooks
 rules:
   - apiGroups:
       - ""
@@ -177,32 +177,32 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "trow.fullname" . }}-admission
+  name: {{ include "trow.fullname" . }}-webhooks-tls-create
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
   labels:
     {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: admission-webhook
+    app.kubernetes.io/component: webhooks
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "trow.fullname" . }}-admission
+  name: {{ include "trow.fullname" . }}-webhooks-tls-create
 subjects:
   - kind: ServiceAccount
-    name: {{ include "trow.fullname" . }}-admission
+    name: {{ include "trow.fullname" . }}-webhooks-patch
     namespace: {{ .Release.Namespace | quote }}
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "trow.fullname" . }}-admission
+  name: {{ include "trow.fullname" . }}-webhooks-patch
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
   labels:
     {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: admission-webhook
+    app.kubernetes.io/component: webhooks
 {{- end -}}

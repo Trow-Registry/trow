@@ -63,7 +63,7 @@ webhooks:
       rootCert:
         # default to be 5y
         duration: ""
-      admissionCert:
+      webhooksCert:
         # default to be 1y
         duration: ""
       # issuerRef:
