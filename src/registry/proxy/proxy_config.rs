@@ -211,7 +211,7 @@ impl SingleRegistryProxyConfig {
 }
 
 #[derive(thiserror::Error, Debug)]
-enum EcrPasswordError {
+pub enum EcrPasswordError {
     #[error("Could not parse region from ECR URL")]
     InvalidRegion,
     #[error("Could not decode ECR token: {0}")]

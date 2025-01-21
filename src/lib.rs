@@ -83,7 +83,7 @@ pub enum TrowConfigError {
     #[error("Could not read file: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Could not parse config file: {0}")]
-    SerdeError(#[from] serde_yaml_ng::Error),
+    SerdeError(#[from] serde_yml::Error),
     #[error("Could not setup database: {0}")]
     DbSetupError(#[from] sqlx::migrate::MigrateError),
     #[error("Could not setup storage backend: {0}")]
@@ -112,7 +112,7 @@ impl TrowConfig {
     ) -> Result<&mut Self, TrowConfigError> {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)?;
-        let config = serde_yaml_ng::from_str::<ConfigFile>(&config_str)?;
+        let config = serde_yml::from_str::<ConfigFile>(&config_str)?;
         self.config_file = Some(config);
         Ok(self)
     }

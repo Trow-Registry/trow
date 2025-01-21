@@ -194,7 +194,7 @@ pub fn get_file<T: Serialize>(dir: &Path, contents: T) -> PathBuf {
     let rnum: u16 = rand::thread_rng().gen();
     let path = dir.join(rnum.to_string());
     let mut file = File::create(&path).unwrap();
-    file.write_all(serde_yaml_ng::to_string(&contents).unwrap().as_bytes())
+    file.write_all(serde_yml::to_string(&contents).unwrap().as_bytes())
         .unwrap();
     file.flush().unwrap();
 
