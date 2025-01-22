@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "trow.fullname" . }}-webhooks-patch
+  name: {{ include "trow.fullname" . }}-webhooks-tls-patch
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
@@ -23,7 +23,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name:  {{ include "trow.fullname" . }}-webhooks-patch
+  name:  {{ include "trow.fullname" . }}-webhooks-tls-patch
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
@@ -33,11 +33,63 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "trow.fullname" . }}-webhooks-patch
+  name: {{ include "trow.fullname" . }}-webhooks-tls-patch
 subjects:
   - kind: ServiceAccount
-    name: {{ include "trow.fullname" . }}-webhooks-patch
+    name: {{ include "trow.fullname" . }}-webhooks-tls
     namespace: {{ .Release.Namespace | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name:  {{ include "trow.fullname" . }}-webhooks-tls-create
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "trow.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhooks
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "trow.fullname" . }}-webhooks-tls-create
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "trow.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhooks
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "trow.fullname" . }}-webhooks-tls-create
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "trow.fullname" . }}-webhooks-tls
+    namespace: {{ .Release.Namespace | quote }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "trow.fullname" . }}-webhooks-tls
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "trow.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhooks
 ---
 apiVersion: batch/v1
 kind: Job
@@ -153,56 +205,4 @@ spec:
         runAsNonRoot: true
         runAsUser: 2000
         fsGroup: 2000
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name:  {{ include "trow.fullname" . }}-webhooks-tls-create
-  namespace: {{ .Release.Namespace }}
-  annotations:
-    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-  labels:
-    {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: webhooks
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - secrets
-    verbs:
-      - get
-      - create
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "trow.fullname" . }}-webhooks-tls-create
-  namespace: {{ .Release.Namespace }}
-  annotations:
-    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-  labels:
-    {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: webhooks
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ include "trow.fullname" . }}-webhooks-tls-create
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "trow.fullname" . }}-webhooks-patch
-    namespace: {{ .Release.Namespace | quote }}
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ include "trow.fullname" . }}-webhooks-patch
-  namespace: {{ .Release.Namespace }}
-  annotations:
-    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-  labels:
-    {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: webhooks
 {{- end -}}

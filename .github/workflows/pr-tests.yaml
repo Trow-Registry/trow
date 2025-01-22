@@ -135,7 +135,6 @@ jobs:
       - name: Install Ingress
         run: |
           .github/workflows/config/install-kind-ingress.sh
-          kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
       - name: Sideload Trow image
         run: |
           kind load image-archive /tmp/trow_image.tar.zst

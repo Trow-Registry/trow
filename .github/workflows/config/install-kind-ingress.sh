@@ -16,4 +16,5 @@ do
     sleep 1
     ((time_out--))
 done
+kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
 echo "Ingress Running"
