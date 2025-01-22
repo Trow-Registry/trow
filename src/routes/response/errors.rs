@@ -165,7 +165,7 @@ impl From<sqlx::Error> for Error {
         match err {
             sqlx::Error::RowNotFound => Self::NotFound,
             _ => {
-                tracing::error!("DbErr: {err}");
+                tracing::error!("Error(DbErr): {err}");
                 Self::InternalError
             }
         }
@@ -174,7 +174,7 @@ impl From<sqlx::Error> for Error {
 
 impl From<StorageBackendError> for Error {
     fn from(err: StorageBackendError) -> Self {
-        tracing::error!("StorageBackendError: {err}");
+        tracing::error!("Error(StorageBackendError): {err}");
         match err {
             StorageBackendError::BlobNotFound(_) => Self::BlobUnknown,
             StorageBackendError::InvalidContentRange => Self::UnsatisfiableRange,
@@ -185,7 +185,7 @@ impl From<StorageBackendError> for Error {
 
 impl From<DigestError> for Error {
     fn from(err: DigestError) -> Self {
-        tracing::warn!("DigestError: {err}");
+        tracing::warn!("Error(DigestError): {err}");
         match err {
             DigestError::InvalidDigest(_) => Self::DigestInvalid,
         }
