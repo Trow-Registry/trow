@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Cross compiling from host platfrom instead of using qemu
+# Cross compiling from host platform instead of using qemu
 FROM --platform=$BUILDPLATFORM rust:bookworm AS cross
 
 ARG TARGETARCH
