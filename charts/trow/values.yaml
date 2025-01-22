@@ -63,7 +63,7 @@ webhooks:
       rootCert:
         # default to be 5y
         duration: ""
-      admissionCert:
+      webhooksCert:
         # default to be 1y
         duration: ""
       # issuerRef:
@@ -90,10 +90,8 @@ service:
 
 ingress:
   enabled: false
-  annotations:
-    {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
+  annotations: {}
+  ingressClassName: ""
   hosts:
     - paths: ["/"]
       # use "none" to not set a host (otherwise defaults to trow.domain)

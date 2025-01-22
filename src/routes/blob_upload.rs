@@ -177,6 +177,9 @@ async fn patch_blob_upload(
     Path((repo, uuid)): Path<(String, uuid::Uuid)>,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
+    if repo.starts_with(PROXY_DIR) {
+        return Err(Error::UnsupportedForProxiedRepo);
+    }
     let uuid_str = uuid.to_string();
     sqlx::query!(
         r#"
@@ -297,6 +300,9 @@ async fn get_blob_upload(
     State(state): State<Arc<TrowServerState>>,
     Path((repo_name, upload_id)): Path<(String, uuid::Uuid)>,
 ) -> Result<Response, Error> {
+    if repo_name.starts_with(PROXY_DIR) {
+        return Err(Error::UnsupportedForProxiedRepo);
+    }
     let upload_id_str = upload_id.to_string();
     let offset: i64 = sqlx::query_scalar!(
         "SELECT offset FROM blob_upload WHERE uuid = $1 AND repo = $2",

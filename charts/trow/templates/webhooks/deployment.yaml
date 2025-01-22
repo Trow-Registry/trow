@@ -69,9 +69,9 @@ spec:
           {{- if (not (empty .Values.webhooks.tls.existingSecretRef)) }}
             secretName: {{ .Values.webhooks.tls.existingSecretRef }}
           {{- else if .Values.webhooks.tls.certmanager.enabled }}
-            secretName: {{ include "trow.fullname" . }}-cm-admission
+            secretName: {{ include "trow.fullname" . }}-cm-webhooks
           {{- else if .Values.webhooks.tls.patch.enabled }}
-            secretName: {{ include "trow.fullname" . }}-patch-admission
+            secretName: {{ include "trow.fullname" . }}-patch-webhooks
           {{- end }}
         - name: webhook-cert-translated
           emptyDir: {}

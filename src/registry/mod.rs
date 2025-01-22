@@ -10,7 +10,7 @@ pub use admission::ImageValidationConfig;
 pub use blob_storage::{BlobReader, ContentInfo, UploadInfo};
 pub use digest::Digest;
 pub use manifest_storage::ManifestReader;
-pub use proxy::{RegistryProxiesConfig, SingleRegistryProxyConfig};
+pub use proxy::{RegistryProxiesConfig, RemoteImage, SingleRegistryProxyConfig};
 use serde::Deserializer;
 pub use server::TrowServer;
 pub use storage::StorageBackendError;

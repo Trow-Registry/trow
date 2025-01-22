@@ -5,6 +5,8 @@ use axum::routing::get;
 use axum::Router;
 
 use super::macros::endpoint_fn_7_levels;
+use crate::registry::manifest::ManifestReference;
+use crate::registry::server::PROXY_DIR;
 use crate::registry::{BlobReader, Digest};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
@@ -26,10 +28,27 @@ digest - unique identifier for the blob to be downloaded
 async fn get_blob(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
-    Path((repo, digest)): Path<(String, Digest)>,
+    Path((mut repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobReader<impl tokio::io::AsyncRead>, Error> {
     let mut conn = state.db.acquire().await?;
     let digest_str = digest.as_str();
+    if repo.starts_with(PROXY_DIR) {
+        let (proxy_cfg, image) = match state
+            .registry
+            .config
+            .registry_proxies
+            .get_proxy_config(&repo, &ManifestReference::Digest(digest.clone()))
+            .await
+        {
+            Some(cfg) => cfg,
+            None => {
+                return Err(Error::NameInvalid(format!(
+                    "No registered proxy matches {repo}"
+                )))
+            }
+        };
+        repo = format!("f/{}/{}", proxy_cfg.alias, image.get_repo())
+    }
     sqlx::query_scalar!(
         r#"
         SELECT digest FROM blob
@@ -69,6 +88,9 @@ async fn delete_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobDeleted, Error> {
+    if repo.starts_with(PROXY_DIR) {
+        return Err(Error::UnsupportedForProxiedRepo);
+    }
     let mut conn = state.db.acquire().await?;
     let digest_str = digest.as_str();
 
