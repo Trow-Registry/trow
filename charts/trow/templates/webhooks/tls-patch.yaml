@@ -1,5 +1,18 @@
 {{- if and (include "webhook.enabled" .) .Values.webhooks.tls.patch.enabled }}
 {{- include "webhook.validateTlsGenValues" . -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "trow.fullname" . }}-webhooks-tls
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "0"
+  labels:
+    {{- include "trow.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhooks
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -7,6 +20,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "0"
   labels:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: admission-webhook
@@ -27,6 +41,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "1"
   labels:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhooks
@@ -47,6 +62,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "0"
   labels:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhooks
@@ -67,6 +83,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "1"
   labels:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhooks
@@ -79,18 +96,6 @@ subjects:
     name: {{ include "trow.fullname" . }}-webhooks-tls
     namespace: {{ .Release.Namespace | quote }}
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ include "trow.fullname" . }}-webhooks-tls
-  namespace: {{ .Release.Namespace }}
-  annotations:
-    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-  labels:
-    {{- include "trow.labels" . | nindent 4 }}
-    app.kubernetes.io/component: webhooks
----
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -99,6 +104,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "2"
   labels:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhooks
@@ -132,7 +138,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
       restartPolicy: OnFailure
-      serviceAccountName: {{ include "trow.fullname" . }}-webhooks-patch
+      serviceAccountName: {{ include "trow.fullname" . }}-webhooks-tls
       securityContext:
         runAsNonRoot: true
         runAsUser: 2000
@@ -146,6 +152,7 @@ metadata:
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "3"
   labels:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhooks
@@ -200,7 +207,7 @@ spec:
             allowPrivilegeEscalation: false
       {{- end }}
       restartPolicy: OnFailure
-      serviceAccountName: {{ include "trow.fullname" . }}-webhooks-patch
+      serviceAccountName: {{ include "trow.fullname" . }}-webhooks-tls
       securityContext:
         runAsNonRoot: true
         runAsUser: 2000
