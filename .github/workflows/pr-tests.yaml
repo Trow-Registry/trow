@@ -94,7 +94,7 @@ jobs:
       - name: Test connectivity
         run: curl "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
       - name: Run OCI Distribution Spec conformance tests
-        uses: opencontainers/distribution-spec@v1.1.0
+        uses: opencontainers/distribution-spec@eeddb235239ccfd57d40a4338853260ed2081266
         env:
           OCI_ROOT_URL: "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
           OCI_NAMESPACE: oci-conformance/distribution-test
