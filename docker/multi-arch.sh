@@ -55,28 +55,39 @@ TAG="$VERSION"
 GH_IMAGE="$GH_REPO:$TAG"
 DATE="$(date '+%Y-%m-%d %T%z')"
 
-if [[ "$CI" = "true" || "$RELEASE" = "true" ]]
-then
+BUILD_ARGS=(
+    "--build-arg" "VCS_REF=${SOURCE_COMMIT:-$(git rev-parse HEAD)}"
+    "--build-arg" "VCS_BRANCH=${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}"
+    "--build-arg" "REPO=$GH_REPO"
+    "--build-arg" "TAG=$TAG"
+    "--build-arg" "DATE=$DATE"
+    "--build-arg" "VERSION=$VERSION"
+)
+
+if [[ "$CI" = "true" || "$RELEASE" = "true" ]]; then
    PUSH="--push"
 fi
 
 echo $PUSH $GH_IMAGE $GH_REPO
-# Can't load the image in the local registry... See https://github.com/docker/roadmap/issues/371
-$docker buildx build \
-  --build-arg VCS_REF="${SOURCE_COMMIT:-$(git rev-parse HEAD)}" \
-  --build-arg VCS_BRANCH="${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}" \
-  --build-arg REPO="$GH_REPO" \
-  --build-arg TAG="$TAG" \
-  --build-arg DATE="$DATE" \
-  --build-arg VERSION="$VERSION" \
-  $PUSH \
-  --pull \
-  --platform linux/arm64,linux/amd64 \
-  -t $GH_IMAGE \
-  -t $GH_REPO:default \
-  -t $GH_REPO:latest \
-  -f Dockerfile ../
+if [ "$docker" = "docker" ]; then
+    # Can't load the image in the local registry... See https://github.com/docker/roadmap/issues/371
+    docker buildx build \
+        "${BUILD_ARGS[@]}" \
+        $PUSH \
+        --pull \
+        --platform linux/amd64,linux/arm64 \
+        -t $GH_IMAGE \
+        -t $GH_REPO:latest \
+        -f Dockerfile ../
+else
+    podman build \
+        "${BUILD_ARGS[@]}" \
+        --platform linux/amd64,linux/arm64 \
+        --manifest $GH_IMAGE \
+        -f Dockerfile ../
+fi
 
+echo "→ Image $GH_IMAGE built successfully"
 if [[ "$CI" = true ]]
 then
     echo "container-image=$GH_IMAGE" >> $GITHUB_OUTPUT
