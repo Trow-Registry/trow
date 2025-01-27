@@ -17,7 +17,7 @@ webhooks:
     sideEffects: None
     {{ if .Values.webhooks.namespaceSelector }}
     namespaceSelector:
-      {{- toYaml .Values.webhooks.namespaceSelector | toYaml | indent 6 }}
+      {{- toYaml .Values.webhooks.namespaceSelector | nindent 6 }}
     {{- end }}
     rules:
       - apiGroups: [""]
