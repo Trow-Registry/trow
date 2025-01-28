@@ -323,22 +323,6 @@ async fn download_manifest_and_layers(
         oci_client::errors::OciDistributionError::ManifestParsingError(e.to_string())
     })?;
 
-    sqlx::query!(
-        "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING",
-        digest,
-        raw_manifest
-    )
-    .execute(&mut *db.acquire().await?)
-    .await?;
-
-    sqlx::query!(
-        "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
-        local_repo_name,
-        digest,
-    )
-    .execute(&mut *db.acquire().await?)
-    .await?;
-
     match &manifest {
         OCIManifest::List(_) => {
             let images_to_dl = manifest
@@ -359,6 +343,17 @@ async fn download_manifest_and_layers(
             try_join_all(futures).await?;
         }
     }
+
+    sqlx::query!(
+        r"INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING;
+        INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
+        digest,
+        raw_manifest,
+        local_repo_name,
+        digest
+    )
+    .execute(&mut *db.acquire().await?)
+    .await?;
 
     Ok(())
 }
