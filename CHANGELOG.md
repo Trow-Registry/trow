@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.0 (2025-01-??)
+## v0.7.0 (2025-01-28)
 
 ### BREAKING
 
@@ -19,7 +19,7 @@ Currently no migration is provided, the `data/` directory needs to be wiped.
 ### Changes
 
 * `--proxy-registry-config-file` and `--image-validation-config-file` are merged into `--config-file`
-* Lots of code refactoring
+* Lots of code refactoring (use sqlite database)
 
 ## v0.6.4
 
