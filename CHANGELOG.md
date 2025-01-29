@@ -2,7 +2,7 @@
 
 ## v0.7.1 (2025-01-29)
 
-Fix: when downloading proxied image, wait for all blobs to be successfuly downloaded before saving the manifest in the DB.
+Fix: when downloading proxied image, wait for all blobs to be successfully downloaded before saving the manifest in the DB.
 
 ## v0.7.0 (2025-01-28)
 
