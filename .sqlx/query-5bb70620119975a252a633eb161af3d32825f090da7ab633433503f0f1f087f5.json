@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING;\n        INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "5bb70620119975a252a633eb161af3d32825f090da7ab633433503f0f1f087f5"
+}
