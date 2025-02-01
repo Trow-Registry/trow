@@ -32,5 +32,4 @@ There are multiple ways to test Trow:
 * `cargo test`
   * `cargo test --lib --bins` to run only unit tests
   * `cargo test --test '*'` to run only integration tests
-* `cargo test -- --ignored` to run the smoke tests
 * `./run_oci_conformance_tests.sh` to run the OCI conformance tests
