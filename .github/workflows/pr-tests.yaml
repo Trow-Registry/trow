@@ -94,7 +94,7 @@ jobs:
       - name: Test connectivity
         run: curl "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
       - name: Run OCI Distribution Spec conformance tests
-        uses: opencontainers/distribution-spec@eeddb235239ccfd57d40a4338853260ed2081266
+        uses: opencontainers/distribution-spec@7872490e9d4943b20f11e21475bc13fd2e02b7d8
         env:
           OCI_ROOT_URL: "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
           OCI_NAMESPACE: oci-conformance/distribution-test
@@ -168,4 +168,4 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Check spelling
-      uses: crate-ci/typos@v1.29.0
+      uses: crate-ci/typos@v1.29.5
