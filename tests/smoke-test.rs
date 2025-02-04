@@ -22,9 +22,7 @@ mod smoke_test {
     }
     /// Call out to cargo to start trow.
     async fn start_trow(temp_dir: &Path) -> TrowInstance {
-        let mut child = Command::new("cargo")
-            .arg("run")
-            .arg("--")
+        let mut child = Command::new("./target/debug/trow")
             .arg("--port")
             .arg(PORT)
             .arg("--data-dir")
@@ -64,13 +62,10 @@ mod smoke_test {
     /**
      * Run a simple podman push/pull against the registry.
      *
-     * This assumes podman is installed and has a cert for the registry.
-     * For that reason, it's set to ignored by default and has to be manually enabled.
-     *
+     * This assumes podman is installed.
      */
     #[tokio::test]
     #[tracing_test::traced_test]
-    #[ignore]
     async fn smoke_test() {
         let temp_dir = test_temp_dir!();
 
@@ -78,38 +73,40 @@ mod smoke_test {
         //It might be possible to improve things with a thread_local
         let _trow = start_trow(temp_dir.as_path_untracked()).await;
 
+        let remote_image = "public.ecr.aws/docker/library/alpine:latest";
+        let local_image = format!("{HOST}/alpine:trow");
+
         println!("Running podman pull alpine:latest");
         let mut status = Command::new("podman")
-            .args(["pull", "docker.io/library/alpine:latest"])
+            .args(["pull", remote_image])
             .status()
             .expect("Failed to call podman pull - prereq for smoke test");
         assert!(status.success());
 
-        println!("Running podman tag alpine:latest {HOST}/alpine:trow");
-        let image_name = format!("{HOST}/alpine:trow");
+        println!("Running podman tag {remote_image} {local_image}");
         status = Command::new("podman")
-            .args(["tag", "docker.io/library/alpine:latest", &image_name])
+            .args(["tag", remote_image, &local_image])
             .status()
             .expect("Failed to call podman");
         assert!(status.success());
 
-        println!("Running podman push {HOST}/alpine:trow");
+        println!("Running podman push {local_image}");
         status = Command::new("podman")
-            .args(["push", &image_name, "--tls-verify=false"])
+            .args(["push", &local_image, "--tls-verify=false"])
             .status()
             .expect("Failed to call podman");
         assert!(status.success());
 
-        println!("Running podman rmi {HOST}/alpine:trow");
+        println!("Running podman rmi {local_image}");
         status = Command::new("podman")
-            .args(["rmi", &image_name])
+            .args(["rmi", &local_image])
             .status()
             .expect("Failed to call podman");
         assert!(status.success());
 
-        println!("Running podman pull {HOST}/alpine:trow");
+        println!("Running podman pull {local_image}");
         status = Command::new("podman")
-            .args(["pull", &image_name, "--tls-verify=false"])
+            .args(["pull", &local_image, "--tls-verify=false"])
             .status()
             .expect("Failed to call podman");
 
