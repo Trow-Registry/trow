@@ -12,7 +12,7 @@ use super::Digest;
 /// the underlying file is deleted in case of an error.
 /// Intended use: create the [`TemporaryFile`], write to it, then move
 /// the underlying file to its final destination.
-pub struct FileWrapper {
+pub(crate) struct FileWrapper {
     file: File,
     path: PathBuf,
     temporary: bool,

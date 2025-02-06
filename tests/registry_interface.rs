@@ -11,7 +11,6 @@ mod registry_interface {
     use reqwest::StatusCode;
     use test_temp_dir::{test_temp_dir, TestTempDir};
     use tower::ServiceExt;
-    use trow::registry::api_types::{HealthStatus, ReadyStatus};
     use trow::registry::digest;
     use trow::types::{RepoCatalog, TagList};
 
@@ -582,9 +581,15 @@ mod registry_interface {
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let rr: ReadyStatus = common::response_body_json(resp).await;
+        let rr: serde_json::Value = common::response_body_json(resp).await;
 
-        assert!(rr.is_ready);
+        assert!(rr
+            .as_object()
+            .unwrap()
+            .get("is_healthy")
+            .unwrap()
+            .as_bool()
+            .unwrap());
     }
 
     #[tokio::test]
@@ -601,9 +606,15 @@ mod registry_interface {
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let hr: HealthStatus = common::response_body_json(resp).await;
+        let hr: serde_json::Value = common::response_body_json(resp).await;
 
-        assert!(hr.is_healthy);
+        assert!(hr
+            .as_object()
+            .unwrap()
+            .get("is_healthy")
+            .unwrap()
+            .as_bool()
+            .unwrap());
     }
 
     #[tokio::test]

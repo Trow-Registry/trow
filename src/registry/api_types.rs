@@ -1,106 +1,10 @@
 //! types for the trow <=> trow-server interface
 
 use serde_derive::{Deserialize, Serialize};
+use tokio::io::AsyncRead;
 
-#[derive(Clone, PartialEq)]
-pub struct UploadRequest {
-    /// e.g. "amouat/network-utils", "nginx", "my-org/my-team/my-repo"
-    ///
-    /// Expect some auth stuff as well later
-    pub repo_name: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct UploadDetails {
-    pub uuid: String,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct UploadRef {
-    pub repo_name: String,
-
-    pub uuid: String,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct BlobRef {
-    pub repo_name: String,
-
-    pub digest: String,
-}
-
-/// At the moment this will be a simple file path, but could evolve in future
-#[derive(Clone, PartialEq)]
-pub struct WriteLocation {
-    pub path: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct ManifestWriteDetails {
-    pub path: String,
-
-    pub uuid: String,
-}
-/// Could have a single "Location", but this allows divergence in the future
-
-#[derive(Clone, PartialEq)]
-pub struct BlobReadLocation {
-    pub path: String,
-}
-/// At the moment this will be a simple file path, but could evolve in future
-
-#[derive(Clone, PartialEq)]
-pub struct CompleteRequest {
-    pub repo_name: String,
-
-    pub uuid: String,
-
-    pub user_digest: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct CompletedUpload {
-    pub digest: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct ManifestRef {
-    pub repo_name: String,
-    /// Can be digest or tag
-    pub reference: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct VerifyManifestRequest {
-    pub manifest: Option<ManifestRef>,
-
-    pub uuid: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct ManifestReadLocation {
-    pub digest: String,
-    /// For the moment path to file
-    pub path: String,
-    /// Version of manifest, used for media type return
-    pub content_type: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct CatalogRequest {
-    pub limit: u32,
-
-    pub last_repo: String,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct ListTagsRequest {
-    pub repo_name: String,
-
-    pub limit: u32,
-
-    pub last_tag: String,
-}
+use super::Digest;
+use crate::types::BoundedStream;
 
 #[derive(Clone, PartialEq)]
 pub struct CatalogEntry {
@@ -121,35 +25,6 @@ pub struct ManifestHistoryRequest {
     pub limit: u32,
 
     pub last_digest: String,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum Status {
-    #[error("Cancelled: {0}")]
-    Cancelled(String),
-    #[error("Unknown: {0}")]
-    Unknown(String),
-    #[error("InvalidArgument: {0}")]
-    InvalidArgument(String),
-    #[error("DeadlineExceeded: {0}")]
-    DeadlineExceeded(String),
-    #[error("NotFound: {0}")]
-    NotFound(String),
-    #[error("AlreadyExists: {0}")]
-    AlreadyExists(String),
-    #[error("FailedPrecondition: {0}")]
-    FailedPrecondition(String),
-    #[error("Internal: {0}")]
-    Internal(String),
-    #[error("Unavailable: {0}")]
-    Unavailable(String),
-}
-
-impl From<sqlx::Error> for Status {
-    fn from(err: sqlx::Error) -> Self {
-        tracing::error!("Database error: {err:?}");
-        Self::Internal(String::new())
-    }
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -192,4 +67,42 @@ pub struct IntAdmissionResponse {
     pub reason: String,
     /// only used for mutation
     pub patch: Option<Vec<u8>>,
+}
+
+pub struct ContentInfo {
+    pub length: u64,
+    pub range: (u64, u64),
+}
+
+pub struct BlobReader<S: AsyncRead + ?Sized + Send> {
+    digest: Digest,
+    reader: Box<S>,
+    size: u64,
+}
+pub struct Stored {
+    pub total_stored: u64,
+    pub chunk: u64,
+}
+
+impl<S: tokio::io::AsyncRead + Send> BlobReader<S> {
+    pub async fn new(digest: Digest, file: BoundedStream<S>) -> Self {
+        let file_size = file.size() as u64;
+        Self {
+            digest,
+            reader: Box::new(file.reader()),
+            size: file_size,
+        }
+    }
+
+    pub fn get_reader(self) -> Box<S> {
+        self.reader
+    }
+
+    pub fn digest(&self) -> &Digest {
+        &self.digest
+    }
+
+    pub fn blob_size(&self) -> u64 {
+        self.size
+    }
 }

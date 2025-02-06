@@ -1,5 +1,5 @@
 mod admission;
-pub mod api_types;
+pub(crate) mod api_types;
 pub mod manifest;
 mod proxy;
 pub mod server;
@@ -7,19 +7,15 @@ mod storage;
 mod temporary_file;
 
 pub use admission::ImageValidationConfig;
-pub use blob_storage::{BlobReader, ContentInfo, UploadInfo};
+pub use api_types::{BlobReader, ContentInfo};
 pub use digest::Digest;
-pub use manifest_storage::ManifestReader;
 pub use proxy::{RegistryProxiesConfig, RemoteImage, SingleRegistryProxyConfig};
 use serde::Deserializer;
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;
 
-pub mod blob_storage;
-#[allow(dead_code)]
 pub mod digest;
-pub mod manifest_storage;
 
 use serde::{Deserialize, Serialize};
 

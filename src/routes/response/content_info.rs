@@ -2,7 +2,7 @@ use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 
-use crate::registry::blob_storage::ContentInfo;
+use crate::registry::api_types::ContentInfo;
 use crate::routes::response::errors::Error;
 
 /**
