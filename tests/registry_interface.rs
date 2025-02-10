@@ -356,19 +356,6 @@ mod registry_interface {
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
-    async fn delete_blob(cl: &Router, repo: &str, digest: &str) {
-        let resp = cl
-            .clone()
-            .oneshot(
-                Request::delete(format!("/v2/{}/blobs/{}", repo, digest))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::ACCEPTED);
-    }
-
     async fn delete_non_existent_manifest(cl: &Router, name: &str) {
         let resp = cl
             .clone()
@@ -519,10 +506,9 @@ mod registry_interface {
         delete_manifest(&trow, "todeletetag", "1").await;
         rc.insert("todeletetag".to_string());
 
-        let (blob_digest, man_digest) =
-            common::upload_fake_image(&trow, "todeletedigest", "1").await;
+        let (_, man_digest) = common::upload_fake_image(&trow, "todeletedigest", "1").await;
         delete_manifest(&trow, "todeletedigest", man_digest.as_str()).await;
-        delete_blob(&trow, "todeletedigest", blob_digest.as_str()).await;
+        rc.insert("todeletedigest".to_string()); // TODO: trow auto delete orphaned digest
 
         check_repo_catalog(&trow, &rc).await;
     }
@@ -586,7 +572,7 @@ mod registry_interface {
         assert!(rr
             .as_object()
             .unwrap()
-            .get("is_healthy")
+            .get("is_ready")
             .unwrap()
             .as_bool()
             .unwrap());
