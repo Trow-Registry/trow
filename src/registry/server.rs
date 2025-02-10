@@ -5,7 +5,6 @@ use std::str;
 use super::storage::TrowStorageBackend;
 use super::{ConfigFile, StorageBackendError};
 
-pub static SUPPORTED_DIGESTS: [&str; 1] = ["sha256"];
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 
 /* Struct implementing callbacks for the Frontend

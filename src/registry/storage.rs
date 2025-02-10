@@ -9,7 +9,7 @@ use tokio::fs;
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::time::Duration;
 
-use crate::registry::blob_storage::Stored;
+use crate::registry::api_types::Stored;
 use crate::registry::temporary_file::FileWrapper;
 use crate::registry::Digest;
 use crate::types::BoundedStream;

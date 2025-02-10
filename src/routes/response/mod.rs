@@ -7,7 +7,6 @@ pub mod errors;
 pub mod health;
 pub mod html;
 pub mod manifest_deleted;
-pub mod manifest_reader;
 pub mod metrics;
 pub mod readiness;
 pub mod tag_list;
