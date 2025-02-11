@@ -1,21 +1,23 @@
 use sqlx::migrate::MigrateError;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
-pub async fn init_db(filename: &str, in_memory: bool) -> Result<SqlitePool, MigrateError> {
+pub async fn init_db(filename: &str) -> Result<(SqlitePool, SqlitePool), MigrateError> {
     let options = SqliteConnectOptions::new()
         .filename(filename)
-        .create_if_missing(true)
-        .in_memory(in_memory)
         .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
         .foreign_keys(true);
 
-    let conn = SqlitePoolOptions::new()
+    let writer_conn = SqlitePoolOptions::new()
         .max_connections(1)
-        .connect_with(options)
+        .connect_with(options.clone().create_if_missing(true))
         .await?;
 
-    sqlx::migrate!().run(&conn).await?;
+    let reader_conn = SqlitePoolOptions::new()
+        .connect_with(options) // Maybe I could use the option .read_only(true) here ?
+        .await?;
 
-    Ok(conn)
+    sqlx::migrate!().run(&writer_conn).await?;
+
+    Ok((reader_conn, writer_conn))
 }

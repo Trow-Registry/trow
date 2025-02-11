@@ -67,7 +67,7 @@ async fn get_manifest(
         };
 
         proxy_cfg
-            .download_remote_image(&image, &state.registry, &state.db)
+            .download_remote_image(&image, &state.registry, &state.db_rw)
             .await
             .map_err(|e| {
                 tracing::error!("Error downloading image: {e}");
@@ -81,7 +81,7 @@ async fn get_manifest(
                     repo,
                     raw_reference
                 )
-                .fetch_optional(&mut *state.db.acquire().await?)
+                .fetch_optional(&state.db_ro)
                 .await?;
                 match tdigest {
                     Some(d) => d,
@@ -104,7 +104,7 @@ async fn get_manifest(
             repo,
             digest
         )
-        .fetch_optional(&mut *state.db.acquire().await?)
+        .fetch_optional(&state.db_ro)
         .await?;
 
         match maybe_digest {
@@ -123,7 +123,7 @@ async fn get_manifest(
         "#,
         digest
     )
-    .fetch_one(&mut *state.db.acquire().await?)
+    .fetch_one(&state.db_ro)
     .await?;
 
     Ok(OciJson::new_raw(res.blob.into())
@@ -186,7 +186,7 @@ async fn put_image_manifest(
                     digest,
                     repo_name
                 )
-                .fetch_optional(&mut *state.db.acquire().await?)
+                .fetch_optional(&state.db_ro)
                 .await?;
                 if res.is_none() {
                     return Err(Error::ManifestInvalid(format!(
@@ -209,7 +209,7 @@ async fn put_image_manifest(
                     digest,
                     repo_name
                 )
-                .fetch_optional(&mut *state.db.acquire().await?)
+                .fetch_optional(&state.db_ro)
                 .await?;
                 if res.is_none() {
                     return Err(Error::ManifestInvalid(format!(
@@ -236,7 +236,7 @@ async fn put_image_manifest(
         computed_digest_str,
         manifest_bytes
     )
-    .execute(&mut *state.db.acquire().await?)
+    .execute(&state.db_rw)
     .await?;
     sqlx::query!(
         r#"
@@ -247,7 +247,7 @@ async fn put_image_manifest(
         repo_name,
         computed_digest_str
     )
-    .execute(&mut *state.db.acquire().await?)
+    .execute(&state.db_rw)
     .await?;
 
     if is_tag {
@@ -262,7 +262,7 @@ async fn put_image_manifest(
             repo_name,
             computed_digest_str,
         )
-        .execute(&mut *state.db.acquire().await?)
+        .execute(&state.db_rw)
         .await?;
     }
 
@@ -307,7 +307,7 @@ async fn delete_image_manifest(
             repo,
             reference
         )
-        .execute(&mut *state.db.acquire().await?)
+        .execute(&state.db_rw)
         .await?;
     } else {
         let digest = Digest::try_from_raw(&reference)?;
@@ -317,7 +317,7 @@ async fn delete_image_manifest(
             repo,
             digest_str
         )
-        .execute(&mut *state.db.acquire().await?)
+        .execute(&state.db_rw)
         .await?;
 
         if res.rows_affected() > 0 {
@@ -325,12 +325,12 @@ async fn delete_image_manifest(
                 "SELECT COUNT(*) FROM repo_blob_association WHERE blob_digest = $1",
                 digest_str
             )
-            .fetch_one(&mut *state.db.acquire().await?)
+            .fetch_one(&state.db_ro)
             .await?;
 
             if remaining_assoc == 0 {
                 sqlx::query!("DELETE FROM manifest where digest = $1", digest_str)
-                    .execute(&mut *state.db.acquire().await?)
+                    .execute(&state.db_rw)
                     .await?;
             }
         }

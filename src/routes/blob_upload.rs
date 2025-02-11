@@ -10,7 +10,7 @@ use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::{digest, ContentInfo, TrowServer};
+use crate::registry::{digest, ContentInfo};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -21,14 +21,12 @@ use crate::TrowServerState;
 mod utils {
     use std::ops::RangeInclusive;
 
-    use sqlx::SqlitePool;
     use uuid::Uuid;
 
     use super::*;
 
     pub async fn complete_upload(
-        db: &SqlitePool,
-        registry: &TrowServer,
+        state: Arc<TrowServerState>,
         upload_id: &str,
         digest: &Digest,
         data: Body,
@@ -41,16 +39,18 @@ mod utils {
             "#,
             upload_id,
         )
-        .fetch_one(&mut *db.acquire().await?)
+        .fetch_one(&state.db_ro)
         .await?;
         let upload_id_bin = Uuid::parse_str(upload_id).unwrap();
 
-        let size = registry
+        let size = state
+            .registry
             .storage
             .write_blob_part_stream(&upload_id_bin, data.into_data_stream(), range)
             .await?;
 
-        registry
+        state
+            .registry
             .storage
             .complete_blob_write(&upload_id_bin, digest)
             .await?;
@@ -62,7 +62,7 @@ mod utils {
             "#,
             upload.uuid
         )
-        .execute(&mut *db.acquire().await?)
+        .execute(&state.db_rw)
         .await?;
 
         let digest_str = digest.as_str();
@@ -75,7 +75,7 @@ mod utils {
             digest_str,
             size_i64
         )
-        .execute(&mut *db.acquire().await?)
+        .execute(&state.db_rw)
         .await?;
 
         sqlx::query!(
@@ -83,7 +83,7 @@ mod utils {
             upload.repo,
             digest_str,
         )
-        .execute(&mut *db.acquire().await?)
+        .execute(&state.db_rw)
         .await?;
 
         Ok(AcceptedUpload::new(
@@ -124,19 +124,12 @@ async fn put_blob_upload(
         "#,
         uuid_str,
     )
-    .fetch_one(&mut *state.db.acquire().await?)
+    .fetch_one(&state.db_ro)
     .await?;
     assert_eq!(upload.repo, repo);
 
-    let accepted_upload = utils::complete_upload(
-        &state.db,
-        &state.registry,
-        &uuid_str,
-        &digest.digest,
-        chunk,
-        None,
-    )
-    .await?;
+    let accepted_upload =
+        utils::complete_upload(state.clone(), &uuid_str, &digest.digest, chunk, None).await?;
 
     // missing location header
     Ok(accepted_upload)
@@ -188,7 +181,7 @@ async fn patch_blob_upload(
         "#,
         uuid_str,
     )
-    .fetch_one(&mut *state.db.acquire().await?)
+    .fetch_one(&state.db_ro)
     .await?;
 
     let content_range = content_info.map(|ci| ci.range.0..=ci.range.1);
@@ -203,7 +196,7 @@ async fn patch_blob_upload(
         uuid_str,
         total_stored,
     )
-    .execute(&mut *state.db.acquire().await?)
+    .execute(&state.db_rw)
     .await?;
 
     Ok(UploadInfo::new(
@@ -255,20 +248,12 @@ async fn post_blob_upload(
         repo_name,
         0_i64
     )
-    .execute(&mut *state.db.acquire().await?)
+    .execute(&state.db_rw)
     .await?;
 
     if let Some(digest) = digest.digest {
         // Have a monolithic upload with data
-        return match utils::complete_upload(
-            &state.db,
-            &state.registry,
-            &upload_uuid,
-            &digest,
-            data,
-            None,
-        )
-        .await
+        return match utils::complete_upload(state.clone(), &upload_uuid, &digest, data, None).await
         {
             Ok(accepted_upload) => Ok(Upload::Accepted(accepted_upload)),
             Err(e) => Err(e),
@@ -309,7 +294,7 @@ async fn get_blob_upload(
         upload_id_str,
         repo_name
     )
-    .fetch_one(&state.db)
+    .fetch_one(&state.db_ro)
     .await?;
     let location = format!("/v2/{}/blobs/uploads/{}", repo_name, upload_id);
 
@@ -384,7 +369,6 @@ mod tests {
             _ => panic!("Invalid value: {resp:?}"),
         };
         assert_eq!(upload.range(), (0, 0)); // Haven't uploaded anything yet
-        let mut conn = state.db.acquire().await.unwrap();
         let upload_uuid = upload.uuid().to_string();
         sqlx::query!(
             r#"
@@ -393,7 +377,7 @@ mod tests {
             "#,
             upload_uuid
         )
-        .fetch_one(&mut *conn)
+        .fetch_one(&state.db_rw)
         .await
         .unwrap();
     }
@@ -496,7 +480,7 @@ mod tests {
             "#,
             upload_uuid_str
         )
-        .execute(&mut *state.db.acquire().await.unwrap())
+        .execute(&state.db_rw)
         .await
         .unwrap();
         state

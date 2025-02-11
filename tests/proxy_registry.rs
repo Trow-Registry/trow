@@ -174,7 +174,7 @@ mod proxy_registry {
         // check that it works and that manifests are written in the correct location
         get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
         sqlx::query_scalar!("SELECT manifest_digest FROM tag WHERE repo = 'f/docker/library/alpine' AND tag = '3.13.4'")
-            .fetch_one(&mut *state.db.acquire().await.unwrap())
+            .fetch_one(&state.db_ro)
             .await
             .expect("Tag not found in database");
     }
@@ -217,7 +217,7 @@ mod proxy_registry {
         // Check that tags get updated to point to latest digest
         let (man_3_13, digest_3_13) = get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
         sqlx::query!("INSERT INTO tag (repo, tag, manifest_digest) VALUES ('f/docker/library/alpine', 'latest', $1)", digest_3_13)
-            .execute(&mut *state.db.acquire().await.unwrap())
+            .execute(&state.db_rw)
             .await
             .expect("Failed to insert tag");
 
