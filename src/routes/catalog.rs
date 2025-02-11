@@ -24,7 +24,6 @@ async fn get_catalog(
     State(state): State<Arc<TrowServerState>>,
     Query(query): Query<CatalogListQuery>,
 ) -> Result<OciJson<RepositoryList>, Error> {
-    let mut conn = state.db.acquire().await?;
     let last_name = match &query.last {
         Some(l) => l,
         None => "",
@@ -41,7 +40,7 @@ async fn get_catalog(
         last_name,
         limit
     )
-    .fetch_all(&mut *conn)
+    .fetch_all(&state.db_ro)
     .await?;
     let raw_repos = repos.into_iter().map(|r| r.repo_name).collect::<Vec<_>>();
 
@@ -59,7 +58,6 @@ async fn list_tags(
     Path(repo_name): Path<String>,
     Query(query): Query<CatalogListQuery>,
 ) -> Result<OciJson<TagList>, Error> {
-    let mut conn = state.db.acquire().await?;
     let last_tag = match &query.last {
         Some(l) => l,
         None => "",
@@ -78,7 +76,7 @@ async fn list_tags(
         last_tag,
         limit
     )
-    .fetch_all(&mut *conn)
+    .fetch_all(&state.db_ro)
     .await?;
     let raw_tags = tags.into_iter().map(|t| t.tag).collect::<Vec<_>>();
 

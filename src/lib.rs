@@ -35,7 +35,8 @@ pub struct NetAddr {
 pub struct TrowServerState {
     pub registry: TrowServer,
     pub config: TrowConfig,
-    pub db: SqlitePool,
+    pub db_ro: SqlitePool,
+    pub db_rw: SqlitePool,
 }
 
 #[derive(Clone, Debug)]
@@ -173,21 +174,21 @@ impl TrowConfig {
 
         let registry = TrowServer::new(self.data_dir.clone(), self.config_file.clone())?;
 
-        let db_in_memory = self.db_connection == Some(":memory:".to_string());
-        let db_file = match (&self.db_connection, db_in_memory) {
-            (Some(conn), false) => conn.clone(),
+        let db_file = match &self.db_connection {
+            Some(conn) => conn.clone(),
             _ => {
                 let mut p = self.data_dir.clone();
                 p.push("trow.db");
                 p.to_string_lossy().to_string()
             }
         };
-        let db = init_db::init_db(&db_file, db_in_memory).await?;
+        let (db_ro, db_rw) = init_db::init_db(&db_file).await?;
 
         let server_state = TrowServerState {
             config: self,
             registry,
-            db,
+            db_ro,
+            db_rw,
         };
         Ok(Arc::new(server_state))
     }

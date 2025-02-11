@@ -29,7 +29,6 @@ async fn get_blob(
     State(state): State<Arc<TrowServerState>>,
     Path((mut repo, digest)): Path<(String, Digest)>,
 ) -> Result<BlobReader<impl tokio::io::AsyncRead>, Error> {
-    let mut conn = state.db.acquire().await?;
     let digest_str = digest.as_str();
     if repo.starts_with(PROXY_DIR) {
         let (proxy_cfg, image) = match state
@@ -57,7 +56,7 @@ async fn get_blob(
         digest_str,
         repo
     )
-    .fetch_one(&mut *conn)
+    .fetch_one(&state.db_ro)
     .await?;
 
     let stream = match state.registry.storage.get_blob_stream(&repo, &digest).await {

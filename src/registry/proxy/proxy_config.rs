@@ -118,7 +118,7 @@ impl SingleRegistryProxyConfig {
         &self,
         image: &RemoteImage,
         registry: &TrowServer,
-        db: &SqlitePool,
+        db_rw: &SqlitePool,
     ) -> Result<String, DownloadRemoteImageError> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
@@ -142,7 +142,7 @@ impl SingleRegistryProxyConfig {
                     repo_name,
                     t
                 )
-                .fetch_optional(&mut *db.acquire().await?)
+                .fetch_optional(db_rw)
                 .await?;
                 if let Some((cl, auth)) = &try_cl {
                     match cl.fetch_manifest_digest(&image_ref, auth).await {
@@ -151,7 +151,7 @@ impl SingleRegistryProxyConfig {
                                 digests.push(Digest::try_from_raw(&d)?);
                             }
                         }
-                        Err(e) => tracing::warn!("Failed to fetch manifest digest: {}", e),
+                        Err(e) => tracing::warn!("Failed to fetch remote tag digest: {}", e),
                     }
                 }
                 if let Some(local_digest) = local_digest {
@@ -167,7 +167,7 @@ impl SingleRegistryProxyConfig {
                 r#"SELECT EXISTS(SELECT 1 FROM manifest WHERE digest = $1)"#,
                 mani_digest_str
             )
-            .fetch_one(&mut *db.acquire().await?)
+            .fetch_one(db_rw)
             .await?;
             if has_manifest == 1 {
                 return Ok(mani_digest.to_string());
@@ -178,7 +178,7 @@ impl SingleRegistryProxyConfig {
                 let manifest_download = download_manifest_and_layers(
                     cl,
                     auth,
-                    db.clone(),
+                    db_rw.clone(),
                     &registry.storage,
                     &ref_to_dl,
                     &repo_name,
@@ -197,7 +197,7 @@ impl SingleRegistryProxyConfig {
                                 tag,
                                 mani_digest_str
                             )
-                            .execute(&mut *db.acquire().await?)
+                            .execute(db_rw)
                             .await?;
                         }
                         return Ok(mani_digest.to_string());
@@ -260,14 +260,14 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPass
 async fn download_manifest_and_layers(
     cl: &oci_client::Client,
     auth: &RegistryAuth,
-    db: SqlitePool,
+    db_rw: SqlitePool,
     storage: &TrowStorageBackend,
     ref_: &Reference,
     local_repo_name: &str,
 ) -> Result<(), DownloadRemoteImageError> {
     async fn download_blob(
         cl: &oci_client::Client,
-        db: SqlitePool,
+        db_rw: SqlitePool,
         storage: &TrowStorageBackend,
         ref_: &Reference,
         layer_digest: &str,
@@ -278,7 +278,7 @@ async fn download_manifest_and_layers(
             "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = $1);",
             layer_digest,
         )
-        .fetch_one(&mut *db.acquire().await?)
+        .fetch_one(&db_rw)
         .await?
             == 1;
 
@@ -293,7 +293,7 @@ async fn download_manifest_and_layers(
                 layer_digest,
                 size
             )
-            .execute(&mut *db.acquire().await?)
+            .execute(&db_rw)
             .await?;
         }
         sqlx::query!(
@@ -301,7 +301,7 @@ async fn download_manifest_and_layers(
             local_repo_name,
             layer_digest
         )
-        .execute(&mut *db.acquire().await?)
+        .execute(&db_rw)
         .await?;
 
         Ok(())
@@ -331,7 +331,7 @@ async fn download_manifest_and_layers(
                 .map(|digest| ref_.clone_with_digest(digest.to_string()))
                 .collect::<Vec<_>>();
             let futures = images_to_dl.iter().map(|img| {
-                download_manifest_and_layers(cl, auth, db.clone(), storage, img, local_repo_name)
+                download_manifest_and_layers(cl, auth, db_rw.clone(), storage, img, local_repo_name)
             });
             try_join_all(futures).await?;
         }
@@ -339,7 +339,7 @@ async fn download_manifest_and_layers(
             let layer_digests = manifest.get_local_asset_digests();
             let futures = layer_digests
                 .iter()
-                .map(|l| download_blob(cl, db.clone(), storage, ref_, l, local_repo_name));
+                .map(|l| download_blob(cl, db_rw.clone(), storage, ref_, l, local_repo_name));
             try_join_all(futures).await?;
         }
     }
@@ -352,7 +352,7 @@ async fn download_manifest_and_layers(
         local_repo_name,
         digest
     )
-    .execute(&mut *db.acquire().await?)
+    .execute(&db_rw)
     .await?;
 
     Ok(())

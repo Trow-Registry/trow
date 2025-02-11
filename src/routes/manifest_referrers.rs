@@ -53,7 +53,7 @@ async fn get_referrers(
         repo,
         digest
     )
-    .fetch_all(&mut *state.db.acquire().await?)
+    .fetch_all(&state.db_ro)
     .await?;
 
     let mut descriptors = vec![];
@@ -170,14 +170,14 @@ mod tests {
                 digest,
                 man,
             )
-            .execute(&mut *state.db.acquire().await.unwrap())
+            .execute(&state.db_rw)
             .await
             .unwrap();
             sqlx::query!(
                 r#"INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ("test", $1)"#,
                 digest
             )
-            .execute(&mut *state.db.acquire().await.unwrap())
+            .execute(&state.db_rw)
             .await
             .unwrap();
         }
