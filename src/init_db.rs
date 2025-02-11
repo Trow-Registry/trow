@@ -14,7 +14,7 @@ pub async fn init_db(filename: &str) -> Result<(SqlitePool, SqlitePool), Migrate
         .await?;
 
     let reader_conn = SqlitePoolOptions::new()
-        .connect_with(options) // Maybe I could use the option .read_only(true) here ?
+        .connect_with(options.read_only(true))
         .await?;
 
     sqlx::migrate!().run(&writer_conn).await?;
