@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.2 (unreleased)
+
+* Smoke test pulls from ecr instead of docker (#408)
+* Remove dead code
+* Separate rw and ro sqlite connection pools (faster response times)
+* Auto clean stale uploads, orphaned blobs
+* Add option to limit disk space usage (LRU for proxied blobs):
+  Avoids Trow filling disk until crashing
+
 ## v0.7.1 (2025-01-29)
 
 Fix: when downloading proxied image, wait for all blobs to be successfully downloaded before saving the manifest in the DB.
