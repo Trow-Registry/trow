@@ -52,7 +52,7 @@ mod utils {
         state
             .registry
             .storage
-            .complete_blob_write(&upload_id_bin, digest)
+            .complete_blob_write(&upload_id_bin, digest.as_str())
             .await?;
 
         sqlx::query!(

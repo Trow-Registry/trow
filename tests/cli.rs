@@ -134,6 +134,7 @@ mod cli {
                             ignore_repos: vec![],
                         },
                     ],
+                    ..Default::default()
                 },
                 ..Default::default()
             },

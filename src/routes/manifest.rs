@@ -67,7 +67,7 @@ async fn get_manifest(
         };
 
         proxy_cfg
-            .download_remote_image(&image, &state.registry, &state.db_rw)
+            .download_remote_image(&image, &state)
             .await
             .map_err(|e| {
                 tracing::error!("Error downloading image: {e}");

@@ -8,19 +8,19 @@ use oci_client::client::ClientProtocol;
 use oci_client::secrets::RegistryAuth;
 use oci_client::Reference;
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
 
 use crate::registry::manifest::{ManifestReference, OCIManifest};
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::storage::TrowStorageBackend;
-use crate::registry::{Digest, TrowServer};
+use crate::registry::Digest;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
     pub registries: Vec<SingleRegistryProxyConfig>,
     #[serde(default)]
     pub offline: bool,
+    #[serde(default)]
+    pub disk_size: Option<size::Size>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -40,6 +40,7 @@ impl Default for RegistryProxiesConfig {
         RegistryProxiesConfig {
             registries: Vec::new(),
             offline: true,
+            disk_size: None,
         }
     }
 }
@@ -68,6 +69,7 @@ impl RegistryProxiesConfig {
     }
 }
 use crate::registry::digest::DigestError;
+use crate::TrowServerState;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DownloadRemoteImageError {
@@ -117,8 +119,7 @@ impl SingleRegistryProxyConfig {
     pub async fn download_remote_image(
         &self,
         image: &RemoteImage,
-        registry: &TrowServer,
-        db_rw: &SqlitePool,
+        state: &TrowServerState,
     ) -> Result<String, DownloadRemoteImageError> {
         // Replace eg f/docker/alpine by f/docker/library/alpine
         let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
@@ -142,7 +143,7 @@ impl SingleRegistryProxyConfig {
                     repo_name,
                     t
                 )
-                .fetch_optional(db_rw)
+                .fetch_optional(&state.db_rw)
                 .await?;
                 if let Some((cl, auth)) = &try_cl {
                     match cl.fetch_manifest_digest(&image_ref, auth).await {
@@ -167,7 +168,7 @@ impl SingleRegistryProxyConfig {
                 r#"SELECT EXISTS(SELECT 1 FROM manifest WHERE digest = $1)"#,
                 mani_digest_str
             )
-            .fetch_one(db_rw)
+            .fetch_one(&state.db_rw)
             .await?;
             if has_manifest == 1 {
                 return Ok(mani_digest.to_string());
@@ -175,15 +176,8 @@ impl SingleRegistryProxyConfig {
             if let Some((cl, auth)) = &try_cl {
                 let ref_to_dl = image_ref.clone_with_digest(mani_digest.to_string());
 
-                let manifest_download = download_manifest_and_layers(
-                    cl,
-                    auth,
-                    db_rw.clone(),
-                    &registry.storage,
-                    &ref_to_dl,
-                    &repo_name,
-                )
-                .await;
+                let manifest_download =
+                    download_manifest_and_layers(cl, auth, state, &ref_to_dl, &repo_name).await;
 
                 match manifest_download {
                     Err(e) => tracing::warn!("Failed to download proxied image: {}", e),
@@ -197,7 +191,7 @@ impl SingleRegistryProxyConfig {
                                 tag,
                                 mani_digest_str
                             )
-                            .execute(db_rw)
+                            .execute(&state.db_rw)
                             .await?;
                         }
                         return Ok(mani_digest.to_string());
@@ -260,15 +254,13 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPass
 async fn download_manifest_and_layers(
     cl: &oci_client::Client,
     auth: &RegistryAuth,
-    db_rw: SqlitePool,
-    storage: &TrowStorageBackend,
+    state: &TrowServerState,
     ref_: &Reference,
     local_repo_name: &str,
 ) -> Result<(), DownloadRemoteImageError> {
     async fn download_blob(
         cl: &oci_client::Client,
-        db_rw: SqlitePool,
-        storage: &TrowStorageBackend,
+        state: &TrowServerState,
         ref_: &Reference,
         layer_digest: &str,
         local_repo_name: &str,
@@ -278,14 +270,16 @@ async fn download_manifest_and_layers(
             "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = $1);",
             layer_digest,
         )
-        .fetch_one(&db_rw)
+        .fetch_one(&state.db_rw)
         .await?
             == 1;
 
         if !already_has_blob {
             let stream = cl.pull_blob_stream(ref_, layer_digest).await?;
-            let path = storage
-                .write_blob_stream(&Digest::try_from_raw(layer_digest).unwrap(), stream, true)
+            let path = state
+                .registry
+                .storage
+                .write_blob_stream(layer_digest, stream, true)
                 .await?;
             let size = path.metadata().unwrap().len() as i64;
             sqlx::query!(
@@ -293,7 +287,7 @@ async fn download_manifest_and_layers(
                 layer_digest,
                 size
             )
-            .execute(&db_rw)
+            .execute(&state.db_rw)
             .await?;
         }
         sqlx::query!(
@@ -301,7 +295,7 @@ async fn download_manifest_and_layers(
             local_repo_name,
             layer_digest
         )
-        .execute(&db_rw)
+        .execute(&state.db_rw)
         .await?;
 
         Ok(())
@@ -330,16 +324,16 @@ async fn download_manifest_and_layers(
                 .iter()
                 .map(|digest| ref_.clone_with_digest(digest.to_string()))
                 .collect::<Vec<_>>();
-            let futures = images_to_dl.iter().map(|img| {
-                download_manifest_and_layers(cl, auth, db_rw.clone(), storage, img, local_repo_name)
-            });
+            let futures = images_to_dl
+                .iter()
+                .map(|img| download_manifest_and_layers(cl, auth, state, img, local_repo_name));
             try_join_all(futures).await?;
         }
         OCIManifest::V2(_) => {
             let layer_digests = manifest.get_local_asset_digests();
             let futures = layer_digests
                 .iter()
-                .map(|l| download_blob(cl, db_rw.clone(), storage, ref_, l, local_repo_name));
+                .map(|l| download_blob(cl, state, ref_, l, local_repo_name));
             try_join_all(futures).await?;
         }
     }
@@ -352,7 +346,7 @@ async fn download_manifest_and_layers(
         local_repo_name,
         digest
     )
-    .execute(&db_rw)
+    .execute(&state.db_rw)
     .await?;
 
     Ok(())

@@ -101,6 +101,15 @@ pub mod manifest_media_type {
 }
 
 impl OCIManifest {
+    pub fn total_size(&self) -> Option<usize> {
+        match self {
+            OCIManifest::List(_) => None,
+            OCIManifest::V2(m) => Some(
+                (m.layers().iter().map(|l| l.size()).sum::<u64>() + m.config().size()) as usize,
+            ),
+        }
+    }
+
     #[inline]
     pub fn subject(&self) -> Option<Descriptor> {
         match self {
