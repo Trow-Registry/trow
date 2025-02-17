@@ -174,15 +174,9 @@ async fn patch_blob_upload(
         return Err(Error::UnsupportedForProxiedRepo);
     }
     let uuid_str = uuid.to_string();
-    sqlx::query!(
-        r#"
-        SELECT * FROM blob_upload
-        WHERE uuid=$1
-        "#,
-        uuid_str,
-    )
-    .fetch_one(&state.db_ro)
-    .await?;
+    sqlx::query_scalar!(r#"SELECT rowid FROM blob_upload WHERE uuid=$1"#, uuid_str)
+        .fetch_one(&state.db_ro)
+        .await?;
 
     let content_range = content_info.map(|ci| ci.range.0..=ci.range.1);
     let size = state
@@ -192,7 +186,7 @@ async fn patch_blob_upload(
         .await?;
     let total_stored = size.total_stored as i64;
     sqlx::query!(
-        "UPDATE blob_upload SET offset=$2 WHERE uuid=$1",
+        "UPDATE blob_upload SET offset=$2, updated_at=unixepoch() WHERE uuid=$1",
         uuid_str,
         total_stored,
     )

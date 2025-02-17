@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE blob SET last_accessed=unixepoch() WHERE rowid=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "c729e8969ca0751f30ec8738b2ef207413399cbc6a9a7b2e4ea65afe22c32547"
+}
