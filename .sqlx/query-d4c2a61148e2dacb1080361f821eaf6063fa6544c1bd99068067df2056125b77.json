@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM repo_blob_association WHERE blob_digest = $1;\n            DELETE FROM blob WHERE digest = $2;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "d4c2a61148e2dacb1080361f821eaf6063fa6544c1bd99068067df2056125b77"
+}

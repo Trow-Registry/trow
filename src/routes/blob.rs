@@ -47,19 +47,30 @@ async fn get_blob(
         };
         repo = format!("f/{}/{}", proxy_cfg.alias, image.get_repo())
     }
-    sqlx::query_scalar!(
+    let rowid = sqlx::query_scalar!(
         r#"
-        SELECT digest FROM blob
-        JOIN repo_blob_association ON blob.digest = repo_blob_association.blob_digest
-        WHERE digest = $1 AND repo_name = $2
+        SELECT b.rowid as "rowid!" FROM blob b
+        JOIN repo_blob_association rba ON b.digest = rba.blob_digest
+        WHERE b.digest = $1 AND rba.repo_name = $2
         "#,
         digest_str,
         repo
     )
     .fetch_one(&state.db_ro)
     .await?;
+    sqlx::query!(
+        "UPDATE blob SET last_accessed=unixepoch() WHERE rowid=$1",
+        rowid
+    )
+    .execute(&state.db_rw)
+    .await?;
 
-    let stream = match state.registry.storage.get_blob_stream(&repo, &digest).await {
+    let stream = match state
+        .registry
+        .storage
+        .get_blob_stream(&repo, digest.as_str())
+        .await
+    {
         Ok(stream) => stream,
         Err(_) => return Err(Error::InternalError),
     };

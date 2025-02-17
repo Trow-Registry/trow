@@ -1,5 +1,6 @@
 mod admission;
 pub(crate) mod api_types;
+pub mod garbage_collect;
 pub mod manifest;
 mod proxy;
 pub mod server;

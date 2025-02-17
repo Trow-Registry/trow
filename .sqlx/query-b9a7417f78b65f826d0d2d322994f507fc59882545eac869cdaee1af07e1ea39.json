@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE blob_upload SET offset=$2, updated_at=unixepoch() WHERE uuid=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b9a7417f78b65f826d0d2d322994f507fc59882545eac869cdaee1af07e1ea39"
+}

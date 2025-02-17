@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT uuid, offset FROM blob_upload bu\n            WHERE bu.updated_at < strftime('%s', 'now', '-1 day')\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "offset",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c6d231b319e1386d6d16aaaf79a1b177e27564c80cc29ac55c6cc962fb6f753b"
+}

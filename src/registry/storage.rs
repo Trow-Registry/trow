@@ -11,7 +11,6 @@ use tokio::time::Duration;
 
 use crate::registry::api_types::Stored;
 use crate::registry::temporary_file::FileWrapper;
-use crate::registry::Digest;
 use crate::types::BoundedStream;
 
 // Storage Driver Error
@@ -71,10 +70,10 @@ impl TrowStorageBackend {
     pub async fn get_blob_stream(
         &self,
         repo_name: &str,
-        digest: &Digest,
+        digest: &str,
     ) -> Result<BoundedStream<impl AsyncRead>, StorageBackendError> {
-        tracing::debug!("Get blob {repo_name}:{digest}");
-        let path = self.blobs_dir.join(digest.to_string());
+        tracing::debug!("Get blob {repo_name}@{digest}");
+        let path = self.blobs_dir.join(digest);
         let file = tokio::fs::File::open(&path).await.map_err(|e| {
             tracing::error!("Could not open blob: {}", e);
             StorageBackendError::BlobNotFound(path)
@@ -85,7 +84,7 @@ impl TrowStorageBackend {
 
     pub async fn write_blob_stream<S, E>(
         &self,
-        digest: &Digest,
+        digest: &str,
         stream: S,
         verify: bool,
     ) -> Result<PathBuf, StorageBackendError>
@@ -94,10 +93,10 @@ impl TrowStorageBackend {
         E: std::error::Error + Send + Sync + 'static,
     {
         tracing::debug!("Write blob {digest}");
-        let tmp_location = self.uploads_dir.join(digest.as_str());
-        let location = self.blobs_dir.join(digest.as_str());
+        let tmp_location = self.uploads_dir.join(digest);
+        let location = self.blobs_dir.join(digest);
         if location.exists() {
-            tracing::info!(digest = digest.as_str(), "Blob already exists");
+            tracing::info!(digest = digest, "Blob already exists");
             return Ok(location);
         }
         let mut tmp_file = match FileWrapper::new_tmp(tmp_location.clone()).await {
@@ -128,7 +127,7 @@ impl TrowStorageBackend {
                     "Could not calculate digest of blob: {e}"
                 )))
             })?;
-            if tmp_digest != *digest {
+            if tmp_digest.as_str() != digest {
                 return Err(StorageBackendError::InvalidDigest);
             }
         }
@@ -196,11 +195,11 @@ impl TrowStorageBackend {
     pub async fn complete_blob_write(
         &self,
         upload_id: &uuid::Uuid,
-        user_digest: &Digest,
+        user_digest: &str,
     ) -> Result<(), StorageBackendError> {
         tracing::debug!("Complete blob write {upload_id}");
         let tmp_location = self.uploads_dir.join(upload_id.to_string());
-        let final_location = self.blobs_dir.join(user_digest.as_str());
+        let final_location = self.blobs_dir.join(user_digest);
         // Should we even do this ? It breaks OCI tests:
         // let f = std::fs::File::open(&tmp_location)?;
         // let calculated_digest = Digest::digest_sha256(f)?;
@@ -221,15 +220,38 @@ impl TrowStorageBackend {
         Ok(())
     }
 
-    pub async fn delete_blob(
-        &self,
-        repo: &str,
-        digest: &Digest,
-    ) -> Result<(), StorageBackendError> {
-        tracing::debug!("Delete blob {repo}:{digest}");
-        let blob_path = self.blobs_dir.join(digest.as_str());
-        tokio::fs::remove_file(blob_path).await?;
+    pub async fn delete_blob(&self, digest: &str) -> Result<(), StorageBackendError> {
+        tracing::debug!("Delete blob {digest}");
+        let blob_path = self.blobs_dir.join(digest);
+        if let Err(e) = tokio::fs::remove_file(blob_path).await {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(StorageBackendError::Io(e));
+            }
+        }
         Ok(())
+    }
+
+    pub async fn delete_upload(&self, uuid: &str) -> Result<(), StorageBackendError> {
+        tracing::debug!("Delete upload {uuid}");
+        let blob_path = self.uploads_dir.join(uuid);
+        if let Err(e) = tokio::fs::remove_file(blob_path).await {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(StorageBackendError::Io(e));
+            }
+        }
+        Ok(())
+    }
+
+    // TODO: generator / coroutine
+    pub async fn list_blobs(&self) -> Result<Vec<String>, StorageBackendError> {
+        let mut read_dir = fs::read_dir(&self.blobs_dir).await?;
+        let mut entries = Vec::new();
+        while let Some(entry) = read_dir.next_entry().await? {
+            if let Ok(file_name) = entry.file_name().into_string() {
+                entries.push(file_name);
+            }
+        }
+        Ok(entries)
     }
 
     pub async fn is_ready(&self) -> Result<(), StorageBackendError> {
@@ -280,9 +302,9 @@ mod tests {
         let dir = test_temp_dir::test_temp_dir!();
         let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
         let stream = pin!(bytes_to_stream(Bytes::from("test")));
-        let digest = Digest::try_from_raw("sha256:123456789101112131415161718192021").unwrap();
+        let digest = "sha256:123456789101112131415161718192021";
         let location = store
-            .write_blob_stream(&digest, stream, false)
+            .write_blob_stream(digest, stream, false)
             .await
             .unwrap();
         assert!(location.exists());

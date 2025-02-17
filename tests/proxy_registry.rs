@@ -47,6 +47,7 @@ mod proxy_registry {
                         ignore_repos: vec![],
                     },
                 ],
+                ..Default::default()
             },
             ..Default::default()
         };

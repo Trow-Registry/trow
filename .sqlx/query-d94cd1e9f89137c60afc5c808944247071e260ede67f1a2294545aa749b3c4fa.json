@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT SUM(u.offset) as \"size!\" FROM blob_upload u",
+  "describe": {
+    "columns": [
+      {
+        "name": "size!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "d94cd1e9f89137c60afc5c808944247071e260ede67f1a2294545aa749b3c4fa"
+}
