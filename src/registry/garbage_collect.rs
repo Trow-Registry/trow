@@ -15,6 +15,10 @@ pub enum GcError {
     StorageError(#[from] StorageBackendError),
 }
 
+fn bytes_humanstring(bytes: usize) -> String {
+    size::Size::from_bytes(bytes).to_string()
+}
+
 pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
     let mut interval = time::interval(Duration::from_secs(120)); // 2 minutes
     loop {
@@ -49,7 +53,7 @@ pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
     }
 }
 
-async fn make_room(state: &TrowServerState, space_needed: Option<usize>) -> Result<usize, GcError> {
+async fn make_room(state: &TrowServerState, space_needed: Option<usize>) -> Result<(), GcError> {
     let mut space_reclaimed = 0;
 
     space_reclaimed += delete_stale_uploads(state).await?;
@@ -59,7 +63,13 @@ async fn make_room(state: &TrowServerState, space_needed: Option<usize>) -> Resu
             delete_old_proxied_images(state, space_required - space_reclaimed).await?;
     }
 
-    Ok(space_reclaimed)
+    if space_reclaimed > 0 {
+        tracing::info!(
+            reclaimed = bytes_humanstring(space_reclaimed),
+            "Total space reclaimed"
+        );
+    }
+    Ok(())
 }
 
 /// (fast)
@@ -83,6 +93,12 @@ pub async fn delete_stale_uploads(state: &TrowServerState) -> Result<usize, GcEr
         bytes_reclaimed += upload.offset as usize;
     }
 
+    if bytes_reclaimed > 0 {
+        tracing::info!(
+            reclaimed = bytes_humanstring(bytes_reclaimed),
+            "Reclaimed space by deleting stale uploads"
+        )
+    }
     Ok(bytes_reclaimed)
 }
 
@@ -115,6 +131,12 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
             .await?;
         state.registry.storage.delete_blob(&blob.digest).await?;
         bytes_reclaimed += blob.size as usize;
+    }
+    if bytes_reclaimed > 0 {
+        tracing::info!(
+            reclaimed = bytes_humanstring(bytes_reclaimed),
+            "Reclaimed space by deleting orphaned blobs"
+        )
     }
     Ok(bytes_reclaimed)
 }
@@ -183,6 +205,12 @@ async fn delete_old_proxied_images(
             .delete_blob(&blob_to_delete.digest)
             .await?;
         bytes_reclaimed += blob_to_delete.size as usize;
+    }
+    if bytes_reclaimed > 0 {
+        tracing::info!(
+            reclaimed = bytes_humanstring(bytes_reclaimed),
+            "Reclaimed space by deleting proxied blobs"
+        )
     }
     Ok(bytes_reclaimed)
 }
