@@ -20,7 +20,7 @@ fn bytes_humanstring(bytes: usize) -> String {
 }
 
 pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
-    let mut interval = time::interval(Duration::from_secs(120)); // 2 minutes
+    let mut interval = time::interval(Duration::from_secs(600)); // 10 minutes
     loop {
         interval.tick().await;
 
@@ -110,11 +110,12 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
         r#"
         SELECT digest, size
         FROM blob b
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM manifest m
-            WHERE m.blob LIKE '%' || b.digest || '%'
-        );
+        WHERE b.last_accessed < strftime('%s', 'now', '-1 day')
+        AND NOT EXISTS (
+                SELECT 1
+                FROM manifest m
+                WHERE m.blob LIKE '%' || b.digest || '%'
+            );
         "#,
     )
     .fetch_all(&state.db_ro)
@@ -151,12 +152,13 @@ async fn delete_old_proxied_images(
         r#"
         SELECT digest, size
         FROM "blob" b
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM "repo_blob_association" rba
-            WHERE rba.blob_digest = b.digest
-            AND rba.repo_name NOT LIKE 'f/%'
-        )
+        WHERE b.last_accessed < strftime('%s', 'now', '-1 day')
+        AND NOT EXISTS (
+                SELECT 1
+                FROM "repo_blob_association" rba
+                WHERE rba.blob_digest = b.digest
+                AND rba.repo_name NOT LIKE 'f/%'
+            )
         ORDER BY b.last_accessed DESC
         LIMIT 500;
         "#
@@ -231,9 +233,9 @@ mod tests {
         sqlx::query!(
             r#"
             INSERT INTO blob (digest, size, last_accessed)
-            VALUES ('sha256:test1', 100, strftime('%s', 'now', '-2 days')),
-                   ('sha256:test2', 175, strftime('%s', 'now', '-1 day')),
-                   ('sha256:test3', 300, strftime('%s', 'now'))
+            VALUES ('sha256:test1', 100, strftime('%s', 'now', '-3 days')),
+                   ('sha256:test2', 175, strftime('%s', 'now', '-3 day')),
+                   ('sha256:test3', 300, strftime('%s', 'now', '-2 days'))
             "#
         )
         .execute(&state.db_rw)
@@ -294,10 +296,10 @@ mod tests {
         // Ingest dummy data
         sqlx::query!(
             r#"
-            INSERT INTO blob (digest, size)
-            VALUES ('sha256:test1', 28),
-                   ('sha256:test2', 200),
-                   ('sha256:test3', 155)
+            INSERT INTO blob (digest, size, last_accessed)
+            VALUES ('sha256:test1', 28, strftime('%s', 'now', '-3 days')),
+                   ('sha256:test2', 200, strftime('%s', 'now', '-3 days')),
+                   ('sha256:test3', 155, strftime('%s', 'now', '-3 days'))
             "#
         )
         .execute(&state.db_rw)
