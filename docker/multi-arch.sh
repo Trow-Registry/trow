@@ -80,6 +80,7 @@ if [ "$docker" = "docker" ]; then
         -t $GH_REPO:latest \
         -f Dockerfile ../
 else
+    podman manifest create $GH_IMAGE
     podman build \
         "${BUILD_ARGS[@]}" \
         --platform linux/amd64,linux/arm64 \
