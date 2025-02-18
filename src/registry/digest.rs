@@ -38,6 +38,12 @@ impl AsRef<String> for Digest {
     }
 }
 
+impl AsRef<str> for Digest {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Digest {
     pub fn try_from_raw(digest_str: &str) -> Result<Digest, DigestError> {
         let sep_loc = match digest_str.find(':') {

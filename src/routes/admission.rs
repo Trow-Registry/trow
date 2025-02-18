@@ -218,6 +218,7 @@ mod test {
                                 ignore_repos: vec![],
                             },
                         ],
+                        ..Default::default()
                     },
                     ..Default::default()
                 });

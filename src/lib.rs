@@ -184,17 +184,19 @@ impl TrowConfig {
         };
         let (db_ro, db_rw) = init_db::init_db(&db_file).await?;
 
-        let server_state = TrowServerState {
+        let server_state = Arc::new(TrowServerState {
             config: self,
             registry,
             db_ro,
             db_rw,
-        };
-        Ok(Arc::new(server_state))
+        });
+
+        Ok(server_state)
     }
 
     pub async fn build_app(self) -> Result<Router, TrowConfigError> {
         let state = self.build_server_state().await?;
+        tokio::spawn(registry::garbage_collect::watchdog(state.clone()));
         Ok(routes::create_app(state))
     }
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.1 (unreleased)
+
+* Trow v0.7.2
+* Add option to limit disk space usage
+
 ## v0.9.0 (2025-01-28)
 
 * The chart is now pulled via OCI (`oci://ghcr.io/trow-registry/charts/trow`)

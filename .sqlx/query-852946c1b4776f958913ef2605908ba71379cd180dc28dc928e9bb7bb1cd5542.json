@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM blob WHERE digest = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "852946c1b4776f958913ef2605908ba71379cd180dc28dc928e9bb7bb1cd5542"
+}

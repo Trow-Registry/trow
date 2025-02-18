@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.7.2 (unreleased)
+
+* Smoke test pulls from ecr instead of docker (#408)
+* Remove dead code
+* Separate rw and ro sqlite connection pools (faster response times)
+* Auto clean stale uploads, orphaned blobs
+* Add option `registry_proxies.max_size`:
+
+  This feature deletes older proxied blobs if the disk usage goes above the specified limit (LRU for proxied blobs).
+
 ## v0.7.1 (2025-01-29)
 
 Fix: when downloading proxied image, wait for all blobs to be successfully downloaded before saving the manifest in the DB.

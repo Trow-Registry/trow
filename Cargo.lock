@@ -3752,6 +3752,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "size"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b6709c7b6754dca1311b3c73e79fcce40dd414c782c66d88e8823030093b02b"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4450,7 +4459,7 @@ dependencies = [
 
 [[package]]
 name = "trow"
-version = "0.7.1"
+version = "0.7.2-b0"
 dependencies = [
  "assert_cmd",
  "async-std",
@@ -4496,6 +4505,7 @@ dependencies = [
  "serde_json",
  "serde_yaml_ng",
  "sha2",
+ "size",
  "sqlx",
  "test-temp-dir",
  "thiserror 2.0.11",

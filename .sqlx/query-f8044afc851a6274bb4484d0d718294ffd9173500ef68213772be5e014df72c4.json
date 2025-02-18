@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT digest FROM manifest WHERE blob LIKE '%' || $1 || '%'",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f8044afc851a6274bb4484d0d718294ffd9173500ef68213772be5e014df72c4"
+}
