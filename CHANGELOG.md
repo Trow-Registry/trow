@@ -6,8 +6,9 @@
 * Remove dead code
 * Separate rw and ro sqlite connection pools (faster response times)
 * Auto clean stale uploads, orphaned blobs
-* Add option to limit disk space usage (LRU for proxied blobs):
-  Avoids Trow filling disk until crashing
+* Add option `registry_proxies.max_size`:
+
+  This feature deletes older proxied blobs if the disk usage goes above the specified limit (LRU for proxied blobs).
 
 ## v0.7.1 (2025-01-29)
 

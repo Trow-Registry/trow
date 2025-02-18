@@ -20,7 +20,7 @@ pub struct RegistryProxiesConfig {
     #[serde(default)]
     pub offline: bool,
     #[serde(default)]
-    pub disk_size: Option<size::Size>,
+    pub max_size: Option<size::Size>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -40,7 +40,7 @@ impl Default for RegistryProxiesConfig {
         RegistryProxiesConfig {
             registries: Vec::new(),
             offline: true,
-            disk_size: None,
+            max_size: None,
         }
     }
 }

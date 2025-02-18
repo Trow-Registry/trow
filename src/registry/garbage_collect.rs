@@ -24,7 +24,7 @@ pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
             .config
             .config_file
             .as_ref()
-            .map(|f| f.registry_proxies.disk_size)
+            .map(|f| f.registry_proxies.max_size)
         {
             let blobs_size = sqlx::query_scalar!(r#"SELECT SUM(b.size) as "size!" FROM blob b"#)
                 .fetch_one(&state.db_ro)
@@ -35,8 +35,12 @@ pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
                     .await?;
             let space_taken = (blobs_size + uploads_size) as usize;
             let space_available = (limit.bytes() as f64 * 0.8) as usize;
-
-            Some(space_taken.saturating_sub(space_available))
+            let space_needed = space_taken.saturating_sub(space_available);
+            if space_needed > 0 {
+                Some(space_needed)
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -100,7 +104,6 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
     .fetch_all(&state.db_ro)
     .await?;
     for blob in blobs_to_delete {
-        state.registry.storage.delete_blob(&blob.digest).await?;
         sqlx::query!(
             r#"DELETE FROM repo_blob_association WHERE blob_digest = $1"#,
             blob.digest
@@ -110,7 +113,7 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
         sqlx::query!(r#"DELETE FROM blob WHERE digest = $1"#, blob.digest)
             .execute(&state.db_rw)
             .await?;
-
+        state.registry.storage.delete_blob(&blob.digest).await?;
         bytes_reclaimed += blob.size as usize;
     }
     Ok(bytes_reclaimed)
