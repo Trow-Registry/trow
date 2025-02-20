@@ -19,7 +19,7 @@ fn bytes_humanstring(bytes: usize) -> String {
     size::Size::from_bytes(bytes).to_string()
 }
 
-pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
+pub async fn watchdog(state: Arc<TrowServerState>) {
     let mut interval = time::interval(Duration::from_secs(600)); // 10 minutes
     loop {
         interval.tick().await;
@@ -32,11 +32,13 @@ pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
         {
             let blobs_size = sqlx::query_scalar!(r#"SELECT SUM(b.size) as "size!" FROM blob b"#)
                 .fetch_one(&state.db_ro)
-                .await?;
+                .await
+                .unwrap_or(0);
             let uploads_size =
                 sqlx::query_scalar!(r#"SELECT SUM(u.offset) as "size!" FROM blob_upload u"#)
                     .fetch_one(&state.db_ro)
-                    .await?;
+                    .await
+                    .unwrap_or(0);
             let space_taken = (blobs_size + uploads_size) as usize;
             let space_available = (limit.bytes() as f64 * 0.8) as usize;
             let space_needed = space_taken.saturating_sub(space_available);
@@ -49,7 +51,9 @@ pub async fn watchdog(state: Arc<TrowServerState>) -> Result<(), GcError> {
             None
         };
 
-        make_room(&state, space_to_reclaim).await?;
+        if let Err(e) = make_room(&state, space_to_reclaim).await {
+            tracing::error!("Could not make room: {e}");
+        }
     }
 }
 
@@ -167,7 +171,6 @@ async fn delete_old_proxied_images(
     .await?;
 
     while bytes_reclaimed < space_needed {
-        tracing::info!(proxied_blobs=?proxied_blobs, "protu");
         let blob_to_delete = match proxied_blobs.pop() {
             Some(b) => b,
             None => return Err(GcError::CouldNotReclaimEnoughSpace),
