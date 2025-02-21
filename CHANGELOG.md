@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.2 (unreleased)
+## v0.7.2 (2025-02-21)
 
 * Smoke test pulls from ecr instead of docker (#408)
 * Remove dead code

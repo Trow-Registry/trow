@@ -7,8 +7,6 @@ use crate::TrowServerState;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GcError {
-    #[error("Could not reclaim enough space")]
-    CouldNotReclaimEnoughSpace,
     #[error("DB error: {0}")]
     DbError(#[from] sqlx::Error),
     #[error("Storage backend error: {0}")]
@@ -65,8 +63,13 @@ async fn make_room(state: &TrowServerState, space_needed: Option<usize>) -> Resu
     if let Some(space_required) = space_needed {
         space_reclaimed +=
             delete_old_proxied_images(state, space_required - space_reclaimed).await?;
+        if space_reclaimed < space_required {
+            tracing::warn!(
+                needed = bytes_humanstring(space_required),
+                "Could not reclaim enough space"
+            )
+        }
     }
-
     if space_reclaimed > 0 {
         tracing::info!(
             reclaimed = bytes_humanstring(space_reclaimed),
@@ -173,7 +176,7 @@ async fn delete_old_proxied_images(
     while bytes_reclaimed < space_needed {
         let blob_to_delete = match proxied_blobs.pop() {
             Some(b) => b,
-            None => return Err(GcError::CouldNotReclaimEnoughSpace),
+            None => return Ok(bytes_reclaimed),
         };
 
         let manifests_to_delete = sqlx::query!(
