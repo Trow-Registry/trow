@@ -15,7 +15,7 @@ DATE="$(date --rfc-3339=seconds)"
 
 $docker build \
   --build-arg VCS_REF="$(git rev-parse HEAD)" \
-  --build-arg VCS_BRANCH="$(git symbolic-ref --short HEAD)" \
+  --build-arg VCS_BRANCH="$(git symbolic-ref --short HEAD || true)" \
   --build-arg REPO="$REPO" \
   --build-arg TAG="$TAG" \
   --build-arg DATE="$DATE" \
