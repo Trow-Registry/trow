@@ -4,11 +4,9 @@
   - [Persisting Data/Images](#persisting-dataimages)
   - [Proxying other registries (and MutatingWebhook)](#proxying-other-registries-and-mutatingwebhook)
   - [Validating Webhook](#validating-webhook)
-    - [Configuration](#configuration)
-    - [Troubleshooting](#troubleshooting)
   - [Listing Repositories and Tags](#listing-repositories-and-tags)
   - [Multiplatform Builds](#multiplatform-builds)
-  - [Troubleshooting](#troubleshooting-1)
+  - [Troubleshooting](#troubleshooting)
     - [Where are the logs?](#where-are-the-logs)
     - [I can't push images into Trow](#i-cant-push-images-into-trow)
     - [My pod can't pull images from Trow](#my-pod-cant-pull-images-from-trow)
@@ -47,7 +45,7 @@ registry_proxies:
       password: pass1234
 ```
 
-```
+```shell
 $ trow --config-file ./proxy.yaml
 Starting Trow 0.6.0 on 0.0.0.0:8000
 Hostname of this registry (for the MutatingWebhook): "0.0.0.0:8000"
@@ -60,8 +58,8 @@ Proxy registries configured:
 
 And then make the following request to the empty registry:
 
-```
-$ docker pull localhost:8443/f/docker/nginx:latest
+```shell
+$ podman pull localhost:8443/f/docker/nginx:latest
 latest: Pulling from f/docker/nginx
 bb79b6b2107f: Already exists
 5a9f1c0027a7: Pull complete
@@ -81,8 +79,6 @@ The helm chart contains a `MutatingWebhookConfiguration`  that will automaticall
 
 ## Validating Webhook
 
-### Configuration
-
 The validating webhook can be configured using `--image-validation-config-file` argument like so:
 
 ```yaml
@@ -96,7 +92,7 @@ image_validation:
     - my-trow-domain.trow.io/my-secret-image
 ```
 
-```console
+```shell
 $ ./trow --config-file ./validation.yaml
 Starting Trow 0.6.0 on 0.0.0.0:8000
 Hostname of this registry (for the MutatingWebhook): "0.0.0.0"
@@ -106,34 +102,6 @@ Image validation webhook configured:
   Denied prefixes: ["my-trow-domain.trow.io/my-secret-image"]
 Proxy registries not configured
 ```
-
-### Troubleshooting
-
-If a deployment isn't starting, check the logs for the replica set e.g:
-
-```bash
-kubectl get rs my-app-844d6db962
-```
-
-If there is a failed create message, the image may have been refused validation by Trow. If the message reads like:
-
-```
-Error creating: admission webhook "validator.trow.io" denied the request: my_registry.io/nginx: Image is neither explicitly allowed nor denied (using default behavior)
-```
-
-That means:
-1. The validation webhook is active
-2. `my_registry.io/` has not been added to the allow list
-3. The default behavior is configured to `"Deny"`
-
-
-Otherwise, if the error reads like:
-
-```
-Error creating: Internal error occurred: failed calling admission webhook "validator.trow.io": Post https://trow.kube-public.svc:443/validate-image?timeout=30s: no endpoints available for service "trow"
-```
-
-Trow probably isn't running and the webhook is configured to `Fail` on error. You will need to disable the admission webhook (or, for helm chart: `onWebhookFailure: Ignore`) and restart Trow.
 
 ## Listing Repositories and Tags
 
@@ -146,8 +114,8 @@ tool](https://github.com/mayflower/docker-ls).
 
 Using `docker-ls` is fairly straightforward, for example, to list all repositories in a registry:
 
-```
-docker-ls repositories -u myuser -p mypass -r https://registry.trow.io
+```shell
+$ docker-ls repositories -u myuser -p mypass -r https://registry.trow.io
 requesting list . done
 repositories:
 - alpine
@@ -158,8 +126,8 @@ repositories:
 
 To list all tags for a repository:
 
-```
-docker-ls tags user1/web -u myuser -p mypass -r https://registry.trow.io
+```shell
+$ docker-ls tags user1/web -u myuser -p mypass -r https://registry.trow.io
 requesting list . done
 repository: user1/web
 tags:
@@ -176,7 +144,7 @@ reasons and ambiguities in specification.
 
 ## Multiplatform Builds
 
-Trow has builds for amd64, armv7 and arm64. Images with a release version but no explicit platform e.g. `trow:0.3` or `trow:0.3.2` should be _multiplatform_ images that will automatically pull the correct version of the image for the current platform. Images tagged `latest` or `default` are currently amd64 only. Images should be pushed to both [GHCR](https://github.com/orgs/trow-registry/packages/container/package/trow%2Ftrow) and the [Docker Hub](https://hub.docker.com/r/containersol/trow).
+Trow has builds for amd64 and arm64. Images tagged `latest` or `default` are currently amd64 only.
 
 If there's another build you would like to see, please get in contact.
 
@@ -188,7 +156,7 @@ The first place to look for debugging information is in the output from the
 `kubectl describe` command. It's worth looking at the output for the deployment,
 replicaset and pod. Assuming the namespace for the Trow is "trow":
 
-```
+```shell
 $ kubectl describe deploy -n trow trow-deploy
 $ kubectl describe replicaset -n trow trow-deploy
 $ kubectl describe pod -n trow trow-deploy
@@ -198,7 +166,7 @@ In particular, look for problems pulling images or with containers crashing.
 
 For the actual application logs try:
 
-```
+```shell
 $ kubectl logs -n trow trow-deploy-596bf849c8-m7b7l
 ```
 
@@ -208,13 +176,13 @@ use autocomplete to get the correct name (hit the tab key after typing
 
 If there are no logs or you get output like:
 
-```
+```log
 Error from server (BadRequest): container "trow-pod" in pod "trow-deploy-6f6f8fbc6d-rndtd" is waiting to start: PodInitializing
 ```
 
 Look at the logs for the init container:
 
-```
+```shell
 $ kubectl logs -n trow trow-deploy-596bf849c8-m7b7l -c trow-init
 ```
 
@@ -240,13 +208,31 @@ that the settings for the volume match the UID of the Trow user (333333 by defau
 
 ### My pod can't pull images from Trow
 
-If you get the error:
+If a deployment isn't starting, check the logs for the replica set e.g:
 
-```
-Error creating: Internal error occurred: failed calling admission webhook "validator.trow.io": Post https://trow.kube-public.svc:443/validate-image?timeout=30s: no endpoints available for service "trow"
+```bash
+kubectl get rs my-app-844d6db962
 ```
 
-Trow probably isn't running and the webhook is configured to `Fail` on error. You will need to disable the admission webhook (or, for helm chart: `onWebhookFailure: Ignore`) and restart Trow.
+* If you get the error:
+
+  ```log
+  Error creating: Internal error occurred: failed calling admission webhook "validator.trow.io": Post https://trow.kube-public.svc:443/validate-image?timeout=30s: no endpoints available for service "trow"
+  ```
+
+  Trow probably isn't running and the webhook is configured to `Fail` on error.
+
+* If the message reads like:
+
+  ```log
+  Error creating: admission webhook "validator.trow.io" denied the request: my_registry.io/nginx: Image is neither explicitly allowed nor denied (using default behavior)
+  ```
+
+  That means:
+
+  1. The validation webhook is active
+  2. `my_registry.io/` has not been added to the allow list
+  3. The default behavior is configured to `"Deny"`
 
 
 ### Permission Denied Errors in Logs
