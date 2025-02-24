@@ -1,48 +1,36 @@
+# Trow
+
 [![Tests](https://github.com/trow-registry/trow/actions/workflows/pr-tests.yaml/badge.svg)](https://github.com/trow-registry/trow/actions/workflows/pr-tests.yaml)
 
-# Trow
-Image Management for Kubernetes.
-Forked from https://github.com/ContainerSolutions/trow
+Image management and caching for Kubernetes.
 
-We're building an image management solution for Kubernetes (and possibly other orchestrators).
-At its heart is the Trow Registry, which runs inside the cluster, is simple to set-up and fully
-integrated with Kubernetes, including support for auditing and RBAC.
-
-### Why "Trow"
-
-"Trow" is a word with multiple, divergent meanings. In Shetland folklore a trow
-is a small, mischievous creature, similar to the Scandinavian troll. In England,
-it is an old style of cargo boat that transported goods on rivers. Finally, it is
-an archaic word meaning "to think, believe, or trust". The reader is free to
-choose which interpretation they like most, but it should be pronounced to rhyme
-with "brow".
+We're building a small registry to make image management in Kubernetes easy.
+The Trow Registry runs inside the cluster with very little resources, and is simple to set-up
+so it caches every image.
 
 ## Use Cases
 
-The primary goal for Trow is to create a registry that runs within Kubernetes
-and provides a secure and fast way to get containers running on the cluster.
-
-A major focus is providing controls for cluster administrators to define which images
-can run in the cluster. Trow can prevent unauthorised and potentially insecure or malicious
-images from touching your cluster.
+* Spin up a lightweight registry within Kubernetes
+* Cache every image in a cluster, thanks to the mutating webhook
+* Prevent unauthorized images form touching the cluster with the admission webhook
 
 Features include:
 
- - [x] conforms to the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec) for registries
- - [x] controls images running inside the cluster via approve/deny lists
- - [x] automagically proxies any registry
- - [ ] full auditing and authentication of image access _(in progress)_
- - [ ] distributed architecture for HA and scalability _(planned)_
+- [x] conforms to the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec) for registries
+- [x] controls images running inside the cluster via approve/deny lists
+- [x] automagically proxy any registry
+- [ ] distributed architecture for HA and scalability _(coming soon)_
+- [ ] full auditing and authentication of image access _(planned)_
 
 ## Comparison to Other Registries
 
-There is a [short article on how Trow compares to other registries](docs/COMPARISON.md), including Harbor.
+See [COMPARISON.md](docs/COMPARISON.md).
 
 ## Install
 
 A [helm chart is available](./charts/trow).
 
-Note that Trow is currently alpha and you can expect to find rough edges.
+Note that Trow is currently beta and you can expect to find rough edges.
 
 ## Architecture and Design
 
@@ -65,6 +53,11 @@ Please take a look at [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to h
 All participants in the Trow project are expected to comply with the [code of
 conduct](CODE_OF_CONDUCT.md).
 
-## Notes
+## Why "Trow"
 
-- The project currently runs on Rust Nightly.
+"Trow" is a word with multiple, divergent meanings. In Shetland folklore a trow
+is a small, mischievous creature, similar to the Scandinavian troll. In England,
+it is an old style of cargo boat that transported goods on rivers. Finally, it is
+an archaic word meaning "to think, believe, or trust". The reader is free to
+choose which interpretation they like most, but it should be pronounced to rhyme
+with "brow".
