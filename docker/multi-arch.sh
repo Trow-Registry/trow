@@ -80,12 +80,16 @@ if [ "$docker" = "docker" ]; then
         -t $GH_REPO:latest \
         -f Dockerfile ../
 else
+    # Note: to build multi arch images with podman, use these commands:
+    # sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    # podman manifest push --all ghcr.io/trow-registry/trow:0.7.2
     podman manifest create $GH_IMAGE
     podman build \
         "${BUILD_ARGS[@]}" \
         --platform linux/amd64,linux/arm64 \
         --manifest $GH_IMAGE \
         -f Dockerfile ../
+
 fi
 
 echo "→ Image $GH_IMAGE built successfully"
