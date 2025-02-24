@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.3 (2025-02-24)
+
+* Fix broken arm64 container image
+
 ## v0.7.2 (2025-02-21)
 
 * Smoke test pulls from ecr instead of docker (#408)
