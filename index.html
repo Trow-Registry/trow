@@ -1,22 +1,13 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-118393862-1"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-
-gtag('config', 'UA-118393862-1');
-    </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="description" content="">
     <meta name="author" content="">
     <link rel="icon" href="favicon.ico">
 
-    <title>Trow - Image Management for Clusters</title>
+    <title>Trow - K8S Image Management</title>
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css" integrity="sha384-9gVQ4dYFwwWSjIDZnLEWnxCjeSWFphJiwGPXr1jddIhOegiu1FwO5qRGvFXOdJZ4" crossorigin="anonymous">
@@ -26,7 +17,7 @@ gtag('config', 'UA-118393862-1');
     <link href="index.yaml">
   </head>
 
-  <body> 
+  <body>
     <div class="content">
       <div class="row blue-bg">
         <div class="container d-flex w-100 h-100 p-3 mx-auto flex-column">
@@ -40,8 +31,8 @@ gtag('config', 'UA-118393862-1');
           <div class="intro text-center">
             <img src="trow.png" width="100" alt="Trow logo"/>
             <h1 class="cover-heading">Trow</h1>
-            <h2 class="turq" >Kubernetes Registry & Image Management Solution</h2>
-            <p class="pad lead">Container Registry and Image Management for Kubernetes Clusters</p>
+            <!-- <h2 class="turq" >Kubernetes Registry & Cache</h2> -->
+            <p class="pad lead">Container Registry and Cache for Kubernetes Clusters</p>
             <a href="https://github.com/Trow-Registry/trow/blob/main/docs/HELM_INSTALL.md" class="input-btn btn-lg btn-primary">INSTALL</a>
           </div>
         </div>
@@ -54,14 +45,15 @@ gtag('config', 'UA-118393862-1');
             <div class="col-sm">
               <ul>
                 <li><span>Get a self-hosted registry for your organisation's images up-and-running quickly</span></li>
+                <li><span>Cache external images locally in your cluster</span></li>
                 <li><span>Lock down the images that can run in your cluster</span></li>
               </ul>
             </div>
 
             <div class="col-sm">
               <ul>
-                <li><span>Tight integration with Kubernetes</span></li> 
-                <li><span>Open-source with enterprise support</span></li>
+                <li><span>Tight integration with Kubernetes</span></li>
+                <li><span>Open-source</span></li>
               </ul>
             </div>
           </div>
@@ -71,12 +63,10 @@ gtag('config', 'UA-118393862-1');
               <ul>
                 <li><span>Integration with vulnerability scanners</span> </li>
                 <li><span>Integration with existing authentication and authorization solutions</span></li>
-                <li><span>Full audit log of operations</span></li>
               </ul>
             </div>
             <div class="col-sm">
               <ul>
-                <li><span>Advanced distribution options for quick deployment of image updates</span></li>
                 <li><span>Support for immutable tags and image streams</span></li>
               </ul>
             </div>
