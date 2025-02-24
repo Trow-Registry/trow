@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=./target \
 
 
 
-FROM debian:bookworm-slim
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 
 LABEL org.opencontainers.image.source="https://github.com/trow-registry/trow"
 LABEL org.opencontainers.image.description="Caching Container Registry and Image Management for Kubernetes Clusters"

@@ -4,6 +4,7 @@
 
 case $TARGETARCH in
 	"amd64")
+		echo "Building for amd64"
 		echo "x86_64-unknown-linux-gnu" > /.platform
 		echo "clang" > /.compiler
 		mold_arch="x86_64"
@@ -13,12 +14,13 @@ case $TARGETARCH in
 		rm -rf mold*
 	;;
 	"arm64")
+		echo "Building for arm64"
 		echo "aarch64-unknown-linux-gnu" > /.platform
 		echo "gcc-aarch64-linux-gnu" > /.compiler
 	;;
 	"arm")
+		echo "Building for amd32"
 		echo "armv7-unknown-linux-gnueabihf" > /.platform
 		echo "gcc-arm-linux-gnuabihf" > /.compiler
 	;;
 esac
-
