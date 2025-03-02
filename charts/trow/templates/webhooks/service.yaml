@@ -5,7 +5,6 @@ metadata:
   name: {{ include "trow.fullname" . }}-webhooks
   labels:
     {{- include "webhook.labels" . | nindent 4 }}
-    app.kubernetes.io/component: webhooks
   namespace: {{ .Release.Namespace }}
 spec:
   type: ClusterIP
