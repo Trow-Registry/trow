@@ -126,7 +126,13 @@ impl SingleRegistryProxyConfig {
         tracing::debug!("Downloading proxied image {}", repo_name);
 
         let image_ref: Reference = image.clone().into();
-        let try_cl = self.setup_client(image.scheme == "http").await.ok();
+        let try_cl = match self.setup_client(image.scheme == "http").await {
+            Ok(cl) => Some(cl),
+            Err(e) => {
+                tracing::warn!("Could not get an OCI client: {e}");
+                None
+            }
+        };
 
         // digests is a list of posstible digests for the given reference
         let digests = match &image.reference {
@@ -152,7 +158,7 @@ impl SingleRegistryProxyConfig {
                                 digests.push(Digest::try_from_raw(&d)?);
                             }
                         }
-                        Err(e) => tracing::warn!("Failed to fetch remote tag digest: {}", e),
+                        Err(e) => tracing::warn!("Failed to fetch remote tag digest: {e}"),
                     }
                 }
                 if let Some(local_digest) = local_digest {

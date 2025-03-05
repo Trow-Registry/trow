@@ -57,7 +57,7 @@ DATE="$(date '+%Y-%m-%d %T%z')"
 
 BUILD_ARGS=(
     "--build-arg" "VCS_REF=${SOURCE_COMMIT:-$(git rev-parse HEAD)}"
-    "--build-arg" "VCS_BRANCH=${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD)}"
+    "--build-arg" "VCS_BRANCH=${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD || true)}"
     "--build-arg" "REPO=$GH_REPO"
     "--build-arg" "TAG=$TAG"
     "--build-arg" "DATE=$DATE"

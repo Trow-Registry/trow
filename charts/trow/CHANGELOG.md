@@ -1,5 +1,10 @@
 # Changelog
 
+
+## v0.10.2 (2025-03-05)
+
+* Trow v0.7.4
+
 ## v0.10.1 (2025-02-24)
 
 * Trow v0.7.3 (fix broken arm64 image)
