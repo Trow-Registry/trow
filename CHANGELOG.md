@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.4 (2025-03-05)
+
+proxy: log error when creating an OCI client fails
+
 ## v0.7.3 (2025-02-24)
 
 * Fix broken arm64 container image
