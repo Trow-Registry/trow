@@ -148,8 +148,8 @@ mod proxy_registry {
         let data_dir = tmp_dir.as_path_untracked();
 
         let trow = start_trow(data_dir).await.1;
-        get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
-        get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
+        get_manifest(&trow, "f/nvcr/nvidia/doca/doca", "2.10.0-base-rt").await;
+        get_manifest(&trow, "f/nvcr/nvidia/doca/doca", "2.10.0-base-rt").await;
     }
 
     #[tokio::test]
