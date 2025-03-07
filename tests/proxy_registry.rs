@@ -237,6 +237,25 @@ mod proxy_registry {
 
     #[tokio::test]
     #[tracing_test::traced_test]
+    async fn test_proxy_same_manifest_different_repo() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await.1;
+
+        let (_man_quay, digest_quay) =
+            get_manifest(&trow, "f/quay/kiwigrid/k8s-sidecar", "1.30.0").await;
+        let (_man_docker, digest_docker) =
+            get_manifest(&trow, "f/docker/kiwigrid/k8s-sidecar", "1.30.0").await;
+
+        assert_eq!(
+            digest_quay, digest_docker,
+            "Test is broken, digests should be the same"
+        );
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
     async fn test_upload_manifest_nonwritable_repo() {
         let tmp_dir = test_temp_dir!();
         let data_dir = tmp_dir.as_path_untracked();
