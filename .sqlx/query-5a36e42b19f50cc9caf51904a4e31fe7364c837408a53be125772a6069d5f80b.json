@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(\n                    SELECT 1 FROM manifest\n                    INNER JOIN repo_blob_association ON blob_digest = manifest.digest AND repo_name = $2\n                    WHERE manifest.digest = $1\n                )",
+  "describe": {
+    "columns": [
+      {
+        "name": "EXISTS(\n                    SELECT 1 FROM manifest\n                    INNER JOIN repo_blob_association ON blob_digest = manifest.digest AND repo_name = $2\n                    WHERE manifest.digest = $1\n                )",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5a36e42b19f50cc9caf51904a4e31fe7364c837408a53be125772a6069d5f80b"
+}
