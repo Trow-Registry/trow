@@ -170,9 +170,15 @@ impl SingleRegistryProxyConfig {
 
         for mani_digest in digests.into_iter() {
             let mani_digest_str = mani_digest.as_str();
+            // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_association entries
             let has_manifest = sqlx::query_scalar!(
-                r#"SELECT EXISTS(SELECT 1 FROM manifest WHERE digest = $1)"#,
-                mani_digest_str
+                r#"SELECT EXISTS(
+                    SELECT 1 FROM manifest
+                    INNER JOIN repo_blob_association ON blob_digest = manifest.digest AND repo_name = $2
+                    WHERE manifest.digest = $1
+                )"#,
+                mani_digest_str,
+                repo_name
             )
             .fetch_one(&state.db_rw)
             .await?;

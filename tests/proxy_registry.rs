@@ -148,8 +148,8 @@ mod proxy_registry {
         let data_dir = tmp_dir.as_path_untracked();
 
         let trow = start_trow(data_dir).await.1;
-        get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
-        get_manifest(&trow, "f/nvcr/nvidia/doca/doca_hbn", "5.1.0-doca1.3.0").await;
+        get_manifest(&trow, "f/nvcr/nvidia/doca/doca", "2.10.0-base-rt").await;
+        get_manifest(&trow, "f/nvcr/nvidia/doca/doca", "2.10.0-base-rt").await;
     }
 
     #[tokio::test]
@@ -232,6 +232,25 @@ mod proxy_registry {
             serde_json::to_string(&man_3_13).unwrap(),
             serde_json::to_string(&man_latest).unwrap(),
             "Trow did not update manifest of `latest` tag"
+        );
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_proxy_same_manifest_different_repo() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = start_trow(data_dir).await.1;
+
+        let (_man_quay, digest_quay) =
+            get_manifest(&trow, "f/quay/kiwigrid/k8s-sidecar", "1.30.0").await;
+        let (_man_docker, digest_docker) =
+            get_manifest(&trow, "f/docker/kiwigrid/k8s-sidecar", "1.30.0").await;
+
+        assert_eq!(
+            digest_quay, digest_docker,
+            "Test is broken, digests should be the same"
         );
     }
 
