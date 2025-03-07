@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.5 (2025-03-07)
+
+proxy: fix error where the same manifest in a different repo would cause HTTP 404
+
 ## v0.7.4 (2025-03-05)
 
 proxy: log error when creating an OCI client fails
