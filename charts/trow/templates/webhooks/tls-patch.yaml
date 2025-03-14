@@ -135,14 +135,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       restartPolicy: OnFailure
       serviceAccountName: {{ include "trow.fullname" . }}-webhooks-tls
+      {{- with .Values.webhooks.tls.patch.podSecurityContext }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 2000
-        fsGroup: 2000
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -184,8 +186,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       {{- end }}
       {{- if .Values.trow.proxyRegistries.webhook.enabled }}
         - name: patch-mutation
@@ -203,13 +207,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       {{- end }}
       restartPolicy: OnFailure
       serviceAccountName: {{ include "trow.fullname" . }}-webhooks-tls
+      {{- with .Values.webhooks.tls.patch.podSecurityContext }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 2000
-        fsGroup: 2000
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end -}}
