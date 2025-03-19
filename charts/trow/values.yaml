@@ -9,6 +9,7 @@ image:
   tag:
   pullPolicy: IfNotPresent
 
+## Applies to the Trow Statefulset and the webhooks Deployment
 podSecurityContext:
   runAsUser: 333333
   runAsGroup: 333333
