@@ -30,6 +30,10 @@ spec:
           - |
             cp /etc/trow/webhook-cert-ecc/tls.crt /etc/trow/webhook-cert/cert && \
             openssl pkcs8 -topk8 -nocrypt -in /etc/trow/webhook-cert-ecc/tls.key -out /etc/trow/webhook-cert/key
+        {{- with .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - name: webhook-cert-translated
           mountPath: /etc/trow/webhook-cert
@@ -53,6 +57,10 @@ spec:
         ports:
         - name: webhook
           containerPort: 8443
+        {{- with .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - name: webhook-cert-translated
           mountPath: /etc/trow/webhook-cert
@@ -63,6 +71,10 @@ spec:
           subPath: config.yaml
           readOnly: true
       {{- end}}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: webhook-cert-ecc
           secret:

@@ -9,6 +9,14 @@ image:
   tag:
   pullPolicy: IfNotPresent
 
+## Applies to the Trow Statefulset and the webhooks Deployment
+podSecurityContext:
+  runAsUser: 333333
+  runAsGroup: 333333
+  fsGroup: 333333
+
+containerSecurityContext: {}
+
 trow:
   ## if using NodePort, this can be set to 127.0.0.1:XXXX
   ## Where "XXXX" is the value of service.nodePort
@@ -76,6 +84,12 @@ webhooks:
       image:
         image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.4.4@sha256:a9f03b34a3cbfbb26d103a14046ab2c5130a80c3d69d526ff8063d2b37b9fd3f
         pullPolicy: IfNotPresent
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        fsGroup: 2000
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
     ## Use an existing secret that contains tls.crt and tls.key
     existingSecretRef: ~
 
