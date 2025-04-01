@@ -18,7 +18,7 @@ jobs:
       - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache compilation artefacts
-        uses: mozilla-actions/sccache-action@v0.0.7
+        uses: mozilla-actions/sccache-action@v0.0.9
       - name: Setup cargo-sqlx
         run: cargo install sqlx-cli
       - name: Setup sqlx database
@@ -44,7 +44,7 @@ jobs:
       - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache compilation artefacts
-        uses: mozilla-actions/sccache-action@v0.0.7
+        uses: mozilla-actions/sccache-action@v0.0.9
       - name: Setup cargo-sqlx
         run: cargo install sqlx-cli
       - name: Setup sqlx database
@@ -166,4 +166,4 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Check spelling
-      uses: crate-ci/typos@v1.30.0
+      uses: crate-ci/typos@v1.31.1
