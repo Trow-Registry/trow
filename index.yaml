@@ -14,42 +14,6 @@ entries:
     - https://github.com/Trow-Registry/trow/releases/download/trow-0.8.1/trow-0.8.1.tgz
     version: 0.8.1
   - apiVersion: v2
-    appVersion: 0.6.4
-    created: "2024-10-17T16:28:32.311818186Z"
-    description: Helm chart for Trow registry
-    digest: 29810e645661b18b0f5dc114bd03bf97abf5683d24f13bf82a213b0c2cabb637
-    home: https://trow.io
-    kubeVersion: '>= 1.26.0-0'
-    name: trow
-    type: application
-    urls:
-    - https://github.com/Trow-Registry/trow/releases/download/trow-0.8.0/trow-0.8.0.tgz
-    version: 0.8.0
-  - apiVersion: v2
-    appVersion: 0.6.4
-    created: "2024-02-14T10:17:00.266308922Z"
-    description: Helm chart for Trow registry
-    digest: 4009ffcfa701ca8018a4df8921d89a10948dda637b8dddca0bb512ed7f07d7ba
-    home: https://trow.io
-    kubeVersion: '>= 1.26.0-0'
-    name: trow
-    type: application
-    urls:
-    - https://github.com/Trow-Registry/trow/releases/download/trow-0.7.0/trow-0.7.0.tgz
-    version: 0.7.0
-  - apiVersion: v2
-    appVersion: 0.6.3
-    created: "2023-12-04T16:32:21.992678466Z"
-    description: Helm chart for Trow registry
-    digest: f5f9605970e5dfec8818804613bcf84b55c40d40d7b65f1854de9f08d047371c
-    home: https://trow.io
-    kubeVersion: '>= 1.26.0-0'
-    name: trow
-    type: application
-    urls:
-    - https://github.com/Trow-Registry/trow/releases/download/trow-0.6.4/trow-0.6.4.tgz
-    version: 0.6.4
-  - apiVersion: v2
     appVersion: 0.6.2
     created: "2023-11-20T16:56:16.724051406Z"
     description: Helm chart for Trow registry
