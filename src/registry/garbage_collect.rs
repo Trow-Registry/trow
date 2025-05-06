@@ -120,8 +120,8 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
         WHERE b.last_accessed < strftime('%s', 'now', '-1 day')
         AND NOT EXISTS (
                 SELECT 1
-                FROM manifest m
-                WHERE m.blob LIKE '%' || b.digest || '%'
+                FROM manifest_blob_map mbm
+                WHERE mbm.blob_digest = b.digest
             );
         "#,
     )
@@ -180,7 +180,7 @@ async fn delete_old_proxied_images(
         };
 
         let manifests_to_delete = sqlx::query!(
-            r#"SELECT digest FROM manifest WHERE blob LIKE '%' || $1 || '%'"#,
+            r#"SELECT manifest_digest FROM manifest_blob_map WHERE blob_digest = $1"#,
             blob_to_delete.digest
         )
         .fetch_all(&state.db_rw)
@@ -188,11 +188,9 @@ async fn delete_old_proxied_images(
         for manifest_digest in manifests_to_delete {
             sqlx::query!(
                 r#"
-                DELETE FROM tag WHERE manifest_digest = $1;
-                DELETE FROM manifest WHERE digest = $2;
+                DELETE FROM manifest WHERE digest = $1;
                 "#,
-                manifest_digest.digest,
-                manifest_digest.digest
+                manifest_digest.manifest_digest
             )
             .execute(&state.db_rw)
             .await?;
