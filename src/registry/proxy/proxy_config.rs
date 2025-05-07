@@ -173,9 +173,7 @@ impl SingleRegistryProxyConfig {
             // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_association entries
             let has_manifest = sqlx::query_scalar!(
                 r#"SELECT EXISTS(
-                    SELECT 1 FROM manifest
-                    INNER JOIN repo_blob_association ON blob_digest = manifest.digest AND repo_name = $2
-                    WHERE manifest.digest = $1
+                    SELECT 1 FROM repo_blob_association WHERE manifest_digest = $1 AND repo_name = $2
                 )"#,
                 mani_digest_str,
                 repo_name
@@ -238,7 +236,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPass
         .ok_or(EcrPasswordError::InvalidRegion)?
         .to_owned();
     let region = aws_types::region::Region::new(region);
-    let config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+    let config = aws_config::defaults(BehaviorVersion::v2025_01_17())
         .region(region)
         .load()
         .await;
@@ -352,7 +350,7 @@ async fn download_manifest_and_layers(
 
     sqlx::query!(
         r"INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING;
-        INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
+        INSERT INTO repo_blob_association (repo_name, manifest_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
         digest,
         raw_manifest,
         local_repo_name,

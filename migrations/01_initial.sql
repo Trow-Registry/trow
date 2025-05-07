@@ -17,6 +17,7 @@ CREATE TABLE "blob_upload" (
 ) STRICT;
 CREATE TABLE "repo_blob_association" (
     "repo_name" TEXT NOT NULL,
+    -- Here blob_digest can also point to a manifest
     "blob_digest" TEXT NOT NULL,
     PRIMARY KEY ("repo_name", "blob_digest")
 ) STRICT;

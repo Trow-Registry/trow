@@ -96,10 +96,9 @@ async fn get_manifest(
         };
         let maybe_digest = sqlx::query_scalar!(
             r#"
-            SELECT m.digest
-            FROM manifest m
-            INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
-            WHERE m.digest = $2 AND rba.repo_name = $1
+            SELECT rba.manifest_digest
+            FROM repo_blob_association rba
+            WHERE rba.manifest_digest = $2 AND rba.repo_name = $1
             "#,
             repo,
             digest
@@ -108,8 +107,8 @@ async fn get_manifest(
         .await?;
 
         match maybe_digest {
-            Some(d) => d,
-            None => {
+            Some(Some(d)) => d,
+            _ => {
                 return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
             }
         }
@@ -180,9 +179,8 @@ async fn put_image_manifest(
                 .map(|m| m.digest().as_ref());
             for digest in assets {
                 let res = sqlx::query!(
-                    r"SELECT m.digest FROM manifest m
-                    INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
-                    WHERE m.digest = $1 AND rba.repo_name = $2",
+                    r"SELECT rba.manifest_digest FROM repo_blob_association rba
+                    WHERE rba.manifest_digest = $1 AND rba.repo_name = $2",
                     digest,
                     repo_name
                 )
@@ -203,9 +201,8 @@ async fn put_image_manifest(
                 .map(|l| l.digest().as_ref());
             for digest in assets {
                 let res = sqlx::query!(
-                    r"SELECT b.digest FROM blob b
-                    INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest
-                    WHERE b.digest = $1 AND rba.repo_name = $2",
+                    r"SELECT rba.blob_digest FROM repo_blob_association rba
+                    WHERE rba.blob_digest = $1 AND rba.repo_name = $2",
                     digest,
                     repo_name
                 )
@@ -241,8 +238,8 @@ async fn put_image_manifest(
     sqlx::query!(
         r#"
         INSERT INTO repo_blob_association
-        VALUES ($1, $2)
-        ON CONFLICT (repo_name, blob_digest) DO NOTHING
+        VALUES ($1, NULL, $2)
+        ON CONFLICT (repo_name, blob_digest, manifest_digest) DO NOTHING
         "#,
         repo_name,
         computed_digest_str
@@ -322,7 +319,7 @@ async fn delete_image_manifest(
 
         if res.rows_affected() > 0 {
             let remaining_assoc = sqlx::query_scalar!(
-                "SELECT COUNT(*) FROM repo_blob_association WHERE blob_digest = $1",
+                "SELECT COUNT(*) FROM repo_blob_association WHERE manifest_digest = $1",
                 digest_str
             )
             .fetch_one(&state.db_ro)

@@ -138,7 +138,7 @@ impl OCIManifest {
     /// With the exception of digests for "foreign blobs"
     pub fn get_local_asset_digests(&self) -> Vec<String> {
         let digests = match self {
-            OCIManifest::V2(ref m2) => {
+            OCIManifest::V2(m2) => {
                 let mut digests: Vec<String> = m2
                     .layers()
                     .iter()
@@ -148,7 +148,7 @@ impl OCIManifest {
                 digests.push(m2.config().digest().to_string());
                 digests
             }
-            OCIManifest::List(ref list) => {
+            OCIManifest::List(list) => {
                 // Just return the manifest digests.
                 // We could recurse into the manifests, but they should have been checked already.
                 list.manifests()

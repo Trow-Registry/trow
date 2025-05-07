@@ -67,11 +67,11 @@ impl TrowStorageBackend {
         })
     }
 
-    pub async fn get_blob_stream(
+    pub async fn get_blob_stream<'a, 'b>(
         &self,
-        repo_name: &str,
-        digest: &str,
-    ) -> Result<BoundedStream<impl AsyncRead>, StorageBackendError> {
+        repo_name: &'a str,
+        digest: &'a str,
+    ) -> Result<BoundedStream<impl AsyncRead + use<'b>>, StorageBackendError> {
         tracing::debug!("Get blob {repo_name}@{digest}");
         let path = self.blobs_dir.join(digest);
         let file = tokio::fs::File::open(&path).await.map_err(|e| {

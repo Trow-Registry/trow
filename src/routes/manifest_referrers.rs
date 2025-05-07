@@ -46,7 +46,7 @@ async fn get_referrers(
             m.digest,
             length(m.blob) as "size!: i64"
         FROM manifest m
-        INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
+        INNER JOIN repo_blob_association rba ON rba.manifest_digest = m.digest
         WHERE rba.repo_name = $1
             AND (m.json -> 'subject' ->> 'digest') = $2
         "#,
@@ -174,7 +174,7 @@ mod tests {
             .await
             .unwrap();
             sqlx::query!(
-                r#"INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ("test", $1)"#,
+                r#"INSERT INTO repo_blob_association (repo_name, blob_digest, manifest_digest) VALUES ("test", NULL, $s1)"#,
                 digest
             )
             .execute(&state.db_rw)

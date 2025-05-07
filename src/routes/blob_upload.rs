@@ -79,7 +79,7 @@ mod utils {
         .await?;
 
         sqlx::query!(
-            "INSERT INTO repo_blob_association VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            "INSERT INTO repo_blob_association VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING",
             upload.repo,
             digest_str,
         )
