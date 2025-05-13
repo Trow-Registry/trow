@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(\n                    SELECT 1 FROM repo_blob_assoc WHERE manifest_digest = $1 AND repo_name = $2\n                )",
+  "describe": {
+    "columns": [
+      {
+        "name": "EXISTS(\n                    SELECT 1 FROM repo_blob_assoc WHERE manifest_digest = $1 AND repo_name = $2\n                )",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bcb80bd6a5d512091b51672c99bebc76514dae22d4595b0da4740e935901e3e5"
+}

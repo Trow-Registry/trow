@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) FROM repo_blob_association WHERE manifest_digest = $1",
+  "query": "SELECT COUNT(*) FROM repo_blob_assoc WHERE manifest_digest = $1",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "724b2e99284ee815406958f59ee43b345b036d9d92da2f64fed1f213ca4ef261"
+  "hash": "2f77dc09de38896eb393ae58962a82764afadd3e432e7f79f4cd1b41010947e1"
 }

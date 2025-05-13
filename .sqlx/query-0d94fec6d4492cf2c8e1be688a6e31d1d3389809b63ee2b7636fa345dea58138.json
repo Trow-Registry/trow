@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT DISTINCT rba.repo_name\n        FROM repo_blob_assoc rba\n        WHERE rba.repo_name > $1\n        ORDER BY rba.repo_name ASC\n        LIMIT $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "repo_name",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0d94fec6d4492cf2c8e1be688a6e31d1d3389809b63ee2b7636fa345dea58138"
+}

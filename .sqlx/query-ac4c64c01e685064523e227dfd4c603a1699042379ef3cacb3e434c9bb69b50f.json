@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT DISTINCT manifest_digest FROM manifest_blob_map WHERE blob_digest = $1",
+  "query": "SELECT DISTINCT manifest_digest FROM manifest_blob_assoc WHERE blob_digest = $1",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "e131dd9a42d5ec09c19fc6cb96b996f612f5d3964faa7087bf90fb2c55aa6b4f"
+  "hash": "ac4c64c01e685064523e227dfd4c603a1699042379ef3cacb3e434c9bb69b50f"
 }

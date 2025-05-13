@@ -120,8 +120,8 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
         WHERE b.last_accessed < strftime('%s', 'now', '-1 day')
         AND NOT EXISTS (
                 SELECT 1
-                FROM manifest_blob_map mbm
-                WHERE mbm.blob_digest = b.digest
+                FROM manifest_blob_assoc mba
+                WHERE mba.blob_digest = b.digest
             );
         "#,
     )
@@ -156,7 +156,7 @@ async fn delete_old_proxied_images(
         WHERE b.last_accessed < strftime('%s', 'now', '-1 day')
         AND NOT EXISTS (
                 SELECT 1
-                FROM "repo_blob_association" rba
+                FROM "repo_blob_assoc" rba
                 WHERE rba.blob_digest = b.digest
                 AND rba.repo_name NOT LIKE 'f/%'
             )
@@ -174,7 +174,7 @@ async fn delete_old_proxied_images(
         };
 
         let manifests_to_delete = sqlx::query!(
-            r#"SELECT DISTINCT manifest_digest FROM manifest_blob_map WHERE blob_digest = $1"#,
+            r#"SELECT DISTINCT manifest_digest FROM manifest_blob_assoc WHERE blob_digest = $1"#,
             blob_to_delete.digest
         )
         .fetch_all(&state.db_rw)
@@ -235,7 +235,7 @@ mod tests {
 
         sqlx::query!(
             r#"
-            INSERT INTO repo_blob_association (repo_name, blob_digest)
+            INSERT INTO repo_blob_assoc (repo_name, blob_digest)
             VALUES ('f/test_repo1', 'sha256:test1'),
                    ('f/test_repo3', 'sha256:test3')
             "#
@@ -264,12 +264,11 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 275); // Expect to clean the 2 oldest blobs
 
-        let repo_blob_associations =
-            sqlx::query_scalar!(r#"SELECT repo_name FROM repo_blob_association"#)
-                .fetch_all(&state.db_ro)
-                .await
-                .unwrap();
-        assert_eq!(&repo_blob_associations, &["f/test_repo3"]);
+        let repo_blob_assocs = sqlx::query_scalar!(r#"SELECT repo_name FROM repo_blob_assoc"#)
+            .fetch_all(&state.db_ro)
+            .await
+            .unwrap();
+        assert_eq!(&repo_blob_assocs, &["f/test_repo3"]);
 
         let manifests = sqlx::query_scalar!(r#"SELECT digest FROM manifest"#)
             .fetch_all(&state.db_ro)

@@ -32,7 +32,7 @@ async fn get_catalog(
     let repos = sqlx::query!(
         r#"
         SELECT DISTINCT rba.repo_name
-        FROM repo_blob_association rba
+        FROM repo_blob_assoc rba
         WHERE rba.repo_name > $1
         ORDER BY rba.repo_name ASC
         LIMIT $2

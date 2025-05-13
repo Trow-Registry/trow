@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT b.rowid as \"rowid!\" FROM blob b\n        JOIN repo_blob_assoc rba ON b.digest = rba.blob_digest\n        WHERE b.digest = $1 AND rba.repo_name = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "rowid!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "f5d12cf96720c56798f47641f38f39ab24a6b027a5bb919f12af3836ea6a49da"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT digest, size\n        FROM \"blob\" b\n        WHERE b.last_accessed < strftime('%s', 'now', '-1 day')\n        AND NOT EXISTS (\n                SELECT 1\n                FROM \"repo_blob_assoc\" rba\n                WHERE rba.blob_digest = b.digest\n                AND rba.repo_name NOT LIKE 'f/%'\n            )\n        ORDER BY b.last_accessed DESC\n        LIMIT 500;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "size",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "5b2946fbbd9c1f20e7f3e1e531b9036960dbec8eab7f419c3a27ef4ca58b7382"
+}

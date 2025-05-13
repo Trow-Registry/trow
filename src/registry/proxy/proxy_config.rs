@@ -170,10 +170,10 @@ impl SingleRegistryProxyConfig {
 
         for mani_digest in digests.into_iter() {
             let mani_digest_str = mani_digest.as_str();
-            // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_association entries
+            // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_assoc entries
             let has_manifest = sqlx::query_scalar!(
                 r#"SELECT EXISTS(
-                    SELECT 1 FROM repo_blob_association WHERE manifest_digest = $1 AND repo_name = $2
+                    SELECT 1 FROM repo_blob_assoc WHERE manifest_digest = $1 AND repo_name = $2
                 )"#,
                 mani_digest_str,
                 repo_name
@@ -301,7 +301,7 @@ async fn download_manifest_and_layers(
             .await?;
         }
         sqlx::query!(
-            "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
+            "INSERT INTO repo_blob_assoc (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
             local_repo_name,
             layer_digest
         )
@@ -335,7 +335,7 @@ async fn download_manifest_and_layers(
 
     sqlx::query!(
         r"INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING;
-        INSERT INTO repo_blob_association (repo_name, manifest_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
+        INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
         digest,
         raw_manifest,
         local_repo_name,

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO repo_blob_assoc VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c6e6b5c94a6532a9e325fa2154d6c46b79488d723ba9840849d58d16d37b41dc"
+}

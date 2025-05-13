@@ -51,7 +51,7 @@ async fn get_blob(
     let rowid = sqlx::query_scalar!(
         r#"
         SELECT b.rowid as "rowid!" FROM blob b
-        JOIN repo_blob_association rba ON b.digest = rba.blob_digest
+        JOIN repo_blob_assoc rba ON b.digest = rba.blob_digest
         WHERE b.digest = $1 AND rba.repo_name = $2
         "#,
         digest_str,

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT rba.manifest_digest FROM repo_blob_association rba\n                    WHERE rba.manifest_digest = $1 AND rba.repo_name = $2",
+  "query": "SELECT rba.manifest_digest FROM repo_blob_assoc rba\n                    WHERE rba.manifest_digest = $1 AND rba.repo_name = $2",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       true
     ]
   },
-  "hash": "8cbef273fcdeada723d5a37b8932b758e32d1b2bc492be0ca97e6713951a1995"
+  "hash": "459995dfcba9b3dc20c52e1709534bc260c313951fda246dfee7fdb64be31429"
 }
