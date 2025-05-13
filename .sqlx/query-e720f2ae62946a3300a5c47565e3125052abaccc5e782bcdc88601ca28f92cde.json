@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT json(m.json) as \"content!: Json<OCIManifest>\",\n            m.digest,\n            length(m.blob) as \"size!: i64\"\n        FROM manifest m\n        INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest\n        WHERE rba.repo_name = $1\n            AND (m.json -> 'subject' ->> 'digest') = $2\n        ",
+  "query": "\n        SELECT json(m.json) as \"content!: Json<OCIManifest>\",\n            m.digest,\n            length(m.blob) as \"size!: i64\"\n        FROM manifest m\n        INNER JOIN repo_blob_association rba ON rba.manifest_digest = m.digest\n        WHERE rba.repo_name = $1\n            AND (m.json -> 'subject' ->> 'digest') = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       null
     ]
   },
-  "hash": "e6725cf1b15f400a63ee13bc6d4f503b45c654ab60abada2a437e81b4992b0b9"
+  "hash": "e720f2ae62946a3300a5c47565e3125052abaccc5e782bcdc88601ca28f92cde"
 }

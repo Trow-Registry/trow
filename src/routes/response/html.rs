@@ -2,9 +2,9 @@ use axum::body;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 
-pub struct HTML<'a>(pub &'a str);
+pub struct Html<'a>(pub &'a str);
 
-impl IntoResponse for HTML<'_> {
+impl IntoResponse for Html<'_> {
     fn into_response(self) -> Response {
         Response::builder()
             .header(header::CONTENT_TYPE, "text/html")

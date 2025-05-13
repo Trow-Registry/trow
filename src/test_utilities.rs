@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use axum::body::Body;
 use axum::Router;
+use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::Response;
 use serde::de::DeserializeOwned;
 use test_temp_dir::TestTempDir;
 
-use crate::{routes, TrowConfig, TrowServerState};
+use crate::{TrowConfig, TrowServerState, routes};
 
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 pub const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";

@@ -6,8 +6,8 @@ use std::str::FromStr;
 
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
-use clap::builder::ArgPredicate;
 use clap::Parser;
+use clap::builder::ArgPredicate;
 use trow::{TlsConfig, TrowConfig};
 
 #[derive(Parser, Debug)]

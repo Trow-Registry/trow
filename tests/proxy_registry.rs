@@ -7,15 +7,15 @@ mod proxy_registry {
     use std::path::Path;
     use std::sync::Arc;
 
-    use axum::body::Body;
     use axum::Router;
+    use axum::body::Body;
     use hyper::Request;
     use oci_spec::image::ImageManifest;
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
-    use trow::registry::{manifest, RegistryProxiesConfig, SingleRegistryProxyConfig};
     use trow::TrowServerState;
+    use trow::registry::{RegistryProxiesConfig, SingleRegistryProxyConfig, manifest};
 
     use crate::common;
     use crate::common::trow_router;

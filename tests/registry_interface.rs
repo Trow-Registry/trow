@@ -3,18 +3,18 @@ mod common;
 
 mod registry_interface {
 
+    use axum::Router;
     use axum::body::Body;
     use axum::http::HeaderValue;
-    use axum::Router;
     use hyper::Request;
     use oci_spec::image::ImageManifest;
     use reqwest::StatusCode;
-    use test_temp_dir::{test_temp_dir, TestTempDir};
+    use test_temp_dir::{TestTempDir, test_temp_dir};
     use tower::ServiceExt;
-    use trow::registry::digest;
+    use trow::registry::{Digest, digest};
     use trow::types::{RepoCatalog, TagList};
 
-    use crate::common::{self, response_body_string, trow_router, DIST_API_HEADER};
+    use crate::common::{self, DIST_API_HEADER, response_body_string, trow_router};
 
     async fn start_trow(data_dir: &TestTempDir) -> Router {
         trow_router(data_dir.as_path_untracked(), |_| {}).await.1
@@ -203,7 +203,10 @@ mod registry_interface {
         assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
-    async fn upload_blob_with_post(cl: &Router, repo_name: &str) {
+    async fn upload_blob_with_post(
+        cl: &Router,
+        repo_name: &str,
+    ) -> (&'static [u8], digest::Digest) {
         let blob_content = "{ }\n".as_bytes();
         let digest = digest::Digest::digest_sha256_slice(blob_content);
 
@@ -227,6 +230,8 @@ mod registry_interface {
             .to_str()
             .unwrap();
         assert_eq!(range, format!("0-{}", (blob_content.len() - 1))); //note first byte is 0, hence len - 1
+
+        (blob_content, digest)
     }
 
     async fn push_oci_manifest(cl: &Router, name: &str, tag: &str) -> String {
@@ -302,11 +307,7 @@ mod registry_interface {
         repo_name: &str,
         tag: &str,
     ) -> String {
-        //Note config was uploaded as blob in earlier test
-        let config = "{ }\n".as_bytes();
-        let config_digest = digest::Digest::digest_sha256_slice(config);
-
-        upload_blob_with_post(cl, repo_name).await;
+        let (config, config_digest) = upload_blob_with_post(cl, repo_name).await;
 
         let manifest = format!(
             r#"{{ "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -569,13 +570,14 @@ mod registry_interface {
 
         let rr: serde_json::Value = common::response_body_json(resp).await;
 
-        assert!(rr
-            .as_object()
-            .unwrap()
-            .get("is_ready")
-            .unwrap()
-            .as_bool()
-            .unwrap());
+        assert!(
+            rr.as_object()
+                .unwrap()
+                .get("is_ready")
+                .unwrap()
+                .as_bool()
+                .unwrap()
+        );
     }
 
     #[tokio::test]
@@ -594,13 +596,14 @@ mod registry_interface {
 
         let hr: serde_json::Value = common::response_body_json(resp).await;
 
-        assert!(hr
-            .as_object()
-            .unwrap()
-            .get("is_healthy")
-            .unwrap()
-            .as_bool()
-            .unwrap());
+        assert!(
+            hr.as_object()
+                .unwrap()
+                .get("is_healthy")
+                .unwrap()
+                .as_bool()
+                .unwrap()
+        );
     }
 
     #[tokio::test]

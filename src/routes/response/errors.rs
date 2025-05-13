@@ -1,13 +1,13 @@
 use std::fmt;
 
 use axum::body;
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::registry::digest::DigestError;
 use crate::registry::StorageBackendError;
+use crate::registry::digest::DigestError;
 
 #[derive(Debug)]
 pub enum Error {
@@ -19,7 +19,7 @@ pub enum Error {
     BlobUnknown,
     BlobUploadUnknown,
     Unsupported,
-    InternalError,
+    Internal,
     DigestInvalid,
     NotFound,
     UnsupportedForProxiedRepo,
@@ -56,7 +56,7 @@ impl fmt::Display for Error {
                 Some(json!({ "Reason": detail })),
             ),
             // TODO: INTERNAL_ERROR code is not in the distribution spec
-            Error::InternalError => {
+            Error::Internal => {
                 format_error_json(f, "INTERNAL_ERROR", "Internal Server Error", None)
             }
             Error::DigestInvalid => format_error_json(
@@ -142,7 +142,7 @@ impl IntoResponse for Error {
             Error::BlobUploadUnknown | Error::ManifestUnknown(_) | Error::BlobUnknown => {
                 StatusCode::NOT_FOUND
             }
-            Error::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::Internal => StatusCode::INTERNAL_SERVER_ERROR,
             Error::BlobUploadInvalid(_) => StatusCode::RANGE_NOT_SATISFIABLE,
             Error::DigestInvalid | Error::ManifestInvalid(_) | Error::NameInvalid(_) => {
                 StatusCode::BAD_REQUEST
@@ -166,7 +166,7 @@ impl From<sqlx::Error> for Error {
             sqlx::Error::RowNotFound => Self::NotFound,
             _ => {
                 tracing::error!("Error(DbErr): {err}");
-                Self::InternalError
+                Self::Internal
             }
         }
     }
@@ -178,7 +178,7 @@ impl From<StorageBackendError> for Error {
         match err {
             StorageBackendError::BlobNotFound(_) => Self::BlobUnknown,
             StorageBackendError::InvalidContentRange => Self::UnsatisfiableRange,
-            _ => Self::InternalError,
+            _ => Self::Internal,
         }
     }
 }

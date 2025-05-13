@@ -36,7 +36,7 @@ CREATE TABLE manifest_blob_map (
     blob_digest TEXT NOT NULL,
     PRIMARY KEY (manifest_digest, blob_digest),
     FOREIGN KEY (manifest_digest) REFERENCES manifest(digest) ON DELETE CASCADE,
-    FOREIGN KEY (blob_digest) REFERENCES blob(digest) ON DELETE CASCADE
+    FOREIGN KEY (blob_digest) REFERENCES blob(digest)
 );
 CREATE INDEX idx_manifest_blob_map_blob ON manifest_blob_map(blob_digest);
 
@@ -44,16 +44,21 @@ CREATE TRIGGER after_manifest_insert_blob_map
     AFTER INSERT ON manifest
     FOR EACH ROW
 BEGIN
+    -- Note: a manifest can reference a non existing blob (eg foreign blobs)
+
     -- Extract blob digests from layers array in the JSON
     INSERT INTO manifest_blob_map (manifest_digest, blob_digest)
     SELECT NEW.digest, json_extract(value, '$.digest')
     FROM json_each(json_extract(NEW.json, '$.layers'))
-    WHERE json_extract(value, '$.digest') IS NOT NULL;
+    WHERE json_extract(value, '$.digest') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM blob WHERE digest = json_extract(value, '$.digest'))
+    ON CONFLICT DO NOTHING;
 
-    -- Also capture config blob if it exists
+    -- Also capture config blob, if it exists
     INSERT OR IGNORE INTO manifest_blob_map (manifest_digest, blob_digest)
     SELECT NEW.digest, json_extract(NEW.json, '$.config.digest')
-    WHERE json_extract(NEW.json, '$.config.digest') IS NOT NULL;
+    WHERE json_extract(NEW.json, '$.config.digest') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM blob WHERE digest = json_extract(NEW.json, '$.config.digest'));
 end;
 
 

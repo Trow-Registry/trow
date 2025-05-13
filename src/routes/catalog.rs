@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
-use axum::Router;
 use oci_spec::distribution::{RepositoryList, RepositoryListBuilder, TagList, TagListBuilder};
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
+use crate::TrowServerState;
 use crate::routes::macros::route_7_levels;
+use crate::routes::response::OciJson;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::routes::response::OciJson;
-use crate::TrowServerState;
 
 #[derive(Debug, Deserialize)]
 pub struct CatalogListQuery {

@@ -3,7 +3,7 @@ use std::env;
 use argon2::{self, Config};
 use bytes::Bytes;
 use data_encoding::HEXUPPER;
-use rusqlite::{params, Connection, NO_PARAMS};
+use rusqlite::{Connection, NO_PARAMS, params};
 use {failure, rand};
 
 // User Struct
@@ -139,7 +139,7 @@ mod tests {
 
     use std::env;
 
-    use super::{get_hash_from_password, get_salt, verify_password, User};
+    use super::{User, get_hash_from_password, get_salt, verify_password};
 
     #[test]
     fn test_get_salt() {

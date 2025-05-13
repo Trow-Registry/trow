@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::{Json, State};
 use axum::routing::post;
-use axum::Router;
 use k8s_openapi::api::core::v1::Pod;
-use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 use kube::core::DynamicObject;
+use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 
 use crate::TrowServerState;
 
@@ -56,7 +56,7 @@ mod test {
     use hyper::Request;
     use k8s_openapi::api::core::v1::Pod;
     use kube::core::admission::AdmissionReview;
-    use reqwest::{header, StatusCode};
+    use reqwest::{StatusCode, header};
     use tower::ServiceExt;
 
     use crate::registry::{

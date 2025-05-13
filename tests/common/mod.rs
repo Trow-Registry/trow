@@ -6,19 +6,19 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use axum::body::Body;
 use axum::Router;
+use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::body::Buf;
 use hyper::{Request, Response};
 use rand::Rng;
 use reqwest::StatusCode;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tower::ServiceExt;
 use trow::registry::digest::Digest;
 use trow::registry::manifest;
-use trow::{routes, TrowConfig, TrowServerState};
+use trow::{TrowConfig, TrowServerState, routes};
 
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
 pub const UPLOAD_HEADER: &str = "Docker-Upload-Uuid";

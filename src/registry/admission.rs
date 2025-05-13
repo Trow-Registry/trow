@@ -26,7 +26,10 @@ fn check_image_is_allowed(
         "Allow" => true,
         "Deny" => false,
         _ => {
-            tracing::warn!( "Invalid default image validation config: `{}`. Should be `Allow` or `Deny`. Default to `Deny`.", config.default);
+            tracing::warn!(
+                "Invalid default image validation config: `{}`. Should be `Allow` or `Deny`. Default to `Deny`.",
+                config.default
+            );
             false
         }
     };
@@ -61,7 +64,7 @@ fn extract_images(pod: &Pod) -> (Vec<String>, Vec<jsonptr::PointerBuf>) {
     for (i, container) in spec.containers.iter().enumerate() {
         if let Some(image) = &container.image {
             images.push(image.clone());
-            paths.push(jsonptr::PointerBuf::parse(&format!("/spec/containers/{i}/image")).unwrap());
+            paths.push(jsonptr::PointerBuf::parse(format!("/spec/containers/{i}/image")).unwrap());
         }
     }
 
@@ -69,7 +72,7 @@ fn extract_images(pod: &Pod) -> (Vec<String>, Vec<jsonptr::PointerBuf>) {
         if let Some(image) = &container.image {
             images.push(image.clone());
             paths.push(
-                jsonptr::PointerBuf::parse(&format!("/spec/initContainers/{i}/image")).unwrap(),
+                jsonptr::PointerBuf::parse(format!("/spec/initContainers/{i}/image")).unwrap(),
             );
         }
     }

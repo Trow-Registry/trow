@@ -1,24 +1,24 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::routing::get;
-use axum::Router;
 use digest::Digest;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
+use crate::TrowServerState;
 use crate::registry::digest;
 use crate::registry::manifest::{
-    layer_is_distributable, ManifestReference, OCIManifest, REGEX_TAG,
+    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable,
 };
 use crate::registry::server::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};
-use crate::TrowServerState;
 
 /*
 ---
@@ -62,7 +62,7 @@ async fn get_manifest(
             None => {
                 return Err(Error::NameInvalid(format!(
                     "No registered proxy matches {repo}"
-                )))
+                )));
             }
         };
 
@@ -71,7 +71,7 @@ async fn get_manifest(
             .await
             .map_err(|e| {
                 tracing::error!("Error downloading image: {e}");
-                Error::InternalError
+                Error::Internal
             })?
     } else {
         let digest = match &reference {
@@ -88,7 +88,7 @@ async fn get_manifest(
                     None => {
                         return Err(Error::ManifestUnknown(format!(
                             "Unknown tag: {raw_reference}"
-                        )))
+                        )));
                     }
                 }
             }

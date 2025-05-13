@@ -4,15 +4,17 @@ use aws_sdk_ecr::error::SdkError;
 use aws_sdk_ecr::operation::get_authorization_token::GetAuthorizationTokenError;
 use base64::Engine;
 use futures::future::try_join_all;
+use oci_client::Reference;
 use oci_client::client::ClientProtocol;
 use oci_client::secrets::RegistryAuth;
-use oci_client::Reference;
 use serde::{Deserialize, Serialize};
 
+use crate::TrowServerState;
+use crate::registry::Digest;
+use crate::registry::digest::DigestError;
 use crate::registry::manifest::{ManifestReference, OCIManifest};
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::Digest;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
@@ -68,8 +70,6 @@ impl RegistryProxiesConfig {
         None
     }
 }
-use crate::registry::digest::DigestError;
-use crate::TrowServerState;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DownloadRemoteImageError {
@@ -327,26 +327,11 @@ async fn download_manifest_and_layers(
         oci_client::errors::OciDistributionError::ManifestParsingError(e.to_string())
     })?;
 
-    match &manifest {
-        OCIManifest::List(_) => {
-            let images_to_dl = manifest
-                .get_local_asset_digests()
-                .iter()
-                .map(|digest| ref_.clone_with_digest(digest.to_string()))
-                .collect::<Vec<_>>();
-            let futures = images_to_dl
-                .iter()
-                .map(|img| download_manifest_and_layers(cl, auth, state, img, local_repo_name));
-            try_join_all(futures).await?;
-        }
-        OCIManifest::V2(_) => {
-            let layer_digests = manifest.get_local_asset_digests();
-            let futures = layer_digests
-                .iter()
-                .map(|l| download_blob(cl, state, ref_, l, local_repo_name));
-            try_join_all(futures).await?;
-        }
-    }
+    let blobs = manifest.get_local_blob_digests();
+    let futures = blobs
+        .iter()
+        .map(|l| download_blob(cl, state, ref_, l, local_repo_name));
+    try_join_all(futures).await?;
 
     sqlx::query!(
         r"INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING;

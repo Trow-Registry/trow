@@ -4,14 +4,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::{body, RequestPartsExt};
+use axum::{RequestPartsExt, body};
 use axum_extra::headers;
-use base64::engine::general_purpose as base64_engine;
 use base64::Engine as _;
+use base64::engine::general_purpose as base64_engine;
 use headers::HeaderMapExt;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

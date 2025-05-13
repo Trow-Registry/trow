@@ -128,12 +128,6 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
     .fetch_all(&state.db_ro)
     .await?;
     for blob in blobs_to_delete {
-        sqlx::query!(
-            r#"DELETE FROM repo_blob_association WHERE blob_digest = $1"#,
-            blob.digest
-        )
-        .execute(&state.db_rw)
-        .await?;
         sqlx::query!(r#"DELETE FROM blob WHERE digest = $1"#, blob.digest)
             .execute(&state.db_rw)
             .await?;
@@ -180,7 +174,7 @@ async fn delete_old_proxied_images(
         };
 
         let manifests_to_delete = sqlx::query!(
-            r#"SELECT manifest_digest FROM manifest_blob_map WHERE blob_digest = $1"#,
+            r#"SELECT DISTINCT manifest_digest FROM manifest_blob_map WHERE blob_digest = $1"#,
             blob_to_delete.digest
         )
         .fetch_all(&state.db_rw)
@@ -195,16 +189,9 @@ async fn delete_old_proxied_images(
             .execute(&state.db_rw)
             .await?;
         }
-        sqlx::query!(
-            r#"
-            DELETE FROM repo_blob_association WHERE blob_digest = $1;
-            DELETE FROM blob WHERE digest = $2;
-            "#,
-            blob_to_delete.digest,
-            blob_to_delete.digest
-        )
-        .execute(&state.db_rw)
-        .await?;
+        sqlx::query!(r"DELETE FROM blob WHERE digest = $1", blob_to_delete.digest)
+            .execute(&state.db_rw)
+            .await?;
         state
             .registry
             .storage

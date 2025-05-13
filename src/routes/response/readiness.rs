@@ -1,4 +1,4 @@
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 
 use crate::registry::api_types::ReadyStatus;

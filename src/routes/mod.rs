@@ -17,16 +17,16 @@ use std::str;
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::Router;
 use axum::body::{Body, HttpBody};
 use axum::extract::State;
 use axum::http::method::Method;
-use axum::http::{header, HeaderName, StatusCode};
+use axum::http::{HeaderName, StatusCode, header};
 use axum::response::Response;
 use axum::routing::get;
-use axum::Router;
 use hyper::http::HeaderValue;
 use response::errors::Error;
-use response::html::HTML;
+use response::html::Html;
 use response::trow_token::{self, TrowToken, ValidBasicToken};
 use tower::ServiceBuilder;
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -148,12 +148,12 @@ async fn get_v2root(_auth_user: TrowToken) -> &'static str {
 /*
  * Welcome message
  */
-async fn get_homepage<'a>() -> HTML<'a> {
+async fn get_homepage<'a>() -> Html<'a> {
     const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
 <h1>Welcome to Trow, the cluster registry</h1>
 </body></html>";
 
-    HTML(ROOT_RESPONSE)
+    Html(ROOT_RESPONSE)
 }
 
 // // Want non HTML return for 404 for docker client
@@ -181,7 +181,7 @@ async fn login(
         Ok(t) => Ok(t),
         Err(e) => {
             tracing::error!("Failed to create token: {:#}", e);
-            Err(Error::InternalError)
+            Err(Error::Internal)
         }
     }
 }

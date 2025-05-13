@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT rba.manifest_digest\n            FROM repo_blob_association rba\n            WHERE rba.manifest_digest = $2 AND rba.repo_name = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "manifest_digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "740b87cdacd4d66477e2887ceccba3d796cf3fba15296c4ee1c3b4a06950f8ea"
+}
