@@ -66,10 +66,12 @@ INSERT INTO manifest_blob_assoc (manifest_digest, blob_digest)
     SELECT m.digest, json_extract(value, '$.digest')
     FROM manifest m
     JOIN json_each(json_extract(m.json, '$.layers'))
-    WHERE json_extract(value, '$.digest') IS NOT NULL;
+    WHERE json_extract(value, '$.digest') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM blob WHERE digest = json_extract(value, '$.digest'));
 
 -- Also capture config blobs for all manifests
 INSERT OR IGNORE INTO manifest_blob_assoc (manifest_digest, blob_digest)
     SELECT m.digest, json_extract(m.json, '$.config.digest')
     FROM manifest m
-    WHERE json_extract(m.json, '$.config.digest') IS NOT NULL;
+    WHERE json_extract(m.json, '$.config.digest') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM blob WHERE digest = json_extract(m.json, '$.config.digest'));
