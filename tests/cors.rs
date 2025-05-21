@@ -5,13 +5,13 @@ mod common;
 mod cors_tests {
     use std::path::Path;
 
-    use axum::body::Body;
     use axum::Router;
-    use base64::engine::general_purpose as base64_engine;
+    use axum::body::Body;
     use base64::Engine as _;
+    use base64::engine::general_purpose as base64_engine;
     use hyper::Request;
     use reqwest::header::HeaderMap;
-    use reqwest::{header, StatusCode};
+    use reqwest::{StatusCode, header};
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 

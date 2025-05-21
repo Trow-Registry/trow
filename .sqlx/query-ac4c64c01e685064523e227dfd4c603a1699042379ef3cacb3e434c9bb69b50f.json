@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT digest FROM manifest WHERE blob LIKE '%' || $1 || '%'",
+  "query": "SELECT DISTINCT manifest_digest FROM manifest_blob_assoc WHERE blob_digest = $1",
   "describe": {
     "columns": [
       {
-        "name": "digest",
+        "name": "manifest_digest",
         "ordinal": 0,
         "type_info": "Text"
       }
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "f8044afc851a6274bb4484d0d718294ffd9173500ef68213772be5e014df72c4"
+  "hash": "ac4c64c01e685064523e227dfd4c603a1699042379ef3cacb3e434c9bb69b50f"
 }

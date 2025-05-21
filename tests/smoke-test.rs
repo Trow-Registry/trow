@@ -4,6 +4,7 @@ mod common;
 
 mod smoke_test {
 
+    use std::net::TcpListener;
     use std::path::Path;
     use std::process::{Child, Command};
     use std::thread;
@@ -13,18 +14,20 @@ mod smoke_test {
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
 
-    const PORT: &str = "39376";
-    const HOST: &str = "127.0.0.1:39376";
-    const TROW_ADDRESS: &str = "http://127.0.0.1:39376";
-
     struct TrowInstance {
         pid: Child,
+        port: u16,
     }
+
     /// Call out to cargo to start trow.
     async fn start_trow(temp_dir: &Path) -> TrowInstance {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+
         let mut child = Command::new("./target/debug/trow")
             .arg("--port")
-            .arg(PORT)
+            .arg(port.to_string())
             .arg("--data-dir")
             .arg(temp_dir)
             .env_clear()
@@ -32,12 +35,13 @@ mod smoke_test {
             .spawn()
             .expect("failed to start");
 
+        let uri = format!("http://127.0.0.1:{}", port);
         let mut timeout = 50;
         let client = reqwest::Client::new();
-        let mut response = client.get(TROW_ADDRESS).send().await;
+        let mut response = client.get(&uri).send().await;
         while timeout > 0 && (response.is_err() || (response.unwrap().status() != StatusCode::OK)) {
             thread::sleep(Duration::from_millis(500));
-            response = client.get(TROW_ADDRESS).send().await;
+            response = client.get(&uri).send().await;
             timeout -= 1;
         }
         if timeout == 0 {
@@ -48,7 +52,7 @@ mod smoke_test {
                 child.stderr.unwrap()
             );
         }
-        TrowInstance { pid: child }
+        TrowInstance { pid: child, port }
     }
 
     impl Drop for TrowInstance {
@@ -71,10 +75,10 @@ mod smoke_test {
 
         //Had issues with stopping and starting trow causing test fails.
         //It might be possible to improve things with a thread_local
-        let _trow = start_trow(temp_dir.as_path_untracked()).await;
+        let trow = start_trow(temp_dir.as_path_untracked()).await;
 
         let remote_image = "public.ecr.aws/docker/library/alpine:latest";
-        let local_image = format!("{HOST}/alpine:trow");
+        let local_image = format!("127.0.0.1:{}/alpine:trow", trow.port);
 
         println!("Running podman pull alpine:latest");
         let mut status = Command::new("podman")

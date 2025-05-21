@@ -4,15 +4,17 @@ use aws_sdk_ecr::error::SdkError;
 use aws_sdk_ecr::operation::get_authorization_token::GetAuthorizationTokenError;
 use base64::Engine;
 use futures::future::try_join_all;
+use oci_client::Reference;
 use oci_client::client::ClientProtocol;
 use oci_client::secrets::RegistryAuth;
-use oci_client::Reference;
 use serde::{Deserialize, Serialize};
 
+use crate::TrowServerState;
+use crate::registry::Digest;
+use crate::registry::digest::DigestError;
 use crate::registry::manifest::{ManifestReference, OCIManifest};
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::Digest;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
@@ -68,8 +70,6 @@ impl RegistryProxiesConfig {
         None
     }
 }
-use crate::registry::digest::DigestError;
-use crate::TrowServerState;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DownloadRemoteImageError {
@@ -170,12 +170,10 @@ impl SingleRegistryProxyConfig {
 
         for mani_digest in digests.into_iter() {
             let mani_digest_str = mani_digest.as_str();
-            // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_association entries
+            // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_assoc entries
             let has_manifest = sqlx::query_scalar!(
                 r#"SELECT EXISTS(
-                    SELECT 1 FROM manifest
-                    INNER JOIN repo_blob_association ON blob_digest = manifest.digest AND repo_name = $2
-                    WHERE manifest.digest = $1
+                    SELECT 1 FROM repo_blob_assoc WHERE manifest_digest = $1 AND repo_name = $2
                 )"#,
                 mani_digest_str,
                 repo_name
@@ -238,7 +236,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPass
         .ok_or(EcrPasswordError::InvalidRegion)?
         .to_owned();
     let region = aws_types::region::Region::new(region);
-    let config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+    let config = aws_config::defaults(BehaviorVersion::v2025_01_17())
         .region(region)
         .load()
         .await;
@@ -303,7 +301,7 @@ async fn download_manifest_and_layers(
             .await?;
         }
         sqlx::query!(
-            "INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
+            "INSERT INTO repo_blob_assoc (repo_name, blob_digest) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
             local_repo_name,
             layer_digest
         )
@@ -329,30 +327,15 @@ async fn download_manifest_and_layers(
         oci_client::errors::OciDistributionError::ManifestParsingError(e.to_string())
     })?;
 
-    match &manifest {
-        OCIManifest::List(_) => {
-            let images_to_dl = manifest
-                .get_local_asset_digests()
-                .iter()
-                .map(|digest| ref_.clone_with_digest(digest.to_string()))
-                .collect::<Vec<_>>();
-            let futures = images_to_dl
-                .iter()
-                .map(|img| download_manifest_and_layers(cl, auth, state, img, local_repo_name));
-            try_join_all(futures).await?;
-        }
-        OCIManifest::V2(_) => {
-            let layer_digests = manifest.get_local_asset_digests();
-            let futures = layer_digests
-                .iter()
-                .map(|l| download_blob(cl, state, ref_, l, local_repo_name));
-            try_join_all(futures).await?;
-        }
-    }
+    let blobs = manifest.get_local_blob_digests();
+    let futures = blobs
+        .iter()
+        .map(|l| download_blob(cl, state, ref_, l, local_repo_name));
+    try_join_all(futures).await?;
 
     sqlx::query!(
         r"INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2) ON CONFLICT DO NOTHING;
-        INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
+        INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($3, $4) ON CONFLICT DO NOTHING;",
         digest,
         raw_manifest,
         local_repo_name,

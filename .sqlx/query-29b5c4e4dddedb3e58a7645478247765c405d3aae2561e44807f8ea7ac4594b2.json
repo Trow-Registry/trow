@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT rba.blob_digest FROM repo_blob_assoc rba\n                    WHERE rba.blob_digest = $1 AND rba.repo_name = $2",
+  "describe": {
+    "columns": [
+      {
+        "name": "blob_digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "29b5c4e4dddedb3e58a7645478247765c405d3aae2561e44807f8ea7ac4594b2"
+}

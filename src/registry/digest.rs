@@ -51,7 +51,7 @@ impl Digest {
             None => {
                 return Err(DigestError::InvalidDigest(
                     "separator ':' not found".to_owned(),
-                ))
+                ));
             }
         };
         let digest_str = digest_str.to_lowercase();

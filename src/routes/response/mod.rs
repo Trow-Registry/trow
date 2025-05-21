@@ -18,7 +18,7 @@ pub mod verified_manifest;
 use std::marker::PhantomData;
 
 use axum::body::Body;
-use axum::http::{header, HeaderValue};
+use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 

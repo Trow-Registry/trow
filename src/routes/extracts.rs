@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use axum::extract::{FromRef, FromRequestParts};
-use axum::http::request::Parts;
-use axum::http::StatusCode;
 use axum::RequestPartsExt;
+use axum::extract::{FromRef, FromRequestParts};
+use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum_extra::extract::Host;
 
 use crate::TrowServerState;

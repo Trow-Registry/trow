@@ -6,8 +6,8 @@ use oci_spec::image::{Descriptor, ImageIndex, ImageManifest, MediaType};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::digest::{Digest, DigestError};
 use crate::registry::RegistryError;
+use crate::registry::digest::{Digest, DigestError};
 
 lazy_static! {
     pub static ref REGEX_TAG: Regex = Regex::new("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$").unwrap();
@@ -77,8 +77,8 @@ impl ManifestReference {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum OCIManifest {
-    List(ImageIndex),
-    V2(ImageManifest),
+    List(Box<ImageIndex>),
+    V2(Box<ImageManifest>),
 }
 
 // #[derive(Error, Debug)]
@@ -134,29 +134,21 @@ impl OCIManifest {
         }
     }
 
-    /// Returns a Vector of the digests of all assets referenced in the Manifest
+    /// Returns a Vec of the digests of all blobs referenced in the Manifest
     /// With the exception of digests for "foreign blobs"
-    pub fn get_local_asset_digests(&self) -> Vec<String> {
+    pub fn get_local_blob_digests(&self) -> Vec<&str> {
         let digests = match self {
-            OCIManifest::V2(ref m2) => {
-                let mut digests: Vec<String> = m2
+            OCIManifest::V2(m2) => {
+                let mut digests: Vec<_> = m2
                     .layers()
                     .iter()
                     .filter(|l| layer_is_distributable(l.media_type()))
-                    .map(|x| x.digest().to_string())
+                    .map(|x| x.digest().as_ref())
                     .collect();
-                digests.push(m2.config().digest().to_string());
+                digests.push(m2.config().digest().as_ref());
                 digests
             }
-            OCIManifest::List(ref list) => {
-                // Just return the manifest digests.
-                // We could recurse into the manifests, but they should have been checked already.
-                list.manifests()
-                    .iter()
-                    .filter(|l| layer_is_distributable(l.media_type()))
-                    .map(|x| x.digest().to_string())
-                    .collect()
-            }
+            OCIManifest::List(_) => Vec::new(),
         };
         digests
     }
@@ -238,15 +230,19 @@ mod test {
             "sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
         );
         assert_eq!(m_v2.layers().len(), 3);
-        let digests_str: Vec<_> = mani.get_local_asset_digests();
+        let digests_str: Vec<_> = mani.get_local_blob_digests();
 
         assert_eq!(digests_str.len(), 3);
-        assert!(digests_str.contains(
-            &"sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609".to_string()
-        ));
-        assert!(digests_str.contains(
-            &"sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826".to_string()
-        ));
+        assert!(
+            digests_str.contains(
+                &"sha256:9d48c3bd43c520dc2784e868a780e976b207cbf493eaff8c6596eb871cbd9609"
+            )
+        );
+        assert!(
+            digests_str.contains(
+                &"sha256:1ae95a11626f76a9bd496d4666276e4495508be864c894ce25602c0baff06826"
+            )
+        );
     }
 
     #[test]
@@ -288,13 +284,17 @@ mod test {
             "sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
         );
 
-        let digests_str: Vec<_> = mani.get_local_asset_digests();
+        let digests_str: Vec<_> = mani.get_local_blob_digests();
         assert_eq!(digests_str.len(), 2);
-        assert!(digests_str.contains(
-            &"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d".to_string()
-        ));
-        assert!(digests_str.contains(
-            &"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526".to_string()
-        ));
+        assert!(
+            digests_str.contains(
+                &"sha256:1e76f742da490c8d7c921e811e5233def206e76683ee28d735397ec2231f131d"
+            )
+        );
+        assert!(
+            digests_str.contains(
+                &"sha256:4a415e3663882fbc554ee830889c68a33b3585503892cc718a4698e91ef2a526"
+            )
+        );
     }
 }

@@ -1,24 +1,24 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::routing::get;
-use axum::Router;
 use digest::Digest;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
+use crate::TrowServerState;
 use crate::registry::digest;
 use crate::registry::manifest::{
-    layer_is_distributable, ManifestReference, OCIManifest, REGEX_TAG,
+    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable,
 };
 use crate::registry::server::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};
-use crate::TrowServerState;
 
 /*
 ---
@@ -62,7 +62,7 @@ async fn get_manifest(
             None => {
                 return Err(Error::NameInvalid(format!(
                     "No registered proxy matches {repo}"
-                )))
+                )));
             }
         };
 
@@ -71,7 +71,7 @@ async fn get_manifest(
             .await
             .map_err(|e| {
                 tracing::error!("Error downloading image: {e}");
-                Error::InternalError
+                Error::Internal
             })?
     } else {
         let digest = match &reference {
@@ -88,7 +88,7 @@ async fn get_manifest(
                     None => {
                         return Err(Error::ManifestUnknown(format!(
                             "Unknown tag: {raw_reference}"
-                        )))
+                        )));
                     }
                 }
             }
@@ -96,10 +96,9 @@ async fn get_manifest(
         };
         let maybe_digest = sqlx::query_scalar!(
             r#"
-            SELECT m.digest
-            FROM manifest m
-            INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
-            WHERE m.digest = $2 AND rba.repo_name = $1
+            SELECT rba.manifest_digest
+            FROM repo_blob_assoc rba
+            WHERE rba.manifest_digest = $2 AND rba.repo_name = $1
             "#,
             repo,
             digest
@@ -108,8 +107,8 @@ async fn get_manifest(
         .await?;
 
         match maybe_digest {
-            Some(d) => d,
-            None => {
+            Some(Some(d)) => d,
+            _ => {
                 return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
             }
         }
@@ -180,9 +179,8 @@ async fn put_image_manifest(
                 .map(|m| m.digest().as_ref());
             for digest in assets {
                 let res = sqlx::query!(
-                    r"SELECT m.digest FROM manifest m
-                    INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
-                    WHERE m.digest = $1 AND rba.repo_name = $2",
+                    r"SELECT rba.manifest_digest FROM repo_blob_assoc rba
+                    WHERE rba.manifest_digest = $1 AND rba.repo_name = $2",
                     digest,
                     repo_name
                 )
@@ -203,9 +201,8 @@ async fn put_image_manifest(
                 .map(|l| l.digest().as_ref());
             for digest in assets {
                 let res = sqlx::query!(
-                    r"SELECT b.digest FROM blob b
-                    INNER JOIN repo_blob_association rba ON rba.blob_digest = b.digest
-                    WHERE b.digest = $1 AND rba.repo_name = $2",
+                    r"SELECT rba.blob_digest FROM repo_blob_assoc rba
+                    WHERE rba.blob_digest = $1 AND rba.repo_name = $2",
                     digest,
                     repo_name
                 )
@@ -240,9 +237,9 @@ async fn put_image_manifest(
     .await?;
     sqlx::query!(
         r#"
-        INSERT INTO repo_blob_association
-        VALUES ($1, $2)
-        ON CONFLICT (repo_name, blob_digest) DO NOTHING
+        INSERT INTO repo_blob_assoc
+        VALUES ($1, NULL, $2)
+        ON CONFLICT (repo_name, blob_digest, manifest_digest) DO NOTHING
         "#,
         repo_name,
         computed_digest_str
@@ -313,7 +310,7 @@ async fn delete_image_manifest(
         let digest = Digest::try_from_raw(&reference)?;
         let digest_str = digest.as_str();
         let res = sqlx::query!(
-            "DELETE FROM repo_blob_association WHERE repo_name = $1 AND blob_digest = $2",
+            "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND blob_digest = $2",
             repo,
             digest_str
         )
@@ -322,7 +319,7 @@ async fn delete_image_manifest(
 
         if res.rows_affected() > 0 {
             let remaining_assoc = sqlx::query_scalar!(
-                "SELECT COUNT(*) FROM repo_blob_association WHERE blob_digest = $1",
+                "SELECT COUNT(*) FROM repo_blob_assoc WHERE manifest_digest = $1",
                 digest_str
             )
             .fetch_one(&state.db_ro)

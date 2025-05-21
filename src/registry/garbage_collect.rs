@@ -120,20 +120,14 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
         WHERE b.last_accessed < strftime('%s', 'now', '-1 day')
         AND NOT EXISTS (
                 SELECT 1
-                FROM manifest m
-                WHERE m.blob LIKE '%' || b.digest || '%'
+                FROM manifest_blob_assoc mba
+                WHERE mba.blob_digest = b.digest
             );
         "#,
     )
     .fetch_all(&state.db_ro)
     .await?;
     for blob in blobs_to_delete {
-        sqlx::query!(
-            r#"DELETE FROM repo_blob_association WHERE blob_digest = $1"#,
-            blob.digest
-        )
-        .execute(&state.db_rw)
-        .await?;
         sqlx::query!(r#"DELETE FROM blob WHERE digest = $1"#, blob.digest)
             .execute(&state.db_rw)
             .await?;
@@ -162,7 +156,7 @@ async fn delete_old_proxied_images(
         WHERE b.last_accessed < strftime('%s', 'now', '-1 day')
         AND NOT EXISTS (
                 SELECT 1
-                FROM "repo_blob_association" rba
+                FROM "repo_blob_assoc" rba
                 WHERE rba.blob_digest = b.digest
                 AND rba.repo_name NOT LIKE 'f/%'
             )
@@ -180,7 +174,7 @@ async fn delete_old_proxied_images(
         };
 
         let manifests_to_delete = sqlx::query!(
-            r#"SELECT digest FROM manifest WHERE blob LIKE '%' || $1 || '%'"#,
+            r#"SELECT DISTINCT manifest_digest FROM manifest_blob_assoc WHERE blob_digest = $1"#,
             blob_to_delete.digest
         )
         .fetch_all(&state.db_rw)
@@ -188,25 +182,16 @@ async fn delete_old_proxied_images(
         for manifest_digest in manifests_to_delete {
             sqlx::query!(
                 r#"
-                DELETE FROM tag WHERE manifest_digest = $1;
-                DELETE FROM manifest WHERE digest = $2;
+                DELETE FROM manifest WHERE digest = $1;
                 "#,
-                manifest_digest.digest,
-                manifest_digest.digest
+                manifest_digest.manifest_digest
             )
             .execute(&state.db_rw)
             .await?;
         }
-        sqlx::query!(
-            r#"
-            DELETE FROM repo_blob_association WHERE blob_digest = $1;
-            DELETE FROM blob WHERE digest = $2;
-            "#,
-            blob_to_delete.digest,
-            blob_to_delete.digest
-        )
-        .execute(&state.db_rw)
-        .await?;
+        sqlx::query!(r"DELETE FROM blob WHERE digest = $1", blob_to_delete.digest)
+            .execute(&state.db_rw)
+            .await?;
         state
             .registry
             .storage
@@ -250,7 +235,7 @@ mod tests {
 
         sqlx::query!(
             r#"
-            INSERT INTO repo_blob_association (repo_name, blob_digest)
+            INSERT INTO repo_blob_assoc (repo_name, blob_digest)
             VALUES ('f/test_repo1', 'sha256:test1'),
                    ('f/test_repo3', 'sha256:test3')
             "#
@@ -279,12 +264,11 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 275); // Expect to clean the 2 oldest blobs
 
-        let repo_blob_associations =
-            sqlx::query_scalar!(r#"SELECT repo_name FROM repo_blob_association"#)
-                .fetch_all(&state.db_ro)
-                .await
-                .unwrap();
-        assert_eq!(&repo_blob_associations, &["f/test_repo3"]);
+        let repo_blob_assocs = sqlx::query_scalar!(r#"SELECT repo_name FROM repo_blob_assoc"#)
+            .fetch_all(&state.db_ro)
+            .await
+            .unwrap();
+        assert_eq!(&repo_blob_assocs, &["f/test_repo3"]);
 
         let manifests = sqlx::query_scalar!(r#"SELECT digest FROM manifest"#)
             .fetch_all(&state.db_ro)

@@ -2,11 +2,10 @@
 name = "trow"
 version = "0.7.5"
 authors = []
-edition = "2021"
+edition = "2024"
 
 [features]
 sqlite = []
-test-utils = []
 
 [dependencies]
 futures = "0.3"
@@ -37,13 +36,13 @@ regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
 thiserror = "2.0"
-kube = { version = "0.98.0", features = ["admission"] }
+kube = { version = "0.99.0", features = ["admission"] }
 k8s-openapi = { version = "0.24.0", features = ["v1_29"] }
-json-patch = "3"
+json-patch = "4"
 jsonptr = "*"
 tokio = { version = "1", features = ["macros"] }
 tokio-util = { version = "0.7.8", features = ["codec", "compat"] }
-hyper = "1.5"
+hyper = "1.6"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing = "0.1.37"
 paste = "1.0.14"
@@ -52,7 +51,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
     "stream",
 ] }
-prometheus = "0.13"
+prometheus = "0.14"
 aws-config = "1.5.0"
 aws-types = "1.3.0"
 aws-sdk-ecr = "1.5.0"
@@ -65,7 +64,7 @@ sqlx = { version = "0.8", features = [
     "sqlite",
     "json",
 ] }
-oci-spec = "0.7.0"
+oci-spec = "0.8.0"
 oci-client = { version = "0.14.0", default-features = false, features = [
     "rustls-tls",
 ] }
@@ -82,7 +81,7 @@ fastrand = "2.0.1"
 http-body-util = "0.1.1"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 test-temp-dir = "0.3.0"
-rstest = "0.24.0"
+rstest = "0.25.0"
 async-std = { version = "1.5", features = ["attributes"] }       # needed by rstest
 
 [profile.dev.build-override]

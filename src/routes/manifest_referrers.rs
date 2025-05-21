@@ -1,22 +1,22 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::{Path, State};
 use axum::routing::get;
-use axum::Router;
 use digest::Digest;
 use oci_spec::image::{Descriptor, ImageIndex, MediaType};
 use sqlx::types::Json;
 
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
+use crate::TrowServerState;
 use crate::registry::digest;
 use crate::registry::manifest::OCIManifest;
 use crate::registry::server::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::TrowServerState;
 
 /*
 ---
@@ -46,7 +46,7 @@ async fn get_referrers(
             m.digest,
             length(m.blob) as "size!: i64"
         FROM manifest m
-        INNER JOIN repo_blob_association rba ON rba.blob_digest = m.digest
+        INNER JOIN repo_blob_assoc rba ON rba.manifest_digest = m.digest
         WHERE rba.repo_name = $1
             AND (m.json -> 'subject' ->> 'digest') = $2
         "#,
@@ -120,6 +120,8 @@ mod tests {
         let tmp_dir = test_temp_dir!();
         let (state, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
 
+        let dummy_blob_digest =
+            "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a";
         let man_referred = serde_json::to_vec(&ImageIndex::default()).unwrap();
         let man_referred_digest = Digest::digest_sha256_slice(&man_referred);
         let subj = serde_json::to_vec(
@@ -130,10 +132,7 @@ mod tests {
                 .config(Descriptor::new(
                     MediaType::EmptyJSON,
                     2,
-                    oci_spec::image::Digest::from_str(
-                        "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-                    )
-                    .unwrap(),
+                    oci_spec::image::Digest::from_str(dummy_blob_digest).unwrap(),
                 ))
                 .subject(Descriptor::new(
                     MediaType::ImageIndex,
@@ -153,10 +152,7 @@ mod tests {
                 .config(Descriptor::new(
                     MediaType::EmptyJSON,
                     2,
-                    oci_spec::image::Digest::from_str(
-                        "sha256:1111111355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-                    )
-                    .unwrap(),
+                    oci_spec::image::Digest::from_str(dummy_blob_digest).unwrap(),
                 ))
                 .build()
                 .unwrap(),
@@ -174,7 +170,7 @@ mod tests {
             .await
             .unwrap();
             sqlx::query!(
-                r#"INSERT INTO repo_blob_association (repo_name, blob_digest) VALUES ("test", $1)"#,
+                r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ("test", $1)"#,
                 digest
             )
             .execute(&state.db_rw)

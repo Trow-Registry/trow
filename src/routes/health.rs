@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use axum::extract::State;
 
-use crate::registry::api_types::HealthStatus;
 use crate::TrowServerState;
+use crate::registry::api_types::HealthStatus;
 /*
 * Trow health endpoint
 * GET /healthz

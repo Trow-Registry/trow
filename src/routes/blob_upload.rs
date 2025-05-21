@@ -1,22 +1,22 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::response::Response;
 use axum::routing::{post, put};
-use axum::Router;
 use digest::Digest;
 use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
+use crate::TrowServerState;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::{digest, ContentInfo};
+use crate::registry::{ContentInfo, digest};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
-use crate::TrowServerState;
 
 mod utils {
     use std::ops::RangeInclusive;
@@ -79,7 +79,7 @@ mod utils {
         .await?;
 
         sqlx::query!(
-            "INSERT INTO repo_blob_association VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            "INSERT INTO repo_blob_assoc VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING",
             upload.repo,
             digest_str,
         )

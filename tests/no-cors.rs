@@ -5,14 +5,14 @@ mod no_cors_tests {
 
     use std::path::Path;
 
-    use axum::body::Body;
     use axum::Router;
+    use axum::body::Body;
     use hyper::Request;
-    use reqwest::header::{
-        HeaderMap, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
-        ACCESS_CONTROL_REQUEST_METHOD, ORIGIN,
-    };
     use reqwest::StatusCode;
+    use reqwest::header::{
+        ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_REQUEST_METHOD,
+        HeaderMap, ORIGIN,
+    };
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 

@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::{Path, State};
 use axum::routing::get;
-use axum::Router;
 
 use super::macros::endpoint_fn_7_levels;
+use crate::TrowServerState;
 use crate::registry::manifest::ManifestReference;
 use crate::registry::server::PROXY_DIR;
 use crate::registry::{BlobReader, Digest};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::TrowServerState;
 
 /*
 ---
@@ -42,7 +42,7 @@ async fn get_blob(
             None => {
                 return Err(Error::NameInvalid(format!(
                     "No registered proxy matches {repo}"
-                )))
+                )));
             }
         };
         // This is important to transform f/docker/ubuntu into f/docker/_library/ubuntu
@@ -51,7 +51,7 @@ async fn get_blob(
     let rowid = sqlx::query_scalar!(
         r#"
         SELECT b.rowid as "rowid!" FROM blob b
-        JOIN repo_blob_association rba ON b.digest = rba.blob_digest
+        JOIN repo_blob_assoc rba ON b.digest = rba.blob_digest
         WHERE b.digest = $1 AND rba.repo_name = $2
         "#,
         digest_str,
@@ -73,7 +73,7 @@ async fn get_blob(
         .await
     {
         Ok(stream) => stream,
-        Err(_) => return Err(Error::InternalError),
+        Err(_) => return Err(Error::Internal),
     };
     Ok(BlobReader::new(digest, stream).await)
 }
