@@ -16,6 +16,8 @@ spec:
     metadata:
       labels:
         {{- include "registry.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include "trow.config" . | sha256sum }}
     spec:
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
