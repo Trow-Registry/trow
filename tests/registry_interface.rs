@@ -316,7 +316,7 @@ mod registry_interface {
         let tmp_dir = test_temp_dir!();
         let trow = start_trow(&tmp_dir).await;
 
-        let resp = cl
+        let resp = trow
             .clone()
             .oneshot(
                 Request::get("/v2/test/test/blobs/sha256:baadf00dbaadf00dbaadf00dbaadf00d")

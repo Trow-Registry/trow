@@ -150,4 +150,46 @@ mod cors_tests {
             "true"
         );
     }
+
+    #[tokio::test]
+    async fn test_no_cors_preflight() {
+        let tmp_dir = test_temp_dir!();
+        let data_dir = tmp_dir.as_path_untracked();
+
+        let trow = trow_router(data_dir, |cfg| {
+            cfg.service_name = "http://127.0.0.1:39368".to_string();
+        })
+        .await
+        .1;
+
+        let mut headers = HeaderMap::new();
+
+        headers.insert(header::ORIGIN, "https://example.com".parse().unwrap());
+        headers.insert(
+            header::ACCESS_CONTROL_REQUEST_METHOD,
+            "OPTIONS".parse().unwrap(),
+        );
+
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::options("/")
+                    .header(header::ORIGIN, "https://example.com")
+                    .header(header::ACCESS_CONTROL_REQUEST_METHOD, "OPTIONS")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(
+            resp.headers().get(header::ACCESS_CONTROL_ALLOW_METHODS),
+            None
+        );
+        assert_eq!(
+            resp.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
+            None
+        );
+    }
 }

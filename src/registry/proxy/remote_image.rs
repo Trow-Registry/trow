@@ -19,14 +19,15 @@ pub enum RemoteImageError {
 /// It returns `name`, `tag` and `digest`.
 ///
 /// Built from:
-/// https://github.com/distribution/distribution/blob/91f33cb5c01ac8eecf4bc721994bcdbb9fb63ae7/reference/regexp.go
-/// https://github.com/distribution/distribution/blob/b5e2f3f33dbc80d2c40b5d550541467477d5d36e/reference/reference.go
+/// https://github.com/distribution/reference/blob/727f80d42224f6696b8e1ad16b06aadf2c6b833b/regexp.go
 const fn get_image_ref_regex() -> &'static str {
-    const SEPARATOR: &str = "(?:[._]|__|[-]*)";
+    const SEPARATOR: &str = "(?:[._]|__|[-]+)";
     const ALPHANUMERIC: &str = "[a-z0-9]+";
     const DOMAIN_COMPONENT: &str = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
     const NAME_COMPONENT: &str = formatcp!("{ALPHANUMERIC}(?:{SEPARATOR}{ALPHANUMERIC})*");
-    const DOMAIN: &str = formatcp!("{DOMAIN_COMPONENT}(?:[.]{DOMAIN_COMPONENT})*(?::[0-9]+)?");
+    const DOMAIN_NAME: &str = formatcp!("{DOMAIN_COMPONENT}(?:[.]{DOMAIN_COMPONENT})*");
+    const IPV6_ADDR: &str = r"\[(?:[a-fA-F0-9:]+)\]";
+    const DOMAIN: &str = formatcp!("(?:{DOMAIN_NAME}|{IPV6_ADDR})(?::[0-9]+)?");
     const DIGEST: &str = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
     const TAG: &str = r"[\w][\w.-]{0,127}";
     const NAME: &str = formatcp!("(?:{DOMAIN}/)?{NAME_COMPONENT}(/{NAME_COMPONENT})*");
@@ -257,6 +258,17 @@ mod test {
                     "sha256:1e428d8e87bcc9cd156539c5afeb60075a518b20d2d4657db962df90e6552fa5"
                 )
                 .unwrap(),
+                ..Default::default()
+            }
+        );
+
+        ret = RemoteImage::try_from_str("[::1]:3409/mydir/another/myimage:test").unwrap();
+        assert_eq!(
+            ret,
+            RemoteImage {
+                host: "[::1]:3409".to_string(),
+                repo: "mydir/another/myimage".to_string(),
+                reference: ManifestReference::try_from_str("test").unwrap(),
                 ..Default::default()
             }
         );
