@@ -67,6 +67,8 @@ spec:
         - name: webhook-cert-translated
           mountPath: /etc/trow/webhook-cert
           readOnly: true
+        - name: data-emptydir
+          mountPath: /data
       {{- if include "trow.hasConfigFile" . }}
         - name: trow-cfg
           mountPath: /etc/trow/config.yaml
@@ -88,6 +90,8 @@ spec:
             secretName: {{ include "trow.fullname" . }}-patch-webhooks
           {{- end }}
         - name: webhook-cert-translated
+          emptyDir: {}
+        - name: data-emptydir
           emptyDir: {}
       {{- if include "trow.hasConfigFile" . }}
         - name: trow-cfg
