@@ -58,7 +58,7 @@ spec:
           value: {{ .Values.trow.logLevel }}
         ports:
         - name: webhook
-          containerPort: 8443
+          containerPort: 8000
         {{- with .Values.containerSecurityContext }}
         securityContext:
           {{- toYaml . | nindent 10 }}

@@ -10,35 +10,13 @@ use clap::Parser;
 use clap::builder::ArgPredicate;
 use trow::{TlsConfig, TrowConfig};
 
-fn parse_bind_addr(s: &str) -> Result<SocketAddr, String> {
-    let mut addr = if let Ok(addr) = s.parse::<SocketAddr>() {
-        addr
-    } else if let Ok(ip) = s.parse::<IpAddr>() {
-        SocketAddr::new(ip, 8000)
-    } else {
-        return Err(format!(
-            "Invalid address format: '{}'. Expected IP address or IP:port",
-            s
-        ));
-    };
-    if addr.port() == 0 {
-        let listener =
-            TcpListener::bind(addr).map_err(|e| format!("Failed to bind to {}: {}", addr, e))?;
-        addr = listener
-            .local_addr()
-            .map_err(|e| format!("Failed to get local bind address: {}", e))?;
-    }
-
-    Ok(addr)
-}
-
 #[derive(Parser, Debug)]
 #[command(name = "Trow")]
 #[command(about = "The Cluster Registry")]
 #[command(author, version, long_about = None)]
 struct Args {
-    /// Interfaces to bind Trow on
-    #[arg(long, default_value = "0.0.0.0:8000", value_parser = parse_bind_addr)]
+    /// Interface to bind Trow on
+    #[arg(long, default_value = "[::]:8000")]
     bind: SocketAddr,
 
     /// Path to TLS certificate and key, separated by ','
