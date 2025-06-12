@@ -176,7 +176,7 @@ async fn login(
     auth_user: ValidBasicToken,
     State(state): State<Arc<TrowServerState>>,
 ) -> Result<TrowToken, Error> {
-    let tok = trow_token::new(auth_user, &state.config);
+    let tok = trow_token::create_token(auth_user, &state.config);
     match tok {
         Ok(t) => Ok(t),
         Err(e) => {
