@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::prelude::*;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -15,18 +15,9 @@ use trow::{TlsConfig, TrowConfig};
 #[command(about = "The Cluster Registry")]
 #[command(author, version, long_about = None)]
 struct Args {
-    /// Name of the host or interface to start Trow on
-    #[arg(long, default_value = "0.0.0.0")]
-    host: IpAddr,
-
-    /// Port that trow will listen on
-    #[arg(
-        short,
-        long,
-        default_value_if("tls", ArgPredicate::IsPresent, "8443"),
-        default_value("8000")
-    )]
-    port: u16,
+    /// Interface to bind Trow on
+    #[arg(long, default_value = "[::]:8000")]
+    bind: SocketAddr,
 
     /// Path to TLS certificate and key, separated by ','
     #[arg(
@@ -44,10 +35,10 @@ struct Args {
 
     /// Host name for registry.
     ///
-    /// Used in AdmissionMutation webhook.
+    /// Used in AdmissionMutation webhook and token issuer.
     /// Defaults to `host`.
-    #[arg(short, long)]
-    name: Option<String>,
+    #[arg(short = 'n', long)]
+    hostname: Option<String>,
 
     /// Don't actually run Trow, just validate arguments.
     ///
@@ -81,8 +72,13 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
-    let addr = SocketAddr::new(args.host, args.port);
-    let host_name = args.name.unwrap_or(addr.to_string());
+    let addr = args
+        .bind
+        .to_socket_addrs()
+        .expect("Could not resolve bind address")
+        .next()
+        .expect("Bound address did not resolve to anything");
+    let host_name = args.hostname.unwrap_or(addr.to_string());
 
     let mut builder = TrowConfig::new();
     builder.data_dir = PathBuf::from_str(args.data_dir.as_str()).expect("Invalid data path");

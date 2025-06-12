@@ -46,13 +46,13 @@ mod cli {
     #[test]
     fn host_name_parsing() {
         get_command()
-            .args(["-n", "myhost.com"])
+            .args(["--hostname", "myhost.com"])
             .assert()
             .success()
             .stdout(predicate::str::contains(": \"myhost.com\""));
 
         get_command()
-            .args(["--name", "trow.test"])
+            .args(["--hostname", "trow.test"])
             .assert()
             .success()
             .stdout(predicate::str::contains(": \"trow.test\""));

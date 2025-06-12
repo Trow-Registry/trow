@@ -137,7 +137,7 @@ struct TokenClaim {
  * Create new jsonwebtoken.
  * Token consists of a string with 3 comma separated fields header, payload, signature
  */
-pub fn new(
+pub fn create_token(
     vbt: ValidBasicToken,
     config: &TrowConfig,
 ) -> Result<TrowToken, jsonwebtoken::errors::Error> {
