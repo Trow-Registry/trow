@@ -33,8 +33,10 @@ mod smoke_test {
         drop(listener);
 
         let mut child = Command::new("./target/debug/trow")
-            .arg(format!("--host={}", if ipv6 { "::" } else { "0.0.0.0" }))
-            .arg(format!("--port={port}"))
+            .arg(format!(
+                "--bind={}",
+                format!("{}:{port}", if ipv6 { "[::]" } else { "0.0.0.0" })
+            ))
             .arg(format!("--data-dir={}", temp_dir.display()))
             .env_clear()
             .envs(Environment::inherit().compile())

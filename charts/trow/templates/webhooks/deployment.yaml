@@ -48,7 +48,7 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
           - "--tls=/etc/trow/webhook-cert/cert,/etc/trow/webhook-cert/key"
-          - "-n"
+          - "--hostname"
           - {{ .Values.trow.domain | quote }}
           {{- if include "trow.hasConfigFile" . }}
           - "--config-file=/etc/trow/config.yaml"
