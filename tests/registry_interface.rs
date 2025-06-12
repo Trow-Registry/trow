@@ -43,24 +43,6 @@ mod registry_interface {
         assert_eq!(resp.headers().get(DIST_API_HEADER).unwrap(), "registry/2.0");
     }
 
-    async fn get_non_existent_blob(cl: &Router) {
-        let resp = cl
-            .clone()
-            .oneshot(
-                Request::get("/v2/test/test/blobs/sha256:baadf00dbaadf00dbaadf00dbaadf00d")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(
-            resp.status(),
-            StatusCode::NOT_FOUND,
-            "resp: {}",
-            response_body_string(resp).await
-        );
-    }
-
     async fn get_manifest(cl: &Router, name: &str, tag: &str, size: Option<usize>) {
         //Might need accept headers here
         let resp = cl
@@ -155,52 +137,6 @@ mod registry_interface {
             .unwrap();
         let tl_resp: TagList = common::response_body_json(resp).await;
         assert_eq!(tl, &tl_resp);
-    }
-
-    async fn upload_blob_with_put(cl: &Router, name: &str) {
-        let resp = cl
-            .clone()
-            .oneshot(
-                Request::post(format!("/v2/{name}/blobs/uploads/"))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::ACCEPTED);
-        let uuid = resp
-            .headers()
-            .get(common::UPLOAD_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
-
-        let range = resp
-            .headers()
-            .get(common::RANGE_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
-        assert_eq!(range, "0-0"); // Haven't uploaded anything yet
-
-        //used by oci_manifest_test
-        let config = "{}\n".as_bytes();
-        let digest = digest::Digest::digest_sha256_slice(config);
-        let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", name, uuid, digest);
-
-        let resp = cl
-            .clone()
-            .oneshot(Request::put(loc).body(Body::from(config)).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-        let range = resp
-            .headers()
-            .get(common::RANGE_HEADER)
-            .unwrap()
-            .to_str()
-            .unwrap();
-        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
     async fn upload_blob_with_post(
@@ -379,7 +315,22 @@ mod registry_interface {
     async fn test_get_non_existent_blob() {
         let tmp_dir = test_temp_dir!();
         let trow = start_trow(&tmp_dir).await;
-        get_non_existent_blob(&trow).await;
+
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::get("/v2/test/test/blobs/sha256:baadf00dbaadf00dbaadf00dbaadf00d")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::NOT_FOUND,
+            "resp: {}",
+            response_body_string(resp).await
+        );
     }
 
     #[tokio::test]
@@ -395,7 +346,51 @@ mod registry_interface {
     async fn blob_upload_with_put() {
         let tmp_dir = test_temp_dir!();
         let trow = start_trow(&tmp_dir).await;
-        upload_blob_with_put(&trow, "puttest").await;
+
+        let name = "puttest";
+        let resp = trow
+            .clone()
+            .oneshot(
+                Request::post(format!("/v2/{name}/blobs/uploads/"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+        let uuid = resp
+            .headers()
+            .get(common::UPLOAD_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+
+        let range = resp
+            .headers()
+            .get(common::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, "0-0"); // Haven't uploaded anything yet
+
+        //used by oci_manifest_test
+        let config = "{}\n".as_bytes();
+        let digest = digest::Digest::digest_sha256_slice(config);
+        let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", name, uuid, digest);
+
+        let resp = trow
+            .clone()
+            .oneshot(Request::put(loc).body(Body::from(config)).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let range = resp
+            .headers()
+            .get(common::RANGE_HEADER)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
     }
 
     #[tokio::test]

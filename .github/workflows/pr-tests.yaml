@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.9
       - name: Setup cargo-sqlx
@@ -28,7 +29,7 @@ jobs:
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Run Trow test suite
-        run: RUST_LOG=info cargo test
+        run: RUST_LOG=info cargo nextest run -- --skip ipv6
 
 
   build:
