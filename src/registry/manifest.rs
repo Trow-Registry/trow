@@ -137,7 +137,7 @@ impl OCIManifest {
     /// Returns a Vec of the digests of all blobs referenced in the Manifest
     /// With the exception of digests for "foreign blobs"
     pub fn get_local_blob_digests(&self) -> Vec<&str> {
-        let digests = match self {
+        match self {
             OCIManifest::V2(m2) => {
                 let mut digests: Vec<_> = m2
                     .layers()
@@ -149,8 +149,7 @@ impl OCIManifest {
                 digests
             }
             OCIManifest::List(_) => Vec::new(),
-        };
-        digests
+        }
     }
 
     pub fn media_type(&self) -> &Option<MediaType> {

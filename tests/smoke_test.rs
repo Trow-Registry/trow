@@ -34,8 +34,8 @@ mod smoke_test {
 
         let mut child = Command::new("./target/debug/trow")
             .arg(format!(
-                "--bind={}",
-                format!("{}:{port}", if ipv6 { "[::]" } else { "0.0.0.0" })
+                "--bind={ip}:{port}",
+                ip = if ipv6 { "[::]" } else { "0.0.0.0" }
             ))
             .arg(format!("--data-dir={}", temp_dir.display()))
             .env_clear()

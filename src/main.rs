@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::prelude::*;
-use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
