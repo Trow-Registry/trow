@@ -5,6 +5,7 @@
 * Trow v0.8.0
 * Add config hash to pod labels
 * Add pod and container security context
+* Change uid and gid to be in a sane range
 
 ## v0.10.2 (2025-03-05)
 
