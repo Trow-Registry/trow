@@ -8,7 +8,7 @@ CREATE TABLE repo_blob_assoc (
     FOREIGN KEY (manifest_digest) REFERENCES manifest(digest) ON DELETE CASCADE,
     CHECK (blob_digest IS NOT NULL OR manifest_digest IS NOT NULL)
 );
-INSERT INTO repo_blob_assoc (repo_name, blob_digest, manifest_digest)
+INSERT OR IGNORE INTO repo_blob_assoc (repo_name, blob_digest, manifest_digest)
 SELECT
     rba.repo_name,
     CASE WHEN m.digest IS NULL THEN rba.blob_digest ELSE NULL END AS blob_digest,

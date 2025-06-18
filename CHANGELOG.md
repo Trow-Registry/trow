@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.0 (2025-06-18)
+
+* listen on IPv6 socket
+* supports image reference with IPv6 host
+* perf: use SQL triggers to fill a manifest_blob_assoc table
+
 ## v0.7.5 (2025-03-07)
 
 proxy: fix error where the same manifest in a different repo would cause HTTP 404
