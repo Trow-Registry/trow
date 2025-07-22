@@ -49,13 +49,17 @@ spec:
         args:
           - "--tls=/etc/trow/webhook-cert/cert,/etc/trow/webhook-cert/key"
           - "--hostname"
-          - {{ .Values.trow.domain | quote }}
+          - {{ tpl .Values.trow.domain . | quote }}
           {{- if include "trow.hasConfigFile" . }}
           - "--config-file=/etc/trow/config.yaml"
           {{- end }}
         env:
         - name: RUST_LOG
           value: {{ .Values.trow.logLevel }}
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         ports:
         - name: webhook
           containerPort: 8000

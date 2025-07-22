@@ -18,9 +18,9 @@ containerSecurityContext:
   allowPrivilegeEscalation: false
 
 trow:
-  ## if using NodePort, this can be set to 127.0.0.1:XXXX
-  ## Where "XXXX" is the value of service.nodePort
-  domain: myregistry.mydomain.io
+  ## Translates to --hostname: Host name for registry.
+  ## Used in AdmissionMutation webhook and token issuer.
+  domain: $(NODE_IP):{{ .Values.service.nodePort }}
   # user: user
   # password: password
 

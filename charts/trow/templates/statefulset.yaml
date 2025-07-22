@@ -29,7 +29,7 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
           - "--hostname"
-          - {{ .Values.trow.domain | quote }}
+          - {{ tpl .Values.trow.domain . | quote }}
           {{- if and (.Values.trow.user) (.Values.trow.password) }}
           - "--user"
           - {{ .Values.trow.user | quote }}
@@ -42,6 +42,10 @@ spec:
         env:
         - name: RUST_LOG
           value: {{ .Values.trow.logLevel }}
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         ports:
         - name: http
           containerPort: 8000
