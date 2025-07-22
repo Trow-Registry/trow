@@ -46,14 +46,5 @@ through from Harbor for use in the cluster. There a lot of potential benefits fr
 ### Compared to Spegel
 
 [Spegel](https://github.com/spegel-org/spegel) is a stateless caching solution for `containerd`.
-
-| Feature | Spegel | Trow | description |
-| --- | :---: | :---: | --- |
-| Works with any kubernetes flavor<br/>and any container runtime | 🟥<br/>(planned?) | 🟩 | Spegel is a containerd plugin.<br/>Trow relies on K8S APIs. |
-| Low configurability | 🟩 | 🟩 | Both solutions are ~ plug and play. |
-| High Availability | 🟩 | 🟥<br/>(planned) | If spegel fails, the original registry is used. If Trow fails, the image can't be pulled. |
-| High performance | 🟩 | 🟨 | Trow has no P2P solution (relates to high availability) nor good benchmarks (_yet_). |
-| Is stateless (🧙) | 🟩 | 🟨<br/>(can use an ephemeral volume) | Spegel uses containerd's state. Trow has it's own state. |
-| Is stateful (💾) | 🟥 | 🟩 | You can air-gap Trow and kill the nodes it's running on, it will keep its state. |
-| Is also a registry | 🟥 | 🟩 | Relates to the stateless/stateful thing |
+It is made to work inconjonction with a registry, like Trow, Zot, Habor, ...
 | Does not duplicate images storage | 🟩 | 🟥 | Relates to the stateless/stateful thing |
