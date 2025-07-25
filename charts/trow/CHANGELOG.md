@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.11.1 (2025-07-25)
+
+* Fix webhook deployment PodDisruptionBudget created when deployment is not
+
 ## v0.11.0 (2025-06-18)
 
 * Trow v0.8.0
