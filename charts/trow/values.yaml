@@ -25,7 +25,6 @@ trow:
   # password: password
 
   ## The Trow validation webhook validates which images are allowed to run on your cluster.
-  ## Note: it runs AFTER the mutating webhook.
   validationWebhook:
     enabled: false
     failurePolicy: Ignore
@@ -40,9 +39,8 @@ trow:
         - 127.0.0.1
       deny: []
         # - 127.0.0.1/f/docker/nope/
-  ## The proxyRegistries section allows you to configure Trow to act as a proxy for other registries.
+  ## Special overrides for registry proxying
   proxyRegistries:
-    ## The Trow mutating webhook will automatically rewrite the pod image URLs to use the Trow proxy.
     config:
       # offline: false
       # registries:
@@ -54,7 +52,7 @@ trow:
   ## For more info on log levels see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html
   logLevel: info
 
-## General configuration for the validation and mutating webhooks
+## General configuration for the validation webhook
 webhooks:
   ## It is possible to restrict webhook access to some namespaces, ref:
   ##   https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector
