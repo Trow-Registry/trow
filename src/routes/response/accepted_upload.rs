@@ -13,7 +13,7 @@ impl IntoResponse for AcceptedUpload {
             .status(StatusCode::CREATED)
             .header("Location", location)
             .header("Docker-Content-Digest", self.digest().to_string())
-            .header("Range", format!("{}-{}", left, right))
+            .header("Range", format!("{left}-{right}"))
             .header("Content-Length", "0")
             .body(body::Body::empty())
             .unwrap()

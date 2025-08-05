@@ -108,7 +108,7 @@ async fn main() {
 
     if let Some(config_file) = args.config_file {
         if let Err(e) = builder.with_config(config_file) {
-            eprintln!("Failed to load proxy registry config file: {:#}", e);
+            eprintln!("Failed to load proxy registry config file: {e:#}");
             std::process::exit(1);
         }
     }
@@ -131,7 +131,7 @@ async fn main() {
     };
 
     serve_app(app, addr, tls).await.unwrap_or_else(|e| {
-        eprintln!("Error launching Trow:\n\n{}", e);
+        eprintln!("Error launching Trow:\n\n{e}");
         std::process::exit(1);
     });
 }

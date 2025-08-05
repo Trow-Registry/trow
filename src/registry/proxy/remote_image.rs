@@ -81,7 +81,7 @@ impl RemoteImage {
             host = "registry-1.docker.io";
             if !repo.contains('/') {
                 // handle images like "nginx:latest" that are actually library/nginx:latest
-                repo = format!("library/{}", repo)
+                repo = format!("library/{repo}")
             }
         }
 
@@ -286,7 +286,7 @@ mod test {
         for i in invalid_images.iter() {
             let ret = RemoteImage::try_from_str("http://docker.io/amouat/myimage:test");
             if let Ok(img) = ret {
-                panic!("Invalid image ref `{}` parsed as `{}`", i, img);
+                panic!("Invalid image ref `{i}` parsed as `{img}`");
             }
         }
     }

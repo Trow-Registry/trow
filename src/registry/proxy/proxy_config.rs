@@ -26,16 +26,15 @@ pub struct RegistryProxiesConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default)]
 pub struct SingleRegistryProxyConfig {
-    pub alias: String,
-    /// This field is unvalidated and may contain a scheme or not.
-    /// eg: `http://example.com` and `example.com`
+    /// What containerd calls "namespace" (ghcr.io, docker.io, ...)
     pub host: String,
+    pub insecure: bool,
     pub username: Option<String>,
     pub password: Option<String>,
-    #[serde(default)]
-    pub ignore_repos: Vec<String>,
 }
+
 
 impl Default for RegistryProxiesConfig {
     fn default() -> Self {
@@ -53,15 +52,15 @@ impl RegistryProxiesConfig {
         repo_name: &str,
         reference: &ManifestReference,
     ) -> Option<(&'a SingleRegistryProxyConfig, RemoteImage)> {
-        // All proxies are under "f_"
+        // All proxies are under "f/"
         if repo_name.starts_with(PROXY_DIR) {
             let segments = repo_name.splitn(3, '/').collect::<Vec<_>>();
             debug_assert_eq!(segments[0], "f");
-            let proxy_alias = segments[1].to_string();
+            let proxy_host = segments[1].to_string();
             let repo = segments[2].to_string();
 
             for proxy in self.registries.iter() {
-                if proxy.alias == proxy_alias {
+                if proxy.host == proxy_host {
                     let image = RemoteImage::new(&proxy.host, repo, reference.clone());
                     return Some((proxy, image));
                 }
@@ -121,8 +120,8 @@ impl SingleRegistryProxyConfig {
         image: &RemoteImage,
         state: &TrowServerState,
     ) -> Result<String, DownloadRemoteImageError> {
-        // Replace eg f/docker/alpine by f/docker/library/alpine
-        let repo_name = format!("f/{}/{}", self.alias, image.get_repo());
+        // Replace eg f/docker.io/alpine by f/docker.io/library/alpine
+        let repo_name = format!("f/{}/{}", self.host, image.get_repo());
         tracing::debug!("Downloading proxied image {}", repo_name);
 
         let image_ref: Reference = image.clone().into();

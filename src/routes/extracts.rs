@@ -31,7 +31,7 @@ where
                 "http"
             };
 
-            return Ok(AlwaysHost(format!("{}://{}", scheme, host)));
+            return Ok(AlwaysHost(format!("{scheme}://{host}")));
         }
 
         Ok(AlwaysHost(String::new()))

@@ -43,17 +43,13 @@ trow:
   ## The proxyRegistries section allows you to configure Trow to act as a proxy for other registries.
   proxyRegistries:
     ## The Trow mutating webhook will automatically rewrite the pod image URLs to use the Trow proxy.
-    webhook:
-      enabled: false
-      failurePolicy: Ignore
     config:
       # offline: false
       # registries:
-      #   - alias: docker
-      #     host: registry-1.docker.io
-      #   - alias: ghcr
-      #     host: ghcr.io
-      #     ignore_repos: ["trow-registry/trow"]
+      #   - host: docker.io
+      #     username: toto
+      #     password: titi
+      #   - host: ghcr.io
       # max_size: 50GiB
   ## For more info on log levels see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html
   logLevel: info

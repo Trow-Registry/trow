@@ -26,25 +26,16 @@ mod proxy_registry {
                 offline: false,
                 registries: vec![
                     SingleRegistryProxyConfig {
-                        alias: "docker".to_string(),
                         host: "registry-1.docker.io".to_string(),
-                        username: None,
-                        password: None,
-                        ignore_repos: vec![],
+                        ..Default::default()
                     },
                     SingleRegistryProxyConfig {
-                        alias: "nvcr".to_string(),
                         host: "nvcr.io".to_string(),
-                        username: None,
-                        password: None,
-                        ignore_repos: vec![],
+                        ..Default::default()
                     },
                     SingleRegistryProxyConfig {
-                        alias: "quay".to_string(),
                         host: "quay.io".to_string(),
-                        username: None,
-                        password: None,
-                        ignore_repos: vec![],
+                        ..Default::default()
                     },
                 ],
                 ..Default::default()
@@ -72,9 +63,7 @@ mod proxy_registry {
         assert_eq!(
             resp.status(),
             StatusCode::OK,
-            "Could not get {}:{}",
-            name,
-            tag
+            "Could not get {name}:{tag}"
         );
         let digest = resp
             .headers()

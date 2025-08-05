@@ -3,9 +3,6 @@ image:
   tag: onpr
 trow:
   domain: "127.0.0.1"
-  proxyRegistries:
-    webhook:
-      enabled: true
 ingress:
   enabled: true
   ingressClassName: nginx

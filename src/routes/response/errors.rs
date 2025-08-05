@@ -133,7 +133,7 @@ fn format_error_json(
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        let json = format!("{}", self);
+        let json = format!("{self}");
         tracing::debug!("Error response: {json}");
 
         let status = match self {

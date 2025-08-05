@@ -33,7 +33,7 @@ impl std::fmt::Display for ManifestReference {
             Self::Tag(t) => Cow::Borrowed(t),
             Self::Digest(d) => Cow::Owned(d.to_string()),
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

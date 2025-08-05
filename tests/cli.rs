@@ -120,18 +120,14 @@ mod cli {
                     offline: true,
                     registries: vec![
                         SingleRegistryProxyConfig {
-                            alias: "lovni".to_string(),
                             host: "jul.example.com".to_string(),
                             username: Some("robert".to_string()),
                             password: Some("1234".to_string()),
-                            ignore_repos: vec![],
+                            ..Default::default()
                         },
                         SingleRegistryProxyConfig {
-                            alias: "trow".to_string(),
                             host: "127.0.0.1".to_string(),
-                            username: None,
-                            password: None,
-                            ignore_repos: vec![],
+                            ..Default::default()
                         },
                     ],
                     ..Default::default()

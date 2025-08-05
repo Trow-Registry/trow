@@ -145,11 +145,8 @@ mod smoke_test {
             cfg.config_file = Some(ConfigFile {
                 registry_proxies: RegistryProxiesConfig {
                     registries: vec![SingleRegistryProxyConfig {
-                        alias: "trow".to_string(),
                         host: format!("http://127.0.0.1:{}", trow0.port),
-                        ignore_repos: vec![],
-                        password: None,
-                        username: None,
+                        ..Default::default()
                     }],
                     ..Default::default()
                 },
@@ -200,11 +197,8 @@ mod smoke_test {
             cfg.config_file = Some(ConfigFile {
                 registry_proxies: RegistryProxiesConfig {
                     registries: vec![SingleRegistryProxyConfig {
-                        alias: "trow".to_string(),
                         host: format!("http://[::1]:{}", trow0.port),
-                        ignore_repos: vec![],
-                        password: None,
-                        username: None,
+                        ..Default::default()
                     }],
                     ..Default::default()
                 },

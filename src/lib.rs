@@ -150,18 +150,6 @@ impl TrowConfig {
             }
             _ => println!("Image validation webhook not configured"),
         }
-        match &self.config_file {
-            Some(ConfigFile {
-                registry_proxies: cfg,
-                ..
-            }) if !cfg.registries.is_empty() => {
-                println!("Proxy registries configured:");
-                for config in &cfg.registries {
-                    println!("  - {}: {}", config.alias, config.host);
-                }
-            }
-            _ => println!("Proxy registries not configured"),
-        }
 
         if self.cors.is_some() {
             println!("Cross-Origin Resource Sharing(CORS) requests are allowed\n");

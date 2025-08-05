@@ -45,8 +45,8 @@ async fn get_blob(
                 )));
             }
         };
-        // This is important to transform f/docker/ubuntu into f/docker/_library/ubuntu
-        repo = format!("f/{}/{}", proxy_cfg.alias, image.get_repo())
+        // This is important to transform f/docker.io/ubuntu into f/docker.io/_library/ubuntu
+        repo = format!("f/{}/{}", proxy_cfg.host, image.get_repo())
     }
     let rowid = sqlx::query_scalar!(
         r#"
