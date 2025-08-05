@@ -38,7 +38,7 @@ from the matching registry. For example, if we start Trow with:
 registry_proxies:
   registries:
     - alias: docker
-      host: registry-1.docker.io
+      host: docker.io
     - alias: my-custom-registry
       host: my_custom_registry.example.com
       username: toto
@@ -51,7 +51,7 @@ Starting Trow 0.6.0 on 0.0.0.0:8000
 Hostname of this registry (for the MutatingWebhook): "0.0.0.0:8000"
 Image validation webhook not configured
 Proxy registries configured:
-  - docker: registry-1.docker.io
+  - docker: docker.io
   - quay: quay.io
   - nvcr: nvcr.io
 ```

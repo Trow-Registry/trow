@@ -121,7 +121,7 @@ mod tests {
             .await;
         let remote_image = remote_image.unwrap();
         assert_eq!(remote_image.get_proxy_cfg().unwrap(), &config.registries[0]);
-        assert_eq!(remote_image.get_host(), "registry-1.docker.io");
+        assert_eq!(remote_image.get_host(), "docker.io");
         assert_eq!(remote_image.get_repo(), "library/nginx");
     }
 
@@ -135,7 +135,7 @@ mod tests {
             .await;
         let remote_image = remote_image.unwrap();
         assert_eq!(*remote_image.get_proxy_cfg(), None);
-        assert_eq!(remote_image.get_host(), "registry-1.docker.io");
+        assert_eq!(remote_image.get_host(), "docker.io");
         assert_eq!(remote_image.get_repo(), "library/nginx");
     }
 }

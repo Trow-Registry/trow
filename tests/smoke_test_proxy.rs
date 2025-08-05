@@ -156,7 +156,7 @@ mod proxy_registry {
             .unwrap();
 
         assert_eq!(tags.len(), 1);
-        assert_eq!(tags[0].repo, "f/registry-1.docker.io/library/alpine");
+        assert_eq!(tags[0].repo, "f/docker.io/library/alpine");
         assert_eq!(tags[0].tag, "3.13.4");
     }
 

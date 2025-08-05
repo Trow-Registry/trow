@@ -54,7 +54,7 @@ impl<'a> std::default::Default for RemoteImage<'a> {
     fn default() -> Self {
         Self {
             scheme: "https",
-            host: "registry-1.docker.io".to_string(),
+            host: "docker.io".to_string(),
             repo: "(none)".to_string(),
             reference: ManifestReference::Tag("latest".to_string()),
             proxy_config: None,
@@ -81,19 +81,16 @@ impl<'a> fmt::Display for RemoteImage<'a> {
 
 impl<'a> RemoteImage<'a> {
     pub fn new(
-        mut host: String,
+        host: String,
         mut repo: String,
         reference: ManifestReference,
         proxy_config: Option<&'a SingleRegistryProxyConfig>,
     ) -> Self {
-        if host.ends_with("docker.io") {
-            // The real docker registry is `registry-1.docker.io`, not `docker.io`.
-            host = "registry-1.docker.io".to_string();
-            if !repo.contains('/') {
+        if host.ends_with("docker.io")
+            && !repo.contains('/') {
                 // handle images like "nginx:latest" that are actually library/nginx:latest
                 repo = format!("library/{repo}")
             }
-        }
         let insecure = matches!(
             proxy_config,
             Some(SingleRegistryProxyConfig { insecure: true, .. })
@@ -113,7 +110,7 @@ impl<'a> RemoteImage<'a> {
         &self.host
     }
 
-    /// Example return value: `https://registry-1.docker.io/v2/library/nginx`
+    /// Example return value: `https://docker.io/v2/library/nginx`
     pub fn get_base_uri(&self) -> String {
         format!("{}://{}/v2/{}", self.scheme, self.host, self.repo)
     }
@@ -122,7 +119,7 @@ impl<'a> RemoteImage<'a> {
         format!("{}/manifests/{}", self.get_base_uri(), self.reference)
     }
 
-    /// Example return value: `registry-1.docker.io/library/nginx@sha256:12345`
+    /// Example return value: `docker.io/library/nginx@sha256:12345`
     pub fn get_ref(&self) -> String {
         let (sep, ref_) = match &self.reference {
             ManifestReference::Digest(d) => ("@", Cow::Owned(d.to_string())),
@@ -163,7 +160,7 @@ impl<'a> RemoteImage<'a> {
                 && &name[..i] != "localhost"
                 && name[..i].to_lowercase() == name[..i])
         {
-            host = "registry-1.docker.io";
+            host = "docker.io";
             repo = name.to_string();
         } else {
             host = &name[..i];
@@ -193,7 +190,7 @@ mod test {
         assert_eq!(
             ret,
             RemoteImage {
-                host: "registry-1.docker.io".to_string(),
+                host: "docker.io".to_string(),
                 repo: "library/debian".to_string(),
                 ..Default::default()
             }
@@ -202,7 +199,7 @@ mod test {
         assert_eq!(
             ret,
             RemoteImage {
-                host: "registry-1.docker.io".to_string(),
+                host: "docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
                 ..Default::default()
             }
@@ -211,17 +208,17 @@ mod test {
         assert_eq!(
             ret,
             RemoteImage {
-                host: "registry-1.docker.io".to_string(),
+                host: "docker.io".to_string(),
                 repo: "amouat/network-utils".to_string(),
                 reference: ManifestReference::Tag("beta".to_string()),
                 ..Default::default()
             }
         );
-        ret = RemoteImage::try_from_str("registry-1.docker.io/mandy").unwrap();
+        ret = RemoteImage::try_from_str("docker.io/mandy").unwrap();
         assert_eq!(
             ret,
             RemoteImage {
-                host: "registry-1.docker.io".to_string(),
+                host: "docker.io".to_string(),
                 repo: "library/mandy".to_string(),
                 ..Default::default()
             }
@@ -304,18 +301,15 @@ mod test {
     #[test]
     fn test_get_uri() {
         let img = RemoteImage::new(
-            "registry-1.docker.io".to_string(),
+            "docker.io".to_string(),
             "debian".to_string(),
             ManifestReference::try_from_str("funky").unwrap(),
             None,
         );
-        assert_eq!(
-            img.get_base_uri(),
-            "https://registry-1.docker.io/v2/library/debian"
-        );
+        assert_eq!(img.get_base_uri(), "https://docker.io/v2/library/debian");
         assert_eq!(
             img.get_manifest_url(),
-            "https://registry-1.docker.io/v2/library/debian/manifests/funky"
+            "https://docker.io/v2/library/debian/manifests/funky"
         );
 
         let proxy_cfg = SingleRegistryProxyConfig {
@@ -335,13 +329,10 @@ mod test {
         );
 
         let img = RemoteImage::try_from_str("spy:v3.1.0-cia-INTERNAL").unwrap();
-        assert_eq!(
-            img.get_base_uri(),
-            "https://registry-1.docker.io/v2/library/spy"
-        );
+        assert_eq!(img.get_base_uri(), "https://docker.io/v2/library/spy");
         assert_eq!(
             img.get_manifest_url(),
-            "https://registry-1.docker.io/v2/library/spy/manifests/v3.1.0-cia-INTERNAL"
+            "https://docker.io/v2/library/spy/manifests/v3.1.0-cia-INTERNAL"
         );
     }
 }

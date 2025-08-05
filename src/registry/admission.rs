@@ -137,7 +137,7 @@ mod test {
         let cfg = ImageValidationConfig {
             default: "Allow".to_string(),
             allow: vec![],
-            deny: vec!["registry-1.docker.io".into(), "toto.land".into()],
+            deny: vec!["docker.io".into(), "toto.land".into()],
         };
 
         let (v, _) = check_image_is_allowed("ubuntu", &cfg);

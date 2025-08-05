@@ -64,7 +64,7 @@ mod test {
                     image_validation: Some(ImageValidationConfig {
                         default: "Deny".to_string(),
                         allow: vec![
-                            "registry-1.docker.io".to_string(),
+                            "docker.io".to_string(),
                             "localhost:8000".to_string(),
                             "trow.test".to_string(),
                             "k8s.gcr.io".to_string(),
