@@ -140,14 +140,10 @@ jobs:
       - name: Helm Install Trow
         run: |
           helm install trow-test -f .github/workflows/config/values.yaml charts/trow/
-      - name: Pull and Tag Docker Image
-        run: |
-          docker pull nginx:alpine
-          docker tag nginx:alpine 127.0.0.1/test/nginx:alpine
-      - name: Push to Trow
+      - name: Pull proxied image from trow
         run: |
           kubectl wait pod/trow-test-0 --for condition=ready --timeout=300s
-          docker push 127.0.0.1/test/nginx:alpine
+          docker pull 127.0.0.1/f/docker.io/test/nginx:alpine
       - if: always()
         name: Export pod logs
         run: .github/workflows/config/export-pod-logs.sh
@@ -157,8 +153,8 @@ jobs:
         with:
           name: pod-logs-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
           path: ./pod_logs/*.txt
-          retention-days: 2
-          compression-level: 9
+          retention-days: 30
+          compression-level: 7
 
 
   typos:
