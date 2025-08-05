@@ -149,11 +149,9 @@ mod registry_interface {
         let resp = cl
             .clone()
             .oneshot(
-                Request::post(format!(
-                    "/v2/{repo_name}/blobs/uploads/?digest={digest}"
-                ))
-                .body(Body::from(blob_content))
-                .unwrap(),
+                Request::post(format!("/v2/{repo_name}/blobs/uploads/?digest={digest}"))
+                    .body(Body::from(blob_content))
+                    .unwrap(),
             )
             .await
             .unwrap();

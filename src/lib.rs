@@ -134,10 +134,7 @@ impl TrowConfig {
     #[doc(hidden)]
     pub async fn build_server_state(self) -> Result<Arc<TrowServerState>, TrowConfigError> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
-        println!(
-            "Hostname of this registry (for the MutatingWebhook): {:?}",
-            self.service_name
-        );
+        println!("Hostname of this registry: {:?}", self.service_name);
         match &self.config_file {
             Some(ConfigFile {
                 image_validation: Some(cfg),

@@ -5,8 +5,14 @@ use axum::extract::{FromRef, FromRequestParts};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum_extra::extract::Host;
+use serde::Deserialize;
 
 use crate::TrowServerState;
+
+#[derive(Deserialize)]
+pub struct ImageNamespace {
+    pub ns: Option<String>,
+}
 
 pub struct AlwaysHost(pub String);
 

@@ -5,9 +5,7 @@ mod common;
 mod cli {
     use predicates::prelude::*;
     use test_temp_dir::test_temp_dir;
-    use trow::registry::{
-        ConfigFile, ImageValidationConfig, RegistryProxiesConfig, SingleRegistryProxyConfig,
-    };
+    use trow::registry::{ConfigFile, ImageValidationConfig};
 
     use crate::common::get_file;
 
@@ -69,11 +67,6 @@ mod cli {
         let tmp_dir = test_temp_dir!();
         let tmp_path = tmp_dir.as_path_untracked();
 
-        get_command()
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Proxy registries not configured"));
-
         let file = get_file(
             tmp_path,
             ConfigFile {
@@ -96,55 +89,6 @@ mod cli {
                     "  Default action: Allow",
                     "  Allowed prefixes: [\"trow.test/\"]",
                     "  Denied prefixes: [\"toto\"]",
-                ]
-                .join("\n"),
-            ));
-    }
-
-    #[test]
-    fn registry_proxy() {
-        let tmp_dir = test_temp_dir!();
-        let tmp_path = tmp_dir.as_path_untracked();
-
-        get_command()
-            .assert()
-            .success()
-            .stdout(predicate::str::contains(
-                "Image validation webhook not configured",
-            ));
-
-        let file = get_file(
-            tmp_path,
-            ConfigFile {
-                registry_proxies: RegistryProxiesConfig {
-                    offline: true,
-                    registries: vec![
-                        SingleRegistryProxyConfig {
-                            host: "jul.example.com".to_string(),
-                            username: Some("robert".to_string()),
-                            password: Some("1234".to_string()),
-                            ..Default::default()
-                        },
-                        SingleRegistryProxyConfig {
-                            host: "127.0.0.1".to_string(),
-                            ..Default::default()
-                        },
-                    ],
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        );
-
-        get_command()
-            .args(["--config-file", file.to_str().unwrap()])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains(
-                [
-                    "Proxy registries configured:",
-                    "  - lovni: jul.example.com",
-                    "  - trow: 127.0.0.1",
                 ]
                 .join("\n"),
             ));

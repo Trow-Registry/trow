@@ -1,9 +1,12 @@
+mod download;
+
 use std::borrow::Cow;
 use std::fmt;
 
 use const_format::formatcp;
 use lazy_static::lazy_static;
 
+use crate::registry::SingleRegistryProxyConfig;
 use crate::registry::digest::{Digest, DigestError};
 use crate::registry::manifest::ManifestReference;
 
@@ -36,7 +39,8 @@ const fn get_image_ref_regex() -> &'static str {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct RemoteImage {
+pub struct RemoteImage<'a> {
+    proxy_config: Option<&'a SingleRegistryProxyConfig>,
     /// `http` or `https`
     pub scheme: &'static str,
     /// Including port, docker.io by default
@@ -46,18 +50,19 @@ pub struct RemoteImage {
     pub reference: ManifestReference,
 }
 
-impl std::default::Default for RemoteImage {
+impl<'a> std::default::Default for RemoteImage<'a> {
     fn default() -> Self {
-        RemoteImage {
+        Self {
             scheme: "https",
             host: "registry-1.docker.io".to_string(),
             repo: "(none)".to_string(),
             reference: ManifestReference::Tag("latest".to_string()),
+            proxy_config: None,
         }
     }
 }
 
-impl From<RemoteImage> for oci_client::Reference {
+impl<'a> From<RemoteImage<'a>> for oci_client::Reference {
     fn from(val: RemoteImage) -> Self {
         match val.reference {
             ManifestReference::Digest(d) => {
@@ -68,37 +73,39 @@ impl From<RemoteImage> for oci_client::Reference {
     }
 }
 
-impl fmt::Display for RemoteImage {
+impl<'a> fmt::Display for RemoteImage<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.get_ref())
     }
 }
 
-impl RemoteImage {
-    pub fn new(mut host: &str, mut repo: String, reference: ManifestReference) -> Self {
+impl<'a> RemoteImage<'a> {
+    pub fn new(
+        mut host: String,
+        mut repo: String,
+        reference: ManifestReference,
+        proxy_config: Option<&'a SingleRegistryProxyConfig>,
+    ) -> Self {
         if host.ends_with("docker.io") {
             // The real docker registry is `registry-1.docker.io`, not `docker.io`.
-            host = "registry-1.docker.io";
+            host = "registry-1.docker.io".to_string();
             if !repo.contains('/') {
                 // handle images like "nginx:latest" that are actually library/nginx:latest
                 repo = format!("library/{repo}")
             }
         }
-
-        // Handle http:// and https:// in the repo uri
-        let scheme = if host.starts_with("http://") {
-            host = host.trim_start_matches("http://");
-            "http"
-        } else {
-            host = host.trim_start_matches("https://");
-            "https"
-        };
+        let insecure = matches!(
+            proxy_config,
+            Some(SingleRegistryProxyConfig { insecure: true, .. })
+        );
+        let scheme = if insecure { "http" } else { "https" };
 
         RemoteImage {
-            host: host.to_string(),
+            host,
             repo,
             reference,
             scheme,
+            proxy_config,
         }
     }
 
@@ -128,8 +135,11 @@ impl RemoteImage {
         &self.repo
     }
 
+    pub fn get_proxy_cfg(&self) -> &Option<&'a SingleRegistryProxyConfig> {
+        &self.proxy_config
+    }
+
     /// Note: this uses the same validation rules as the Docker engine.
-    /// Schemes (`http`, `https`) are not supported here.
     pub fn try_from_str(image_ref: &str) -> Result<Self, RemoteImageError> {
         lazy_static! {
             static ref RE: regex::Regex = regex::RegexBuilder::new(get_image_ref_regex())
@@ -169,7 +179,7 @@ impl RemoteImage {
             ManifestReference::Tag("latest".to_string())
         };
 
-        Ok(Self::new(host, repo, ref_))
+        Ok(Self::new(host.to_string(), repo, ref_, None))
     }
 }
 
@@ -294,9 +304,10 @@ mod test {
     #[test]
     fn test_get_uri() {
         let img = RemoteImage::new(
-            "registry-1.docker.io",
+            "registry-1.docker.io".to_string(),
             "debian".to_string(),
             ManifestReference::try_from_str("funky").unwrap(),
+            None,
         );
         assert_eq!(
             img.get_base_uri(),
@@ -307,10 +318,15 @@ mod test {
             "https://registry-1.docker.io/v2/library/debian/manifests/funky"
         );
 
+        let proxy_cfg = SingleRegistryProxyConfig {
+            insecure: true,
+            ..Default::default()
+        };
         let img = RemoteImage::new(
-            "http://cia.gov",
+            "cia.gov".to_string(),
             "not-watching".to_string(),
             ManifestReference::try_from_str("i-swear").unwrap(),
+            Some(&proxy_cfg),
         );
         assert_eq!(img.get_base_uri(), "http://cia.gov/v2/not-watching");
         assert_eq!(
