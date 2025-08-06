@@ -5,9 +5,7 @@ set -exo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-docker="$(command -v docker 2> /dev/null || echo "podman")"
 GH_REPO="ghcr.io/trow-registry/trow"
-
 
 # Check if cargo-sqlx is installed
 if ! command -v cargo-sqlx >/dev/null 2>&1; then
@@ -37,19 +35,6 @@ else
     echo "→ Development database already exists at $DB_PATH"
 fi
 
-if [ "$docker" = "docker" ]; then
-    # Use trow-multi builder if it exists, otherwise create it
-    # Not needed for podman
-    if ! docker buildx ls | grep -s trow-multi ;
-    then
-        # # Register binfmt handlers
-        docker run --rm --privileged aptman/qus -s -- -p arm aarch64
-        # Create new build instance
-        docker buildx create --name trow-multi
-    fi
-    docker buildx use trow-multi
-fi
-
 VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 TAG="$VERSION"
 GH_IMAGE="$GH_REPO:$TAG"
@@ -64,36 +49,23 @@ BUILD_ARGS=(
     "--build-arg" "VERSION=$VERSION"
 )
 
-if [[ "$CI" = "true" || "$RELEASE" = "true" ]]; then
-   PUSH="--push"
-fi
+sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
+podman manifest create -a $GH_IMAGE
 
-echo $PUSH $GH_IMAGE $GH_REPO
-if [ "$docker" = "docker" ]; then
-    # Can't load the image in the local registry... See https://github.com/docker/roadmap/issues/371
-    docker buildx build \
-        "${BUILD_ARGS[@]}" \
-        $PUSH \
-        --pull \
-        --platform linux/amd64,linux/arm64 \
-        -t $GH_IMAGE \
-        -t $GH_REPO:latest \
-        -f Dockerfile ../
-else
-    # Note: to build multi arch images with podman, use these commands:
-    # sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    # podman manifest push --all ghcr.io/trow-registry/trow:0.7.2
-    podman manifest create $GH_IMAGE
+for target in linux/arm64:aarch64-unknown-linux-gnu linux/amd64:x86_64-unknown-linux-gnu; do
+    platform=$(echo $target | cut -d ':' -f 1)
+    rust_target=$(echo $target | cut -d ':' -f 2)
+
+    echo "-> $rust_target"
+    cross build --release --target $rust_target
     podman build \
         "${BUILD_ARGS[@]}" \
-        --platform linux/amd64,linux/arm64 \
+        --platform $platform \
         --manifest $GH_IMAGE \
-        -f Dockerfile ../
+        -f Dockerfile ../target/$rust_target/release/
+done
 
-fi
-
-echo "→ Image $GH_IMAGE built successfully"
-if [[ "$CI" = true ]]
-then
+if [[ "$CI" = "true" || "$RELEASE" = "true" ]]; then
+    podman manifest push --all $GH_IMAGE
     echo "container-image=$GH_IMAGE" >> $GITHUB_OUTPUT
 fi

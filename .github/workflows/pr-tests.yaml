@@ -59,8 +59,8 @@ jobs:
       - name: Build and export container image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./docker/Dockerfile.debug
+          context: target/debug/
+          file: ./docker/Dockerfile
           tags: trow:onpr
           outputs: type=docker,dest=/tmp/trow_image.tar.zst
       - name: Upload artifact

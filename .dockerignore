@@ -3,3 +3,6 @@ target
 certs/ca.crt
 certs/domain.key
 conformance.test
+build
+deps
+incremental
