@@ -146,7 +146,7 @@ jobs:
         run: |
           kubectl wait --for condition=ready pod/trow-test-0 --timeout=300s
       - name: Pull proxied image from trow
-        run: docker pull ${{ steps.get-ip.outputs.ip }}:30000/f/docker.io/test/nginx:alpine
+        run: podman pull --tls-verify=false ${{ steps.get-ip.outputs.ip }}:30000/f/docker.io/nginx:alpine
       - if: always()
         name: Export pod logs
         run: .github/workflows/config/export-pod-logs.sh
