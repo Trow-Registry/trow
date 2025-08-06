@@ -21,15 +21,14 @@ impl FromStr for BindAddr {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let given_addr = SocketAddr::from_str(s)
             .or_else(|_| IpAddr::from_str(s).map(|ip| SocketAddr::new(ip, 8000)))
-            .map_err(|_| format!("Invalid address: '{}'. Expected format: IP or IP:PORT", s))?;
+            .map_err(|_| format!("Invalid address: '{s}'. Expected format: IP or IP:PORT"))?;
 
         let socketaddr = given_addr
             .to_socket_addrs()
             .map_err(|e| format!("Could not resolve bind address: {e}"))?
             .next()
             .ok_or(format!(
-                "Bound address {} did not resolve to anything",
-                given_addr
+                "Bound address {given_addr} did not resolve to anything"
             ))?;
 
         Ok(Self {
