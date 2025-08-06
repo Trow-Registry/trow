@@ -140,10 +140,12 @@ jobs:
       - name: Helm Install Trow
         run: |
           helm install trow-test -f .github/workflows/config/values.yaml charts/trow/
-      - name: Pull proxied image from trow
+      - name: Wait for trow
         run: |
-          kubectl wait pod/trow-test-0 --for condition=ready --timeout=300s
-          docker pull 127.0.0.1/f/docker.io/test/nginx:alpine
+          kubectl wait --for condition=ready pod/trow-test-0 --timeout=300s
+          kubectl wait --for condition=ready ingress/trow-test --timeout=300s
+      - name: Pull proxied image from trow
+        run: docker pull 127.0.0.1/f/docker.io/test/nginx:alpine
       - if: always()
         name: Export pod logs
         run: .github/workflows/config/export-pod-logs.sh
