@@ -1,9 +1,5 @@
-[registries.crates-io]
-protocol = "sparse"
-
 [target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "link-arg=--target=x86-64"]
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
