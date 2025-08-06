@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::prelude::*;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -10,6 +10,34 @@ use clap::Parser;
 use clap::builder::ArgPredicate;
 use trow::{TlsConfig, TrowConfig};
 
+#[derive(Debug, Clone)]
+struct BindAddr {
+    pub resolved: SocketAddr,
+}
+
+impl FromStr for BindAddr {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let given_addr = SocketAddr::from_str(s)
+            .or_else(|_| IpAddr::from_str(s).map(|ip| SocketAddr::new(ip, 8000)))
+            .map_err(|_| format!("Invalid address: '{}'. Expected format: IP or IP:PORT", s))?;
+
+        let socketaddr = given_addr
+            .to_socket_addrs()
+            .map_err(|e| format!("Could not resolve bind address: {e}"))?
+            .next()
+            .ok_or(format!(
+                "Bound address {} did not resolve to anything",
+                given_addr
+            ))?;
+
+        Ok(Self {
+            resolved: socketaddr,
+        })
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "Trow")]
 #[command(about = "The Cluster Registry")]
@@ -17,7 +45,7 @@ use trow::{TlsConfig, TrowConfig};
 struct Args {
     /// Interface to bind Trow on
     #[arg(long, default_value = "[::]:8000")]
-    bind: SocketAddr,
+    bind: BindAddr,
 
     /// Path to TLS certificate and key, separated by ','
     #[arg(
@@ -72,12 +100,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
-    let addr = args
-        .bind
-        .to_socket_addrs()
-        .expect("Could not resolve bind address")
-        .next()
-        .expect("Bound address did not resolve to anything");
+    let addr = args.bind.resolved;
     let host_name = args.hostname.unwrap_or(addr.to_string());
 
     let mut builder = TrowConfig::new();

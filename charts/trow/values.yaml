@@ -21,6 +21,8 @@ trow:
   ## if using NodePort, this can be set to 127.0.0.1:XXXX
   ## Where "XXXX" is the value of service.nodePort
   domain: myregistry.mydomain.io
+  ## By default, trow binds [::]:8000. On some systems it is necessary to bind to IPv4 only.
+  # bind: 0.0.0.0
   # user: user
   # password: password
 

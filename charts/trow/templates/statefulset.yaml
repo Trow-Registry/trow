@@ -30,6 +30,10 @@ spec:
         args:
           - "--hostname"
           - {{ .Values.trow.domain | quote }}
+          {{- if .Values.trow.bind }}
+          - --bind
+          - {{ .Values.trow.bind | quote }}
+          {{- end }}
           {{- if and (.Values.trow.user) (.Values.trow.password) }}
           - "--user"
           - {{ .Values.trow.user | quote }}

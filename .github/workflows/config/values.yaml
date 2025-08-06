@@ -3,6 +3,7 @@ image:
   tag: onpr
 trow:
   domain: "127.0.0.1"
+  bind: 0.0.0.0
 ingress:
   enabled: true
   ingressClassName: nginx
