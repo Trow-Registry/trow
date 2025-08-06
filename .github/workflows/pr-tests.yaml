@@ -85,7 +85,7 @@ jobs:
         id: start-container-image
         run: |
           docker load --input /tmp/trow_image.tar.zst
-          ID=$(docker run -d -e RUST_LOG=debug --name trow -p 8000:8000 trow:onpr)
+          ID=$(docker run -d -e RUST_LOG=debug --name trow -p 8000:8000 trow:onpr --bind 0.0.0.0:8000)
           IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $ID)
           echo "container-ip=$IP" >> $GITHUB_OUTPUT
           echo "ID=$ID   IP=$IP"
