@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.0 (2025-08-05)
+
+* Trow v0.9.0
+* Drop the mutating webhook
+* New proxy configuration format
+
 ## v0.11.1 (2025-07-25)
 
 * Fix webhook deployment PodDisruptionBudget created when deployment is not

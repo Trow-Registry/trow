@@ -141,15 +141,14 @@ mod smoke_test {
         let data_trow1 = temp_dir.subdir_untracked("1");
 
         let trow0 = start_trow(&data_trow0, false).await;
+        let trow0_host = format!("127.0.0.1:{}", trow0.port);
         let trow1 = trow_router(&data_trow1, |cfg| {
             cfg.config_file = Some(ConfigFile {
                 registry_proxies: RegistryProxiesConfig {
                     registries: vec![SingleRegistryProxyConfig {
-                        alias: "trow".to_string(),
-                        host: format!("http://127.0.0.1:{}", trow0.port),
-                        ignore_repos: vec![],
-                        password: None,
-                        username: None,
+                        host: trow0_host.clone(),
+                        insecure: true,
+                        ..Default::default()
                     }],
                     ..Default::default()
                 },
@@ -179,7 +178,7 @@ mod smoke_test {
             .1
             .clone()
             .oneshot(
-                Request::get("/v2/f/trow/alpine/manifests/latest")
+                Request::get(format!("/v2/f/{trow0_host}/alpine/manifests/latest"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -196,15 +195,14 @@ mod smoke_test {
         let data_trow1 = temp_dir.subdir_untracked("1");
 
         let trow0 = start_trow(&data_trow0, true).await;
+        let trow0_host = format!("[::1]:{}", trow0.port);
         let trow1 = trow_router(&data_trow1, |cfg| {
             cfg.config_file = Some(ConfigFile {
                 registry_proxies: RegistryProxiesConfig {
                     registries: vec![SingleRegistryProxyConfig {
-                        alias: "trow".to_string(),
-                        host: format!("http://[::1]:{}", trow0.port),
-                        ignore_repos: vec![],
-                        password: None,
-                        username: None,
+                        host: trow0_host.clone(),
+                        insecure: true,
+                        ..Default::default()
                     }],
                     ..Default::default()
                 },
@@ -234,7 +232,7 @@ mod smoke_test {
             .1
             .clone()
             .oneshot(
-                Request::get("/v2/f/trow/alpine/manifests/latest")
+                Request::get(format!("/v2/f/{trow0_host}/alpine/manifests/latest"))
                     .body(Body::empty())
                     .unwrap(),
             )

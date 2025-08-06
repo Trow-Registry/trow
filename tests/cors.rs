@@ -128,7 +128,7 @@ mod cors_tests {
             .oneshot(
                 Request::get("/login")
                     .header(header::ORIGIN, "https://example.com")
-                    .header(header::AUTHORIZATION, format!("Basic {}", bytes))
+                    .header(header::AUTHORIZATION, format!("Basic {bytes}"))
                     .body(Body::empty())
                     .unwrap(),
             )

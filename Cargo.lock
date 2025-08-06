@@ -4232,7 +4232,7 @@ dependencies = [
 
 [[package]]
 name = "trow"
-version = "0.7.5"
+version = "0.9.0"
 dependencies = [
  "assert_cmd",
  "aws-config",

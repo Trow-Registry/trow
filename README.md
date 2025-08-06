@@ -11,7 +11,7 @@ so it caches every image.
 ## Use Cases
 
 * Spin up a lightweight registry within Kubernetes
-* Cache every image in a cluster, thanks to the mutating webhook
+* Cache every image in a cluster when using the proper containerd or cri-o configuration
 * Prevent unauthorized images form touching the cluster with the admission webhook
 
 Features include:

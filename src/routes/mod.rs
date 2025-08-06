@@ -45,7 +45,7 @@ fn add_router_layers<S: Send + Sync + Clone + 'static>(
                 tracing::info_span!(
                     "request",
                     method = req.method().as_str(),
-                    path = req.uri().path(),
+                    path = req.uri().path_and_query().map(|pq| pq.as_str()),
                 )
             })
             .on_response(
@@ -61,13 +61,6 @@ fn add_router_layers<S: Send + Sync + Clone + 'static>(
                         size = size_str,
                         "response sent"
                     );
-                },
-            )
-            .on_eos(
-                |_trailers: Option<&hyper::HeaderMap>,
-                 stream_duration: Duration,
-                 _span: &tracing::Span| {
-                    tracing::info!(duration_ms = stream_duration.as_millis(), "end of stream");
                 },
             ),
     );

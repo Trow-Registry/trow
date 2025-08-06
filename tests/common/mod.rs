@@ -79,7 +79,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, D
     let resp = cl
         .clone()
         .oneshot(
-            Request::post(format!("/v2/{}/blobs/uploads/", name))
+            Request::post(format!("/v2/{name}/blobs/uploads/"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -114,8 +114,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, D
         .clone()
         .oneshot(
             Request::put(format!(
-                "/v2/{}/blobs/uploads/{}?digest={}",
-                name, uuid, blob_digest
+                "/v2/{name}/blobs/uploads/{uuid}?digest={blob_digest}"
             ))
             .body(Body::empty())
             .unwrap(),
@@ -128,7 +127,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, D
     let resp = cl
         .clone()
         .oneshot(
-            Request::get(format!("/v2/{}/blobs/{}", name, blob_digest))
+            Request::get(format!("/v2/{name}/blobs/{blob_digest}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -167,7 +166,7 @@ pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, D
     let manifest_digest = Digest::digest_sha256_slice(raw_manifest.as_bytes());
     let _: manifest::OCIManifest = serde_json::from_str(&raw_manifest).unwrap();
 
-    let manifest_addr = format!("/v2/{}/manifests/{}", name, tag);
+    let manifest_addr = format!("/v2/{name}/manifests/{tag}");
     let resp = cl
         .clone()
         .oneshot(

@@ -134,10 +134,7 @@ impl TrowConfig {
     #[doc(hidden)]
     pub async fn build_server_state(self) -> Result<Arc<TrowServerState>, TrowConfigError> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
-        println!(
-            "Hostname of this registry (for the MutatingWebhook): {:?}",
-            self.service_name
-        );
+        println!("Hostname of this registry: {:?}", self.service_name);
         match &self.config_file {
             Some(ConfigFile {
                 image_validation: Some(cfg),
@@ -149,18 +146,6 @@ impl TrowConfig {
                 println!("  Denied prefixes: {:?}", cfg.deny);
             }
             _ => println!("Image validation webhook not configured"),
-        }
-        match &self.config_file {
-            Some(ConfigFile {
-                registry_proxies: cfg,
-                ..
-            }) if !cfg.registries.is_empty() => {
-                println!("Proxy registries configured:");
-                for config in &cfg.registries {
-                    println!("  - {}: {}", config.alias, config.host);
-                }
-            }
-            _ => println!("Proxy registries not configured"),
         }
 
         if self.cors.is_some() {

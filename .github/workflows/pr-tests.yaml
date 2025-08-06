@@ -85,7 +85,7 @@ jobs:
         id: start-container-image
         run: |
           docker load --input /tmp/trow_image.tar.zst
-          ID=$(docker run -d -e RUST_LOG=debug --name trow -p 8000:8000 trow:onpr)
+          ID=$(docker run -d -e RUST_LOG=debug --name trow -p 8000:8000 trow:onpr --bind 0.0.0.0:8000)
           IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $ID)
           echo "container-ip=$IP" >> $GITHUB_OUTPUT
           echo "ID=$ID   IP=$IP"
@@ -131,23 +131,22 @@ jobs:
         with:
           config: .github/workflows/config/kind.yaml
           cluster_name: kind
-      - name: Install Ingress
+      - name: Get kind node IP
+        id: get-ip
         run: |
-          .github/workflows/config/install-kind-ingress.sh
+          IP=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
+          echo "ip=$IP" >> $GITHUB_OUTPUT
       - name: Sideload Trow image
         run: |
           kind load image-archive /tmp/trow_image.tar.zst
       - name: Helm Install Trow
         run: |
           helm install trow-test -f .github/workflows/config/values.yaml charts/trow/
-      - name: Pull and Tag Docker Image
+      - name: Wait for trow
         run: |
-          docker pull nginx:alpine
-          docker tag nginx:alpine 127.0.0.1/test/nginx:alpine
-      - name: Push to Trow
-        run: |
-          kubectl wait pod/trow-test-0 --for condition=ready --timeout=300s
-          docker push 127.0.0.1/test/nginx:alpine
+          kubectl wait --for condition=ready pod/trow-test-0 --timeout=300s
+      - name: Pull proxied image from trow
+        run: podman pull --tls-verify=false ${{ steps.get-ip.outputs.ip }}:30000/f/docker.io/nginx:alpine
       - if: always()
         name: Export pod logs
         run: .github/workflows/config/export-pod-logs.sh
@@ -157,8 +156,8 @@ jobs:
         with:
           name: pod-logs-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
           path: ./pod_logs/*.txt
-          retention-days: 2
-          compression-level: 9
+          retention-days: 30
+          compression-level: 7
 
 
   typos:

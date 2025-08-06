@@ -290,7 +290,7 @@ async fn get_blob_upload(
     )
     .fetch_one(&state.db_ro)
     .await?;
-    let location = format!("/v2/{}/blobs/uploads/{}", repo_name, upload_id);
+    let location = format!("/v2/{repo_name}/blobs/uploads/{upload_id}");
 
     Ok(Response::builder()
         .header("Docker-Upload-UUID", upload_id.to_string())
@@ -402,14 +402,11 @@ mod tests {
         let range = resp_header!(resp, test_utilities::RANGE_HEADER);
         let location = resp_header!(resp, test_utilities::LOCATION_HEADER);
         assert_eq!(range, "0-0"); // Haven't uploaded anything yet
-        assert_eq!(
-            location,
-            format!("/v2/{}/blobs/uploads/{}", repo_name, uuid)
-        );
+        assert_eq!(location, format!("/v2/{repo_name}/blobs/uploads/{uuid}"));
 
         let blob = "super secret blob".as_bytes();
         let digest = Digest::digest_sha256_slice(blob);
-        let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", repo_name, uuid, digest);
+        let loc = &format!("/v2/{repo_name}/blobs/uploads/{uuid}?digest={digest}");
 
         let resp = router
             .call(Request::put(loc).body(Body::from(blob)).unwrap())
@@ -440,12 +437,9 @@ mod tests {
         let resp = router
             .clone()
             .oneshot(
-                Request::post(format!(
-                    "/v2/{}/blobs/uploads/?digest={}",
-                    repo_name, digest
-                ))
-                .body(Body::from(config))
-                .unwrap(),
+                Request::post(format!("/v2/{repo_name}/blobs/uploads/?digest={digest}"))
+                    .body(Body::from(config))
+                    .unwrap(),
             )
             .await
             .unwrap();

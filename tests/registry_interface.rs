@@ -69,7 +69,7 @@ mod registry_interface {
                 .unwrap()
                 .to_str()
                 .unwrap();
-            assert_eq!(actual_size, format!("{}", s));
+            assert_eq!(actual_size, format!("{s}"));
         }
         let mani: ImageManifest = common::response_body_json(resp).await;
 
@@ -149,12 +149,9 @@ mod registry_interface {
         let resp = cl
             .clone()
             .oneshot(
-                Request::post(format!(
-                    "/v2/{}/blobs/uploads/?digest={}",
-                    repo_name, digest
-                ))
-                .body(Body::from(blob_content))
-                .unwrap(),
+                Request::post(format!("/v2/{repo_name}/blobs/uploads/?digest={digest}"))
+                    .body(Body::from(blob_content))
+                    .unwrap(),
             )
             .await
             .unwrap();
@@ -188,7 +185,7 @@ mod registry_interface {
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(format!("/v2/{}/manifests/{}", name, tag))
+                Request::put(format!("/v2/{name}/manifests/{tag}"))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -210,7 +207,7 @@ mod registry_interface {
                   {{
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
                     "size": 7143,
-                    "digest": "{}",
+                    "digest": "{digest}",
                     "platform": {{
                       "architecture": "ppc64le",
                       "os": "linux"
@@ -218,14 +215,13 @@ mod registry_interface {
                   }}
                 ]
               }}
-              "#,
-            digest
+              "#
         );
         let bytes = manifest.clone();
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(format!("/v2/{}/manifests/{}", name, tag))
+                Request::put(format!("/v2/{name}/manifests/{tag}"))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -267,7 +263,7 @@ mod registry_interface {
         let resp = cl
             .clone()
             .oneshot(
-                Request::put(format!("/v2/{}/manifests/{}", repo_name, tag))
+                Request::put(format!("/v2/{repo_name}/manifests/{tag}"))
                     .body(Body::from(bytes))
                     .unwrap(),
             )
@@ -284,7 +280,7 @@ mod registry_interface {
         let resp = cl
             .clone()
             .oneshot(
-                Request::delete(format!("/v2/{}/manifests/{}", repo, reference))
+                Request::delete(format!("/v2/{repo}/manifests/{reference}"))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -376,7 +372,7 @@ mod registry_interface {
         //used by oci_manifest_test
         let config = "{}\n".as_bytes();
         let digest = digest::Digest::digest_sha256_slice(config);
-        let loc = &format!("/v2/{}/blobs/uploads/{}?digest={}", name, uuid, digest);
+        let loc = &format!("/v2/{name}/blobs/uploads/{uuid}?digest={digest}");
 
         let resp = trow
             .clone()

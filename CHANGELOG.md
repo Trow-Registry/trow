@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.0 (2025-08-06)
+
+* Can proxy any registry (no prior configuration needed)
+* Drop the mutating webhook in favor of containerd/cri-o configuration
+* Support for the `ns` query parameter (so trow can be a catch-all mirror for containerd)
+
 ## v0.8.0 (2025-06-18)
 
 * listen on IPv6 socket

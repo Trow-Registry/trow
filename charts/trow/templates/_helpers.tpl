@@ -68,7 +68,7 @@ app.kubernetes.io/component: webhooks
 
 {{/* Is any webhook enabled? */}}
 {{- define "webhook.enabled" -}}
-{{- $trowWebhooksEnabled := or (default false .Values.trow.validationWebhook.enabled) (default false .Values.trow.proxyRegistries.webhook.enabled) -}}
+{{- $trowWebhooksEnabled := or (default false .Values.trow.validationWebhook.enabled) -}}
 {{ ternary "true" "" $trowWebhooksEnabled }}
 {{- end }}
 

@@ -2,7 +2,7 @@
 
 - [Trow User Guide](#trow-user-guide)
   - [Persisting Data/Images](#persisting-dataimages)
-  - [Proxying other registries (and MutatingWebhook)](#proxying-other-registries-and-mutatingwebhook)
+  - [Proxying other registries](#proxying-other-registries)
   - [Validating Webhook](#validating-webhook)
   - [Listing Repositories and Tags](#listing-repositories-and-tags)
   - [Multiplatform Builds](#multiplatform-builds)
@@ -27,55 +27,86 @@ cases you may need to perform an explicit `chown` or `chmod` using the UID of th
 
 Backing up the Trow registry can be done by copying the data directory (`/data` by default).
 
-## Proxying other registries (and MutatingWebhook)
+## Proxying other registries
 
-Trow can be configured as a proxy cache for other registries by passing the argument
-`--config-file` on start-up. Any repositories under `f/{alias}/` will automatically be pulled
-from the matching registry. For example, if we start Trow with:
+Trow will proxy any registry by default, ways to pull two syntaxes are supported:
+* `podman pull mytrow/f/docker.io/nginx:latest` (custom)
+* `curl https://mytrow/v2/nginx/manifests/latest?ns=docker.io` (standard registry mirror)
+
+Special configuration (e.g. credentials) can be configured by using `--config-file`:
 
 ```yaml
 # proxy.yaml
 registry_proxies:
   registries:
-    - alias: docker
-      host: registry-1.docker.io
-    - alias: my-custom-registry
-      host: my_custom_registry.example.com
+    - host: my_custom_registry.example.com
       username: toto
       password: pass1234
 ```
 
 ```shell
-$ trow --config-file ./proxy.yaml
-Starting Trow 0.6.0 on 0.0.0.0:8000
-Hostname of this registry (for the MutatingWebhook): "0.0.0.0:8000"
+$ RUST_LOG=info ./target/debug/trow
+Starting Trow 0.8.0
+Hostname of this registry: "[::]:8000"
 Image validation webhook not configured
-Proxy registries configured:
-  - docker: registry-1.docker.io
-  - quay: quay.io
-  - nvcr: nvcr.io
 ```
 
 And then make the following request to the empty registry:
 
 ```shell
-$ podman pull localhost:8443/f/docker/nginx:latest
-latest: Pulling from f/docker/nginx
-bb79b6b2107f: Already exists
-5a9f1c0027a7: Pull complete
-b5c20b2b484f: Pull complete
-166a2418f7e8: Pull complete
-1966ea362d23: Pull complete
-Digest: sha256:34f3f875e745861ff8a37552ed7eb4b673544d2c56c7cc58f9a9bec5b4b3530e
-Status: Downloaded newer image for localhost:8443/f/docker/nginx:latest
-localhost:8443/f/docker/nginx:latest
+$ podman pull --tls-verify=false 127.0.0.1:8000/f/docker.io/nginx
+Trying to pull 127.0.0.1:8000/f/docker.io/nginx:latest...
+[...]
+Writing manifest to image destination
+2cd1d97f893f70cee86a38b7160c30e5750f3ed6ad86c598884ca9c6a563a501
 ```
 
 Trow will keep a cached copy and check for new versions on each pull. The check is done via a HEAD
 request which does not count towards the dockerhub rate limits. If the image cannot be pulled a cached
 version will be returned, if available. This can be used to effectively mitigate availability issues with registries.
 
-The helm chart contains a `MutatingWebhookConfiguration`  that will automatically rewrite pod specs to pull through Trow.
+### Configuring containerd
+
+See [the containerd docs](https://github.com/containerd/containerd/blob/main/docs/hosts.md#setup-default-mirror-for-all-registries).
+
+```shell
+$ tree /etc/containerd/certs.d
+/etc/containerd/certs.d
+└── _default
+    └── hosts.toml
+
+$ cat /etc/containerd/certs.d/_default/hosts.toml
+[host."https://registry.example.com"]
+  capabilities = ["pull", "resolve"]
+```
+
+Example bottlerocket initcontainer script:
+
+```bash
+#!/bin/sh
+set -euo pipefail
+
+IP_FAMILY=ipv6 # can also be local-ipv4
+PORT=12345
+
+IMDS_TOKEN="$(curl -s -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 360" "http://[fd00:ec2::254]/latest/api/token")"
+IP="$(curl -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://[fd00:ec2::254]/latest/meta-data/${IP_FAMILY})"
+cat >> /.bottlerocket/rootfs/etc/containerd/config.toml << EOF
+[plugins."io.containerd.grpc.v1.cri".registry]
+  config_path = "/etc/containerd/certs.d"
+EOF
+mkdir -p /.bottlerocket/rootfs/etc/containerd/certs.d/_default/
+chmod -R 0755 /.bottlerocket/rootfs/etc/containerd/certs.d/
+cat >> /.bottlerocket/rootfs/etc/containerd/certs.d/_default/hosts.toml << EOF
+[host."http://${IP}:${PORT}"]
+  capabilities = ["pull", "resolve"]
+  skip_verify = true
+EOF
+chmod 0644 /.bottlerocket/rootfs/etc/containerd/certs.d/_default/hosts.toml
+chown -R root /.bottlerocket/rootfs/etc/containerd/certs.d/
+```
+
+TODO: cri-o configuration (https://github.com/cri-o/cri-o/discussions/9383).
 
 ## Validating Webhook
 

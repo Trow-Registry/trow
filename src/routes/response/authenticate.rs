@@ -25,8 +25,7 @@ impl IntoResponse for Authenticate {
         response.headers_mut().insert(
             "WWW-Authenticate",
             HeaderValue::from_str(&format!(
-                "Bearer realm=\"{}/login\",service=\"trow_registry\",scope=\"push/pull\"",
-                realm
+                "Bearer realm=\"{realm}/login\",service=\"trow_registry\",scope=\"push/pull\""
             ))
             .unwrap(),
         );

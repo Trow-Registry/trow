@@ -1,4 +1,3 @@
-use json_patch::{Patch, PatchOperation};
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use serde::{Deserialize, Serialize};
@@ -113,74 +112,6 @@ impl TrowServer {
             resp.deny(reasons.join("; "))
         }
     }
-
-    pub async fn mutate_admission(
-        &self,
-        ar: &AdmissionRequest<Pod>,
-        host_name: &str,
-    ) -> AdmissionResponse {
-        let resp = AdmissionResponse::from(ar);
-        let proxy_config = &self.config.registry_proxies;
-        let pod = match &ar.object {
-            Some(pod) => pod,
-            None => {
-                tracing::warn!("No pod in pod admission mutation request");
-                return resp;
-            }
-        };
-        let (images, image_paths) = extract_images(pod);
-        let mut patch_operations = Vec::<PatchOperation>::new();
-        for (raw_image, image_path) in images.iter().zip(image_paths.iter()) {
-            let image = match RemoteImage::try_from_str(raw_image) {
-                Ok(image) => image,
-                Err(e) => {
-                    tracing::warn!("Could not parse image reference `{raw_image}` ({e})",);
-                    continue;
-                }
-            };
-
-            let image_host = image.get_host();
-            let proxy_config = proxy_config
-                .registries
-                .iter()
-                .find(|cfg| cfg.host == image_host);
-            if let Some(proxy_config) = proxy_config {
-                let image_repo = image.get_repo();
-                let ignored = proxy_config
-                    .ignore_repos
-                    .iter()
-                    .any(|repo| image_repo == repo);
-                if !ignored {
-                    tracing::info!(
-                        "mutate_admission: proxying image {} to {}",
-                        raw_image,
-                        proxy_config.alias
-                    );
-                    let im = RemoteImage::new(
-                        host_name,
-                        format!("f/{}/{}", proxy_config.alias, image.get_repo()),
-                        image.reference.clone(),
-                    );
-                    patch_operations.push(
-                        serde_json::from_str(&format!(
-                            r#"{{ "op": "replace", "path": "{}", "value": "{}" }}"#,
-                            image_path,
-                            im.get_ref()
-                        ))
-                        .unwrap(),
-                    );
-                }
-            }
-        }
-        let patch = Patch(patch_operations);
-        match resp.with_patch(patch) {
-            Ok(resp) => resp,
-            Err(e) => {
-                tracing::warn!("Produced invalid admission patch: {}", e);
-                AdmissionResponse::invalid("Internal error serializing the patch")
-            }
-        }
-    }
 }
 #[cfg(test)]
 mod test {
@@ -206,7 +137,7 @@ mod test {
         let cfg = ImageValidationConfig {
             default: "Allow".to_string(),
             allow: vec![],
-            deny: vec!["registry-1.docker.io".into(), "toto.land".into()],
+            deny: vec!["docker.io".into(), "toto.land".into()],
         };
 
         let (v, _) = check_image_is_allowed("ubuntu", &cfg);

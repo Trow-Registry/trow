@@ -3,17 +3,10 @@ image:
   tag: onpr
 trow:
   domain: "127.0.0.1"
-  proxyRegistries:
-    webhook:
-      enabled: true
-ingress:
-  enabled: true
-  ingressClassName: nginx
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "0"
-  hosts:
-    - paths: ['/']
-      host: "none"
+  bind: 0.0.0.0
+service:
+  type: NodePort
+  nodePort: 30000
 webhooks:
   replicas: 1
   namespaceSelector:

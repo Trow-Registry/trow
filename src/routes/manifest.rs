@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::routing::get;
 use digest::Digest;
 
@@ -15,6 +15,7 @@ use crate::registry::manifest::{
     ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable,
 };
 use crate::registry::server::PROXY_DIR;
+use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -44,35 +45,24 @@ async fn get_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, raw_reference)): Path<(String, String)>,
+    Query(query): Query<ImageNamespace>,
 ) -> Result<OciJson<OCIManifest>, Error> {
     let reference = ManifestReference::try_from_str(&raw_reference).map_err(|e| {
         // Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
         Error::ManifestUnknown(format!("Invalid reference: {raw_reference} ({e:?})"))
     })?;
 
-    let digest = if repo.starts_with(PROXY_DIR) {
-        let (proxy_cfg, image) = match state
-            .registry
-            .config
-            .registry_proxies
-            .get_proxy_config(&repo, &reference)
-            .await
-        {
-            Some(cfg) => cfg,
-            None => {
-                return Err(Error::NameInvalid(format!(
-                    "No registered proxy matches {repo}"
-                )));
-            }
-        };
-
-        proxy_cfg
-            .download_remote_image(&image, &state)
-            .await
-            .map_err(|e| {
-                tracing::error!("Error downloading image: {e}");
-                Error::Internal
-            })?
+    let digest = if let Some(image) = state
+        .registry
+        .config
+        .registry_proxies
+        .get_proxied_image(&repo, &reference, query.ns)
+        .await
+    {
+        image.download(&state).await.map_err(|e| {
+            tracing::error!("Error downloading image: {e}");
+            Error::Internal
+        })?
     } else {
         let digest = match &reference {
             ManifestReference::Tag(_) => {
@@ -134,7 +124,8 @@ endpoint_fn_7_levels!(
     get_manifest(
         auth_user: TrowToken,
         state: State<Arc<TrowServerState>>;
-        path: [image_name, reference: String]
+        path: [image_name, reference: String],
+        ns: Query<ImageNamespace>
     ) -> Result<OciJson<OCIManifest>, Error>
 );
 

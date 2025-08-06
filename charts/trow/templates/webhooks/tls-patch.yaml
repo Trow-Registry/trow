@@ -29,7 +29,6 @@ rules:
       - admissionregistration.k8s.io
     resources:
       - validatingwebhookconfigurations
-      - mutatingwebhookconfigurations
     verbs:
       - get
       - update
@@ -181,27 +180,6 @@ spec:
             - --patch-mutating=false
             - --secret-name={{ include "trow.fullname" . }}-patch-webhooks
             - --patch-failure-policy={{ .Values.trow.validationWebhook.failurePolicy }}
-          env:
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-          {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-      {{- end }}
-      {{- if .Values.trow.proxyRegistries.webhook.enabled }}
-        - name: patch-mutation
-          image: {{ .Values.webhooks.tls.patch.image.image }}
-          imagePullPolicy: {{ .Values.webhooks.tls.patch.image.pullPolicy }}
-          args:
-            - patch
-            - --webhook-name={{ include "trow.fullname" . }}-mutation
-            - --namespace=$(POD_NAMESPACE)
-            - --patch-validating=false
-            - --secret-name={{ include "trow.fullname" . }}-patch-webhooks
-            - --patch-failure-policy={{ .Values.trow.proxyRegistries.webhook.failurePolicy }}
           env:
             - name: POD_NAMESPACE
               valueFrom:

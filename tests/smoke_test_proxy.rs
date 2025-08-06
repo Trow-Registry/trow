@@ -24,29 +24,10 @@ mod proxy_registry {
         let config_file = trow::registry::ConfigFile {
             registry_proxies: RegistryProxiesConfig {
                 offline: false,
-                registries: vec![
-                    SingleRegistryProxyConfig {
-                        alias: "docker".to_string(),
-                        host: "registry-1.docker.io".to_string(),
-                        username: None,
-                        password: None,
-                        ignore_repos: vec![],
-                    },
-                    SingleRegistryProxyConfig {
-                        alias: "nvcr".to_string(),
-                        host: "nvcr.io".to_string(),
-                        username: None,
-                        password: None,
-                        ignore_repos: vec![],
-                    },
-                    SingleRegistryProxyConfig {
-                        alias: "quay".to_string(),
-                        host: "quay.io".to_string(),
-                        username: None,
-                        password: None,
-                        ignore_repos: vec![],
-                    },
-                ],
+                registries: vec![SingleRegistryProxyConfig {
+                    host: "nvcr.io".to_string(),
+                    ..Default::default()
+                }],
                 ..Default::default()
             },
             ..Default::default()
@@ -69,13 +50,7 @@ mod proxy_registry {
             )
             .await
             .unwrap();
-        assert_eq!(
-            resp.status(),
-            StatusCode::OK,
-            "Could not get {}:{}",
-            name,
-            tag
-        );
+        assert_eq!(resp.status(), StatusCode::OK, "Could not get {name}:{tag}");
         let digest = resp
             .headers()
             .get("Docker-Content-Digest")
@@ -137,8 +112,8 @@ mod proxy_registry {
         let data_dir = tmp_dir.as_path_untracked();
 
         let trow = start_trow(data_dir).await.1;
-        get_manifest(&trow, "f/docker/amouat/trow", "latest").await;
-        get_manifest(&trow, "f/docker/amouat/trow", "latest").await;
+        get_manifest(&trow, "f/docker.io/amouat/trow", "latest").await;
+        get_manifest(&trow, "f/docker.io/amouat/trow", "latest").await;
     }
 
     #[tokio::test]
@@ -148,8 +123,8 @@ mod proxy_registry {
         let data_dir = tmp_dir.as_path_untracked();
 
         let trow = start_trow(data_dir).await.1;
-        get_manifest(&trow, "f/nvcr/nvidia/doca/doca", "2.10.0-base-rt").await;
-        get_manifest(&trow, "f/nvcr/nvidia/doca/doca", "2.10.0-base-rt").await;
+        get_manifest(&trow, "f/nvcr.io/nvidia/doca/doca", "2.10.0-base-rt").await;
+        get_manifest(&trow, "f/nvcr.io/nvidia/doca/doca", "2.10.0-base-rt").await;
     }
 
     #[tokio::test]
@@ -160,8 +135,8 @@ mod proxy_registry {
 
         let trow = start_trow(data_dir).await.1;
         // This should use same alpine image as base (so partially cached)
-        get_manifest(&trow, "f/docker/library/alpine", "3.13.4").await;
-        get_manifest(&trow, "f/docker/library/nginx", "1.20.0-alpine").await;
+        get_manifest(&trow, "f/docker.io/library/alpine", "3.13.4").await;
+        get_manifest(&trow, "f/docker.io/library/nginx", "1.20.0-alpine").await;
     }
 
     #[tokio::test]
@@ -173,11 +148,16 @@ mod proxy_registry {
         let (state, trow) = start_trow(data_dir).await;
         // Special case: docker/library
         // check that it works and that manifests are written in the correct location
-        get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
-        sqlx::query_scalar!("SELECT manifest_digest FROM tag WHERE repo = 'f/docker/library/alpine' AND tag = '3.13.4'")
-            .fetch_one(&state.db_ro)
+        get_manifest(&trow, "f/docker.io/alpine", "3.13.4").await;
+
+        let tags = sqlx::query!("SELECT * FROM tag")
+            .fetch_all(&state.db_ro)
             .await
-            .expect("Tag not found in database");
+            .unwrap();
+
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].repo, "f/docker.io/library/alpine");
+        assert_eq!(tags[0].tag, "3.13.4");
     }
 
     #[tokio::test]
@@ -190,11 +170,11 @@ mod proxy_registry {
         //Download an amd64 manifest, then the multi platform version of the same manifest
         get_manifest(
             &trow,
-            "f/docker/hello-world",
+            "f/docker.io/hello-world",
             "sha256:f54a58bc1aac5ea1a25d796ae155dc228b3f0e11d046ae276b39c4bf2f13d8c4",
         )
         .await;
-        get_manifest(&trow, "f/docker/hello-world", "linux").await;
+        get_manifest(&trow, "f/docker.io/hello-world", "linux").await;
     }
 
     #[tokio::test]
@@ -205,7 +185,7 @@ mod proxy_registry {
 
         let trow = start_trow(data_dir).await.1;
         // test a registry that doesn't require auth
-        get_manifest(&trow, "f/quay/openshifttest/scratch", "latest").await;
+        get_manifest(&trow, "f/quay.io/openshifttest/scratch", "latest").await;
     }
 
     #[tokio::test]
@@ -216,14 +196,14 @@ mod proxy_registry {
         let (state, trow) = start_trow(data_dir).await;
 
         // Check that tags get updated to point to latest digest
-        let (man_3_13, digest_3_13) = get_manifest(&trow, "f/docker/alpine", "3.13.4").await;
-        sqlx::query!("INSERT INTO tag (repo, tag, manifest_digest) VALUES ('f/docker/library/alpine', 'latest', $1)", digest_3_13)
+        let (man_3_13, digest_3_13) = get_manifest(&trow, "f/docker.io/alpine", "3.13.4").await;
+        sqlx::query!("INSERT INTO tag (repo, tag, manifest_digest) VALUES ('f/docker.io/library/alpine', 'latest', $1)", digest_3_13)
             .execute(&state.db_rw)
             .await
             .expect("Failed to insert tag");
 
         let (man_latest, digest_latest) =
-            get_manifest(&trow, "f/docker/library/alpine", "latest").await;
+            get_manifest(&trow, "f/docker.io/library/alpine", "latest").await;
         assert_ne!(
             digest_3_13, digest_latest,
             "Trow did not update digest of `latest` tag"
@@ -244,9 +224,9 @@ mod proxy_registry {
         let trow = start_trow(data_dir).await.1;
 
         let (_man_quay, digest_quay) =
-            get_manifest(&trow, "f/quay/kiwigrid/k8s-sidecar", "1.30.0").await;
+            get_manifest(&trow, "f/quay.io/kiwigrid/k8s-sidecar", "1.30.0").await;
         let (_man_docker, digest_docker) =
-            get_manifest(&trow, "f/docker/kiwigrid/k8s-sidecar", "1.30.0").await;
+            get_manifest(&trow, "f/docker.io/kiwigrid/k8s-sidecar", "1.30.0").await;
 
         assert_eq!(
             digest_quay, digest_docker,
