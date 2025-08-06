@@ -23,6 +23,7 @@ pub struct SingleRegistryProxyConfig {
     /// This can be empty !!
     pub host: String,
     /// TODO: insecure currently means "use HTTP", we should also support self-signed TLS
+    #[serde(default)]
     pub insecure: bool,
     pub username: Option<String>,
     pub password: Option<String>,

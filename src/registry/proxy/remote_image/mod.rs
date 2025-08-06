@@ -86,11 +86,10 @@ impl<'a> RemoteImage<'a> {
         reference: ManifestReference,
         proxy_config: Option<&'a SingleRegistryProxyConfig>,
     ) -> Self {
-        if host.ends_with("docker.io")
-            && !repo.contains('/') {
-                // handle images like "nginx:latest" that are actually library/nginx:latest
-                repo = format!("library/{repo}")
-            }
+        if host.ends_with("docker.io") && !repo.contains('/') {
+            // handle images like "nginx:latest" that are actually library/nginx:latest
+            repo = format!("library/{repo}")
+        }
         let insecure = matches!(
             proxy_config,
             Some(SingleRegistryProxyConfig { insecure: true, .. })
