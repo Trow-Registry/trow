@@ -1,10 +1,10 @@
 use aws_config::BehaviorVersion;
 use base64::Engine;
 use futures::future::try_join_all;
+use lazy_static::lazy_static;
 use oci_client::Reference;
 use oci_client::client::ClientProtocol;
 use oci_client::secrets::RegistryAuth;
-use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::TrowServerState;
@@ -117,7 +117,8 @@ async fn get_oci_client(
     cfg: Option<&SingleRegistryProxyConfig>,
 ) -> Result<(oci_client::Client, RegistryAuth), DownloadRemoteImageError> {
     lazy_static! {
-        static ref REGEX_PRIVATE_ECR: Regex = Regex::new(r"^[0-9]+\.dkr\.ecr\.[a-z0-9-]+\.amazonaws.com$").unwrap();
+        static ref REGEX_PRIVATE_ECR: Regex =
+            Regex::new(r"^[0-9]+\.dkr\.ecr\.[a-z0-9-]+\.amazonaws.com$").unwrap();
     }
 
     let mut client_config = oci_client::client::ClientConfig::default();
@@ -278,7 +279,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_oci_client_no_cfg_ecr() {
         let err = get_oci_client("1234.dkr.ecr.mars-1.amazonaws.com", None).await;
-        assert!(matches!(err, Err(DownloadRemoteImageError::EcrLoginError(_))));
+        assert!(matches!(
+            err,
+            Err(DownloadRemoteImageError::EcrLoginError(_))
+        ));
     }
     #[tokio::test]
     async fn test_get_oci_client_cfg_basic() {
@@ -286,7 +290,12 @@ mod tests {
             username: Some("Jacky".to_string()),
             ..Default::default()
         };
-        let (_clt, auth) = get_oci_client("prout.oups", Some(&proxy_cfg)).await.unwrap();
-        assert_eq!(auth, RegistryAuth::Basic("Jacky".to_string(), String::new()));
+        let (_clt, auth) = get_oci_client("prout.oups", Some(&proxy_cfg))
+            .await
+            .unwrap();
+        assert_eq!(
+            auth,
+            RegistryAuth::Basic("Jacky".to_string(), String::new())
+        );
     }
 }
