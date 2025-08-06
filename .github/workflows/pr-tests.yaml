@@ -77,7 +77,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download container image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp
@@ -93,7 +93,7 @@ jobs:
       - name: Test connectivity
         run: curl "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
       - name: Run OCI Distribution Spec conformance tests
-        uses: opencontainers/distribution-spec@583e014d15418d839d67f68152bc2c83821770e0
+        uses: opencontainers/distribution-spec@9d1b92567f2c7e5061a82e70b6fecbb1b0498b71
         env:
           OCI_ROOT_URL: "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
           OCI_NAMESPACE: oci-conformance/distribution-test
@@ -116,7 +116,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download container image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp
@@ -166,4 +166,4 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Check spelling
-      uses: crate-ci/typos@v1.34.0
+      uses: crate-ci/typos@v1.35.1
