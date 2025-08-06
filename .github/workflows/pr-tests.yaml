@@ -131,9 +131,11 @@ jobs:
         with:
           config: .github/workflows/config/kind.yaml
           cluster_name: kind
-      - name: Install Ingress
+      - name: Get kind node IP
+        id: get-ip
         run: |
-          .github/workflows/config/install-kind-ingress.sh
+          IP=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
+          echo "ip=$IP" >> $GITHUB_OUTPUT
       - name: Sideload Trow image
         run: |
           kind load image-archive /tmp/trow_image.tar.zst
@@ -143,9 +145,8 @@ jobs:
       - name: Wait for trow
         run: |
           kubectl wait --for condition=ready pod/trow-test-0 --timeout=300s
-          kubectl wait --for condition=ready ingress/trow-test --timeout=300s
       - name: Pull proxied image from trow
-        run: docker pull 127.0.0.1/f/docker.io/test/nginx:alpine
+        run: docker pull ${{ steps.get-ip.outputs.ip }}:30000/f/docker.io/test/nginx:alpine
       - if: always()
         name: Export pod logs
         run: .github/workflows/config/export-pod-logs.sh
