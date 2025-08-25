@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.1 (2025-08-25)
+
+* Automatically fetch AWS credentials for images from private ECR registries
+
 ## v0.9.0 (2025-08-06)
 
 * Can proxy any registry (no prior configuration needed)
