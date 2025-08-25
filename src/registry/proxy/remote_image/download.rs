@@ -243,7 +243,7 @@ async fn get_aws_ecr_password_from_env(ecr_host: &str) -> Result<String, EcrPass
         .ok_or(EcrPasswordError::InvalidRegion)?
         .to_owned();
     let region = aws_types::region::Region::new(region);
-    let config = aws_config::defaults(BehaviorVersion::v2025_01_17())
+    let config = aws_config::defaults(BehaviorVersion::v2025_08_07())
         .region(region)
         .load()
         .await;
