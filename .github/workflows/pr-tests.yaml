@@ -14,7 +14,7 @@ jobs:
       RUSTC_WRAPPER: "sccache"
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache compilation artefacts
@@ -41,7 +41,7 @@ jobs:
       container-image: ${{ steps.meta.outputs.tags }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache compilation artefacts
@@ -121,7 +121,7 @@ jobs:
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Helm
         uses: azure/setup-helm@v4
         with:
@@ -164,6 +164,6 @@ jobs:
     name: Typos
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Check spelling
-      uses: crate-ci/typos@v1.35.1
+      uses: crate-ci/typos@v1.37.0
