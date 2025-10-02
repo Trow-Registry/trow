@@ -19,7 +19,7 @@ tower-http = { version = "0.6", features = [
     "trace",
     "set-header",
 ] }
-jsonwebtoken = "9.2"
+jsonwebtoken = { version = "10.0", features = ["aws_lc_rs"] }
 rust-argon2 = "3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -36,8 +36,8 @@ regex = "1.5.0"
 sha2 = "0.10.0"
 hex = "0.4.0"
 thiserror = "2.0"
-kube = { version = "1.1.0", features = ["admission"] }
-k8s-openapi = { version = "0.25.0", features = ["v1_30"] }
+kube = { version = "2.0.1", features = ["admission"] }
+k8s-openapi = { version = "0.26.0", features = ["v1_30"] }
 json-patch = "4"
 jsonptr = "*"
 tokio = { version = "1", features = ["macros"] }
@@ -78,7 +78,7 @@ wiremock = "0.6.0"
 fastrand = "2.0.1"
 http-body-util = "0.1.1"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
-test-temp-dir = "0.3.0"
+test-temp-dir = "0.4.0"
 rstest = "0.26.0"
 
 [profile.dev.build-override]
