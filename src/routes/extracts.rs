@@ -36,6 +36,19 @@ where
             } else {
                 "http"
             };
+            if let (Some(forwarded_host_header), Some(forwarded_port_header)) = (
+                parts.headers.get("X-Forwarded-Host"),
+                parts.headers.get("X-Forwarded-Port"),
+            ) {
+                let forwarded_host = forwarded_host_header.to_str().unwrap_or("");
+                let forwarded_port = forwarded_port_header.to_str().unwrap_or("");
+                let res = format!("{scheme}://{forwarded_host}");
+                if forwarded_port.is_empty() {
+                    return Ok(AlwaysHost(res));
+                } else {
+                    return Ok(AlwaysHost(format!("{res}:{forwarded_port}")));
+                }
+            };
 
             return Ok(AlwaysHost(format!("{scheme}://{host}")));
         }
