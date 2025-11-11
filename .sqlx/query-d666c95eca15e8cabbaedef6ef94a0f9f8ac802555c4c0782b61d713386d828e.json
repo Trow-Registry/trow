@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND manifest_digest = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "d666c95eca15e8cabbaedef6ef94a0f9f8ac802555c4c0782b61d713386d828e"
+}

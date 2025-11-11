@@ -301,7 +301,7 @@ async fn delete_image_manifest(
         let digest = Digest::try_from_raw(&reference)?;
         let digest_str = digest.as_str();
         let res = sqlx::query!(
-            "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND blob_digest = $2",
+            "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND manifest_digest = $2",
             repo,
             digest_str
         )
@@ -320,6 +320,13 @@ async fn delete_image_manifest(
                 sqlx::query!("DELETE FROM manifest where digest = $1", digest_str)
                     .execute(&state.db_rw)
                     .await?;
+
+                sqlx::query!(
+                    "DELETE FROM manifest_blob_assoc where manifest_digest = $1",
+                    digest_str
+                )
+                .execute(&state.db_rw)
+                .await?;
             }
         }
     }
