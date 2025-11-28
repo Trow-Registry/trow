@@ -163,15 +163,15 @@ impl TrowStorageBackend {
         let file_size = tmp_file.metadata().await?.len();
         let range_len = range.as_ref().map(|r| r.end() - r.start() + 1);
 
-        if let Some(range) = &range {
-            if *range.start() != file_size {
-                tracing::error!(
-                    "Invalid content-range: start={} file_pos={}",
-                    range.start(),
-                    file_size
-                );
-                return Err(StorageBackendError::InvalidContentRange);
-            }
+        if let Some(range) = &range
+            && *range.start() != file_size
+        {
+            tracing::error!(
+                "Invalid content-range: start={} file_pos={}",
+                range.start(),
+                file_size
+            );
+            return Err(StorageBackendError::InvalidContentRange);
         }
         let bytes_written = tmp_file.write_stream(stream).await.map_err(|_e| {
             StorageBackendError::Internal(Cow::Borrowed("Couldn't write stream to file"))
@@ -223,10 +223,10 @@ impl TrowStorageBackend {
     pub async fn delete_blob(&self, digest: &str) -> Result<(), StorageBackendError> {
         tracing::debug!("Delete blob {digest}");
         let blob_path = self.blobs_dir.join(digest);
-        if let Err(e) = tokio::fs::remove_file(blob_path).await {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(StorageBackendError::Io(e));
-            }
+        if let Err(e) = tokio::fs::remove_file(blob_path).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(StorageBackendError::Io(e));
         }
         Ok(())
     }
@@ -234,10 +234,10 @@ impl TrowStorageBackend {
     pub async fn delete_upload(&self, uuid: &str) -> Result<(), StorageBackendError> {
         tracing::debug!("Delete upload {uuid}");
         let blob_path = self.uploads_dir.join(uuid);
-        if let Err(e) = tokio::fs::remove_file(blob_path).await {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(StorageBackendError::Io(e));
-            }
+        if let Err(e) = tokio::fs::remove_file(blob_path).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(StorageBackendError::Io(e));
         }
         Ok(())
     }
