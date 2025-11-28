@@ -11,7 +11,7 @@ sqlite = []
 futures = "0.3"
 axum = { version = "0.8.1", features = ["tracing"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum-extra = { version = "0.12.0", features = ["typed-header"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = [
     "cors",
@@ -78,7 +78,7 @@ wiremock = "0.6.0"
 fastrand = "2.0.1"
 http-body-util = "0.1.1"
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
-test-temp-dir = "0.4.0"
+test-temp-dir = "0.6.0"
 rstest = "0.26.0"
 
 [profile.dev.build-override]

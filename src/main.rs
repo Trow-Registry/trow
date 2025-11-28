@@ -128,11 +128,11 @@ async fn main() {
         builder.with_user(user, &pass);
     }
 
-    if let Some(config_file) = args.config_file {
-        if let Err(e) = builder.with_config(config_file) {
-            eprintln!("Failed to load proxy registry config file: {e:#}");
-            std::process::exit(1);
-        }
+    if let Some(config_file) = args.config_file
+        && let Err(e) = builder.with_config(config_file)
+    {
+        eprintln!("Failed to load proxy registry config file: {e:#}");
+        std::process::exit(1);
     }
     builder.uses_tls = args.tls.is_some(); // that's pretty bad :(
 

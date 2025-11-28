@@ -86,14 +86,12 @@ where
  */
 fn verify_user(user_pass: Vec<u8>, user_cfg: &UserConfig) -> bool {
     let mut user_pass = user_pass.split(|b| b == &b':');
-    if let Some(user) = user_pass.next() {
-        if let Some(pass) = user_pass.next() {
-            if user_cfg.user.as_bytes() == user {
-                if let Ok(v) = argon2::verify_encoded(&user_cfg.hash_encoded, pass) {
-                    return v;
-                }
-            }
-        }
+    if let Some(user) = user_pass.next()
+        && let Some(pass) = user_pass.next()
+        && user_cfg.user.as_bytes() == user
+        && let Ok(v) = argon2::verify_encoded(&user_cfg.hash_encoded, pass)
+    {
+        return v;
     }
     false
 }
