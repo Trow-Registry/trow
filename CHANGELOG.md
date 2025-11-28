@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.2 (2025-11-28)
+
+* upgrade dependencies
+* fix login redirect behind reverse proxy (#457)
+* fix manifests not being deleted (#460)
+
 ## v0.9.1 (2025-08-25)
 
 * Automatically fetch AWS credentials for images from private ECR registries
