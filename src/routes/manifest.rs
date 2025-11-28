@@ -302,26 +302,24 @@ async fn delete_image_manifest(
     } else {
         let digest = Digest::try_from_raw(&reference)?;
         let digest_str = digest.as_str();
-        let repo_assoc = sqlx::query_scalar!(
+        sqlx::query!(
+            "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND manifest_digest = $2",
+            repo,
+            digest_str
+        )
+        .execute(&state.db_rw)
+        .await?;
+        let num_repo_assoc = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM repo_blob_assoc WHERE manifest_digest = $1",
             digest_str
         )
         .fetch_one(&state.db_ro)
         .await?;
-        if repo_assoc <= 1 {
+        if num_repo_assoc == 0 {
             // Manifest is not referenced anymore, delete it
             sqlx::query!("DELETE FROM manifest where digest = $1", digest_str)
                 .execute(&state.db_rw)
                 .await?;
-        } else {
-            // Just delete the association with this repo
-            sqlx::query!(
-                "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND manifest_digest = $2",
-                repo,
-                digest_str
-            )
-            .execute(&state.db_rw)
-            .await?;
         }
     }
 
