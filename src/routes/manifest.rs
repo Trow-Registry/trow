@@ -169,6 +169,7 @@ async fn put_image_manifest(
                 .filter(|l| layer_is_distributable(l.media_type()))
                 .map(|m| m.digest().as_ref());
             for digest in assets {
+                // Check that each manifest referenced in the list exists in the repo
                 let res = sqlx::query!(
                     r"SELECT rba.manifest_digest FROM repo_blob_assoc rba
                     WHERE rba.manifest_digest = $1 AND rba.repo_name = $2",
@@ -191,6 +192,7 @@ async fn put_image_manifest(
                 .filter(|l| layer_is_distributable(l.media_type()))
                 .map(|l| l.digest().as_ref());
             for digest in assets {
+                // Check that each blob referenced in the manifest exists in the repo
                 let res = sqlx::query!(
                     r"SELECT rba.blob_digest FROM repo_blob_assoc rba
                     WHERE rba.blob_digest = $1 AND rba.repo_name = $2",
@@ -300,27 +302,24 @@ async fn delete_image_manifest(
     } else {
         let digest = Digest::try_from_raw(&reference)?;
         let digest_str = digest.as_str();
-        let res = sqlx::query!(
-            "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND blob_digest = $2",
+        sqlx::query!(
+            "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND manifest_digest = $2",
             repo,
             digest_str
         )
         .execute(&state.db_rw)
         .await?;
-
-        if res.rows_affected() > 0 {
-            let remaining_assoc = sqlx::query_scalar!(
-                "SELECT COUNT(*) FROM repo_blob_assoc WHERE manifest_digest = $1",
-                digest_str
-            )
-            .fetch_one(&state.db_ro)
-            .await?;
-
-            if remaining_assoc == 0 {
-                sqlx::query!("DELETE FROM manifest where digest = $1", digest_str)
-                    .execute(&state.db_rw)
-                    .await?;
-            }
+        let num_repo_assoc = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM repo_blob_assoc WHERE manifest_digest = $1",
+            digest_str
+        )
+        .fetch_one(&state.db_ro)
+        .await?;
+        if num_repo_assoc == 0 {
+            // Manifest is not referenced anymore, delete it
+            sqlx::query!("DELETE FROM manifest where digest = $1", digest_str)
+                .execute(&state.db_rw)
+                .await?;
         }
     }
 
@@ -344,4 +343,110 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
         delete(delete_image_manifest, delete_image_manifest_2level, delete_image_manifest_3level, delete_image_manifest_4level, delete_image_manifest_5level, delete_image_manifest_6level, delete_image_manifest_7level)
     );
     app
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use axum::body::Body;
+    use hyper::{Request, StatusCode};
+    use oci_spec::image::{Descriptor, ImageManifestBuilder, MediaType};
+    use test_temp_dir::test_temp_dir;
+    use tower::ServiceExt;
+
+    use super::*;
+    use crate::test_utilities;
+
+    #[tracing_test::traced_test]
+    #[tokio::test]
+    async fn test_delete_manifest() {
+        let tmp_dir = test_temp_dir!();
+        let (state, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
+
+        // 1. insert a dummy manifest into 2 repos
+        let dummy_blob_digest =
+            "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a";
+        let manifest = serde_json::to_vec(
+            &ImageManifestBuilder::default()
+                .schema_version(2u32)
+                .layers([])
+                .media_type(MediaType::ImageManifest)
+                .config(Descriptor::new(
+                    MediaType::EmptyJSON,
+                    2,
+                    oci_spec::image::Digest::from_str(dummy_blob_digest).unwrap(),
+                ))
+                .build()
+                .unwrap(),
+        )
+        .unwrap();
+        let manifest_digest = Digest::digest_sha256_slice(&manifest);
+        let manifest_digest_str = manifest_digest.as_str();
+        sqlx::query!(
+            "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
+            manifest_digest_str,
+            manifest,
+        )
+        .execute(&state.db_rw)
+        .await
+        .unwrap();
+        for repo in ["test1", "test2"] {
+            sqlx::query!(
+                r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($1, $2)"#,
+                repo,
+                manifest_digest_str
+            )
+            .execute(&state.db_rw)
+            .await
+            .unwrap();
+        }
+
+        // 2. delete from one repo: check manifest still exists
+        let resp = router
+            .clone()
+            .oneshot(
+                Request::delete(format!("/v2/test1/manifests/{manifest_digest_str}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::ACCEPTED,
+            "unexpected status code: {resp:?}"
+        );
+        let res = sqlx::query!(
+            r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
+            manifest_digest_str
+        )
+        .fetch_one(&state.db_ro)
+        .await
+        .unwrap();
+        assert_eq!(res.count, 1, "manifest was deleted unexpectedly");
+
+        // 3. delete from second repo: check manifest is deleted
+        let resp = router
+            .oneshot(
+                Request::delete(format!("/v2/test2/manifests/{manifest_digest_str}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::ACCEPTED,
+            "unexpected status code: {resp:?}"
+        );
+        let res = sqlx::query!(
+            r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
+            manifest_digest_str
+        )
+        .fetch_one(&state.db_ro)
+        .await
+        .unwrap();
+        assert_eq!(res.count, 0, "manifest was not deleted");
+    }
 }
