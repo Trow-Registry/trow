@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        default: 'v0.9.2'
 
 jobs:
   release-trow:
@@ -29,11 +35,14 @@ jobs:
       - name: Check tag and Cargo.toml version match
         run: |
           FROM_CARGO="v$(sed '/^version = */!d; s///;q' Cargo.toml | sed s/\"//g)"
-          FROM_TAG="${GITHUB_REF#refs/tags/}"
+          FROM_TAG="${{ github.event.inputs.tag || github.ref_name }}"
           if [ "$FROM_CARGO" != "$FROM_TAG" ]; then
             echo "Versions do not match: $FROM_CARGO and $FROM_TAG"
             exit 1
           fi
-      - name: Build and push multi-arch image
+      - name: Build multi-arch image
         id: build-images
         run: ./docker/multi-arch.sh
+      - name: Publish multi-arch image
+        run: |
+          podman manifest push ${{ steps.build-images.outputs.container-image }}"
