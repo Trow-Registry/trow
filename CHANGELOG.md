@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.3 (2025-12-02)
+
+* fix content-type header for GET manifest when manifest has no mediaType (#465)
+
 ## v0.9.2 (2025-11-28)
 
 * upgrade dependencies
