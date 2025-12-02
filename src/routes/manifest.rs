@@ -12,7 +12,7 @@ use super::response::OciJson;
 use crate::TrowServerState;
 use crate::registry::digest;
 use crate::registry::manifest::{
-    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable,
+    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type,
 };
 use crate::registry::server::PROXY_DIR;
 use crate::routes::extracts::ImageNamespace;
@@ -115,13 +115,13 @@ async fn get_manifest(
     .fetch_one(&state.db_ro)
     .await?;
     let content_type = match res.media_type.as_ref() {
-        Some(mt) => mt.to_string(),
+        Some(mt) => mt,
         None => determine_content_type(&res.blob)?,
     };
 
     Ok(OciJson::new_raw(res.blob.into())
         .set_digest(digest)
-        .set_content_type(&content_type))
+        .set_content_type(content_type))
 }
 
 endpoint_fn_7_levels!(
@@ -349,28 +349,13 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
     app
 }
 
-fn determine_content_type(manifest_bytes: &[u8]) -> Result<String, Error> {
-    // Try to deserialize as OCIManifest
+fn determine_content_type(manifest_bytes: &[u8]) -> Result<&'static str, Error> {
     let manifest: OCIManifest = serde_json::from_slice(manifest_bytes)
         .map_err(|e| Error::ManifestInvalid(format!("Invalid manifest JSON: {}", e)))?;
 
     let content_type = match &manifest {
-        OCIManifest::List(index) => {
-            // Check if mediaType is set, otherwise infer
-            index
-                .media_type()
-                .as_ref()
-                .map(|mt| mt.to_string())
-                .unwrap_or_else(|| "application/vnd.oci.image.index.v1+json".to_string())
-        }
-        OCIManifest::V2(image_manifest) => {
-            // Check if mediaType is set, otherwise infer
-            image_manifest
-                .media_type()
-                .as_ref()
-                .map(|mt| mt.to_string())
-                .unwrap_or_else(|| "application/vnd.oci.image.manifest.v1+json".to_string())
-        }
+        OCIManifest::List(_) => manifest_media_type::OCI_INDEX,
+        OCIManifest::V2(_) => manifest_media_type::OCI_V1,
     };
 
     Ok(content_type)
