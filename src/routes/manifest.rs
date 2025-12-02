@@ -12,7 +12,7 @@ use super::response::OciJson;
 use crate::TrowServerState;
 use crate::registry::digest;
 use crate::registry::manifest::{
-    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable,
+    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type,
 };
 use crate::registry::server::PROXY_DIR;
 use crate::routes::extracts::ImageNamespace;
@@ -114,10 +114,14 @@ async fn get_manifest(
     )
     .fetch_one(&state.db_ro)
     .await?;
+    let content_type = match res.media_type.as_ref() {
+        Some(mt) => mt,
+        None => determine_content_type(&res.blob)?,
+    };
 
     Ok(OciJson::new_raw(res.blob.into())
         .set_digest(digest)
-        .set_content_type(&res.media_type.unwrap_or("application/json".to_owned())))
+        .set_content_type(content_type))
 }
 
 endpoint_fn_7_levels!(
@@ -345,6 +349,18 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
     app
 }
 
+fn determine_content_type(manifest_bytes: &[u8]) -> Result<&'static str, Error> {
+    let manifest: OCIManifest = serde_json::from_slice(manifest_bytes)
+        .map_err(|e| Error::ManifestInvalid(format!("Invalid manifest JSON: {}", e)))?;
+
+    let content_type = match &manifest {
+        OCIManifest::List(_) => manifest_media_type::OCI_INDEX,
+        OCIManifest::V2(_) => manifest_media_type::OCI_V1,
+    };
+
+    Ok(content_type)
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -448,5 +464,65 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(res.count, 0, "manifest was not deleted");
+    }
+
+    #[tracing_test::traced_test]
+    #[tokio::test]
+    async fn test_get_manifest_no_mediatype() {
+        let tmp_dir = test_temp_dir!();
+        let (state, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
+
+        // Insert a manifest without mediaType field
+        let manifest_json = r#"{"schemaVersion":2,"manifests":[{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:9606ce5d502876100782b78351910efb2008d738e438ebc708fa4fabf5c01e9b","size":3317,"platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:97530f8d15b87fa5e5a42687371de32b3919c49c53e16366428972eeb64735f6","size":3317,"platform":{"architecture":"arm64","os":"linux"}}]}"#;
+        let manifest_bytes = manifest_json.as_bytes();
+        let manifest_digest = Digest::digest_sha256_slice(manifest_bytes);
+        let manifest_digest_str = manifest_digest.as_str();
+
+        sqlx::query!(
+            "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
+            manifest_digest_str,
+            manifest_bytes,
+        )
+        .execute(&state.db_rw)
+        .await
+        .unwrap();
+
+        let repo_name = "test-repo";
+        sqlx::query!(
+            r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($1, $2)"#,
+            repo_name,
+            manifest_digest_str
+        )
+        .execute(&state.db_rw)
+        .await
+        .unwrap();
+
+        // Get the manifest
+        let resp = router
+            .oneshot(
+                Request::get(format!("/v2/{repo_name}/manifests/{manifest_digest_str}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "unexpected status code: {resp:?}"
+        );
+
+        // Check that the content-type is application/vnd.oci.image.index.v1+json
+        let content_type = resp
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(
+            content_type, "application/vnd.oci.image.index.v1+json",
+            "unexpected content-type"
+        );
     }
 }
