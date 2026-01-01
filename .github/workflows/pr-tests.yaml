@@ -66,7 +66,7 @@ jobs:
           tags: trow:onpr
           outputs: type=docker,dest=/tmp/trow_image.tar.zst
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           retention-days: 1
           name: "trow-image-${{ github.event.pull_request.number }}"
@@ -79,7 +79,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download container image artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp
@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download container image artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp
@@ -154,7 +154,7 @@ jobs:
         run: .github/workflows/config/export-pod-logs.sh
       - if: always()
         name: Upload pod logs
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: pod-logs-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
           path: ./pod_logs/*.txt
@@ -168,4 +168,4 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Check spelling
-      uses: crate-ci/typos@v1.40.0
+      uses: crate-ci/typos@v1.41.0
