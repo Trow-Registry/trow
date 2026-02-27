@@ -46,6 +46,9 @@ spec:
         env:
         - name: RUST_LOG
           value: {{ .Values.trow.logLevel }}
+{{- with .Values.additionalEnv }}
+        {{- toYaml . | nindent 8 }}
+{{- end }}
         ports:
         - name: http
           containerPort: 8000
