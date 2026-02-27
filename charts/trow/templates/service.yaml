@@ -7,16 +7,16 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   type: {{ .Values.service.type }}
-  {{- if and (eq .Values.service.type "ClusterIP") (not (empty .Values.service.clusterIP)) }}
+{{- if and (eq .Values.service.type "ClusterIP") (not (empty .Values.service.clusterIP)) }}
   clusterIP: {{ .Values.service.clusterIP }}
-  {{- end }}
+{{- end }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: http
       name: http
-      {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePort)) }}
+{{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePort)) }}
       nodePort: {{ .Values.service.nodePort }}
-      {{- end }}
+{{- end }}
 
   selector:
     {{- include "registry.selectorLabels" . | nindent 4 }}

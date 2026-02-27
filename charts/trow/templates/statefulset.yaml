@@ -19,10 +19,10 @@ spec:
       annotations:
         checksum/config: {{ include "trow.config" . | sha256sum }}
     spec:
-    {{- with .Values.imagePullSecrets }}
+{{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
-    {{- end }}
+{{- end }}
       containers:
       - name: trow
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -30,82 +30,82 @@ spec:
         args:
           - "--hostname"
           - {{ .Values.trow.domain | quote }}
-          {{- if .Values.trow.bind }}
+{{- if .Values.trow.bind }}
           - --bind
           - {{ .Values.trow.bind | quote }}
-          {{- end }}
-          {{- if and (.Values.trow.user) (.Values.trow.password) }}
+{{- end }}
+{{- if and (.Values.trow.user) (.Values.trow.password) }}
           - "--user"
           - {{ .Values.trow.user | quote }}
           - "--password"
           - "file:///etc/trow/pass"
-          {{- end }}
-          {{- if or (not (empty .Values.trow.proxyRegistries.config)) (not (empty .Values.trow.validationWebhook.config)) }}
+{{- end }}
+{{- if or (not (empty .Values.trow.proxyRegistries.config)) (not (empty .Values.trow.validationWebhook.config)) }}
           - "--config-file=/etc/trow/config.yaml"
-          {{- end }}
+{{- end }}
         env:
         - name: RUST_LOG
           value: {{ .Values.trow.logLevel }}
-        {{- with .Values.additionalEnv }}
+{{- with .Values.additionalEnv }}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+{{- end }}
         ports:
         - name: http
           containerPort: 8000
         volumeMounts:
         - name: data-vol
           mountPath: /data
-      {{- if and (.Values.trow.user) (.Values.trow.password) }}
+{{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
           mountPath: /etc/trow/pass
           subPath: pass
           readOnly: true
-      {{- end}}
-      {{- if include "trow.hasConfigFile" . }}
+{{- end}}
+{{- if include "trow.hasConfigFile" . }}
         - name: trow-cfg
           mountPath: /etc/trow/config.yaml
           subPath: config.yaml
           readOnly: true
-      {{- end}}
-      {{- with .Values.resources }}
+{{- end}}
+{{- with .Values.resources }}
         resources:
         {{- toYaml . | nindent 10 }}
-      {{- end }}
-        {{- with .Values.containerSecurityContext }}
+{{- end }}
+{{- with .Values.containerSecurityContext }}
         securityContext:
           {{- toYaml . | nindent 10 }}
-        {{- end }}
-      {{- with .Values.podSecurityContext }}
+{{- end }}
+{{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+{{- end }}
       volumes:
-      {{- if and (.Values.trow.user) (.Values.trow.password) }}
+{{- if and (.Values.trow.user) (.Values.trow.password) }}
         - name: trow-pass
           secret:
             secretName: {{ include "trow.fullname" . }}-password
-      {{- end}}
-      {{- if include "trow.hasConfigFile" . }}
+{{- end}}
+{{- if include "trow.hasConfigFile" . }}
         - name: trow-cfg
           secret:
             secretName: {{ include "trow.fullname" . }}-cfg
-      {{- end }}
-      {{- with .Values.nodeSelector }}
+{{- end }}
+{{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
+{{- end }}
+{{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
+{{- end }}
+{{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-  {{- with .Values.volumeClaim }}
+{{- end }}
+{{- with .Values.volumeClaim }}
   volumeClaimTemplates:
     - metadata:
         name: data-vol
       spec:
         {{- toYaml . | nindent 8 }}
-  {{- end }}
+{{- end }}
