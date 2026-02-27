@@ -131,3 +131,8 @@ volumeClaim:
   resources:
     requests:
       storage: 20Gi
+
+## Specify any additional environment variables to set in the trow container.
+additionalEnv:
+#   - name: ENV_VAR_NAME
+#     value: "env_var_value"
