@@ -23,11 +23,3 @@ repos:
     hooks:
       - id: helmfmt
         files: ^charts/.*\.yaml$
-
-  - repo: local
-    hooks:
-      - id: build-helm-values-schema
-        name: Build helm values.schema.json
-        language: docker_image
-        entry: --entrypoint sh alpine/helm:4 charts/trow/hack/build_helm_values_schema.sh
-        files: charts/.+/values\.yaml$
