@@ -29,5 +29,5 @@ repos:
       - id: build-helm-values-schema
         name: Build helm values.schema.json
         language: docker_image
-        entry: --entrypoint sh alpine/helm:4 charts/trow/build_helm_values_schema.sh
-        files: charts/values\.yaml$
+        entry: --entrypoint sh alpine/helm:4 charts/trow/hack/build_helm_values_schema.sh
+        files: charts/.+/values\.yaml$
