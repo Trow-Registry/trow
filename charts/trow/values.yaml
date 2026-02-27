@@ -87,7 +87,7 @@ webhooks:
       containerSecurityContext:
         allowPrivilegeEscalation: false
     ## Use an existing secret that contains tls.crt and tls.key
-    existingSecretRef: ~
+    existingSecretRef: ""
 
 imagePullSecrets: []
 nameOverride: ""
