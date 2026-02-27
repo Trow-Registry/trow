@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/trow-registry/trow
-  tag:
+  tag: ""
   pullPolicy: IfNotPresent
 podSecurityContext:
   runAsNonRoot: true
@@ -43,7 +43,7 @@ trow:
         # - 127.0.0.1/f/docker/nope/
   ## Special overrides for registry proxying
   proxyRegistries:
-    config:
+    config: {}
       # offline: false
       # registries:
       #   - host: docker.io
@@ -87,7 +87,7 @@ webhooks:
       containerSecurityContext:
         allowPrivilegeEscalation: false
     ## Use an existing secret that contains tls.crt and tls.key
-    existingSecretRef: ~
+    existingSecretRef: ""
 
 imagePullSecrets: []
 nameOverride: ""
@@ -97,6 +97,7 @@ service:
   type: NodePort
   port: 8000
   ## Specify the nodePort value for the LoadBalancer and NodePort service types.
+  # @schema type: [null, integer]
   nodePort:
 
 ingress:
@@ -106,7 +107,7 @@ ingress:
   hosts:
     - paths: ["/"]
       # use "none" to not set a host (otherwise defaults to trow.domain)
-      host:
+      host: ""
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:

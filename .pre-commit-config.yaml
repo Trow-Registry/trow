@@ -1,0 +1,33 @@
+# See https://prek.j178.dev/builtin/ for more information
+
+repos:
+  # --- Basic hooks for all subdirectories here ---
+  - repo: builtin
+    hooks:
+      - id: trailing-whitespace
+        exclude: "elysium/projects/webapp/tests/component/__snapshots__/.*"
+      - id: end-of-file-fixer
+        exclude: ".*\\.vtp|qa/qa/test_data/.+"
+      - id: check-yaml
+        exclude: charts/.+/templates/.+
+      - id: check-toml
+      - id: check-added-large-files
+
+  - repo: https://github.com/crate-ci/typos
+    rev: 57b11c6b7e54c402ccd9cda953f1072ec4f78e33  # frozen: v1.43.5
+    hooks:
+      - id: typos
+
+  - repo: https://github.com/digitalstudium/helmfmt
+    rev: 26780169a74813fd81f3e7d36c4ebd634bdde97e  # frozen: v0.4.3
+    hooks:
+      - id: helmfmt
+        files: ^charts/.*\.yaml$
+
+  - repo: local
+    hooks:
+      - id: build-helm-values-schema
+        name: Build helm values.schema.json
+        language: docker_image
+        entry: --entrypoint sh alpine/helm:4 charts/trow/hack/build_helm_values_schema.sh
+        files: charts/.+/values\.yaml$
