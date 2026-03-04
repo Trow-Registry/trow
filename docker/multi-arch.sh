@@ -36,19 +36,6 @@ else
     echo "→ Development database already exists at $DB_PATH"
 fi
 
-if [ "$docker" = "docker" ]; then
-    # Use trow-multi builder if it exists, otherwise create it
-    # Not needed for podman
-    if ! docker buildx ls | grep -s trow-multi ;
-    then
-        # # Register binfmt handlers
-        docker run --rm --privileged aptman/qus -s -- -p arm aarch64
-        # Create new build instance
-        docker buildx create --name trow-multi
-    fi
-    docker buildx use trow-multi
-fi
-
 VERSION=$(sed '/^version = */!d; s///;q' ../Cargo.toml | sed s/\"//g)
 TAG="$VERSION"
 GH_IMAGE="$GH_REPO:$TAG"

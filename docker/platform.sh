@@ -3,19 +3,23 @@ set -eux
 
 # Used in Docker build to set platform dependent variables
 
-function install_mold() {
-    curl -L https://github.com/rui314/mold/releases/download/v2.40.4/mold-2.40.4-$1-linux.tar.gz -o mold.tar.gz
-	tar -xzf mold.tar.gz
-	cp -rl mold*/* /usr
-	rm -rf mold*
-}
+mkdir -p $HOME/.cargo
+cat > /root/.cargo/config.toml <<EOF
+    [target.aarch64-unknown-linux-gnu]
+    linker = "x86_64-linux-gnu-gcc"
+
+    [target.armv7-unknown-linux-gnueabihf]
+    linker = "arm-linux-gnueabihf-gcc"
+
+    [target.aarch64-unknown-linux-gnu]
+    linker = "aarch64-linux-gnu-gcc"
+EOF
 
 case $TARGETARCH in
 	"amd64")
 		echo "Building for amd64"
 		echo "x86_64-unknown-linux-gnu" > /.platform
-		echo "clang" > /.compiler
-		install_mold "x86_64"
+		echo "gcc-x86-64-linux-gnu" > /.compiler
 	;;
 	"arm64")
 		echo "Building for arm64"
