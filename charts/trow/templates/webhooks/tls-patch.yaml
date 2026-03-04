@@ -108,9 +108,9 @@ metadata:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhooks
 spec:
-{{- if .Capabilities.APIVersions.Has "batch/v1alpha1" }}
+  {{- if .Capabilities.APIVersions.Has "batch/v1alpha1" }}
   ttlSecondsAfterFinished: 0
-{{- end }}
+  {{- end }}
   template:
     metadata:
       name: {{ include "trow.fullname" . }}-webhooks-tls-create
@@ -134,16 +134,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
+  {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
-          {{- end }}
+  {{- end }}
       restartPolicy: OnFailure
       serviceAccountName: {{ include "trow.fullname" . }}-webhooks-tls
-      {{- with .Values.webhooks.tls.patch.podSecurityContext }}
+  {{- with .Values.webhooks.tls.patch.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+  {{- end }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -158,9 +158,9 @@ metadata:
     {{- include "trow.labels" . | nindent 4 }}
     app.kubernetes.io/component: webhooks
 spec:
-{{- if .Capabilities.APIVersions.Has "batch/v1alpha1" }}
+  {{- if .Capabilities.APIVersions.Has "batch/v1alpha1" }}
   ttlSecondsAfterFinished: 0
-{{- end }}
+  {{- end }}
   template:
     metadata:
       name: {{ include "trow.fullname" . }}-webhooks-patch
@@ -169,7 +169,7 @@ spec:
         app.kubernetes.io/component: webhooks-webhook
     spec:
       containers:
-      {{- if .Values.trow.validationWebhook.enabled }}
+  {{- if .Values.trow.validationWebhook.enabled }}
         - name: patch-validation
           image: {{ .Values.webhooks.tls.patch.image.image }}
           imagePullPolicy: {{ .Values.webhooks.tls.patch.image.pullPolicy }}
@@ -185,15 +185,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
+    {{- with .Values.webhooks.tls.patch.containerSecurityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
-          {{- end }}
-      {{- end }}
+    {{- end }}
+  {{- end }}
       restartPolicy: OnFailure
       serviceAccountName: {{ include "trow.fullname" . }}-webhooks-tls
-      {{- with .Values.webhooks.tls.patch.podSecurityContext }}
+  {{- with .Values.webhooks.tls.patch.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+  {{- end }}
 {{- end -}}

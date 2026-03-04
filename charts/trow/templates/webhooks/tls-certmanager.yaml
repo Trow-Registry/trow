@@ -47,11 +47,11 @@ spec:
   secretName: {{ include "trow.fullname" . }}-cm-webhooks
   duration: {{ .Values.webhooks.tls.certmanager.webhooksCert.duration | default "8760h0m0s" | quote }}
   issuerRef:
-    {{- if .Values.webhooks.tls.certmanager.issuerRef }}
+  {{- if .Values.webhooks.tls.certmanager.issuerRef }}
     {{- toYaml .Values.webhooks.tls.certmanager.issuerRef | nindent 4 }}
-    {{- else }}
+  {{- else }}
     name: {{ include "trow.fullname" . }}-cm-webhooks-root-issuer
-    {{- end }}
+  {{- end }}
   dnsNames:
     - {{ include "trow.fullname" . }}-webhooks
     - {{ include "trow.fullname" . }}-webhooks.{{ .Release.Namespace }}

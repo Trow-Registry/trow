@@ -77,10 +77,8 @@ app.kubernetes.io/component: webhooks
 {{- or (not (empty .Values.trow.proxyRegistries.config)) (not (empty .Values.trow.validationWebhook.config)) -}}
 {{- end -}}
 {{- define "trow.config" -}}
-registry_proxies:
-{{ .Values.trow.proxyRegistries.config | toYaml | indent 2 }}
-image_validation:
-{{ .Values.trow.validationWebhook.config | toYaml | indent 2 }}
+registry_proxies: {{- .Values.trow.proxyRegistries.config | toYaml | nindent 2 }}
+image_validation: {{- .Values.trow.validationWebhook.config | toYaml | nindent 2 }}
 {{- end -}}
 
 {{/* Webhook certificate generation is done either via patch or certmanager */}}

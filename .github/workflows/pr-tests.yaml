@@ -7,6 +7,13 @@ on:
 
 
 jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: j178/prek-action@v1
+
   tests:
     runs-on: ubuntu-latest
     env:
@@ -151,21 +158,12 @@ jobs:
         run: podman pull --tls-verify=false ${{ steps.get-ip.outputs.ip }}:30000/f/docker.io/nginx:alpine
       - if: always()
         name: Export pod logs
-        run: .github/workflows/config/export-pod-logs.sh
+        run: kind export logs kind-logs
       - if: always()
         name: Upload pod logs
         uses: actions/upload-artifact@v7
         with:
           name: pod-logs-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-          path: ./pod_logs/*.txt
+          path: kind-logs/
           retention-days: 30
           compression-level: 7
-
-
-  typos:
-    name: Typos
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v6
-    - name: Check spelling
-      uses: crate-ci/typos@v1.44.0
