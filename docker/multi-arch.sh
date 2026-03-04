@@ -5,7 +5,6 @@ set -exo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-docker="$(command -v docker 2> /dev/null || echo "podman")"
 GH_REPO="ghcr.io/trow-registry/trow"
 
 
@@ -55,42 +54,30 @@ TAG="$VERSION"
 GH_IMAGE="$GH_REPO:$TAG"
 DATE="$(date '+%Y-%m-%d %T%z')"
 
-BUILD_ARGS=(
-    "--build-arg" "VCS_REF=${SOURCE_COMMIT:-$(git rev-parse HEAD)}"
-    "--build-arg" "VCS_BRANCH=${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD || true)}"
-    "--build-arg" "REPO=$GH_REPO"
-    "--build-arg" "TAG=$TAG"
-    "--build-arg" "DATE=$DATE"
-    "--build-arg" "VERSION=$VERSION"
-)
+VCS_REF="${SOURCE_COMMIT:-$(git rev-parse HEAD)}"
+VCS_BRANCH="${SOURCE_BRANCH:-$(git symbolic-ref --short HEAD || true)}"
 
-if [[ "$CI" = "true" || "$RELEASE" = "true" ]]; then
-   PUSH="--push"
-fi
+sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
 
-echo $PUSH $GH_IMAGE $GH_REPO
-if [ "$docker" = "docker" ]; then
-    # Can't load the image in the local registry... See https://github.com/docker/roadmap/issues/371
-    docker buildx build \
-        "${BUILD_ARGS[@]}" \
-        $PUSH \
-        --pull \
-        --platform linux/amd64,linux/arm64 \
-        -t $GH_IMAGE \
-        -t $GH_REPO:latest \
+podman manifest create -a $GH_IMAGE
+for platform in linux/arm64 linux/amd64; do
+    podman build \
+        --label "org.opencontainers.image.created=$DATE" \
+        --label "org.opencontainers.image.authors=Container Solutions Labs" \
+        --label "org.opencontainers.image.url=https://trow.io" \
+        --label "org.opencontainers.image.source=https://github.com/trow-registry/trow" \
+        --label "org.opencontainers.image.version=$VERSION" \
+        --label "org.opencontainers.image.revision=$VCS_REF" \
+        --label "git.branch=$VCS_BRANCH" \
+        --label "org.opencontainers.image.title=Trow Cluster Registry" \
+        --label "repository=$GH_REPO" \
+        --label "tag=$TAG" \
+        --platform $platform \
+        --manifest $GH_IMAGE \
         -f Dockerfile ../
-else
-    sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    # podman manifest push --all ghcr.io/trow-registry/trow:0.7.2
-    podman manifest create -a $GH_IMAGE
-    for platform in linux/arm64 linux/amd64; do
-        podman build \
-            "${BUILD_ARGS[@]}" \
-            --platform $platform \
-            --manifest $GH_IMAGE \
-            -f Dockerfile ../
-    done
-fi
+done
+
+# podman manifest push ghcr.io/trow-registry/trow:0.7.2
 
 echo "→ Image $GH_IMAGE built successfully"
 if [[ "$CI" = true ]]

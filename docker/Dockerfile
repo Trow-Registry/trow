@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Cross compiling from host platform instead of using qemu
-FROM --platform=$BUILDPLATFORM rust:bookworm AS cross
+FROM --platform=$BUILDPLATFORM docker.io/rust:bullseye AS cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
@@ -29,11 +29,11 @@ RUN --mount=type=cache,target=./target \
 
 
 
-FROM --platform=$TARGETPLATFORM debian:bookworm-slim
+FROM debian:bullseye-slim
 
-LABEL org.opencontainers.image.source="https://github.com/trow-registry/trow"
-LABEL org.opencontainers.image.description="Caching Container Registry and Image Management for Kubernetes Clusters"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.source="https://github.com/trow-registry/trow" \
+  org.opencontainers.image.description="Caching Container Registry and Image Management for Kubernetes Clusters" \
+  org.opencontainers.image.licenses="Apache-2.0"
 
 RUN groupadd -r -g 2000 trow &&\
     useradd -r -g trow -u 2000 trow
@@ -50,25 +50,3 @@ RUN mkdir -p /data /certs &&\
 COPY --from=cross /usr/src/trow/trow /trow
 USER trow
 ENTRYPOINT ["/trow"]
-
-ARG VCS_REF
-ARG VCS_BRANCH
-ARG DATE
-ARG VERSION
-ARG REPO
-ARG TAG
-ENV CREATED=$DATE
-ENV VCS_REF=$VCS_REF
-ENV VCS_BRANCH=$VCS_BRANCH
-ENV VERSION=$VERSION
-
-LABEL org.opencontainers.image.created=$DATE \
-  org.opencontainers.image.authors="Container Solutions Labs" \
-  org.opencontainers.image.url="https://trow.io" \
-  org.opencontainers.image.source="https://github.com/trow-registry/trow" \
-  org.opencontainers.image.version=$VERSION \
-  org.opencontainers.image.revision=$VCS_REF \
-  git.branch=$VCS_BRANCH \
-  org.opencontainers.image.title="Trow Cluster Registry" \
-  repository=$REPO \
-  tag=$TAG

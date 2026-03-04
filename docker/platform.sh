@@ -1,9 +1,10 @@
 #!/bin/bash
+set -eux
 
 # Used in Docker build to set platform dependent variables
 
 function install_mold() {
-    curl -L https://github.com/rui314/mold/releases/download/v2.40.3/mold-2.40.3-$1-linux.tar.gz -o mold.tar.gz
+    curl -L https://github.com/rui314/mold/releases/download/v2.40.4/mold-2.40.4-$1-linux.tar.gz -o mold.tar.gz
 	tar -xzf mold.tar.gz
 	cp -rl mold*/* /usr
 	rm -rf mold*
