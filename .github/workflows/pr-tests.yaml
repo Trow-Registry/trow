@@ -158,12 +158,12 @@ jobs:
         run: podman pull --tls-verify=false ${{ steps.get-ip.outputs.ip }}:30000/f/docker.io/nginx:alpine
       - if: always()
         name: Export pod logs
-        run: .github/workflows/config/export-pod-logs.sh
+        run: kind export logs kind-logs
       - if: always()
         name: Upload pod logs
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pod-logs-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-          path: ./pod_logs/*.txt
+          path: kind-logs/
           retention-days: 30
           compression-level: 7
