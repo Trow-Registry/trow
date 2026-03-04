@@ -73,7 +73,7 @@ jobs:
           tags: trow:onpr
           outputs: type=docker,dest=/tmp/trow_image.tar.zst
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           retention-days: 1
           name: "trow-image-${{ github.event.pull_request.number }}"
@@ -86,7 +86,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download container image artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp
@@ -102,7 +102,7 @@ jobs:
       - name: Test connectivity
         run: curl "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
       - name: Run OCI Distribution Spec conformance tests
-        uses: opencontainers/distribution-spec@05d45d0f94adb38ee0ae982e77fbd75a398327d5
+        uses: opencontainers/distribution-spec@aa0c00b0645d5212ed4ba7627b36d5e05b93e237
         env:
           OCI_ROOT_URL: "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
           OCI_NAMESPACE: oci-conformance/distribution-test
@@ -125,7 +125,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download container image artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp
@@ -136,7 +136,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create kind cluster
-        uses: helm/kind-action@v1.13.0
+        uses: helm/kind-action@v1.14.0
         with:
           config: .github/workflows/config/kind.yaml
           cluster_name: kind
