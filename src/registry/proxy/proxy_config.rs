@@ -10,6 +10,7 @@ use crate::registry::server::PROXY_DIR;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
+    #[serde(default)]
     pub registries: Vec<SingleRegistryProxyConfig>,
     #[serde(default)]
     pub offline: bool,
