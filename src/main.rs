@@ -171,7 +171,7 @@ async fn serve_app(
     addr: SocketAddr,
     tls: Option<TlsConfig>,
 ) -> Result<(), ServeAppError> {
-    async fn shutdown_signal(handle: axum_server::Handle) {
+    async fn shutdown_signal(handle: axum_server::Handle<SocketAddr>) {
         use std::time::Duration;
 
         use tokio::signal;
