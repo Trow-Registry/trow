@@ -3,19 +3,21 @@ set -eux
 
 # Used in Docker build to set platform dependent variables
 
-mkdir -p $HOME/.cargo
-cat > /root/.cargo/config.toml <<EOF
-    [target.aarch64-unknown-linux-gnu]
-    linker = "x86_64-linux-gnu-gcc"
+CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
 
-    [target.armv7-unknown-linux-gnueabihf]
-    linker = "arm-linux-gnueabihf-gcc"
+mkdir -p "$CARGO_HOME"
+cat > "$CARGO_HOME/config.toml" <<EOF
+[target.x86_64-unknown-linux-gnu]
+linker = "x86_64-linux-gnu-gcc"
 
-    [target.aarch64-unknown-linux-gnu]
-    linker = "aarch64-linux-gnu-gcc"
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
 EOF
 
-case $TARGETARCH in
+case "$TARGETARCH" in
 	"amd64")
 		echo "Building for amd64"
 		echo "x86_64-unknown-linux-gnu" > /.platform
@@ -29,6 +31,10 @@ case $TARGETARCH in
 	"arm")
 		echo "Building for amd32"
 		echo "armv7-unknown-linux-gnueabihf" > /.platform
-		echo "gcc-arm-linux-gnuabihf" > /.compiler
+		echo "gcc-arm-linux-gnueabihf" > /.compiler
+	;;
+	*)
+		echo "Unsupported architecture: $TARGETARCH" >&2
+		exit 1
 	;;
 esac
