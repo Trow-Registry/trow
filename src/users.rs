@@ -3,8 +3,9 @@ use std::env;
 use argon2::{self, Config};
 use bytes::Bytes;
 use data_encoding::HEXUPPER;
+use failure;
+use rand;
 use rusqlite::{Connection, NO_PARAMS, params};
-use {failure, rand};
 
 // User Struct
 pub struct User {
