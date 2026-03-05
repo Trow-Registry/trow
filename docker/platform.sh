@@ -5,7 +5,7 @@ set -eux
 
 mkdir -p $HOME/.cargo
 cat > /root/.cargo/config.toml <<EOF
-    [target.aarch64-unknown-linux-gnu]
+    [target.x86_64-unknown-linux-gnu]
     linker = "x86_64-linux-gnu-gcc"
 
     [target.armv7-unknown-linux-gnueabihf]
