@@ -22,6 +22,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 COPY . .
 
+# Remove project-level cargo config that assumes mold linker is available
+RUN rm -f .cargo/config.toml
+
 # Get rid of the "cp" when cargo build --out is stable
 RUN --mount=type=cache,target=./target \
     cargo build --release --target $(cat /.platform) &&\
