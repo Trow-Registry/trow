@@ -187,7 +187,11 @@ mod tests {
 
         // "project-a/app" matches the project-a prefix
         let image = config
-            .get_proxied_image("f/registry.example.com/project-a/app", &manifest_ref(), None)
+            .get_proxied_image(
+                "f/registry.example.com/project-a/app",
+                &manifest_ref(),
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(
@@ -197,7 +201,11 @@ mod tests {
 
         // "project-b/worker" matches the project-b prefix
         let image = config
-            .get_proxied_image("f/registry.example.com/project-b/worker", &manifest_ref(), None)
+            .get_proxied_image(
+                "f/registry.example.com/project-b/worker",
+                &manifest_ref(),
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(
