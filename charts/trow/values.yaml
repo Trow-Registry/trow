@@ -50,6 +50,16 @@ trow:
       #     username: toto
       #     password: titi
       #   - host: ghcr.io
+      #   ## Use path_prefix for scoped credentials on the same host
+      #   ## (e.g. GitLab deploy tokens per project):
+      #   - host: registry.example.com
+      #     path_prefix: project-a
+      #     username: project-a-deploy-token
+      #     password: glpat-xxx
+      #   - host: registry.example.com
+      #     path_prefix: project-b
+      #     username: project-b-deploy-token
+      #     password: glpat-yyy
       # max_size: 50GiB
   ## For more info on log levels see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html
   logLevel: info

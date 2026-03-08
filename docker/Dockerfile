@@ -18,9 +18,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean &&\
     apt-get update &&\
-    apt-get install -y unzip openssl $(cat /.compiler)
+    apt-get install -y unzip openssl cmake clang $(cat /.compiler)
 
 COPY . .
+
+# Replace project-level cargo config: strip mold linker (not in container),
+# keep cross-compiler settings needed for multi-arch builds
+RUN printf '[target.armv7-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"\n\n[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\n' > .cargo/config.toml
 
 # Get rid of the "cp" when cargo build --out is stable
 RUN --mount=type=cache,target=./target \

@@ -5,7 +5,8 @@ set -exo pipefail
 src_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$src_dir"
 
-GH_REPO="ghcr.io/trow-registry/trow"
+# Use GITHUB_REPOSITORY if available (e.g. in CI), otherwise default to upstream
+GH_REPO="ghcr.io/${GITHUB_REPOSITORY:-trow-registry/trow}"
 
 
 # Check if cargo-sqlx is installed

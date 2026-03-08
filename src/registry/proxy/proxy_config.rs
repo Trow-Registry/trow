@@ -23,6 +23,12 @@ pub struct SingleRegistryProxyConfig {
     /// What containerd calls "namespace" (ghcr.io, docker.io, ...)
     /// This can be empty !!
     pub host: String,
+    /// Optional path prefix for scoped credential matching.
+    /// Allows different credentials for different projects on the same registry host.
+    /// Example: "system" matches repos like "system/app", "system/worker".
+    /// When multiple entries match the same host, the longest matching prefix wins.
+    #[serde(default)]
+    pub path_prefix: Option<String>,
     /// TODO: insecure currently means "use HTTP", we should also support self-signed TLS
     #[serde(default)]
     pub insecure: bool,
@@ -58,13 +64,31 @@ impl RegistryProxiesConfig {
             return None;
         };
 
+        let mut best_match: Option<&SingleRegistryProxyConfig> = None;
+        let mut best_prefix_len: usize = 0;
+
         for proxy in self.registries.iter() {
-            if proxy.host == host {
-                let image = RemoteImage::new(host, repo, reference.clone(), Some(proxy));
-                return Some(image);
+            if proxy.host != host {
+                continue;
+            }
+            match &proxy.path_prefix {
+                Some(prefix) if repo.starts_with(prefix.as_str()) => {
+                    if prefix.len() > best_prefix_len {
+                        best_match = Some(proxy);
+                        best_prefix_len = prefix.len();
+                    }
+                }
+                Some(_) => {} // prefix doesn't match this repo
+                None => {
+                    // Host-only match (no prefix) — fallback if no prefix matches
+                    if best_prefix_len == 0 && best_match.is_none() {
+                        best_match = Some(proxy);
+                    }
+                }
             }
         }
-        Some(RemoteImage::new(host, repo, reference.clone(), None))
+
+        Some(RemoteImage::new(host, repo, reference.clone(), best_match))
     }
 }
 
@@ -139,5 +163,165 @@ mod tests {
         assert_eq!(*remote_image.get_proxy_cfg(), None);
         assert_eq!(remote_image.get_host(), "docker.io");
         assert_eq!(remote_image.get_repo(), "library/nginx");
+    }
+
+    #[tokio::test]
+    async fn test_path_prefix_selects_correct_credentials() {
+        let config = RegistryProxiesConfig {
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("project-a".to_string()),
+                    username: Some("project-a-token".to_string()),
+                    ..Default::default()
+                },
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("project-b".to_string()),
+                    username: Some("project-b-token".to_string()),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        // "project-a/app" matches the project-a prefix
+        let image = config
+            .get_proxied_image(
+                "f/registry.example.com/project-a/app",
+                &manifest_ref(),
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            image.get_proxy_cfg().unwrap().username,
+            Some("project-a-token".to_string())
+        );
+
+        // "project-b/worker" matches the project-b prefix
+        let image = config
+            .get_proxied_image(
+                "f/registry.example.com/project-b/worker",
+                &manifest_ref(),
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            image.get_proxy_cfg().unwrap().username,
+            Some("project-b-token".to_string())
+        );
+
+        // "other/app" matches neither prefix — no credentials
+        let image = config
+            .get_proxied_image("f/registry.example.com/other/app", &manifest_ref(), None)
+            .await
+            .unwrap();
+        assert_eq!(*image.get_proxy_cfg(), None);
+    }
+
+    #[tokio::test]
+    async fn test_path_prefix_longest_match_wins() {
+        let config = RegistryProxiesConfig {
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("org".to_string()),
+                    username: Some("org-token".to_string()),
+                    ..Default::default()
+                },
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("org/sub".to_string()),
+                    username: Some("org-sub-token".to_string()),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        // "org/sub/app" matches both, but "org/sub" is longer
+        let image = config
+            .get_proxied_image("f/registry.example.com/org/sub/app", &manifest_ref(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            image.get_proxy_cfg().unwrap().username,
+            Some("org-sub-token".to_string())
+        );
+
+        // "org/other" matches only "org"
+        let image = config
+            .get_proxied_image("f/registry.example.com/org/other", &manifest_ref(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            image.get_proxy_cfg().unwrap().username,
+            Some("org-token".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_path_prefix_host_only_fallback() {
+        let config = RegistryProxiesConfig {
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("special".to_string()),
+                    username: Some("special-token".to_string()),
+                    ..Default::default()
+                },
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    // no path_prefix — fallback for this host
+                    username: Some("default-token".to_string()),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        // "special/app" matches the prefix entry
+        let image = config
+            .get_proxied_image("f/registry.example.com/special/app", &manifest_ref(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            image.get_proxy_cfg().unwrap().username,
+            Some("special-token".to_string())
+        );
+
+        // "other/app" falls back to the host-only entry
+        let image = config
+            .get_proxied_image("f/registry.example.com/other/app", &manifest_ref(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            image.get_proxy_cfg().unwrap().username,
+            Some("default-token".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_no_path_prefix_backward_compatible() {
+        // Existing config without path_prefix still works
+        let config = RegistryProxiesConfig {
+            registries: vec![SingleRegistryProxyConfig {
+                host: "docker.io".to_string(),
+                username: Some("old-user".to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let image = config
+            .get_proxied_image("f/docker.io/nginx", &manifest_ref(), None)
+            .await
+            .unwrap();
+        assert_eq!(image.get_proxy_cfg().unwrap(), &config.registries[0]);
+        assert_eq!(
+            image.get_proxy_cfg().unwrap().username,
+            Some("old-user".to_string())
+        );
     }
 }
