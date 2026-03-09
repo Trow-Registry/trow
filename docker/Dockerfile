@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Cross compiling from host platform instead of using qemu
-FROM --platform=$BUILDPLATFORM docker.io/rust:bullseye AS cross
+FROM --platform=$BUILDPLATFORM docker.io/library/rust:1.94-bullseye AS cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
@@ -20,10 +20,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update &&\
     apt-get install -y unzip openssl $(cat /.compiler)
 
+# --- build ---
+COPY Cargo.toml Cargo.lock ./
+# Trick cargo into building dependencies only
+RUN --mount=type=cache,target=./target,id=trow-build-$TARGETARCH \
+    mkdir src && echo "fn main() {}" > src/main.rs &&\
+    cargo build --release --target $(cat /.platform)
 COPY . .
-
-# Get rid of the "cp" when cargo build --out is stable
-RUN --mount=type=cache,target=./target \
+# TODO: Get rid of the "cp" when cargo build --out is stable
+RUN --mount=type=cache,target=./target,id=trow-build-$TARGETARCH \
     cargo build --release --target $(cat /.platform) &&\
     cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
 
