@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Cross compiling from host platform instead of using qemu
-FROM --platform=$BUILDPLATFORM docker.io/library/rust:1.94-bullseye AS cross
+FROM --platform=$BUILDPLATFORM docker.io/library/rust:1.94-trixie AS cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=./target,id=trow-build-$TARGETARCH \
 
 
 
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 
 LABEL org.opencontainers.image.source="https://github.com/trow-registry/trow" \
   org.opencontainers.image.description="Caching Container Registry and Image Management for Kubernetes Clusters" \

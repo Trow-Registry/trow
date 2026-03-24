@@ -42,7 +42,7 @@ jobs:
 
 
   build:
-    runs-on: ubuntu-22.04  # older ubuntu == older glibc
+    runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
