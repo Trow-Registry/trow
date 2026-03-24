@@ -22,10 +22,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
+      - uses: wild-linker/action@0.8.0
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.9
       - uses: taiki-e/install-action@v2
@@ -42,7 +42,7 @@ jobs:
 
 
   build:
-    runs-on: ubuntu-22.04  # older ubuntu == older glibc
+    runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
@@ -51,12 +51,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - uses: rui314/setup-mold@v1
       - uses: dtolnay/rust-toolchain@stable
+      - uses: wild-linker/action@0.8.0
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.9
-      - name: Setup cargo-sqlx
-        run: cargo install sqlx-cli
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
       - name: Setup sqlx database
         run: mkdir -p target && cargo sqlx database setup
       - name: Build
@@ -75,7 +76,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          retention-days: 1
+          retention-days: 3
           name: "trow-image-${{ github.event.pull_request.number }}"
           path: /tmp/trow_image.tar.zst
 
