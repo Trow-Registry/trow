@@ -4,6 +4,7 @@
 
 * update dependencies
 * allow empty object as RegistryProxiesConfig
+* fix multi-arch builds (locally and in CI)
 
 ## v0.9.3 (2025-12-02)
 
