@@ -1,4 +1,3 @@
-mod admission;
 pub(crate) mod api_types;
 pub mod garbage_collect;
 pub mod manifest;
@@ -7,7 +6,6 @@ pub mod server;
 mod storage;
 mod temporary_file;
 
-pub use admission::ImageValidationConfig;
 pub use api_types::{BlobReader, ContentInfo};
 pub use digest::Digest;
 pub use proxy::{
@@ -21,6 +19,13 @@ use thiserror::Error;
 pub mod digest;
 
 use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ImageValidationConfig {
+    pub default: String,
+    pub allow: Vec<String>,
+    pub deny: Vec<String>,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ConfigFile {

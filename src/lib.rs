@@ -1,6 +1,7 @@
 mod init_db;
 pub mod registry;
 pub mod routes;
+pub mod services;
 #[cfg(test)]
 pub mod test_utilities;
 pub mod types;
