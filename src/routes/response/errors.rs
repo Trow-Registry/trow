@@ -1,13 +1,13 @@
 use std::fmt;
 
 use axum::body;
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::registry::digest::DigestError;
 use crate::registry::StorageBackendError;
+use crate::registry::digest::DigestError;
 
 #[derive(Debug)]
 pub enum Error {
