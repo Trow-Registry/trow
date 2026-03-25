@@ -1,13 +1,13 @@
 use std::fmt;
 
 use axum::body;
-use axum::http::{StatusCode, header};
+use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::registry::StorageBackendError;
 use crate::registry::digest::DigestError;
+use crate::registry::StorageBackendError;
 
 #[derive(Debug)]
 pub enum Error {
@@ -188,6 +188,21 @@ impl From<DigestError> for Error {
         tracing::warn!("Error(DigestError): {err}");
         match err {
             DigestError::InvalidDigest(_) => Self::DigestInvalid,
+        }
+    }
+}
+
+impl From<crate::registry::DownloadRemoteImageError> for Error {
+    fn from(err: crate::registry::DownloadRemoteImageError) -> Self {
+        use oci_client::errors::OciDistributionError;
+        match &err {
+            crate::registry::DownloadRemoteImageError::OciClientError(
+                OciDistributionError::ImageManifestNotFoundError(_),
+            ) => Self::ManifestUnknown(err.to_string()),
+            _ => {
+                tracing::error!("Error(DownloadRemoteImageError): {err}");
+                Self::Internal
+            }
         }
     }
 }
