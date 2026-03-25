@@ -1,12 +1,12 @@
 mod init_db;
 pub mod registry;
 pub mod routes;
-pub mod services;
 #[cfg(test)]
 pub mod test_utilities;
 pub mod types;
 #[cfg(feature = "sqlite")]
 mod users;
+pub mod utils;
 
 use std::path::PathBuf;
 use std::str::FromStr;

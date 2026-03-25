@@ -3,10 +3,10 @@ use aws_sdk_ecr::error::SdkError;
 use aws_sdk_ecr::operation::get_authorization_token::GetAuthorizationTokenError;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::digest::DigestError;
-use crate::registry::manifest::ManifestReference;
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
+use crate::utils::digest::DigestError;
+use crate::utils::manifest::ManifestReference;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
@@ -103,7 +103,7 @@ pub enum EcrPasswordError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::manifest::ManifestReference;
+    use crate::utils::manifest::ManifestReference;
 
     fn manifest_ref() -> ManifestReference {
         ManifestReference::Tag("napoleon".to_string())

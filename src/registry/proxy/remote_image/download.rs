@@ -8,10 +8,10 @@ use oci_client::secrets::RegistryAuth;
 use regex::Regex;
 
 use crate::TrowServerState;
-use crate::registry::digest::Digest;
-use crate::registry::manifest::{ManifestReference, OCIManifest};
 use crate::registry::proxy::proxy_config::{DownloadRemoteImageError, EcrPasswordError};
 use crate::registry::{RemoteImage, SingleRegistryProxyConfig};
+use crate::utils::digest::Digest;
+use crate::utils::manifest::{ManifestReference, OCIManifest};
 
 impl<'a> RemoteImage<'a> {
     /// returns the downloaded digest

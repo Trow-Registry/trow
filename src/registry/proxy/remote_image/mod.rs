@@ -7,8 +7,8 @@ use const_format::formatcp;
 use lazy_static::lazy_static;
 
 use crate::registry::SingleRegistryProxyConfig;
-use crate::registry::digest::{Digest, DigestError};
-use crate::registry::manifest::ManifestReference;
+use crate::utils::digest::{Digest, DigestError};
+use crate::utils::manifest::ManifestReference;
 
 #[derive(thiserror::Error, Debug)]
 pub enum RemoteImageError {

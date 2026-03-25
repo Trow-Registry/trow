@@ -10,8 +10,8 @@ use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::time::Duration;
 
 use crate::registry::api_types::Stored;
-use crate::registry::temporary_file::FileWrapper;
 use crate::types::BoundedStream;
+use crate::utils::temporary_file::FileWrapper;
 
 // Storage Driver Error
 #[derive(thiserror::Error, Debug)]

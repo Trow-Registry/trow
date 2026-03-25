@@ -6,12 +6,13 @@ use axum::routing::get;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::TrowServerState;
-use crate::registry::manifest::ManifestReference;
-use crate::registry::{BlobReader, Digest};
+use crate::registry::BlobReader;
 use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
+use crate::utils::digest::Digest;
+use crate::utils::manifest::ManifestReference;
 
 /*
 ---

@@ -5,18 +5,18 @@ use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::response::Response;
 use axum::routing::{post, put};
-use digest::Digest;
 use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::TrowServerState;
+use crate::registry::ContentInfo;
 use crate::registry::server::PROXY_DIR;
-use crate::registry::{ContentInfo, digest};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
+use crate::utils::digest::Digest;
 
 mod utils {
     use std::ops::RangeInclusive;
@@ -340,8 +340,8 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::registry::Digest;
     use crate::test_utilities::{self, resp_header};
+    use crate::utils::digest;
 
     // POST blob upload
     #[tokio::test]

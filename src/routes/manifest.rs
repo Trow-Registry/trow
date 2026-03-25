@@ -10,16 +10,16 @@ use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::TrowServerState;
-use crate::registry::digest;
-use crate::registry::manifest::{
-    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type,
-};
 use crate::registry::server::PROXY_DIR;
 use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};
+use crate::utils::digest;
+use crate::utils::manifest::{
+    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type,
+};
 
 /*
 ---

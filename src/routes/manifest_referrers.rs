@@ -11,12 +11,12 @@ use sqlx::types::Json;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::TrowServerState;
-use crate::registry::digest;
-use crate::registry::manifest::OCIManifest;
 use crate::registry::server::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
+use crate::utils::digest;
+use crate::utils::manifest::OCIManifest;
 
 /*
 ---

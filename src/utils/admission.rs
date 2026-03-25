@@ -1,11 +1,8 @@
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
-use serde::{Deserialize, Serialize};
-
 use oci_client::Reference;
-use crate::registry::TrowServer;
-use crate::registry::ImageValidationConfig;
 
+use crate::registry::ImageValidationConfig;
 
 fn check_image_is_allowed(
     raw_image_ref: &str,
@@ -74,7 +71,10 @@ fn extract_images(pod: &Pod) -> (Vec<String>, Vec<jsonptr::PointerBuf>) {
     (images, paths)
 }
 
-pub async fn validate_admission(image_validation: &Option<ImageValidationConfig>, ar: &AdmissionRequest<Pod>) -> AdmissionResponse {
+pub async fn validate_admission(
+    image_validation: &Option<ImageValidationConfig>,
+    ar: &AdmissionRequest<Pod>,
+) -> AdmissionResponse {
     let resp = AdmissionResponse::from(ar);
 
     if image_validation.is_none() {
@@ -90,8 +90,7 @@ pub async fn validate_admission(image_validation: &Option<ImageValidationConfig>
     let mut reasons = Vec::new();
 
     for image_raw in images {
-        let (v, r) =
-            check_image_is_allowed(&image_raw, image_validation.as_ref().unwrap());
+        let (v, r) = check_image_is_allowed(&image_raw, image_validation.as_ref().unwrap());
         if !v {
             valid = false;
             reasons.push(format!("{image_raw}: {r}"));

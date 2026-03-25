@@ -1,24 +1,19 @@
 pub(crate) mod api_types;
 pub mod garbage_collect;
-pub mod manifest;
 mod proxy;
 pub mod server;
 mod storage;
-mod temporary_file;
 
 pub use api_types::{BlobReader, ContentInfo};
-pub use digest::Digest;
 pub use proxy::{
     DownloadRemoteImageError, RegistryProxiesConfig, RemoteImage, SingleRegistryProxyConfig,
 };
-use serde::Deserializer;
+use serde::{Deserialize, Deserializer, Serialize};
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;
 
-pub mod digest;
-
-use serde::{Deserialize, Serialize};
+use crate::utils::digest::Digest;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageValidationConfig {

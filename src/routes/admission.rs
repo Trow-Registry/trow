@@ -7,9 +7,8 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::core::DynamicObject;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 
-use crate::services::admission::validate_admission;
-
 use crate::TrowServerState;
+use crate::utils::admission::validate_admission;
 
 async fn validate_image(
     State(state): State<Arc<TrowServerState>>,
@@ -21,7 +20,9 @@ async fn validate_image(
         Err(e) => {
             AdmissionResponse::invalid(format!("Invalid admission request: {e:#}")).into_review()
         }
-        Ok(req) => validate_admission(&state.registry.config.image_validation, &req).await.into_review(),
+        Ok(req) => validate_admission(&state.registry.config.image_validation, &req)
+            .await
+            .into_review(),
     })
 }
 
