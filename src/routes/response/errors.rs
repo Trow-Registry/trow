@@ -191,3 +191,18 @@ impl From<DigestError> for Error {
         }
     }
 }
+
+impl From<crate::registry::DownloadRemoteImageError> for Error {
+    fn from(err: crate::registry::DownloadRemoteImageError) -> Self {
+        use oci_client::errors::OciDistributionError;
+        match &err {
+            crate::registry::DownloadRemoteImageError::OciClientError(
+                OciDistributionError::ImageManifestNotFoundError(_),
+            ) => Self::ManifestUnknown(err.to_string()),
+            _ => {
+                tracing::error!("Error(DownloadRemoteImageError): {err}");
+                Self::Internal
+            }
+        }
+    }
+}

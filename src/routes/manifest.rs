@@ -59,10 +59,7 @@ async fn get_manifest(
         .get_proxied_image(&repo, &reference, query.ns)
         .await
     {
-        image.download(&state).await.map_err(|e| {
-            tracing::error!("Error downloading image: {e}");
-            Error::Internal
-        })?
+        image.download(&state).await?
     } else {
         let digest = match &reference {
             ManifestReference::Tag(_) => {

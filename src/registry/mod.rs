@@ -10,7 +10,9 @@ mod temporary_file;
 pub use admission::ImageValidationConfig;
 pub use api_types::{BlobReader, ContentInfo};
 pub use digest::Digest;
-pub use proxy::{RegistryProxiesConfig, RemoteImage, SingleRegistryProxyConfig};
+pub use proxy::{
+    DownloadRemoteImageError, RegistryProxiesConfig, RemoteImage, SingleRegistryProxyConfig,
+};
 use serde::Deserializer;
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
