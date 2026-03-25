@@ -41,7 +41,7 @@ mod test {
     use reqwest::{StatusCode, header};
     use tower::ServiceExt;
 
-    use crate::registry::{ConfigFile, ImageValidationConfig};
+    use crate::configuration::{ConfigFile, ImageValidationConfig};
     use crate::test_utilities;
     use crate::test_utilities::test_temp_dir;
 

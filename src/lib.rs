@@ -1,3 +1,4 @@
+pub mod configuration;
 mod init_db;
 pub mod registry;
 pub mod routes;
@@ -19,7 +20,7 @@ use sqlx::sqlite::SqlitePool;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::registry::ConfigFile;
+use crate::configuration::ConfigFile;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]

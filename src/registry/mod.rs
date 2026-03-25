@@ -5,37 +5,13 @@ pub mod server;
 mod storage;
 
 pub use api_types::{BlobReader, ContentInfo};
-pub use proxy::{
-    DownloadRemoteImageError, RegistryProxiesConfig, RemoteImage, SingleRegistryProxyConfig,
-};
-use serde::{Deserialize, Deserializer, Serialize};
+pub use proxy::{DownloadRemoteImageError, RemoteImage};
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;
 
+use crate::configuration::SingleRegistryProxyConfig;
 use crate::utils::digest::Digest;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ImageValidationConfig {
-    pub default: String,
-    pub allow: Vec<String>,
-    pub deny: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct ConfigFile {
-    #[serde(deserialize_with = "de_unwrap_or_default")]
-    pub registry_proxies: RegistryProxiesConfig,
-    pub image_validation: Option<ImageValidationConfig>,
-}
-
-fn de_unwrap_or_default<'de, T, D>(d: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de> + Default,
-{
-    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or_default())
-}
 
 // Storage Driver Error
 #[derive(Error, Debug)]

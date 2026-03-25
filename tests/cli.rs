@@ -5,7 +5,7 @@ mod common;
 mod cli {
     use predicates::prelude::*;
     use test_temp_dir::test_temp_dir;
-    use trow::registry::{ConfigFile, ImageValidationConfig};
+    use trow::configuration::{ConfigFile, ImageValidationConfig};
 
     use crate::common::get_file;
 

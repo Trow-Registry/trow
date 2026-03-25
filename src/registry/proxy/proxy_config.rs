@@ -1,34 +1,12 @@
 use aws_sdk_ecr::config::http::HttpResponse;
 use aws_sdk_ecr::error::SdkError;
 use aws_sdk_ecr::operation::get_authorization_token::GetAuthorizationTokenError;
-use serde::{Deserialize, Serialize};
 
+use crate::configuration::RegistryProxiesConfig;
 use crate::registry::proxy::remote_image::RemoteImage;
 use crate::registry::server::PROXY_DIR;
 use crate::utils::digest::DigestError;
 use crate::utils::manifest::ManifestReference;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RegistryProxiesConfig {
-    #[serde(default)]
-    pub registries: Vec<SingleRegistryProxyConfig>,
-    #[serde(default)]
-    pub offline: bool,
-    #[serde(default)]
-    pub max_size: Option<size::Size>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct SingleRegistryProxyConfig {
-    /// What containerd calls "namespace" (ghcr.io, docker.io, ...)
-    /// This can be empty !!
-    pub host: String,
-    /// TODO: insecure currently means "use HTTP", we should also support self-signed TLS
-    #[serde(default)]
-    pub insecure: bool,
-    pub username: Option<String>,
-    pub password: Option<String>,
-}
 
 impl Default for RegistryProxiesConfig {
     fn default() -> Self {

@@ -2,7 +2,7 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use oci_client::Reference;
 
-use crate::registry::ImageValidationConfig;
+use crate::configuration::ImageValidationConfig;
 
 fn check_image_is_allowed(
     raw_image_ref: &str,

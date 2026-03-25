@@ -11,8 +11,8 @@ mod registry_interface {
     use reqwest::StatusCode;
     use test_temp_dir::{TestTempDir, test_temp_dir};
     use tower::ServiceExt;
-    use trow::registry::digest;
     use trow::types::{RepoCatalog, TagList};
+    use trow::utils::digest;
 
     use crate::common::{self, DIST_API_HEADER, response_body_string, trow_router};
 

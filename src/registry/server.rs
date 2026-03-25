@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 use std::str;
 
+use super::StorageBackendError;
 // use super::manifest::Manifest;
 use super::storage::TrowStorageBackend;
-use super::{ConfigFile, StorageBackendError};
+use crate::configuration::ConfigFile;
 
 pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 

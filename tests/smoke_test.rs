@@ -16,7 +16,7 @@ mod smoke_test {
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
-    use trow::registry::{ConfigFile, RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::configuration::{ConfigFile, RegistryProxiesConfig, SingleRegistryProxyConfig};
 
     use crate::common::trow_router;
 

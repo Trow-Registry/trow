@@ -30,7 +30,7 @@ mod test {
     use axum::response::IntoResponse;
 
     use crate::types::VerifiedManifest;
-    use crate::utils::digest;
+    use crate::utils::digest::Digest;
 
     #[test]
     fn accepted_ok() {
