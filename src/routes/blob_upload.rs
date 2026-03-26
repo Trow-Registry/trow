@@ -9,8 +9,7 @@ use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::TrowServerState;
-use crate::registry::ContentInfo;
-use crate::registry::server::PROXY_DIR;
+use crate::registry::{ContentInfo, PROXY_DIR};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
@@ -44,13 +43,11 @@ mod utils {
         let upload_id_bin = Uuid::parse_str(upload_id).unwrap();
 
         let size = state
-            .registry
             .storage
             .write_blob_part_stream(&upload_id_bin, data.into_data_stream(), range)
             .await?;
 
         state
-            .registry
             .storage
             .complete_blob_write(&upload_id_bin, digest.as_str())
             .await?;
@@ -180,7 +177,6 @@ async fn patch_blob_upload(
 
     let content_range = content_info.map(|ci| ci.range.0..=ci.range.1);
     let size = state
-        .registry
         .storage
         .write_blob_part_stream(&uuid, chunk.into_data_stream(), content_range)
         .await?;
@@ -471,7 +467,6 @@ mod tests {
         .await
         .unwrap();
         state
-            .registry
             .storage
             .write_blob_part_stream(&upload_uuid, Body::from("whazaaa").into_data_stream(), None)
             .await

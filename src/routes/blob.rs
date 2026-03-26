@@ -55,12 +55,7 @@ async fn get_blob(
     .execute(&state.db_rw)
     .await?;
 
-    let stream = match state
-        .registry
-        .storage
-        .get_blob_stream(&repo, digest.as_str())
-        .await
-    {
+    let stream = match state.storage.get_blob_stream(&repo, digest.as_str()).await {
         Ok(stream) => stream,
         Err(_) => return Err(Error::Internal),
     };

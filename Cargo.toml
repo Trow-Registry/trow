@@ -4,9 +4,6 @@ version = "0.9.4"
 authors = []
 edition = "2024"
 
-[features]
-sqlite = []
-
 [dependencies]
 futures = "0.3"
 axum = { version = "0.8.1", features = ["tracing"] }

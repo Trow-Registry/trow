@@ -20,7 +20,7 @@ async fn validate_image(
         Err(e) => {
             AdmissionResponse::invalid(format!("Invalid admission request: {e:#}")).into_review()
         }
-        Ok(req) => validate_admission(&state.registry.config.image_validation, &req)
+        Ok(req) => validate_admission(&state.config.config_file.image_validation, &req)
             .await
             .into_review(),
     })
@@ -63,7 +63,7 @@ mod test {
         let tmp_dir = test_temp_dir!();
         let (_, router) = test_utilities::trow_router(
             |builder| {
-                builder.config_file = Some(ConfigFile {
+                builder.config_file = ConfigFile {
                     image_validation: Some(ImageValidationConfig {
                         default: "Deny".to_string(),
                         allow: vec![
@@ -75,7 +75,7 @@ mod test {
                         deny: vec!["localhost:8000/secret/".to_string()],
                     }),
                     ..Default::default()
-                })
+                }
             },
             &tmp_dir,
         )

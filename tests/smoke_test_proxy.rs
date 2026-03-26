@@ -36,7 +36,7 @@ mod proxy_registry {
         };
 
         trow_router(data_dir, |cfg| {
-            cfg.config_file = Some(config_file);
+            cfg.config_file = config_file;
         })
         .await
     }

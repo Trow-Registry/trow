@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use oci_client::Reference;
 
-use crate::registry::server::PROXY_DIR;
+use crate::registry::PROXY_DIR;
 use crate::routes::Error;
 use crate::utils::manifest::REGEX_TAG;
 
@@ -28,7 +28,7 @@ pub fn parse_reference(
     };
 
     // Only from_str calls `split_domain`, which handles the docker "library" hack.
-    Reference::from_str(&str_reference).map_err(|_e| Error::DigestInvalid)
+    Reference::from_str(&str_reference).map_err(|e| Error::InvalidReference(Some(format!("{}", e))))
 }
 
 #[derive(Debug, Clone, PartialEq)]

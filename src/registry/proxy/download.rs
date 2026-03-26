@@ -170,7 +170,6 @@ async fn download_manifest_and_layers(
         if !already_has_blob {
             let stream = cl.pull_blob_stream(ref_, layer_digest).await?;
             let path = state
-                .registry
                 .storage
                 .write_blob_stream(layer_digest, stream, true)
                 .await?;

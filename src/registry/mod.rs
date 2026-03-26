@@ -1,17 +1,17 @@
 pub(crate) mod api_types;
 pub mod garbage_collect;
 pub mod proxy;
-pub mod server;
-mod storage;
+pub mod storage;
 
 pub use api_types::{BlobReader, ContentInfo};
 pub use proxy::DownloadRemoteImageError;
-pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;
 
 use crate::configuration::SingleRegistryProxyConfig;
 use crate::utils::digest::Digest;
+
+pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 
 // Storage Driver Error
 #[derive(Error, Debug)]

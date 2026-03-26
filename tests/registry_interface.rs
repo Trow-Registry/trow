@@ -315,7 +315,7 @@ mod registry_interface {
         let resp = trow
             .clone()
             .oneshot(
-                Request::get("/v2/test/test/blobs/sha256:baadf00dbaadf00dbaadf00dbaadf00d")
+                Request::get("/v2/test/test/blobs/sha256:a4244aa43ddd6e3ef9e64bb80f4ee952f68232aa008d3da9c78e3b627e5675c8")
                     .body(Body::empty())
                     .unwrap(),
             )

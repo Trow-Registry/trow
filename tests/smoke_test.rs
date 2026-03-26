@@ -143,7 +143,7 @@ mod smoke_test {
         let trow0 = start_trow(&data_trow0, false).await;
         let trow0_host = format!("127.0.0.1:{}", trow0.port);
         let trow1 = trow_router(&data_trow1, |cfg| {
-            cfg.config_file = Some(ConfigFile {
+            cfg.config_file = ConfigFile {
                 registry_proxies: RegistryProxiesConfig {
                     registries: vec![SingleRegistryProxyConfig {
                         host: trow0_host.clone(),
@@ -154,7 +154,7 @@ mod smoke_test {
                     ..Default::default()
                 },
                 ..Default::default()
-            });
+            };
         })
         .await;
 
@@ -198,7 +198,7 @@ mod smoke_test {
         let trow0 = start_trow(&data_trow0, true).await;
         let trow0_host = format!("[::1]:{}", trow0.port);
         let trow1 = trow_router(&data_trow1, |cfg| {
-            cfg.config_file = Some(ConfigFile {
+            cfg.config_file = ConfigFile {
                 registry_proxies: RegistryProxiesConfig {
                     registries: vec![SingleRegistryProxyConfig {
                         host: trow0_host.clone(),
@@ -209,7 +209,7 @@ mod smoke_test {
                     ..Default::default()
                 },
                 ..Default::default()
-            });
+            };
         })
         .await;
 

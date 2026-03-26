@@ -10,8 +10,8 @@ use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::TrowServerState;
+use crate::registry::PROXY_DIR;
 use crate::registry::proxy::download_image;
-use crate::registry::server::PROXY_DIR;
 use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
@@ -51,8 +51,8 @@ async fn get_manifest(
 
     let digest = if image.registry() != "localhost" {
         let proxy_config = state
-            .registry
             .config
+            .config_file
             .registry_proxies
             .registries
             .get_for(image.registry());
