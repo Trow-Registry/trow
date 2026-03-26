@@ -10,6 +10,7 @@ use regex::Regex;
 use crate::TrowServerState;
 use crate::registry::SingleRegistryProxyConfig;
 use crate::registry::proxy::{DownloadRemoteImageError, EcrPasswordError};
+use crate::utils::digest::DigestError;
 use crate::utils::manifest::OCIManifest;
 
 /// returns the downloaded digest
@@ -62,7 +63,9 @@ pub async fn download_image(
         }
         digests
     } else {
-        panic!();
+        return Err(DownloadRemoteImageError::InvalidDigest(
+            DigestError::InvalidDigest(String::new()),
+        ));
     };
 
     for mani_digest in digests.into_iter() {
