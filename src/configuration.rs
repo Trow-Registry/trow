@@ -1,6 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageValidationConfig {
     pub default: String,
@@ -23,10 +22,13 @@ where
     Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or_default())
 }
 
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+pub struct RegistryProxyConfigs(Vec<SingleRegistryProxyConfig>);
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RegistryProxiesConfig {
     #[serde(default)]
-    pub registries: Vec<SingleRegistryProxyConfig>,
+    pub registries: RegistryProxyConfigs,
     #[serde(default)]
     pub offline: bool,
     #[serde(default)]
@@ -43,4 +45,29 @@ pub struct SingleRegistryProxyConfig {
     pub insecure: bool,
     pub username: Option<String>,
     pub password: Option<String>,
+}
+
+impl Default for RegistryProxiesConfig {
+    fn default() -> Self {
+        RegistryProxiesConfig {
+            registries: RegistryProxyConfigs(Vec::new()),
+            offline: true,
+            max_size: None,
+        }
+    }
+}
+
+impl RegistryProxyConfigs {
+    pub fn get_for<'a>(&'a self, registry_host: &str) -> Option<&'a SingleRegistryProxyConfig> {
+        self.0
+            .iter()
+            .find(|&registry| registry.host == registry_host)
+            .map(|v| v as _)
+    }
+}
+
+impl From<Vec<SingleRegistryProxyConfig>> for RegistryProxyConfigs {
+    fn from(vec: Vec<SingleRegistryProxyConfig>) -> Self {
+        RegistryProxyConfigs(vec)
+    }
 }

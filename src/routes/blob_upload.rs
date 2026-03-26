@@ -341,7 +341,6 @@ mod tests {
 
     use super::*;
     use crate::test_utilities::{self, resp_header};
-    use crate::utils::digest;
 
     // POST blob upload
     #[tokio::test]

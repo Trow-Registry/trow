@@ -28,7 +28,8 @@ mod proxy_registry {
                 registries: vec![SingleRegistryProxyConfig {
                     host: "nvcr.io".to_string(),
                     ..Default::default()
-                }],
+                }]
+                .into(),
                 ..Default::default()
             },
             ..Default::default()

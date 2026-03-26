@@ -1,11 +1,11 @@
 pub(crate) mod api_types;
 pub mod garbage_collect;
-mod proxy;
+pub mod proxy;
 pub mod server;
 mod storage;
 
 pub use api_types::{BlobReader, ContentInfo};
-pub use proxy::{DownloadRemoteImageError, RemoteImage};
+pub use proxy::DownloadRemoteImageError;
 pub use server::TrowServer;
 pub use storage::StorageBackendError;
 use thiserror::Error;

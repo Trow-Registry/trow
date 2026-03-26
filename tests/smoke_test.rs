@@ -149,7 +149,8 @@ mod smoke_test {
                         host: trow0_host.clone(),
                         insecure: true,
                         ..Default::default()
-                    }],
+                    }]
+                    .into(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -203,7 +204,8 @@ mod smoke_test {
                         host: trow0_host.clone(),
                         insecure: true,
                         ..Default::default()
-                    }],
+                    }]
+                    .into(),
                     ..Default::default()
                 },
                 ..Default::default()
