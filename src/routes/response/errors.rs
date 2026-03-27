@@ -24,7 +24,6 @@ pub enum Error {
     NotFound,
     UnsupportedForProxiedRepo,
     UnsatisfiableRange,
-    InvalidReference(Option<String>),
 }
 
 // Create ErrorMsg struct that serializes to json of appropriate type
@@ -91,12 +90,6 @@ impl fmt::Display for Error {
                 "The range specified in the request header cannot be satisfied by the current blob.",
                 None,
             ),
-            Error::InvalidReference(ref detail) => format_error_json(
-                f,
-                "INVALID_REFERENCE",
-                "The reference provided was invalid.",
-                detail.as_ref().map(|d| json!({ "detail": d })),
-            ),
         }
     }
 }
@@ -151,10 +144,9 @@ impl IntoResponse for Error {
             }
             Error::Internal => StatusCode::INTERNAL_SERVER_ERROR,
             Error::BlobUploadInvalid(_) => StatusCode::RANGE_NOT_SATISFIABLE,
-            Error::DigestInvalid
-            | Error::ManifestInvalid(_)
-            | Error::NameInvalid(_)
-            | Error::InvalidReference(_) => StatusCode::BAD_REQUEST,
+            Error::DigestInvalid | Error::ManifestInvalid(_) | Error::NameInvalid(_) => {
+                StatusCode::BAD_REQUEST
+            }
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::UnsatisfiableRange => StatusCode::RANGE_NOT_SATISFIABLE,
         };

@@ -22,7 +22,6 @@ pub async fn download_image(
     let repo_name = format!("f/{}/{}", image.registry(), image.repository());
     tracing::debug!("Downloading proxied image {}", repo_name);
 
-    // let image_ref: Reference = self.clone().into();
     let try_cl = match get_oci_client(image.registry(), proxy_config).await {
         Ok(cl) => Some(cl),
         Err(e) => {

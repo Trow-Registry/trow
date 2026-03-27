@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use oci_client::Reference;
+use oci_spec::distribution::{self, Reference};
 
 use crate::registry::PROXY_DIR;
 use crate::routes::Error;
@@ -28,7 +28,11 @@ pub fn parse_reference(
     };
 
     // Only from_str calls `split_domain`, which handles the docker "library" hack.
-    Reference::from_str(&str_reference).map_err(|e| Error::InvalidReference(Some(format!("{}", e))))
+    match Reference::from_str(&str_reference) {
+        Ok(reference) => Ok(reference),
+        Err(distribution::ParseError::DigestInvalidLength) => Err(Error::BlobUnknown),
+        Err(_) => Err(Error::NameInvalid(str_reference)),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,7 +47,7 @@ fn resolve_version<'a>(version: &'a str) -> Result<BlobVersion<'a>, Error> {
     } else if REGEX_TAG.is_match(version) {
         Ok(BlobVersion::Tag(version))
     } else {
-        Err(Error::DigestInvalid)
+        Err(Error::NameInvalid(version.to_string()))
     }
 }
 

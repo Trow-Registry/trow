@@ -38,8 +38,6 @@ mod smoke_test {
                 ip = if ipv6 { "[::]" } else { "0.0.0.0" }
             ))
             .arg(format!("--data-dir={}", temp_dir.display()))
-            .env_clear()
-            .envs(Environment::inherit().compile())
             .spawn()
             .expect("failed to start");
 
@@ -139,6 +137,8 @@ mod smoke_test {
         let temp_dir = test_temp_dir!();
         let data_trow0 = temp_dir.subdir_untracked("0");
         let data_trow1 = temp_dir.subdir_untracked("1");
+        std::fs::create_dir(&data_trow0).unwrap();
+        std::fs::create_dir(&data_trow1).unwrap();
 
         let trow0 = start_trow(&data_trow0, false).await;
         let trow0_host = format!("127.0.0.1:{}", trow0.port);
@@ -194,6 +194,8 @@ mod smoke_test {
         let temp_dir = test_temp_dir!();
         let data_trow0 = temp_dir.subdir_untracked("0");
         let data_trow1 = temp_dir.subdir_untracked("1");
+        std::fs::create_dir(&data_trow0).unwrap();
+        std::fs::create_dir(&data_trow1).unwrap();
 
         let trow0 = start_trow(&data_trow0, true).await;
         let trow0_host = format!("[::1]:{}", trow0.port);
