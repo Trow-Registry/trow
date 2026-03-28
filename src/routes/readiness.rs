@@ -9,9 +9,9 @@ use crate::registry::api_types::ReadyStatus;
 * Trow readiness endpoint
 * GET /readiness
 */
-pub async fn readiness(State(_state): State<Arc<TrowServerState>>) -> ReadyStatus {
+pub async fn readiness(State(state): State<Arc<TrowServerState>>) -> ReadyStatus {
     ReadyStatus {
         message: "".to_string(),
-        is_ready: true,
+        is_ready: state.storage.is_ready().await.is_ok(),
     }
 }

@@ -4,7 +4,6 @@ use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
-use digest::Digest;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
@@ -17,7 +16,7 @@ use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};
-use crate::utils::digest;
+use crate::utils::digest::Digest;
 use crate::utils::manifest::{OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type};
 use crate::utils::resolve_reference::parse_reference;
 

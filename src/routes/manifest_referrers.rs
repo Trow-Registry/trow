@@ -4,7 +4,6 @@ use std::sync::Arc;
 use axum::Router;
 use axum::extract::{Path, State};
 use axum::routing::get;
-use digest::Digest;
 use oci_spec::image::{Descriptor, ImageIndex, MediaType};
 use sqlx::types::Json;
 
@@ -15,7 +14,7 @@ use crate::registry::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::utils::digest;
+use crate::utils::digest::Digest;
 use crate::utils::manifest::OCIManifest;
 
 /*
