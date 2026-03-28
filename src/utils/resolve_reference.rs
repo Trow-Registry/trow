@@ -1,6 +1,4 @@
-use std::str::FromStr;
-
-use oci_spec::distribution::{self, Reference};
+use oci_spec::distribution::Reference;
 
 use crate::registry::PROXY_DIR;
 use crate::routes::Error;
@@ -11,7 +9,7 @@ pub fn parse_reference(
     version: &str,
     namespace: Option<&str>,
 ) -> Result<Reference, Error> {
-    let (upstream, name) = if let Some(upstream) = namespace {
+    let (upstream, mut name) = if let Some(upstream) = namespace {
         (upstream.to_string(), name.to_string())
     } else if name.starts_with(PROXY_DIR) {
         let segments = name.splitn(3, '/').collect::<Vec<_>>();
@@ -20,19 +18,15 @@ pub fn parse_reference(
     } else {
         ("localhost".to_string(), name.to_string())
     };
+    if upstream == "docker.io" && name.find('/').is_none() {
+        name = format!("library/{}", name);
+    }
 
     let version = resolve_version(version)?;
-    let str_reference = match version {
-        BlobVersion::Tag(tag) => format!("{upstream}/{name}:{tag}"),
-        BlobVersion::Digest(digest) => format!("{upstream}/{name}@{digest}"),
-    };
-
-    // Only from_str calls `split_domain`, which handles the docker "library" hack.
-    match Reference::from_str(&str_reference) {
-        Ok(reference) => Ok(reference),
-        Err(distribution::ParseError::DigestInvalidLength) => Err(Error::BlobUnknown),
-        Err(_) => Err(Error::NameInvalid(str_reference)),
-    }
+    Ok(match version {
+        BlobVersion::Tag(tag) => Reference::with_tag(upstream, name, tag.to_owned()),
+        BlobVersion::Digest(digest) => Reference::with_digest(upstream, name, digest.to_owned()),
+    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -54,6 +48,12 @@ fn resolve_version<'a>(version: &'a str) -> Result<BlobVersion<'a>, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_reference() {
+        let reference = parse_reference("library/ubuntu", "latest", Some("docker.io")).unwrap();
+        assert_eq!(reference.whole(), "docker.io/library/ubuntu:latest");
+    }
 
     #[test]
     fn test_parse_reference_docker_library() {
