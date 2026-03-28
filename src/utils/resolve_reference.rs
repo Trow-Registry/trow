@@ -41,7 +41,8 @@ fn resolve_version<'a>(version: &'a str) -> Result<BlobVersion<'a>, Error> {
     } else if REGEX_TAG.is_match(version) {
         Ok(BlobVersion::Tag(version))
     } else {
-        Err(Error::NameInvalid(version.to_string()))
+        // According to opencontainers/distribution-spec/conformance, 404 must be returned (not 400)
+        Err(Error::BlobUnknown)
     }
 }
 

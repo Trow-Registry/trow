@@ -523,4 +523,29 @@ mod tests {
             "unexpected content-type"
         );
     }
+
+    #[tracing_test::traced_test]
+    #[tokio::test]
+    async fn test_head_nonexistent_manifest() {
+        let tmp_dir = test_temp_dir!();
+        let (_, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
+
+        let repo_name = "test-repo";
+        let non_existent_digest = "sha256:nonexistentdigest";
+
+        let resp = router
+            .oneshot(
+                Request::head(format!("/v2/{repo_name}/manifests/{non_existent_digest}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::NOT_FOUND,
+            "unexpected status code: {resp:?}"
+        );
+    }
 }

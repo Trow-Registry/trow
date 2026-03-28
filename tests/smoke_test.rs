@@ -11,7 +11,6 @@ mod smoke_test {
     use std::time::Duration;
 
     use axum::body::Body;
-    use environment::Environment;
     use hyper::Request;
     use reqwest::StatusCode;
     use test_temp_dir::test_temp_dir;
