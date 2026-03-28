@@ -26,8 +26,8 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::registry::Digest;
     use crate::types::AcceptedUpload;
+    use crate::utils::digest::Digest;
 
     #[tokio::test]
     async fn test_resp() {

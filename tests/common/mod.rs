@@ -15,8 +15,8 @@ use reqwest::StatusCode;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tower::ServiceExt;
-use trow::registry::digest::Digest;
-use trow::registry::manifest;
+use trow::utils::digest::Digest;
+use trow::utils::manifest;
 use trow::{TrowConfig, TrowServerState, routes};
 
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";

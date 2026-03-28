@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT manifest_digest\n                FROM tag\n                WHERE repo = $1\n                AND tag = $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "manifest_digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "552852975d7cbaf61439d8ad1b2004d8e34ff55915ebd7f418986c68792fbb91"
+}

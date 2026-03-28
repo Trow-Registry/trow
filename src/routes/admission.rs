@@ -8,6 +8,7 @@ use kube::core::DynamicObject;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 
 use crate::TrowServerState;
+use crate::utils::admission::validate_admission;
 
 async fn validate_image(
     State(state): State<Arc<TrowServerState>>,
@@ -19,7 +20,9 @@ async fn validate_image(
         Err(e) => {
             AdmissionResponse::invalid(format!("Invalid admission request: {e:#}")).into_review()
         }
-        Ok(req) => state.registry.validate_admission(&req).await.into_review(),
+        Ok(req) => validate_admission(&state.config.config_file.image_validation, &req)
+            .await
+            .into_review(),
     })
 }
 
@@ -38,7 +41,7 @@ mod test {
     use reqwest::{StatusCode, header};
     use tower::ServiceExt;
 
-    use crate::registry::{ConfigFile, ImageValidationConfig};
+    use crate::configuration::{ConfigFile, ImageValidationConfig};
     use crate::test_utilities;
     use crate::test_utilities::test_temp_dir;
 
@@ -60,7 +63,7 @@ mod test {
         let tmp_dir = test_temp_dir!();
         let (_, router) = test_utilities::trow_router(
             |builder| {
-                builder.config_file = Some(ConfigFile {
+                builder.config_file = ConfigFile {
                     image_validation: Some(ImageValidationConfig {
                         default: "Deny".to_string(),
                         allow: vec![
@@ -72,7 +75,7 @@ mod test {
                         deny: vec!["localhost:8000/secret/".to_string()],
                     }),
                     ..Default::default()
-                })
+                }
             },
             &tmp_dir,
         )

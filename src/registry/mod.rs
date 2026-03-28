@@ -1,41 +1,17 @@
-mod admission;
 pub(crate) mod api_types;
 pub mod garbage_collect;
-pub mod manifest;
-mod proxy;
-pub mod server;
-mod storage;
-mod temporary_file;
+pub mod proxy;
+pub mod storage;
 
-pub use admission::ImageValidationConfig;
 pub use api_types::{BlobReader, ContentInfo};
-pub use digest::Digest;
-pub use proxy::{
-    DownloadRemoteImageError, RegistryProxiesConfig, RemoteImage, SingleRegistryProxyConfig,
-};
-use serde::Deserializer;
-pub use server::TrowServer;
+pub use proxy::DownloadRemoteImageError;
 pub use storage::StorageBackendError;
 use thiserror::Error;
 
-pub mod digest;
+use crate::configuration::SingleRegistryProxyConfig;
+use crate::utils::digest::Digest;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct ConfigFile {
-    #[serde(deserialize_with = "de_unwrap_or_default")]
-    pub registry_proxies: RegistryProxiesConfig,
-    pub image_validation: Option<ImageValidationConfig>,
-}
-
-fn de_unwrap_or_default<'de, T, D>(d: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de> + Default,
-{
-    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or_default())
-}
+pub static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 
 // Storage Driver Error
 #[derive(Error, Debug)]

@@ -4,22 +4,21 @@ use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
-use digest::Digest;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::TrowServerState;
-use crate::registry::digest;
-use crate::registry::manifest::{
-    ManifestReference, OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type,
-};
-use crate::registry::server::PROXY_DIR;
+use crate::registry::PROXY_DIR;
+use crate::registry::proxy::download_image;
 use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};
+use crate::utils::digest::Digest;
+use crate::utils::manifest::{OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type};
+use crate::utils::resolve_reference::parse_reference;
 
 /*
 ---
@@ -47,40 +46,41 @@ async fn get_manifest(
     Path((repo, raw_reference)): Path<(String, String)>,
     Query(query): Query<ImageNamespace>,
 ) -> Result<OciJson<OCIManifest>, Error> {
-    let reference = ManifestReference::try_from_str(&raw_reference).map_err(|e| {
-        // Error::ManifestInvalid(format!("Invalid reference: {raw_reference} ({e:?})"))
-        Error::ManifestUnknown(format!("Invalid reference: {raw_reference} ({e:?})"))
-    })?;
+    let image = parse_reference(&repo, &raw_reference, query.ns.as_deref())?;
 
-    let digest = if let Some(image) = state
-        .registry
-        .config
-        .registry_proxies
-        .get_proxied_image(&repo, &reference, query.ns)
-        .await
-    {
-        image.download(&state).await?
+    let digest = if image.registry() != "localhost" {
+        let proxy_config = state
+            .config
+            .config_file
+            .registry_proxies
+            .registries
+            .get_for(image.registry());
+        download_image(&image, proxy_config, &state).await?
     } else {
-        let digest = match &reference {
-            ManifestReference::Tag(_) => {
-                let tdigest = sqlx::query_scalar!(
-                    "SELECT t.manifest_digest FROM tag t WHERE t.repo = $1 AND t.tag = $2",
-                    repo,
-                    raw_reference
-                )
-                .fetch_optional(&state.db_ro)
-                .await?;
-                match tdigest {
-                    Some(d) => d,
-                    None => {
-                        return Err(Error::ManifestUnknown(format!(
-                            "Unknown tag: {raw_reference}"
-                        )));
-                    }
+        let digest = if let Some(tag) = image.tag() {
+            let tdigest = sqlx::query_scalar!(
+                "SELECT t.manifest_digest FROM tag t WHERE t.repo = $1 AND t.tag = $2",
+                repo,
+                tag
+            )
+            .fetch_optional(&state.db_ro)
+            .await?;
+            match tdigest {
+                Some(d) => d,
+                None => {
+                    return Err(Error::ManifestUnknown(format!(
+                        "Unknown tag: {raw_reference}"
+                    )));
                 }
             }
-            ManifestReference::Digest(_) => raw_reference,
+        } else if let Some(digest) = image.digest() {
+            digest.to_string()
+        } else {
+            return Err(Error::ManifestUnknown(format!(
+                "Invalid reference: {raw_reference}"
+            )));
         };
+
         let maybe_digest = sqlx::query_scalar!(
             r#"
             SELECT rba.manifest_digest
@@ -520,6 +520,31 @@ mod tests {
         assert_eq!(
             content_type, "application/vnd.oci.image.index.v1+json",
             "unexpected content-type"
+        );
+    }
+
+    #[tracing_test::traced_test]
+    #[tokio::test]
+    async fn test_head_nonexistent_manifest() {
+        let tmp_dir = test_temp_dir!();
+        let (_, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
+
+        let repo_name = "test-repo";
+        let non_existent_digest = "sha256:nonexistentdigest";
+
+        let resp = router
+            .oneshot(
+                Request::head(format!("/v2/{repo_name}/manifests/{non_existent_digest}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::NOT_FOUND,
+            "unexpected status code: {resp:?}"
         );
     }
 }

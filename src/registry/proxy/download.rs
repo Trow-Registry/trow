@@ -8,108 +8,107 @@ use oci_client::secrets::RegistryAuth;
 use regex::Regex;
 
 use crate::TrowServerState;
-use crate::registry::digest::Digest;
-use crate::registry::manifest::{ManifestReference, OCIManifest};
-use crate::registry::proxy::proxy_config::{DownloadRemoteImageError, EcrPasswordError};
-use crate::registry::{RemoteImage, SingleRegistryProxyConfig};
+use crate::registry::SingleRegistryProxyConfig;
+use crate::registry::proxy::{DownloadRemoteImageError, EcrPasswordError};
+use crate::utils::digest::DigestError;
+use crate::utils::manifest::OCIManifest;
 
-impl<'a> RemoteImage<'a> {
-    /// returns the downloaded digest
-    pub async fn download(
-        &self,
-        state: &TrowServerState,
-    ) -> Result<String, DownloadRemoteImageError> {
-        // Replace eg f/docker.io/alpine by f/docker.io/library/alpine
-        let repo_name = format!("f/{}/{}", self.get_host(), self.get_repo());
-        tracing::debug!("Downloading proxied image {}", repo_name);
+/// returns the downloaded digest
+pub async fn download_image(
+    image: &Reference,
+    proxy_config: Option<&SingleRegistryProxyConfig>,
+    state: &TrowServerState,
+) -> Result<String, DownloadRemoteImageError> {
+    let repo_name = format!("f/{}/{}", image.registry(), image.repository());
+    tracing::debug!("Downloading proxied image {}", repo_name);
 
-        let image_ref: Reference = self.clone().into();
-        let try_cl = match get_oci_client(&self.host, self.proxy_config).await {
-            Ok(cl) => Some(cl),
-            Err(e) => {
-                tracing::warn!("Could not get an OCI client: {e}");
-                None
-            }
-        };
+    let try_cl = match get_oci_client(image.registry(), proxy_config).await {
+        Ok(cl) => Some(cl),
+        Err(e) => {
+            tracing::warn!("Could not get an OCI client: {e}");
+            None
+        }
+    };
 
-        // digests is a list of posstible digests for the given reference
-        let digests = match &self.reference {
-            ManifestReference::Digest(d) => vec![d.clone()],
-            ManifestReference::Tag(t) => {
-                let mut digests = vec![];
-                let local_digest = sqlx::query_scalar!(
-                    r#"
-                    SELECT manifest_digest
-                    FROM tag
-                    WHERE repo = $1
-                    AND tag = $2
-                    "#,
-                    repo_name,
-                    t
-                )
-                .fetch_optional(&state.db_rw)
-                .await?;
-                if let Some((cl, auth)) = &try_cl {
-                    match cl.fetch_manifest_digest(&image_ref, auth).await {
-                        Ok(d) => {
-                            if Some(&d) != local_digest.as_ref() {
-                                digests.push(Digest::try_from_raw(&d)?);
-                            }
-                        }
-                        Err(e) => tracing::warn!("Failed to fetch remote tag digest: {e}"),
+    // digests is a list of posstible digests for the given reference
+    let digests = if let Some(d) = image.digest() {
+        Vec::from([d.to_string()])
+    } else if let Some(t) = image.tag() {
+        let mut digests = vec![];
+        let local_digest = sqlx::query_scalar!(
+            r#"
+                SELECT manifest_digest
+                FROM tag
+                WHERE repo = $1
+                AND tag = $2
+                "#,
+            repo_name,
+            t
+        )
+        .fetch_optional(&state.db_rw)
+        .await?;
+        if let Some((cl, auth)) = &try_cl {
+            match cl.fetch_manifest_digest(image, auth).await {
+                Ok(d) => {
+                    if Some(&d) != local_digest.as_ref() {
+                        digests.push(d);
                     }
                 }
-                if let Some(local_digest) = local_digest {
-                    digests.push(Digest::try_from_raw(&local_digest)?);
-                }
-                digests
+                Err(e) => tracing::warn!("Failed to fetch remote tag digest: {e}"),
             }
-        };
+        }
+        if let Some(local_digest) = local_digest {
+            digests.push(local_digest);
+        }
+        digests
+    } else {
+        return Err(DownloadRemoteImageError::InvalidDigest(
+            DigestError::InvalidDigest(String::new()),
+        ));
+    };
 
-        for mani_digest in digests.into_iter() {
-            let mani_digest_str = mani_digest.as_str();
-            // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_assoc entries
-            let has_manifest = sqlx::query_scalar!(
-                r#"SELECT EXISTS(
+    for mani_digest in digests.into_iter() {
+        // In order to just support querying the manifest digest we need logic to create the necessary repo_blob_assoc entries
+        let has_manifest = sqlx::query_scalar!(
+            r#"SELECT EXISTS(
                     SELECT 1 FROM repo_blob_assoc WHERE manifest_digest = $1 AND repo_name = $2
                 )"#,
-                mani_digest_str,
-                repo_name
-            )
-            .fetch_one(&state.db_rw)
-            .await?;
-            if has_manifest == 1 {
-                return Ok(mani_digest.to_string());
-            }
-            if let Some((cl, auth)) = &try_cl {
-                let ref_to_dl = image_ref.clone_with_digest(mani_digest.to_string());
+            mani_digest,
+            repo_name
+        )
+        .fetch_one(&state.db_rw)
+        .await?;
+        if has_manifest == 1 {
+            return Ok(mani_digest.to_string());
+        }
+        if let Some((cl, auth)) = &try_cl {
+            let ref_to_dl = image.clone_with_digest(mani_digest.to_string());
 
-                let manifest_download =
-                    download_manifest_and_layers(cl, auth, state, &ref_to_dl, &repo_name).await;
+            let manifest_download =
+                download_manifest_and_layers(cl, auth, state, &ref_to_dl, &repo_name).await;
 
-                match manifest_download {
-                    Err(e) => tracing::warn!("Failed to download proxied image: {}", e),
-                    Ok(()) => {
-                        if let Some(tag) = image_ref.tag() {
-                            sqlx::query!(
-                                r#"INSERT INTO tag (repo, tag, manifest_digest)
+            match manifest_download {
+                Err(e) => tracing::warn!("Failed to download proxied image: {}", e),
+                Ok(()) => {
+                    if let Some(tag) = image.tag() {
+                        sqlx::query!(
+                            r#"INSERT INTO tag (repo, tag, manifest_digest)
                                 VALUES ($1, $2, $3)
                                 ON CONFLICT (repo, tag) DO UPDATE SET manifest_digest = $3"#,
-                                repo_name,
-                                tag,
-                                mani_digest_str
-                            )
-                            .execute(&state.db_rw)
-                            .await?;
-                        }
-                        return Ok(mani_digest.to_string());
+                            repo_name,
+                            tag,
+                            mani_digest
+                        )
+                        .execute(&state.db_rw)
+                        .await?;
                     }
+                    return Ok(mani_digest.to_string());
                 }
             }
         }
-
-        Err(DownloadRemoteImageError::DownloadAttemptsFailed)
     }
+
+    Err(DownloadRemoteImageError::DownloadAttemptsFailed)
 }
 
 async fn get_oci_client(
@@ -173,7 +172,6 @@ async fn download_manifest_and_layers(
         if !already_has_blob {
             let stream = cl.pull_blob_stream(ref_, layer_digest).await?;
             let path = state
-                .registry
                 .storage
                 .write_blob_stream(layer_digest, stream, true)
                 .await?;

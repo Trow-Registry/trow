@@ -6,12 +6,13 @@ use axum::routing::get;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::TrowServerState;
-use crate::registry::manifest::ManifestReference;
-use crate::registry::{BlobReader, Digest};
+use crate::registry::BlobReader;
 use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
+use crate::utils::digest::Digest;
+use crate::utils::resolve_reference::parse_reference;
 
 /*
 ---
@@ -31,16 +32,11 @@ async fn get_blob(
     Query(query): Query<ImageNamespace>,
 ) -> Result<BlobReader<impl tokio::io::AsyncRead>, Error> {
     let digest_str = digest.as_str();
-    if let Some(image) = state
-        .registry
-        .config
-        .registry_proxies
-        .get_proxied_image(&repo, &ManifestReference::Digest(digest.clone()), query.ns)
-        .await
-    {
-        repo = format!("f/{}/{}", image.get_host(), image.get_repo())
-    }
+    let blob = parse_reference(&repo, digest_str, query.ns.as_deref())?;
 
+    if blob.registry() != "localhost" {
+        repo = format!("f/{}/{}", blob.registry(), blob.repository())
+    }
     let rowid = sqlx::query_scalar!(
         r#"
         SELECT b.rowid as "rowid!" FROM blob b
@@ -59,12 +55,7 @@ async fn get_blob(
     .execute(&state.db_rw)
     .await?;
 
-    let stream = match state
-        .registry
-        .storage
-        .get_blob_stream(&repo, digest.as_str())
-        .await
-    {
+    let stream = match state.storage.get_blob_stream(&repo, digest.as_str()).await {
         Ok(stream) => stream,
         Err(_) => return Err(Error::Internal),
     };

@@ -12,6 +12,6 @@ use crate::registry::api_types::ReadyStatus;
 pub async fn readiness(State(state): State<Arc<TrowServerState>>) -> ReadyStatus {
     ReadyStatus {
         message: "".to_string(),
-        is_ready: state.registry.is_ready().await,
+        is_ready: state.storage.is_ready().await.is_ok(),
     }
 }
