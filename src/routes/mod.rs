@@ -25,14 +25,14 @@ use axum::http::{HeaderName, StatusCode, header};
 use axum::response::Response;
 use axum::routing::get;
 use hyper::http::HeaderValue;
-use response::errors::Error;
-use response::html::Html;
-use response::trow_token::{self, TrowToken, ValidBasicToken};
 use tower::ServiceBuilder;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::{cors, trace};
 
 use crate::TrowServerState;
+pub use crate::routes::response::errors::Error;
+use crate::routes::response::html::Html;
+use crate::routes::response::trow_token::{self, TrowToken, ValidBasicToken};
 
 fn add_router_layers<S: Send + Sync + Clone + 'static>(
     mut app: Router<S>,

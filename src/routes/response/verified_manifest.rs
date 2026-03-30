@@ -29,8 +29,8 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::registry::Digest;
     use crate::types::VerifiedManifest;
+    use crate::utils::digest::Digest;
 
     #[test]
     fn accepted_ok() {

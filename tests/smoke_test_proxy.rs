@@ -15,26 +15,28 @@ mod proxy_registry {
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
     use trow::TrowServerState;
-    use trow::registry::{RegistryProxiesConfig, SingleRegistryProxyConfig, manifest};
+    use trow::configuration::{RegistryProxiesConfig, SingleRegistryProxyConfig};
+    use trow::utils::manifest;
 
     use crate::common;
     use crate::common::trow_router;
 
     async fn start_trow(data_dir: &Path) -> (Arc<TrowServerState>, Router) {
-        let config_file = trow::registry::ConfigFile {
+        let config_file = trow::configuration::ConfigFile {
             registry_proxies: RegistryProxiesConfig {
                 offline: false,
                 registries: vec![SingleRegistryProxyConfig {
                     host: "nvcr.io".to_string(),
                     ..Default::default()
-                }],
+                }]
+                .into(),
                 ..Default::default()
             },
             ..Default::default()
         };
 
         trow_router(data_dir, |cfg| {
-            cfg.config_file = Some(config_file);
+            cfg.config_file = config_file;
         })
         .await
     }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::registry::StorageBackendError;
-use crate::registry::digest::DigestError;
+use crate::utils::digest::DigestError;
 
 #[derive(Debug)]
 pub enum Error {

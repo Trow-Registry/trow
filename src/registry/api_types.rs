@@ -18,11 +18,6 @@ pub struct ReadyStatus {
     pub message: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct MetricsResponse {
-    pub metrics: String,
-}
-
 // These types are largely stripped down versions of the Kubernetes types.
 // In future, we could directly use k8s types, but I'd rather leave that to a higher level.
 

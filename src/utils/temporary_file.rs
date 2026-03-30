@@ -6,7 +6,7 @@ use futures::stream::Stream;
 use tokio::fs::{self, File};
 use tokio::io::{self, AsyncSeekExt, AsyncWriteExt};
 
-use super::Digest;
+use crate::utils::digest::Digest;
 
 /// Designed for downloading files. The [`Drop`] implementation makes sure that
 /// the underlying file is deleted in case of an error.
