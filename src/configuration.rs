@@ -88,3 +88,94 @@ impl From<Vec<SingleRegistryProxyConfig>> for RegistryProxyConfigs {
         RegistryProxyConfigs(vec)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_registry_proxy_configs_path_prefix_selects_correct_credentials() {
+        let config = RegistryProxiesConfig {
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("project-a".to_string()),
+                    username: Some("project-a-token".to_string()),
+                    ..Default::default()
+                },
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("project-b".to_string()),
+                    username: Some("project-b-token".to_string()),
+                    ..Default::default()
+                },
+            ]
+            .into(),
+            ..Default::default()
+        };
+
+        // "project-a/app" matches the project-a prefix
+        let proxy_config = config
+            .registries
+            .get_for("registry.example.com", "project-a/app")
+            .unwrap();
+        assert_eq!(proxy_config.username, Some("project-a-token".to_string()));
+
+        // "project-b/worker" matches the project-b prefix
+        let proxy_config = config
+            .registries
+            .get_for("registry.example.com", "project-b/worker")
+            .unwrap();
+        assert_eq!(proxy_config.username, Some("project-b-token".to_string()));
+
+        // "other/app" matches neither prefix — no credentials
+        let proxy_config = config
+            .registries
+            .get_for("registry.example.com", "other/app");
+        assert_eq!(proxy_config, None);
+    }
+
+    #[test]
+    fn test_registry_proxy_configs_path_prefix_longest_match_wins() {
+        let config = RegistryProxiesConfig {
+            registries: vec![
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    username: Some("default".to_string()),
+                    ..Default::default()
+                },
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("org".to_string()),
+                    username: Some("org-token".to_string()),
+                    ..Default::default()
+                },
+                SingleRegistryProxyConfig {
+                    host: "registry.example.com".to_string(),
+                    path_prefix: Some("org/sub".to_string()),
+                    username: Some("org-sub-token".to_string()),
+                    ..Default::default()
+                },
+            ]
+            .into(),
+            ..Default::default()
+        };
+        // "org/sub/app" matches both, but "org/sub" is longer
+        let proxy = config
+            .registries
+            .get_for("registry.example.com", "org/sub/app");
+        assert_eq!(proxy.unwrap().username, Some("org-sub-token".to_string()));
+
+        // "org/other" matches only "org"
+        let proxy = config
+            .registries
+            .get_for("registry.example.com", "org/other");
+        assert_eq!(proxy.unwrap().username, Some("org-token".to_string()));
+
+        // no path_prefix match
+        let proxy = config
+            .registries
+            .get_for("registry.example.com", "outta-this-world");
+        assert_eq!(proxy.unwrap().username, Some("default".to_string()));
+    }
+}
