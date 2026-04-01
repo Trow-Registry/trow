@@ -1,26 +1,18 @@
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
-use serde::{Deserialize, Serialize};
+use oci_client::Reference;
 
-use super::TrowServer;
-use crate::registry::proxy::RemoteImage;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ImageValidationConfig {
-    pub default: String,
-    pub allow: Vec<String>,
-    pub deny: Vec<String>,
-}
+use crate::configuration::ImageValidationConfig;
 
 fn check_image_is_allowed(
     raw_image_ref: &str,
     config: &ImageValidationConfig,
 ) -> (bool, &'static str) {
-    let image = match RemoteImage::try_from_str(raw_image_ref) {
+    let image = match Reference::try_from(raw_image_ref) {
         Ok(image) => image,
         Err(_) => return (false, "Invalid image reference"),
     };
-    let image_ref = image.get_ref();
+    let image_ref = image.whole();
     let mut is_allowed = match config.default.as_str() {
         "Allow" => true,
         "Deny" => false,
@@ -79,40 +71,40 @@ fn extract_images(pod: &Pod) -> (Vec<String>, Vec<jsonptr::PointerBuf>) {
     (images, paths)
 }
 
-// AdmissionController
-impl TrowServer {
-    pub async fn validate_admission(&self, ar: &AdmissionRequest<Pod>) -> AdmissionResponse {
-        let resp = AdmissionResponse::from(ar);
+pub async fn validate_admission(
+    image_validation: &Option<ImageValidationConfig>,
+    ar: &AdmissionRequest<Pod>,
+) -> AdmissionResponse {
+    let resp = AdmissionResponse::from(ar);
 
-        if self.config.image_validation.is_none() {
-            return resp.deny("Image validation not configured");
-        }
-        let pod = match &ar.object {
-            Some(pod) => pod,
-            None => return resp.deny("No pod in pod admission request"),
-        };
-        let (images, _) = extract_images(pod);
+    if image_validation.is_none() {
+        return resp.deny("Image validation not configured");
+    }
+    let pod = match &ar.object {
+        Some(pod) => pod,
+        None => return resp.deny("No pod in pod admission request"),
+    };
+    let (images, _) = extract_images(pod);
 
-        let mut valid = true;
-        let mut reasons = Vec::new();
+    let mut valid = true;
+    let mut reasons = Vec::new();
 
-        for image_raw in images {
-            let (v, r) =
-                check_image_is_allowed(&image_raw, self.config.image_validation.as_ref().unwrap());
-            if !v {
-                valid = false;
-                reasons.push(format!("{image_raw}: {r}"));
-                break;
-            }
-        }
-
-        if valid {
-            resp
-        } else {
-            resp.deny(reasons.join("; "))
+    for image_raw in images {
+        let (v, r) = check_image_is_allowed(&image_raw, image_validation.as_ref().unwrap());
+        if !v {
+            valid = false;
+            reasons.push(format!("{image_raw}: {r}"));
+            break;
         }
     }
+
+    if valid {
+        resp
+    } else {
+        resp.deny(reasons.join("; "))
+    }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;

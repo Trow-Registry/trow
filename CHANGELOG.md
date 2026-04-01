@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.4 (2026-03-04)
+
+* update dependencies
+* allow empty object as RegistryProxiesConfig
+* fix multi-arch builds (locally and in CI)
+
 ## v0.9.3 (2025-12-02)
 
 * fix content-type header for GET manifest when manifest has no mediaType (#465)

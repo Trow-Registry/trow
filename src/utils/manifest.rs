@@ -7,7 +7,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::registry::RegistryError;
-use crate::registry::digest::{Digest, DigestError};
+use crate::utils::digest::{Digest, DigestError};
 
 lazy_static! {
     pub static ref REGEX_TAG: Regex = Regex::new("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$").unwrap();

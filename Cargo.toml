@@ -1,11 +1,8 @@
 [package]
 name = "trow"
-version = "0.9.3"
+version = "0.9.4"
 authors = []
 edition = "2024"
-
-[features]
-sqlite = []
 
 [dependencies]
 futures = "0.3"
@@ -33,7 +30,7 @@ bytes = "1"
 chrono = { version = "^0.4", features = ["serde"] }
 lazy_static = "1.4.0"
 regex = "1.5.0"
-sha2 = "0.10.0"
+sha2 = "0.11.0"
 hex = "0.4.0"
 thiserror = "2.0"
 kube = { version = "3.0.1", features = ["admission"] }

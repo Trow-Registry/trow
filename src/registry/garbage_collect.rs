@@ -22,11 +22,8 @@ pub async fn watchdog(state: Arc<TrowServerState>) {
     loop {
         interval.tick().await;
 
-        let space_to_reclaim = if let Some(Some(limit)) = state
-            .config
-            .config_file
-            .as_ref()
-            .map(|f| f.registry_proxies.max_size)
+        let space_to_reclaim = if let Some(limit) =
+            state.config.config_file.registry_proxies.max_size
         {
             let blobs_size = sqlx::query_scalar!(r#"SELECT SUM(b.size) as "size!" FROM blob b"#)
                 .fetch_one(&state.db_ro)
@@ -96,7 +93,7 @@ pub async fn delete_stale_uploads(state: &TrowServerState) -> Result<usize, GcEr
         sqlx::query!("DELETE FROM blob_upload WHERE uuid = $1", upload.uuid)
             .execute(&state.db_rw)
             .await?;
-        state.registry.storage.delete_upload(&upload.uuid).await?;
+        state.storage.delete_upload(&upload.uuid).await?;
         bytes_reclaimed += upload.offset as usize;
     }
 
@@ -131,7 +128,7 @@ async fn delete_orphan_blobs(state: &TrowServerState) -> Result<usize, GcError> 
         sqlx::query!(r#"DELETE FROM blob WHERE digest = $1"#, blob.digest)
             .execute(&state.db_rw)
             .await?;
-        state.registry.storage.delete_blob(&blob.digest).await?;
+        state.storage.delete_blob(&blob.digest).await?;
         bytes_reclaimed += blob.size as usize;
     }
     if bytes_reclaimed > 0 {
@@ -192,11 +189,7 @@ async fn delete_old_proxied_images(
         sqlx::query!(r"DELETE FROM blob WHERE digest = $1", blob_to_delete.digest)
             .execute(&state.db_rw)
             .await?;
-        state
-            .registry
-            .storage
-            .delete_blob(&blob_to_delete.digest)
-            .await?;
+        state.storage.delete_blob(&blob_to_delete.digest).await?;
         bytes_reclaimed += blob_to_delete.size as usize;
     }
     if bytes_reclaimed > 0 {

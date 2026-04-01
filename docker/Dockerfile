@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Cross compiling from host platform instead of using qemu
-FROM --platform=$BUILDPLATFORM docker.io/rust:bullseye AS cross
+FROM --platform=$BUILDPLATFORM docker.io/library/rust:1.94-trixie AS cross
 
 ARG TARGETARCH
 WORKDIR /usr/src/trow
@@ -18,22 +18,23 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean &&\
     apt-get update &&\
-    apt-get install -y unzip openssl cmake clang $(cat /.compiler)
+    apt-get install -y unzip openssl $(cat /.compiler)
 
+# --- build ---
+COPY Cargo.toml Cargo.lock ./
+# Trick cargo into building dependencies only
+RUN --mount=type=cache,target=./target,id=trow-build-$TARGETARCH \
+    mkdir src && echo "fn main() {}" > src/main.rs &&\
+    cargo build --release --target $(cat /.platform)
 COPY . .
-
-# Replace project-level cargo config: strip mold linker (not in container),
-# keep cross-compiler settings needed for multi-arch builds
-RUN printf '[target.armv7-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"\n\n[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\n' > .cargo/config.toml
-
-# Get rid of the "cp" when cargo build --out is stable
-RUN --mount=type=cache,target=./target \
+# TODO: Get rid of the "cp" when cargo build --out is stable
+RUN --mount=type=cache,target=./target,id=trow-build-$TARGETARCH \
     cargo build --release --target $(cat /.platform) &&\
     cp /usr/src/trow/target/$(cat /.platform)/release/trow /usr/src/trow/
 
 
 
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 
 LABEL org.opencontainers.image.source="https://github.com/trow-registry/trow" \
   org.opencontainers.image.description="Caching Container Registry and Image Management for Kubernetes Clusters" \

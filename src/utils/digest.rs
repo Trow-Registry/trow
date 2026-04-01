@@ -122,7 +122,7 @@ impl Digest {
 #[cfg(test)]
 mod test {
 
-    use crate::registry::digest::Digest;
+    use crate::utils::digest::Digest;
 
     #[test]
     fn sha256_digest_test() {

@@ -1,11 +1,11 @@
+pub mod configuration;
 mod init_db;
 pub mod registry;
 pub mod routes;
 #[cfg(test)]
 pub mod test_utilities;
 pub mod types;
-#[cfg(feature = "sqlite")]
-mod users;
+pub mod utils;
 
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -13,12 +13,13 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use axum::Router;
-use registry::{StorageBackendError, TrowServer};
+use registry::StorageBackendError;
 use sqlx::sqlite::SqlitePool;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::registry::ConfigFile;
+use crate::configuration::ConfigFile;
+use crate::registry::storage::TrowStorageBackend;
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -33,7 +34,7 @@ pub struct NetAddr {
 
 #[derive(Debug)]
 pub struct TrowServerState {
-    pub registry: TrowServer,
+    pub storage: TrowStorageBackend,
     pub config: TrowConfig,
     pub db_ro: SqlitePool,
     pub db_rw: SqlitePool,
@@ -64,7 +65,7 @@ struct UserConfig {
 pub struct TrowConfig {
     pub data_dir: PathBuf,
     pub service_name: String,
-    pub config_file: Option<ConfigFile>,
+    pub config_file: ConfigFile,
     pub dry_run: bool,
     pub token_secret: Vec<u8>,
     user: Option<UserConfig>,
@@ -97,7 +98,7 @@ impl TrowConfig {
         Self {
             data_dir: PathBuf::from_str("./data").unwrap(),
             service_name: "http://trow".to_string(),
-            config_file: None,
+            config_file: ConfigFile::default(),
             dry_run: false,
             token_secret: Uuid::new_v4().as_bytes().to_vec(),
             user: None,
@@ -114,7 +115,7 @@ impl TrowConfig {
         let config_file = config_file.as_ref();
         let config_str = fs::read_to_string(config_file)?;
         let config = serde_yaml_ng::from_str::<ConfigFile>(&config_str)?;
-        self.config_file = Some(config);
+        self.config_file = config;
         Ok(self)
     }
 
@@ -135,17 +136,13 @@ impl TrowConfig {
     pub async fn build_server_state(self) -> Result<Arc<TrowServerState>, TrowConfigError> {
         println!("Starting Trow {}", env!("CARGO_PKG_VERSION"),);
         println!("Hostname of this registry: {:?}", self.service_name);
-        match &self.config_file {
-            Some(ConfigFile {
-                image_validation: Some(cfg),
-                ..
-            }) => {
-                println!("Image validation webhook configured:");
-                println!("  Default action: {}", cfg.default);
-                println!("  Allowed prefixes: {:?}", cfg.allow);
-                println!("  Denied prefixes: {:?}", cfg.deny);
-            }
-            _ => println!("Image validation webhook not configured"),
+        if let Some(cfg) = self.config_file.image_validation.as_ref() {
+            println!("Image validation webhook configured:");
+            println!("  Default action: {}", cfg.default);
+            println!("  Allowed prefixes: {:?}", cfg.allow);
+            println!("  Denied prefixes: {:?}", cfg.deny);
+        } else {
+            println!("Image validation webhook not configured");
         }
 
         if self.cors.is_some() {
@@ -157,8 +154,6 @@ impl TrowConfig {
             std::process::exit(0);
         }
 
-        let registry = TrowServer::new(self.data_dir.clone(), self.config_file.clone())?;
-
         let db_file = match &self.db_connection {
             Some(conn) => conn.clone(),
             _ => {
@@ -169,9 +164,11 @@ impl TrowConfig {
         };
         let (db_ro, db_rw) = init_db::init_db(&db_file).await?;
 
+        let storage = TrowStorageBackend::new(self.data_dir.clone())?;
+
         let server_state = Arc::new(TrowServerState {
             config: self,
-            registry,
+            storage,
             db_ro,
             db_rw,
         });

@@ -3,7 +3,7 @@ use std::ops::Deref;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncRead;
 
-use crate::registry::Digest;
+use crate::utils::digest::Digest;
 
 // TODO: Kill this file. Move types and methods to where they're used.
 
