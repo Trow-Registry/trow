@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: j178/prek-action@v1
+      - uses: j178/prek-action@v2
 
   tests:
     runs-on: ubuntu-latest
@@ -65,9 +65,9 @@ jobs:
           cargo build
           mv target/debug/trow trow
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Build and export container image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./docker/Dockerfile.debug
@@ -103,7 +103,7 @@ jobs:
       - name: Test connectivity
         run: curl "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
       - name: Run OCI Distribution Spec conformance tests
-        uses: opencontainers/distribution-spec@aa0c00b0645d5212ed4ba7627b36d5e05b93e237
+        uses: opencontainers/distribution-spec@5e57cc0a07ea002e507a65d4757e823f133fcb52
         env:
           OCI_ROOT_URL: "http://${{ steps.start-container-image.outputs.container-ip }}:8000"
           OCI_NAMESPACE: oci-conformance/distribution-test
@@ -133,7 +133,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create kind cluster
