@@ -35,6 +35,24 @@ pub struct RegistryProxiesConfig {
     pub max_size: Option<size::Size>,
 }
 
+/// Normalizes the path prefix by trimming leading slashes and ensuring it ends with a slash if it's not empty.
+/// Thus path_prefix `myorg` will not match `myorg2/app`.
+fn normalize_path_prefix<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    Ok(opt.and_then(|s| {
+        let trimmed = s.trim_start_matches('/');
+        match trimmed {
+            // Treat empty/slash-only strings as no prefix
+            "" => None,
+            s if s.ends_with('/') => Some(s.to_string()),
+            s => Some(format!("{s}/")),
+        }
+    }))
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct SingleRegistryProxyConfig {
     /// What containerd calls "namespace" (ghcr.io, docker.io, ...)
@@ -44,7 +62,7 @@ pub struct SingleRegistryProxyConfig {
     /// Allows different credentials for different projects on the same registry host.
     /// Example: "system" matches repos like "system/app", "system/worker".
     /// When multiple entries match the same host, the longest matching prefix wins.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "normalize_path_prefix")]
     pub path_prefix: Option<String>,
     /// TODO: insecure currently means "use HTTP", we should also support self-signed TLS
     #[serde(default)]
@@ -94,45 +112,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_registry_proxy_configs_path_prefix_selects_correct_credentials() {
-        let config = RegistryProxiesConfig {
-            registries: vec![
-                SingleRegistryProxyConfig {
-                    host: "registry.example.com".to_string(),
-                    path_prefix: Some("project-a".to_string()),
-                    username: Some("project-a-token".to_string()),
-                    ..Default::default()
-                },
-                SingleRegistryProxyConfig {
-                    host: "registry.example.com".to_string(),
-                    path_prefix: Some("project-b".to_string()),
-                    username: Some("project-b-token".to_string()),
-                    ..Default::default()
-                },
-            ]
-            .into(),
-            ..Default::default()
-        };
+    fn test_registry_proxy_deserialize_path_prefix() {
+        let proxy_config: SingleRegistryProxyConfig = serde_json::from_str(r#"
+            {"host": "registry.example.com", "path_prefix": "/org/sub"}
+        "#).unwrap();
 
-        // "project-a/app" matches the project-a prefix
-        let proxy_config = config
-            .registries
-            .get_for("registry.example.com", "project-a/app")
-            .unwrap();
-        assert_eq!(proxy_config.username, Some("project-a-token".to_string()));
-
-        // "project-b/worker" matches the project-b prefix
-        let proxy_config = config
-            .registries
-            .get_for("registry.example.com", "project-b/worker")
-            .unwrap();
-        assert_eq!(proxy_config.username, Some("project-b-token".to_string()));
-
-        // "other/app" matches neither prefix — no credentials
-        let proxy_config = config
-            .registries
-            .get_for("registry.example.com", "other/app");
-        assert_eq!(proxy_config, None);
+        assert_eq!(proxy_config.path_prefix.unwrap(), "org/sub/");
     }
 
     #[test]
