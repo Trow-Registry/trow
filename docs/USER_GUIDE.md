@@ -98,9 +98,6 @@ an image like `registry.example.com/project-a/app` will match the `project-a` en
 If no prefix matches, a host-only entry (without `path_prefix`) is used as a fallback.
 If neither matches, the image is proxied without authentication.
 
-This is fully backward compatible — existing configurations without `path_prefix`
-continue to work unchanged.
-
 ### Configuring containerd
 
 See [the containerd docs](https://github.com/containerd/containerd/blob/main/docs/hosts.md#setup-default-mirror-for-all-registries).
