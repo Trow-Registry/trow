@@ -35,22 +35,14 @@ pub struct RegistryProxiesConfig {
     pub max_size: Option<size::Size>,
 }
 
-/// Normalizes the path prefix by trimming leading slashes and ensuring it ends with a slash if it's not empty.
-/// Thus path_prefix `myorg` will not match `myorg2/app`.
 fn normalize_path_prefix<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let opt = Option::<String>::deserialize(deserializer)?;
-    Ok(opt.and_then(|s| {
-        let trimmed = s.trim_start_matches('/');
-        match trimmed {
-            // Treat empty/slash-only strings as no prefix
-            "" => None,
-            s if s.ends_with('/') => Some(s.to_string()),
-            s => Some(format!("{s}/")),
-        }
-    }))
+    Ok(opt
+        .map(|s| s.trim_matches('/').to_string())
+        .filter(|s| !s.is_empty()))
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -88,12 +80,20 @@ impl RegistryProxyConfigs {
         repo: &str,
     ) -> Option<&'a SingleRegistryProxyConfig> {
         let matches = self.0.iter().filter_map(|proxy| {
-            let proxy_prefix = proxy.path_prefix.as_deref().unwrap_or("");
-            if proxy.host == registry && repo.starts_with(proxy_prefix) {
-                Some((proxy_prefix.len(), proxy))
-            } else {
-                None
+            if proxy.host == registry {
+                if let Some(proxy_prefix) = proxy.path_prefix.as_deref() {
+                    // for prefix "org" match org/toto, not org_b/toto
+                    if repo == proxy_prefix
+                        || (repo.starts_with(proxy_prefix)
+                            && repo.as_bytes().get(proxy_prefix.len()) == Some(&b'/'))
+                    {
+                        return Some((proxy_prefix.len(), proxy));
+                    }
+                } else {
+                    return Some((0, proxy));
+                }
             }
+            None
         });
         matches
             .max_by_key(|(prefix_len, _)| *prefix_len)
@@ -113,11 +113,15 @@ mod tests {
 
     #[test]
     fn test_registry_proxy_deserialize_path_prefix() {
-        let proxy_config: SingleRegistryProxyConfig = serde_json::from_str(r#"
-            {"host": "registry.example.com", "path_prefix": "/org/sub"}
-        "#).unwrap();
+        let proxy_config: SingleRegistryProxyConfig =
+            serde_json::from_str(r#"{"host": "registry.example.com", "path_prefix": "/org/sub/"}"#)
+                .unwrap();
+        assert_eq!(proxy_config.path_prefix.unwrap(), "org/sub");
 
-        assert_eq!(proxy_config.path_prefix.unwrap(), "org/sub/");
+        let proxy_config: SingleRegistryProxyConfig =
+            serde_json::from_str(r#"{"host": "registry.example.com", "path_prefix": "/"}"#)
+                .unwrap();
+        assert_eq!(proxy_config.path_prefix, None);
     }
 
     #[test]
@@ -161,6 +165,12 @@ mod tests {
         let proxy = config
             .registries
             .get_for("registry.example.com", "outta-this-world");
+        assert_eq!(proxy.unwrap().username, Some("default".to_string()));
+
+        // doesn't match path prefix across '/' boundary
+        let proxy = config
+            .registries
+            .get_for("registry.example.com", "org_b/app");
         assert_eq!(proxy.unwrap().username, Some("default".to_string()));
     }
 }
