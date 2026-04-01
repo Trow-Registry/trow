@@ -65,6 +65,39 @@ Trow will keep a cached copy and check for new versions on each pull. The check 
 request which does not count towards the dockerhub rate limits. If the image cannot be pulled a cached
 version will be returned, if available. This can be used to effectively mitigate availability issues with registries.
 
+### Scoped credentials with `path_prefix`
+
+Some container registries (e.g. GitLab) issue scoped deploy tokens that only grant
+access to a single project. When proxying multiple projects from the same registry
+host, each project needs its own credentials. The `path_prefix` field allows you to
+configure different credentials for different repository paths on the same host:
+
+```yaml
+registry_proxies:
+  registries:
+    # Scoped token for project-a
+    - host: registry.example.com
+      path_prefix: project-a
+      username: project-a-deploy-token
+      password: glpat-aaa
+
+    # Scoped token for project-b
+    - host: registry.example.com
+      path_prefix: project-b
+      username: project-b-deploy-token
+      password: glpat-bbb
+
+    # Fallback for any other repo on this host (optional)
+    - host: registry.example.com
+      username: default-token
+      password: glpat-ccc
+```
+
+When Trow resolves credentials for a proxied image, it uses **longest-prefix matching**:
+an image like `registry.example.com/project-a/app` will match the `project-a` entry.
+If no prefix matches, a host-only entry (without `path_prefix`) is used as a fallback.
+If neither matches, the image is proxied without authentication.
+
 ### Configuring containerd
 
 See [the containerd docs](https://github.com/containerd/containerd/blob/main/docs/hosts.md#setup-default-mirror-for-all-registries).

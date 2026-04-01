@@ -54,7 +54,7 @@ async fn get_manifest(
             .config_file
             .registry_proxies
             .registries
-            .get_for(image.registry());
+            .get_for(image.registry(), image.repository());
         download_image(&image, proxy_config, &state).await?
     } else {
         let digest = if let Some(tag) = image.tag() {
