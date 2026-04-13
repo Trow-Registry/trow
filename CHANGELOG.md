@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.0 (2026-04-13)
+
+* feat: support `path_prefix` for scoped proxy credentials (#478) — enables per-project credentials on registries like GitLab that issue scoped deploy tokens
+* fix: return HTTP 404 instead of 500 for missing upstream layers (#482)
+* code cleanup: module restructuring, remove custom types, remove `registry::server` (#483)
+
 ## v0.9.4 (2026-03-04)
 
 * update dependencies
