@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.0 (2026-04-13)
+
+* Trow v0.10.0
+* path prefix proxy credentials (#478)
+* Allow users to add additional env vars into the trow pod (#473)
+
 ## v0.12.3 (2025-12-02)
 
 * Trow v0.9.3
