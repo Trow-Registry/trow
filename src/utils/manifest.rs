@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
@@ -6,8 +5,7 @@ use oci_spec::image::{Descriptor, ImageIndex, ImageManifest, MediaType};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::registry::RegistryError;
-use crate::utils::digest::{Digest, DigestError};
+use crate::utils::digest::DigestError;
 
 lazy_static! {
     pub static ref REGEX_TAG: Regex = Regex::new("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$").unwrap();
@@ -19,59 +17,6 @@ pub enum ManifestError {
     DeserializeError(#[from] serde_json::Error),
     #[error("Manifest contains invalid digest: {0}")]
     InvalidDigest(#[from] DigestError),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ManifestReference {
-    Tag(String),
-    Digest(Digest),
-}
-
-impl std::fmt::Display for ManifestReference {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Self::Tag(t) => Cow::Borrowed(t),
-            Self::Digest(d) => Cow::Owned(d.to_string()),
-        };
-        write!(f, "{s}")
-    }
-}
-
-impl TryFrom<&str> for ManifestReference {
-    type Error = RegistryError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::try_from_str(value)
-    }
-}
-
-impl ManifestReference {
-    pub fn try_from_str(reference: &str) -> Result<Self, RegistryError> {
-        if reference.contains(':') {
-            match Digest::try_from_raw(reference) {
-                Ok(d) => Ok(Self::Digest(d)),
-                Err(_) => Err(RegistryError::InvalidDigest),
-            }
-        } else if REGEX_TAG.is_match(reference) {
-            Ok(Self::Tag(reference.to_string()))
-        } else {
-            Err(RegistryError::InvalidName(String::new()))
-        }
-    }
-
-    pub fn tag(&self) -> Option<&str> {
-        match self {
-            Self::Tag(t) => Some(t),
-            Self::Digest(_) => None,
-        }
-    }
-
-    pub fn digest(&self) -> Option<&Digest> {
-        match self {
-            Self::Tag(_) => None,
-            Self::Digest(d) => Some(d),
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

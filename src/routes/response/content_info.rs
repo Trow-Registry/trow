@@ -2,8 +2,13 @@ use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 
-use crate::registry::api_types::ContentInfo;
 use crate::routes::response::errors::Error;
+
+pub struct ContentInfo {
+    #[allow(dead_code)]
+    pub length: u64,
+    pub range: (u64, u64),
+}
 
 /**
  * ContentInfo should always be wrapped an Option in routes to avoid failure returns.

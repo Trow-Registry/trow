@@ -1,3 +1,9 @@
+//! FileStorage layer: filesystem operations for blob and upload storage.
+//!
+//! This module handles all filesystem I/O for container image blobs and
+//! in-progress uploads. Services interact with this layer through
+//! `FileStorage` methods.
+
 use std::borrow::Cow;
 use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
@@ -9,8 +15,12 @@ use tokio::fs;
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::time::Duration;
 
-use crate::registry::api_types::Stored;
 use crate::types::BoundedStream;
+
+pub struct Stored {
+    pub total_stored: u64,
+    pub chunk: u64,
+}
 use crate::utils::temporary_file::FileWrapper;
 
 // Storage Driver Error
@@ -33,12 +43,12 @@ pub enum StorageBackendError {
 }
 
 #[derive(Clone, Debug)]
-pub struct TrowStorageBackend {
+pub struct FileStorage {
     blobs_dir: PathBuf,
     uploads_dir: PathBuf,
 }
 
-impl TrowStorageBackend {
+impl FileStorage {
     fn init_create_path(root: &Path, dir: &str) -> Result<PathBuf, StorageBackendError> {
         let path = root.join(dir);
         match std::fs::create_dir_all(&path) {
@@ -289,18 +299,18 @@ mod tests {
     }
 
     #[test]
-    fn trow_storage_backend_new() {
+    fn file_storage_new() {
         let dir = test_temp_dir::test_temp_dir!();
-        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
+        let store = FileStorage::new(dir.as_path_untracked().to_owned()).unwrap();
         assert!(store.blobs_dir.exists());
         assert!(store.uploads_dir.exists());
         drop(dir);
     }
 
     #[tokio::test]
-    async fn trow_storage_backend_write_blob_stream() {
+    async fn file_storage_write_blob_stream() {
         let dir = test_temp_dir::test_temp_dir!();
-        let store = TrowStorageBackend::new(dir.as_path_untracked().to_owned()).unwrap();
+        let store = FileStorage::new(dir.as_path_untracked().to_owned()).unwrap();
         let stream = pin!(bytes_to_stream(Bytes::from("test")));
         let digest = "sha256:123456789101112131415161718192021";
         let location = store

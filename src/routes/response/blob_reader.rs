@@ -4,7 +4,7 @@ use axum::response::{IntoResponse, Response};
 use tokio::io::AsyncRead;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use crate::registry::BlobReader;
+use crate::services::blob_service::BlobReader;
 
 impl<S: AsyncRead + Send + 'static> IntoResponse for BlobReader<S> {
     fn into_response(self) -> Response {

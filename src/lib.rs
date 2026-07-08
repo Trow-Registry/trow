@@ -1,7 +1,9 @@
 pub mod configuration;
-mod init_db;
-pub mod registry;
+pub mod file_storage;
+
+pub mod repositories;
 pub mod routes;
+pub mod services;
 #[cfg(test)]
 pub mod test_utilities;
 pub mod types;
@@ -13,13 +15,16 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use axum::Router;
-use registry::StorageBackendError;
-use sqlx::sqlite::SqlitePool;
+use file_storage::StorageBackendError;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::configuration::ConfigFile;
-use crate::registry::storage::TrowStorageBackend;
+use crate::file_storage::FileStorage;
+use crate::repositories::Repositories;
+use crate::services::Services;
+
+pub(crate) static PROXY_DIR: &str = "f/"; //Repositories starting with this are considered proxies
 
 //TODO: Make this take a cause or description
 #[derive(Error, Debug)]
@@ -34,10 +39,8 @@ pub struct NetAddr {
 
 #[derive(Debug)]
 pub struct TrowServerState {
-    pub storage: TrowStorageBackend,
     pub config: TrowConfig,
-    pub db_ro: SqlitePool,
-    pub db_rw: SqlitePool,
+    pub services: Arc<Services>,
 }
 
 #[derive(Clone, Debug)]
@@ -162,15 +165,14 @@ impl TrowConfig {
                 p.to_string_lossy().to_string()
             }
         };
-        let (db_ro, db_rw) = init_db::init_db(&db_file).await?;
-
-        let storage = TrowStorageBackend::new(self.data_dir.clone())?;
+        let storage = Arc::new(FileStorage::new(self.data_dir.clone())?);
+        let repos = Arc::new(Repositories::new(&db_file).await?);
+        let config_arc = Arc::new(self.clone());
+        let services = Arc::new(Services::new(repos, storage, config_arc));
 
         let server_state = Arc::new(TrowServerState {
             config: self,
-            storage,
-            db_ro,
-            db_rw,
+            services,
         });
 
         Ok(server_state)
@@ -178,7 +180,10 @@ impl TrowConfig {
 
     pub async fn build_app(self) -> Result<Router, TrowConfigError> {
         let state = self.build_server_state().await?;
-        tokio::spawn(registry::garbage_collect::watchdog(state.clone()));
+        tokio::spawn({
+            let gc = state.services.gc.clone();
+            async move { gc.watchdog().await }
+        });
         Ok(routes::create_app(state))
     }
 }

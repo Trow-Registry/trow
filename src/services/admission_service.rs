@@ -1,8 +1,26 @@
+use std::sync::Arc;
+
 use k8s_openapi::api::core::v1::Pod;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse};
 use oci_client::Reference;
 
+use crate::TrowConfig;
 use crate::configuration::ImageValidationConfig;
+
+#[derive(Debug)]
+pub struct AdmissionService {
+    config: Arc<TrowConfig>,
+}
+
+impl AdmissionService {
+    pub fn new(config: Arc<TrowConfig>) -> Self {
+        Self { config }
+    }
+
+    pub async fn validate(&self, req: &AdmissionRequest<Pod>) -> AdmissionResponse {
+        validate_admission(&self.config.config_file.image_validation, req)
+    }
+}
 
 fn check_image_is_allowed(
     raw_image_ref: &str,
@@ -71,7 +89,7 @@ fn extract_images(pod: &Pod) -> (Vec<String>, Vec<jsonptr::PointerBuf>) {
     (images, paths)
 }
 
-pub async fn validate_admission(
+fn validate_admission(
     image_validation: &Option<ImageValidationConfig>,
     ar: &AdmissionRequest<Pod>,
 ) -> AdmissionResponse {
@@ -106,42 +124,33 @@ pub async fn validate_admission(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_check() {
+    fn check_image_is_allowed_deny_default() {
         let cfg = ImageValidationConfig {
             default: "Deny".to_string(),
             allow: vec!["localhost:8080/".into(), "quay.io/".into()],
             deny: vec![],
         };
 
-        let (v, _) = check_image_is_allowed("localhost:8080/mydir/myimage:test", &cfg);
-        assert!(v);
+        assert!(check_image_is_allowed("localhost:8080/mydir/myimage:test", &cfg).0);
+        assert!(!check_image_is_allowed("quay.io:8080/mydir/myimage:test", &cfg).0);
+        assert!(check_image_is_allowed("quay.io/mydir/myimage:test", &cfg).0);
+    }
 
-        let (v, _) = check_image_is_allowed("quay.io:8080/mydir/myimage:test", &cfg);
-        assert!(!v);
-
-        let (v, _) = check_image_is_allowed("quay.io/mydir/myimage:test", &cfg);
-        assert!(v);
-
+    #[test]
+    fn check_image_is_allowed_allow_default() {
         let cfg = ImageValidationConfig {
             default: "Allow".to_string(),
             allow: vec![],
             deny: vec!["docker.io".into(), "toto.land".into()],
         };
 
-        let (v, _) = check_image_is_allowed("ubuntu", &cfg);
-        assert!(!v);
-
-        let (v, _) = check_image_is_allowed("toto.land/myimage:test", &cfg);
-        assert!(!v);
-
-        let (v, _) = check_image_is_allowed("quay.io/myimage:test", &cfg);
-        assert!(v);
-
-        let (v, _) = check_image_is_allowed("quay.io/myimage@invalid", &cfg);
-        assert!(!v);
+        assert!(!check_image_is_allowed("ubuntu", &cfg).0);
+        assert!(!check_image_is_allowed("toto.land/myimage:test", &cfg).0);
+        assert!(check_image_is_allowed("quay.io/myimage:test", &cfg).0);
+        assert!(!check_image_is_allowed("quay.io/myimage@invalid", &cfg).0);
     }
 }

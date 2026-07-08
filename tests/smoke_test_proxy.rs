@@ -153,7 +153,7 @@ mod proxy_registry {
         get_manifest(&trow, "f/docker.io/alpine", "3.13.4").await;
 
         let tags = sqlx::query!("SELECT * FROM tag")
-            .fetch_all(&state.db_ro)
+            .fetch_all(state.services.repos().db_ro())
             .await
             .unwrap();
 
@@ -200,7 +200,7 @@ mod proxy_registry {
         // Check that tags get updated to point to latest digest
         let (man_3_13, digest_3_13) = get_manifest(&trow, "f/docker.io/alpine", "3.13.4").await;
         sqlx::query!("INSERT INTO tag (repo, tag, manifest_digest) VALUES ('f/docker.io/library/alpine', 'latest', $1)", digest_3_13)
-            .execute(&state.db_rw)
+            .execute(state.services.repos().db_rw())
             .await
             .expect("Failed to insert tag");
 

@@ -1,85 +1,39 @@
-use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::Router;
 use axum::extract::{Path, State};
 use axum::routing::get;
-use oci_spec::image::{Descriptor, ImageIndex, MediaType};
-use sqlx::types::Json;
+use oci_spec::image::ImageIndex;
 
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::TrowServerState;
-use crate::registry::PROXY_DIR;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::utils::digest::Digest;
-use crate::utils::manifest::OCIManifest;
 
 /*
 ---
 Listing Referrers
 GET /v2/<name>/referrers/<digest>
-
 # Parameters
 name - The namespace of the repository
 digest - The digest of the manifest specified in the subject field.
-
 # Query Parameters
 (TODO) artifactType: The type of artifact to list referrers for.
-
  */
 async fn get_referrers(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, digest)): Path<(String, String)>,
 ) -> Result<OciJson<ImageIndex>, Error> {
-    if repo.starts_with(PROXY_DIR) {
-        return Err(Error::UnsupportedForProxiedRepo);
-    }
-    let _ = Digest::try_from_raw(&digest)?;
-    let referrers = sqlx::query!(
-        r#"
-        SELECT json(m.json) as "content!: Json<OCIManifest>",
-            m.digest,
-            length(m.blob) as "size!: i64"
-        FROM manifest m
-        INNER JOIN repo_blob_assoc rba ON rba.manifest_digest = m.digest
-        WHERE rba.repo_name = $1
-            AND (m.json -> 'subject' ->> 'digest') = $2
-        "#,
-        repo,
-        digest
-    )
-    .fetch_all(&state.db_ro)
-    .await?;
-
-    let mut descriptors = vec![];
-    for row in referrers {
-        let parsed_manifest = row.content.0;
-
-        let mediatype = parsed_manifest
-            .media_type()
-            .clone()
-            .unwrap_or(MediaType::ImageConfig);
-
-        let mut descriptor = Descriptor::new(
-            mediatype,
-            row.size as u64,
-            oci_spec::image::Digest::from_str(&row.digest).unwrap(),
-        );
-        descriptor.set_artifact_type(parsed_manifest.artifact_type());
-        descriptor.set_annotations(parsed_manifest.annotations().clone());
-        descriptors.push(descriptor);
-    }
-
-    let mut response_manifest = ImageIndex::default();
-    response_manifest.set_manifests(descriptors);
-    response_manifest.set_media_type(Some(MediaType::ImageIndex));
-    let content_type = response_manifest.media_type().as_ref().unwrap().as_ref();
-
-    Ok(OciJson::new(&response_manifest).set_content_type(content_type))
+    let index = state
+        .services
+        .referrers
+        .list_referrers(repo, digest)
+        .await?;
+    let content_type = index.media_type().as_ref().unwrap().as_ref();
+    Ok(OciJson::new(&index).set_content_type(content_type))
 }
 
 endpoint_fn_7_levels!(
@@ -110,8 +64,8 @@ mod tests {
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 
-    use super::*;
     use crate::test_utilities;
+    use crate::utils::digest::Digest;
 
     #[tracing_test::traced_test]
     #[tokio::test]
@@ -165,14 +119,14 @@ mod tests {
                 digest,
                 man,
             )
-            .execute(&state.db_rw)
+            .execute(state.services.repos().db_rw())
             .await
             .unwrap();
             sqlx::query!(
                 r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ("test", $1)"#,
                 digest
             )
-            .execute(&state.db_rw)
+            .execute(state.services.repos().db_rw())
             .await
             .unwrap();
         }

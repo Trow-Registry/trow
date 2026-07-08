@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
-use oci_spec::distribution::{RepositoryList, RepositoryListBuilder, TagList, TagListBuilder};
+use oci_spec::distribution::{RepositoryList, TagList};
 use serde_derive::Deserialize;
 
 use super::macros::endpoint_fn_7_levels;
@@ -24,32 +24,12 @@ async fn get_catalog(
     State(state): State<Arc<TrowServerState>>,
     Query(query): Query<CatalogListQuery>,
 ) -> Result<OciJson<RepositoryList>, Error> {
-    let last_name = match &query.last {
-        Some(l) => l,
-        None => "",
-    };
-    let limit = query.n.unwrap_or(i64::MAX as u64) as i64;
-    let repos = sqlx::query!(
-        r#"
-        SELECT DISTINCT rba.repo_name
-        FROM repo_blob_assoc rba
-        WHERE rba.repo_name > $1
-        ORDER BY rba.repo_name ASC
-        LIMIT $2
-        "#,
-        last_name,
-        limit
-    )
-    .fetch_all(&state.db_ro)
-    .await?;
-    let raw_repos = repos.into_iter().map(|r| r.repo_name).collect::<Vec<_>>();
-
-    Ok(OciJson::new(
-        &RepositoryListBuilder::default()
-            .repositories(raw_repos)
-            .build()
-            .unwrap(),
-    ))
+    let result = state
+        .services
+        .catalog
+        .list_repositories(query.last.as_deref(), query.n)
+        .await?;
+    Ok(OciJson::new(&result))
 }
 
 async fn list_tags(
@@ -58,35 +38,12 @@ async fn list_tags(
     Path(repo_name): Path<String>,
     Query(query): Query<CatalogListQuery>,
 ) -> Result<OciJson<TagList>, Error> {
-    let last_tag = match &query.last {
-        Some(l) => l,
-        None => "",
-    };
-    let limit = query.n.unwrap_or(i64::MAX as u64) as i64;
-    let tags = sqlx::query!(
-        r#"
-        SELECT t.tag
-        FROM tag t
-        WHERE t.repo = $1
-            AND t.tag > $2
-        ORDER BY t.tag COLLATE NOCASE ASC
-        LIMIT $3
-        "#,
-        repo_name,
-        last_tag,
-        limit
-    )
-    .fetch_all(&state.db_ro)
-    .await?;
-    let raw_tags = tags.into_iter().map(|t| t.tag).collect::<Vec<_>>();
-
-    Ok(OciJson::new(
-        &TagListBuilder::default()
-            .name(repo_name)
-            .tags(raw_tags)
-            .build()
-            .unwrap(),
-    ))
+    let result = state
+        .services
+        .catalog
+        .list_tags(&repo_name, query.last.as_deref(), query.n)
+        .await?;
+    Ok(OciJson::new(&result))
 }
 endpoint_fn_7_levels!(
     list_tags(

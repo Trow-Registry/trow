@@ -8,21 +8,17 @@ use kube::core::DynamicObject;
 use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 
 use crate::TrowServerState;
-use crate::utils::admission::validate_admission;
 
 async fn validate_image(
     State(state): State<Arc<TrowServerState>>,
     Json(image_data): Json<AdmissionReview<Pod>>,
 ) -> Json<AdmissionReview<DynamicObject>> {
     let req: Result<AdmissionRequest<_>, _> = image_data.try_into();
-
     Json::from(match req {
         Err(e) => {
             AdmissionResponse::invalid(format!("Invalid admission request: {e:#}")).into_review()
         }
-        Ok(req) => validate_admission(&state.config.config_file.image_validation, &req)
-            .await
-            .into_review(),
+        Ok(req) => state.services.admission.validate(&req).await.into_review(),
     })
 }
 
@@ -143,7 +139,6 @@ mod test {
 
         assert_eq!(resp.status(), StatusCode::OK);
         let mut val: serde_json::Value = test_utilities::response_body_json(resp).await;
-        // Fixes "missing field" (which is bollocks)
         val["response"]["auditAnnotations"] =
             serde_json::to_value(HashMap::<String, String>::new()).unwrap();
         let review: AdmissionReview<Pod> = serde_json::from_value(val).unwrap();
