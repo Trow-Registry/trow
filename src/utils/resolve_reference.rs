@@ -1,7 +1,7 @@
 use oci_spec::distribution::Reference;
 
-use crate::registry::PROXY_DIR;
-use crate::routes::Error;
+use crate::PROXY_DIR;
+use crate::services::Error;
 use crate::utils::manifest::REGEX_TAG;
 
 pub fn parse_reference(
@@ -41,8 +41,7 @@ fn resolve_version<'a>(version: &'a str) -> Result<BlobVersion<'a>, Error> {
     } else if REGEX_TAG.is_match(version) {
         Ok(BlobVersion::Tag(version))
     } else {
-        // According to opencontainers/distribution-spec/conformance, 404 must be returned (not 400)
-        Err(Error::BlobUnknown)
+        Err(Error::NotFound)
     }
 }
 

@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT json(m.json) as \"content!: Json<OCIManifest>\",\n                m.digest,\n                length(m.blob) as \"size!: i64\"\n            FROM manifest m\n            INNER JOIN repo_blob_assoc rba ON rba.manifest_digest = m.digest\n            WHERE rba.repo_name = $1\n                AND (m.json -> 'subject' ->> 'digest') = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "content!: Json<OCIManifest>",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "digest",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "size!: i64",
+        "ordinal": 2,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "f53d056f0d6784eccc62730fddd8169cb79bc5c582d070fa182b49fcdc8ceecc"
+}

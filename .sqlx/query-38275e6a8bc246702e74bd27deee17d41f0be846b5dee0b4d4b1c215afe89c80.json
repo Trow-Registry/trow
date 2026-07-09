@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE blob SET last_accessed=unixepoch()\n            WHERE digest = $1\n              AND EXISTS (\n                  SELECT 1 FROM repo_blob_assoc\n                  WHERE blob_digest = $1 AND repo_name = $2\n              )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "38275e6a8bc246702e74bd27deee17d41f0be846b5dee0b4d4b1c215afe89c80"
+}

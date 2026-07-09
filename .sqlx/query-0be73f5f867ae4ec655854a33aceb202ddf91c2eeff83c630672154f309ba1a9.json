@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT digest, size, last_accessed\n            FROM blob b\n            WHERE b.last_accessed < strftime('%s', 'now', '-1 day')\n            AND NOT EXISTS (\n                    SELECT 1\n                    FROM manifest_blob_assoc mba\n                    WHERE mba.blob_digest = b.digest\n                );\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "size",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_accessed",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0be73f5f867ae4ec655854a33aceb202ddf91c2eeff83c630672154f309ba1a9"
+}

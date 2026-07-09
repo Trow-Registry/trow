@@ -5,8 +5,12 @@ use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::Response;
 use serde::de::DeserializeOwned;
+use sqlx::sqlite::{
+    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
+};
 use test_temp_dir::TestTempDir;
 
+use crate::repositories::Repositories;
 use crate::{TrowConfig, TrowServerState, routes};
 
 pub const DIST_API_HEADER: &str = "Docker-Distribution-API-Version";
@@ -24,6 +28,45 @@ pub async fn trow_router<F: FnOnce(&mut TrowConfig)>(
     let state = trow_builder.build_server_state().await.unwrap();
     let router = routes::create_app(state.clone());
     (state, router)
+}
+
+/// Create an `Arc<Repositories>` backed by an in-memory SQLite database.
+/// Runs all migrations. Use for unit tests that need database access without
+/// spinning up a full Trow instance.
+pub async fn repos_in_memory() -> Arc<Repositories> {
+    let options = SqliteConnectOptions::new()
+        .filename(":memory:")
+        .synchronous(SqliteSynchronous::Normal)
+        .journal_mode(SqliteJournalMode::Wal)
+        .foreign_keys(true);
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .unwrap();
+
+    sqlx::migrate!().run(&pool).await.unwrap();
+    Arc::new(Repositories::from_pools(pool.clone(), pool))
+}
+
+/// Create an `Arc<SqlitePool>` backed by an in-memory SQLite database
+/// with migrations applied. Useful when tests need direct pool access.
+pub async fn pool_in_memory() -> SqlitePool {
+    let options = SqliteConnectOptions::new()
+        .filename(":memory:")
+        .synchronous(SqliteSynchronous::Normal)
+        .journal_mode(SqliteJournalMode::Wal)
+        .foreign_keys(true);
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .unwrap();
+
+    sqlx::migrate!().run(&pool).await.unwrap();
+    pool
 }
 
 pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {

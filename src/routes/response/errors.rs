@@ -6,7 +6,7 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::registry::StorageBackendError;
+use crate::file_storage::StorageBackendError;
 use crate::utils::digest::DigestError;
 
 #[derive(Debug)]
@@ -192,17 +192,39 @@ impl From<DigestError> for Error {
     }
 }
 
-impl From<crate::registry::DownloadRemoteImageError> for Error {
-    fn from(err: crate::registry::DownloadRemoteImageError) -> Self {
+impl From<crate::services::proxy_service::errors::DownloadRemoteImageError> for Error {
+    fn from(err: crate::services::proxy_service::errors::DownloadRemoteImageError) -> Self {
         use oci_client::errors::OciDistributionError;
         match &err {
-            crate::registry::DownloadRemoteImageError::OciClientError(
+            crate::services::proxy_service::errors::DownloadRemoteImageError::OciClientError(
                 OciDistributionError::ImageManifestNotFoundError(_),
             ) => Self::ManifestUnknown(err.to_string()),
             _ => {
                 tracing::error!("Error(DownloadRemoteImageError): {err}");
                 Self::Internal
             }
+        }
+    }
+}
+
+impl From<crate::services::Error> for Error {
+    fn from(err: crate::services::Error) -> Self {
+        use crate::services::Error as S;
+        match err {
+            S::NotFound => Error::NotFound,
+            S::Invalid(s) => Error::NameInvalid(s),
+            S::UnsupportedForProxiedRepo => Error::UnsupportedForProxiedRepo,
+            S::ManifestInvalid(s) => Error::ManifestInvalid(s),
+            S::ManifestUnknown(s) => Error::ManifestUnknown(s),
+            S::BlobUploadUnknown => Error::BlobUploadUnknown,
+            S::Db(sqlx::Error::RowNotFound) => Error::NotFound,
+            S::Db(e) => {
+                tracing::error!("Error(DbErr): {e}");
+                Error::Internal
+            }
+            S::Storage(e) => Error::from(e),
+            S::Digest(e) => Error::from(e),
+            S::Proxy(e) => Error::from(*e),
         }
     }
 }

@@ -8,96 +8,20 @@ use axum::routing::{post, put};
 use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
-use crate::TrowServerState;
-use crate::registry::{ContentInfo, PROXY_DIR};
 use crate::routes::macros::route_7_levels;
+use crate::routes::response::content_info::ContentInfo;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
-use crate::utils::digest::Digest;
+use crate::{PROXY_DIR, TrowServerState};
 
-mod utils {
-    use std::ops::RangeInclusive;
-
-    use uuid::Uuid;
-
-    use super::*;
-
-    pub async fn complete_upload(
-        state: Arc<TrowServerState>,
-        upload_id: &str,
-        digest: &Digest,
-        data: Body,
-        range: Option<RangeInclusive<u64>>,
-    ) -> Result<AcceptedUpload, Error> {
-        let upload = sqlx::query!(
-            r#"
-            SELECT * FROM blob_upload
-            WHERE uuid=$1
-            "#,
-            upload_id,
-        )
-        .fetch_one(&state.db_ro)
-        .await?;
-        let upload_id_bin = Uuid::parse_str(upload_id).unwrap();
-
-        let size = state
-            .storage
-            .write_blob_part_stream(&upload_id_bin, data.into_data_stream(), range)
-            .await?;
-
-        state
-            .storage
-            .complete_blob_write(&upload_id_bin, digest.as_str())
-            .await?;
-
-        sqlx::query!(
-            r#"
-            DELETE FROM blob_upload
-            WHERE uuid=$1
-            "#,
-            upload.uuid
-        )
-        .execute(&state.db_rw)
-        .await?;
-
-        let digest_str = digest.as_str();
-        let size_i64 = size.total_stored as i64;
-        sqlx::query!(
-            r#"
-            INSERT INTO blob (digest, size)
-            VALUES ($1, $2) ON CONFLICT (digest) DO NOTHING
-            "#,
-            digest_str,
-            size_i64
-        )
-        .execute(&state.db_rw)
-        .await?;
-
-        sqlx::query!(
-            "INSERT INTO repo_blob_assoc VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING",
-            upload.repo,
-            digest_str,
-        )
-        .execute(&state.db_rw)
-        .await?;
-
-        Ok(AcceptedUpload::new(
-            digest.clone(),
-            upload.repo,
-            upload_id_bin,
-            (0, size.total_stored.saturating_sub(1)), // Note first byte is 0
-        ))
-    }
-}
 /*
 ---
 Monolithic Upload
 PUT /v2/<name>/blobs/uploads/<uuid>?digest=<digest>
 Content-Length: <size of layer>
 Content-Type: application/octet-stream
-
 <Layer Binary Data>
 ---
 Completes the upload.
@@ -106,7 +30,6 @@ async fn put_blob_upload(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, uuid)): Path<(String, uuid::Uuid)>,
-
     Query(digest): Query<DigestQuery>,
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
@@ -114,22 +37,12 @@ async fn put_blob_upload(
         return Err(Error::UnsupportedForProxiedRepo);
     }
     let uuid_str = uuid.to_string();
-    let upload = sqlx::query!(
-        r#"
-        SELECT * FROM blob_upload
-        WHERE uuid=$1
-        "#,
-        uuid_str,
-    )
-    .fetch_one(&state.db_ro)
-    .await?;
-    assert_eq!(upload.repo, repo);
 
-    let accepted_upload =
-        utils::complete_upload(state.clone(), &uuid_str, &digest.digest, chunk, None).await?;
-
-    // missing location header
-    Ok(accepted_upload)
+    Ok(state
+        .services
+        .blob_upload
+        .complete_upload(&repo, &uuid_str, &digest.digest, chunk, None)
+        .await?)
 }
 
 endpoint_fn_7_levels!(
@@ -143,22 +56,16 @@ endpoint_fn_7_levels!(
 );
 
 /*
-
 ---
 Chunked Upload
-
 PATCH /v2/<name>/blobs/uploads/<uuid>
 Content-Length: <size of chunk>
 Content-Range: <start of range>-<end of range>
 Content-Type: application/octet-stream
-
 <Layer Chunk Binary Data>
 ---
-
 Uploads a blob or chunk of a blob.
-
 Checks UUID. Returns UploadInfo with range set to correct position.
-
 */
 async fn patch_blob_upload(
     _auth_user: TrowToken,
@@ -167,33 +74,12 @@ async fn patch_blob_upload(
     Path((repo, uuid)): Path<(String, uuid::Uuid)>,
     chunk: Body,
 ) -> Result<UploadInfo, Error> {
-    if repo.starts_with(PROXY_DIR) {
-        return Err(Error::UnsupportedForProxiedRepo);
-    }
-    let uuid_str = uuid.to_string();
-    sqlx::query_scalar!(r#"SELECT rowid FROM blob_upload WHERE uuid=$1"#, uuid_str)
-        .fetch_one(&state.db_ro)
-        .await?;
-
     let content_range = content_info.map(|ci| ci.range.0..=ci.range.1);
-    let size = state
-        .storage
-        .write_blob_part_stream(&uuid, chunk.into_data_stream(), content_range)
-        .await?;
-    let total_stored = size.total_stored as i64;
-    sqlx::query!(
-        "UPDATE blob_upload SET offset=$2, updated_at=unixepoch() WHERE uuid=$1",
-        uuid_str,
-        total_stored,
-    )
-    .execute(&state.db_rw)
-    .await?;
-
-    Ok(UploadInfo::new(
-        uuid_str,
-        repo,
-        (0, (size.total_stored).saturating_sub(1)), // Note first byte is 0
-    ))
+    Ok(state
+        .services
+        .blob_upload
+        .patch_upload(repo, uuid, content_range, chunk)
+        .await?)
 }
 
 endpoint_fn_7_levels!(
@@ -208,11 +94,8 @@ endpoint_fn_7_levels!(
 
 /*
 POST /v2/<name>/blobs/uploads/?digest=<digest>
-
 Starting point for uploading a new image or new version of an image.
-
 We respond with details of location and UUID to upload to with patch/put.
-
 No data is being transferred _unless_ the request ends with "?digest".
 In this case the whole blob is attached.
 */
@@ -223,38 +106,11 @@ async fn post_blob_upload(
     Path(repo_name): Path<String>,
     data: Body,
 ) -> Result<Upload, Error> {
-    if repo_name.starts_with(PROXY_DIR) {
-        return Err(Error::UnsupportedForProxiedRepo);
-    }
-
-    // Create new blob upload
-    let upload_uuid = uuid::Uuid::new_v4().to_string();
-    sqlx::query!(
-        r#"
-        INSERT INTO blob_upload (uuid, repo, offset)
-        VALUES ($1, $2, $3)
-        "#,
-        upload_uuid,
-        repo_name,
-        0_i64
-    )
-    .execute(&state.db_rw)
-    .await?;
-
-    if let Some(digest) = digest.digest {
-        // Have a monolithic upload with data
-        return match utils::complete_upload(state.clone(), &upload_uuid, &digest, data, None).await
-        {
-            Ok(accepted_upload) => Ok(Upload::Accepted(accepted_upload)),
-            Err(e) => Err(e),
-        };
-    }
-
-    Ok(Upload::Info(UploadInfo::new(
-        upload_uuid,
-        repo_name,
-        (0, 0),
-    )))
+    Ok(state
+        .services
+        .blob_upload
+        .start_upload(repo_name, digest.digest, data)
+        .await?)
 }
 
 endpoint_fn_7_levels!(
@@ -275,22 +131,19 @@ async fn get_blob_upload(
     State(state): State<Arc<TrowServerState>>,
     Path((repo_name, upload_id)): Path<(String, uuid::Uuid)>,
 ) -> Result<Response, Error> {
-    if repo_name.starts_with(PROXY_DIR) {
-        return Err(Error::UnsupportedForProxiedRepo);
-    }
-    let upload_id_str = upload_id.to_string();
-    let offset: i64 = sqlx::query_scalar!(
-        "SELECT offset FROM blob_upload WHERE uuid = $1 AND repo = $2",
-        upload_id_str,
-        repo_name
-    )
-    .fetch_one(&state.db_ro)
-    .await?;
-    let location = format!("/v2/{repo_name}/blobs/uploads/{upload_id}");
+    let status = state
+        .services
+        .blob_upload
+        .get_upload_status(repo_name.clone(), upload_id)
+        .await?;
+    let location = format!("/v2/{}/blobs/uploads/{}", status.repo, status.uuid);
 
     Ok(Response::builder()
-        .header("Docker-Upload-UUID", upload_id.to_string())
-        .header("Range", format!("0-{}", (offset as u64).saturating_sub(1)))
+        .header("Docker-Upload-UUID", status.uuid.to_string())
+        .header(
+            "Range",
+            format!("0-{}", (status.offset as u64).saturating_sub(1)),
+        )
         .header("Content-Length", "0")
         .header("Location", location)
         .status(StatusCode::NO_CONTENT)
@@ -337,8 +190,8 @@ mod tests {
 
     use super::*;
     use crate::test_utilities::{self, resp_header};
+    use crate::utils::digest::Digest;
 
-    // POST blob upload
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_create_new_upload() {
@@ -357,7 +210,7 @@ mod tests {
             Ok(Upload::Info(upload)) => upload,
             _ => panic!("Invalid value: {resp:?}"),
         };
-        assert_eq!(upload.range(), (0, 0)); // Haven't uploaded anything yet
+        assert_eq!(upload.range(), (0, 0));
         let upload_uuid = upload.uuid().to_string();
         sqlx::query!(
             r#"
@@ -366,12 +219,11 @@ mod tests {
             "#,
             upload_uuid
         )
-        .fetch_one(&state.db_rw)
+        .fetch_one(state.services.repos().db_rw())
         .await
         .unwrap();
     }
 
-    // POST followed by a single PUT
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_put_blob_upload() {
@@ -396,7 +248,7 @@ mod tests {
         let uuid = resp_header!(resp, test_utilities::UPLOAD_HEADER);
         let range = resp_header!(resp, test_utilities::RANGE_HEADER);
         let location = resp_header!(resp, test_utilities::LOCATION_HEADER);
-        assert_eq!(range, "0-0"); // Haven't uploaded anything yet
+        assert_eq!(range, "0-0");
         assert_eq!(location, format!("/v2/{repo_name}/blobs/uploads/{uuid}"));
 
         let blob = "super secret blob".as_bytes();
@@ -415,10 +267,9 @@ mod tests {
             .unwrap()
             .to_str()
             .unwrap();
-        assert_eq!(range, format!("0-{}", (blob.len() - 1))); //note first byte is 0, hence len - 1
+        assert_eq!(range, format!("0-{}", (blob.len() - 1)));
     }
 
-    /// A single POST
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_post_blob_upload_complete_upload() {
@@ -445,10 +296,9 @@ mod tests {
             .unwrap()
             .to_str()
             .unwrap();
-        assert_eq!(range, format!("0-{}", (config.len() - 1))); //note first byte is 0, hence len - 1
+        assert_eq!(range, format!("0-{}", (config.len() - 1)));
     }
 
-    // POST (skipped) then PATCH
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_patch_blob_upload() {
@@ -463,11 +313,12 @@ mod tests {
             "#,
             upload_uuid_str
         )
-        .execute(&state.db_rw)
+        .execute(state.services.repos().db_rw())
         .await
         .unwrap();
         state
-            .storage
+            .services
+            .storage()
             .write_blob_part_stream(&upload_uuid, Body::from("whazaaa").into_data_stream(), None)
             .await
             .unwrap();

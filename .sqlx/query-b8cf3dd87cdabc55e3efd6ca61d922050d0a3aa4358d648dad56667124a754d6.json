@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT t.tag\n            FROM tag t\n            WHERE t.repo = $1\n                AND t.tag COLLATE NOCASE > $2\n            ORDER BY t.tag COLLATE NOCASE ASC\n            LIMIT $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "tag",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b8cf3dd87cdabc55e3efd6ca61d922050d0a3aa4358d648dad56667124a754d6"
+}

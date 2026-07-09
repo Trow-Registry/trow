@@ -9,116 +9,27 @@ use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
 use super::response::OciJson;
 use crate::TrowServerState;
-use crate::registry::PROXY_DIR;
-use crate::registry::proxy::download_image;
 use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::types::{ManifestDeleted, VerifiedManifest};
-use crate::utils::digest::Digest;
-use crate::utils::manifest::{OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type};
-use crate::utils::resolve_reference::parse_reference;
+use crate::utils::manifest::OCIManifest;
 
-/*
----
-Pulling an image
-GET /v2/<name>/manifests/<reference>
-
-# Parameters
-name - The namespace of the repository
-reference - either a tag or a digest
-
-# Client Headers
-Accept: manifest-version
-
-# Headers
-Accept: manifest-version
-?Docker-Content-Digest: digest of manifest file
-
-# Returns
-200 - return the manifest
-404 - manifest not known to the registry
- */
 async fn get_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, raw_reference)): Path<(String, String)>,
     Query(query): Query<ImageNamespace>,
 ) -> Result<OciJson<OCIManifest>, Error> {
-    let image = parse_reference(&repo, &raw_reference, query.ns.as_deref())?;
-
-    let digest = if image.registry() != "localhost" {
-        let proxy_config = state
-            .config
-            .config_file
-            .registry_proxies
-            .registries
-            .get_for(image.registry(), image.repository());
-        download_image(&image, proxy_config, &state).await?
-    } else {
-        let digest = if let Some(tag) = image.tag() {
-            let tdigest = sqlx::query_scalar!(
-                "SELECT t.manifest_digest FROM tag t WHERE t.repo = $1 AND t.tag = $2",
-                repo,
-                tag
-            )
-            .fetch_optional(&state.db_ro)
-            .await?;
-            match tdigest {
-                Some(d) => d,
-                None => {
-                    return Err(Error::ManifestUnknown(format!(
-                        "Unknown tag: {raw_reference}"
-                    )));
-                }
-            }
-        } else if let Some(digest) = image.digest() {
-            digest.to_string()
-        } else {
-            return Err(Error::ManifestUnknown(format!(
-                "Invalid reference: {raw_reference}"
-            )));
-        };
-
-        let maybe_digest = sqlx::query_scalar!(
-            r#"
-            SELECT rba.manifest_digest
-            FROM repo_blob_assoc rba
-            WHERE rba.manifest_digest = $2 AND rba.repo_name = $1
-            "#,
-            repo,
-            digest
-        )
-        .fetch_optional(&state.db_ro)
+    let payload = state
+        .services
+        .manifest
+        .get_manifest(repo, raw_reference, query.ns.as_deref())
         .await?;
-
-        match maybe_digest {
-            Some(Some(d)) => d,
-            _ => {
-                return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
-            }
-        }
-    };
-
-    let res = sqlx::query!(
-        r#"
-        SELECT m.json ->> 'mediaType' as "media_type: String", m.blob
-        FROM manifest m
-        WHERE m.digest = $1
-        "#,
-        digest
-    )
-    .fetch_one(&state.db_ro)
-    .await?;
-    let content_type = match res.media_type.as_ref() {
-        Some(mt) => mt,
-        None => determine_content_type(&res.blob)?,
-    };
-
-    Ok(OciJson::new_raw(res.blob.into())
-        .set_digest(digest)
-        .set_content_type(content_type))
+    Ok(OciJson::new_raw(payload.bytes)
+        .set_digest(payload.digest)
+        .set_content_type(&payload.content_type))
 }
 
 endpoint_fn_7_levels!(
@@ -130,15 +41,6 @@ endpoint_fn_7_levels!(
     ) -> Result<OciJson<OCIManifest>, Error>
 );
 
-/*
-
----
-Pushing an image manifest
-PUT /v2/<name>/manifests/<reference>
-Content-Type: <manifest media type>
-
-TODO: return 413 payload too large
- */
 async fn put_image_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
@@ -146,127 +48,11 @@ async fn put_image_manifest(
     Path((repo_name, reference)): Path<(String, String)>,
     body: Body,
 ) -> Result<VerifiedManifest, Error> {
-    if repo_name.starts_with(PROXY_DIR) {
-        return Err(Error::UnsupportedForProxiedRepo);
-    }
-    let is_tag = REGEX_TAG.is_match(&reference);
-    const MANIFEST_BODY_SIZE_LIMIT_MB: usize = 4;
-    let manifest_bytes = axum::body::to_bytes(body, MANIFEST_BODY_SIZE_LIMIT_MB * 1024 * 1024)
-        .await
-        .map_err(|_| {
-            Error::ManifestInvalid(format!(
-                "Manifest is bigger than limit of {MANIFEST_BODY_SIZE_LIMIT_MB}MiB"
-            ))
-        })?
-        .to_vec();
-    let manifest_parsed = serde_json::from_slice::<'_, OCIManifest>(&manifest_bytes)
-        .map_err(|e| Error::ManifestInvalid(format!("{e}")))?;
-
-    match &manifest_parsed {
-        OCIManifest::List(m) => {
-            let assets = m
-                .manifests()
-                .iter()
-                .filter(|l| layer_is_distributable(l.media_type()))
-                .map(|m| m.digest().as_ref());
-            for digest in assets {
-                // Check that each manifest referenced in the list exists in the repo
-                let res = sqlx::query!(
-                    r"SELECT rba.manifest_digest FROM repo_blob_assoc rba
-                    WHERE rba.manifest_digest = $1 AND rba.repo_name = $2",
-                    digest,
-                    repo_name
-                )
-                .fetch_optional(&state.db_ro)
-                .await?;
-                if res.is_none() {
-                    return Err(Error::ManifestInvalid(format!(
-                        "Manifest asset not found: {digest}"
-                    )));
-                }
-            }
-        }
-        OCIManifest::V2(m) => {
-            let assets = m
-                .layers()
-                .iter()
-                .filter(|l| layer_is_distributable(l.media_type()))
-                .map(|l| l.digest().as_ref());
-            for digest in assets {
-                // Check that each blob referenced in the manifest exists in the repo
-                let res = sqlx::query!(
-                    r"SELECT rba.blob_digest FROM repo_blob_assoc rba
-                    WHERE rba.blob_digest = $1 AND rba.repo_name = $2",
-                    digest,
-                    repo_name
-                )
-                .fetch_optional(&state.db_ro)
-                .await?;
-                if res.is_none() {
-                    return Err(Error::ManifestInvalid(format!(
-                        "Blob asset not found: {digest}"
-                    )));
-                }
-            }
-        }
-    }
-    let computed_digest = Digest::digest_sha256_slice(&manifest_bytes);
-    let computed_digest_str = computed_digest.as_str();
-    if !is_tag && computed_digest_str != reference {
-        return Err(Error::ManifestInvalid(
-            "Given digest does not match".to_string(),
-        ));
-    }
-
-    sqlx::query!(
-        r#"
-        INSERT INTO manifest (digest, json, blob)
-        VALUES ($1, jsonb($2), $2)
-        ON CONFLICT (digest) DO NOTHING
-        "#,
-        computed_digest_str,
-        manifest_bytes
-    )
-    .execute(&state.db_rw)
-    .await?;
-    sqlx::query!(
-        r#"
-        INSERT INTO repo_blob_assoc
-        VALUES ($1, NULL, $2)
-        ON CONFLICT (repo_name, blob_digest, manifest_digest) DO NOTHING
-        "#,
-        repo_name,
-        computed_digest_str
-    )
-    .execute(&state.db_rw)
-    .await?;
-
-    if is_tag {
-        sqlx::query!(
-            r#"
-            INSERT INTO tag
-            VALUES ($1, $2, $3)
-            ON CONFLICT (repo, tag) DO UPDATE
-                SET manifest_digest = EXCLUDED.manifest_digest
-            "#,
-            reference,
-            repo_name,
-            computed_digest_str,
-        )
-        .execute(&state.db_rw)
-        .await?;
-    }
-
-    // check if the manifest has a Subject field, if so return the header OCI-Subject
-    let subject = manifest_parsed.subject().map(|s| s.digest().to_string());
-
-    Ok(VerifiedManifest::new(
-        Some(host),
-        repo_name,
-        computed_digest,
-        reference,
-        subject,
-    ))
+    Ok(state
+        .services
+        .manifest
+        .put_manifest(repo_name, reference, host, body)
+        .await?)
 }
 endpoint_fn_7_levels!(
     put_image_manifest(
@@ -278,53 +64,16 @@ endpoint_fn_7_levels!(
     ) -> Result<VerifiedManifest, Error>
 );
 
-/*
----
-Deleting an Image
-DELETE /v2/<name>/manifests/<reference>
-*/
 async fn delete_image_manifest(
     _auth_user: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo, reference)): Path<(String, String)>,
 ) -> Result<ManifestDeleted, Error> {
-    if repo.starts_with(PROXY_DIR) {
-        return Err(Error::UnsupportedForProxiedRepo);
-    }
-    // irh, Digest is not doing validation it seems ?
-    if REGEX_TAG.is_match(&reference) {
-        sqlx::query!(
-            r#"DELETE FROM tag WHERE repo = $1 AND tag = $2"#,
-            repo,
-            reference
-        )
-        .execute(&state.db_rw)
-        .await?;
-    } else {
-        let digest = Digest::try_from_raw(&reference)?;
-        let digest_str = digest.as_str();
-        sqlx::query!(
-            "DELETE FROM repo_blob_assoc WHERE repo_name = $1 AND manifest_digest = $2",
-            repo,
-            digest_str
-        )
-        .execute(&state.db_rw)
-        .await?;
-        let num_repo_assoc = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM repo_blob_assoc WHERE manifest_digest = $1",
-            digest_str
-        )
-        .fetch_one(&state.db_ro)
-        .await?;
-        if num_repo_assoc == 0 {
-            // Manifest is not referenced anymore, delete it
-            sqlx::query!("DELETE FROM manifest where digest = $1", digest_str)
-                .execute(&state.db_rw)
-                .await?;
-        }
-    }
-
-    Ok(ManifestDeleted {})
+    Ok(state
+        .services
+        .manifest
+        .delete_manifest(repo, reference)
+        .await?)
 }
 endpoint_fn_7_levels!(
     delete_image_manifest(
@@ -346,18 +95,6 @@ pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerStat
     app
 }
 
-fn determine_content_type(manifest_bytes: &[u8]) -> Result<&'static str, Error> {
-    let manifest: OCIManifest = serde_json::from_slice(manifest_bytes)
-        .map_err(|e| Error::ManifestInvalid(format!("Invalid manifest JSON: {}", e)))?;
-
-    let content_type = match &manifest {
-        OCIManifest::List(_) => manifest_media_type::OCI_INDEX,
-        OCIManifest::V2(_) => manifest_media_type::OCI_V1,
-    };
-
-    Ok(content_type)
-}
-
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -368,8 +105,8 @@ mod tests {
     use test_temp_dir::test_temp_dir;
     use tower::ServiceExt;
 
-    use super::*;
     use crate::test_utilities;
+    use crate::utils::digest::Digest;
 
     #[tracing_test::traced_test]
     #[tokio::test]
@@ -377,7 +114,6 @@ mod tests {
         let tmp_dir = test_temp_dir!();
         let (state, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
 
-        // 1. insert a dummy manifest into 2 repos
         let dummy_blob_digest =
             "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a";
         let manifest = serde_json::to_vec(
@@ -401,7 +137,7 @@ mod tests {
             manifest_digest_str,
             manifest,
         )
-        .execute(&state.db_rw)
+        .execute(state.services.repos().db_rw())
         .await
         .unwrap();
         for repo in ["test1", "test2"] {
@@ -410,12 +146,11 @@ mod tests {
                 repo,
                 manifest_digest_str
             )
-            .execute(&state.db_rw)
+            .execute(state.services.repos().db_rw())
             .await
             .unwrap();
         }
 
-        // 2. delete from one repo: check manifest still exists
         let resp = router
             .clone()
             .oneshot(
@@ -434,12 +169,11 @@ mod tests {
             r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
             manifest_digest_str
         )
-        .fetch_one(&state.db_ro)
+        .fetch_one(state.services.repos().db_ro())
         .await
         .unwrap();
         assert_eq!(res.count, 1, "manifest was deleted unexpectedly");
 
-        // 3. delete from second repo: check manifest is deleted
         let resp = router
             .oneshot(
                 Request::delete(format!("/v2/test2/manifests/{manifest_digest_str}"))
@@ -457,7 +191,7 @@ mod tests {
             r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
             manifest_digest_str
         )
-        .fetch_one(&state.db_ro)
+        .fetch_one(state.services.repos().db_ro())
         .await
         .unwrap();
         assert_eq!(res.count, 0, "manifest was not deleted");
@@ -469,7 +203,6 @@ mod tests {
         let tmp_dir = test_temp_dir!();
         let (state, router) = test_utilities::trow_router(|_| {}, &tmp_dir).await;
 
-        // Insert a manifest without mediaType field
         let manifest_json = r#"{"schemaVersion":2,"manifests":[{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:9606ce5d502876100782b78351910efb2008d738e438ebc708fa4fabf5c01e9b","size":3317,"platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:97530f8d15b87fa5e5a42687371de32b3919c49c53e16366428972eeb64735f6","size":3317,"platform":{"architecture":"arm64","os":"linux"}}]}"#;
         let manifest_bytes = manifest_json.as_bytes();
         let manifest_digest = Digest::digest_sha256_slice(manifest_bytes);
@@ -480,7 +213,7 @@ mod tests {
             manifest_digest_str,
             manifest_bytes,
         )
-        .execute(&state.db_rw)
+        .execute(state.services.repos().db_rw())
         .await
         .unwrap();
 
@@ -490,11 +223,10 @@ mod tests {
             repo_name,
             manifest_digest_str
         )
-        .execute(&state.db_rw)
+        .execute(state.services.repos().db_rw())
         .await
         .unwrap();
 
-        // Get the manifest
         let resp = router
             .oneshot(
                 Request::get(format!("/v2/{repo_name}/manifests/{manifest_digest_str}"))
@@ -510,7 +242,6 @@ mod tests {
             "unexpected status code: {resp:?}"
         );
 
-        // Check that the content-type is application/vnd.oci.image.index.v1+json
         let content_type = resp
             .headers()
             .get("content-type")

@@ -3,15 +3,8 @@ use std::sync::Arc;
 use axum::extract::State;
 
 use crate::TrowServerState;
-use crate::registry::api_types::HealthStatus;
-/*
-* Trow health endpoint
-* GET /healthz
-*/
+use crate::services::health_service::HealthStatus;
 
-pub async fn healthz(State(_state): State<Arc<TrowServerState>>) -> HealthStatus {
-    HealthStatus {
-        message: "".to_string(),
-        is_healthy: true,
-    }
+pub async fn healthz(State(state): State<Arc<TrowServerState>>) -> HealthStatus {
+    state.services.health.healthz()
 }

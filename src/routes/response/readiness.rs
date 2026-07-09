@@ -1,7 +1,7 @@
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 
-use crate::registry::api_types::ReadyStatus;
+use crate::services::health_service::ReadyStatus;
 
 impl IntoResponse for ReadyStatus {
     fn into_response(self) -> Response {
@@ -29,7 +29,7 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::registry::api_types::ReadyStatus;
+    use crate::services::health_service::ReadyStatus;
 
     fn build_ready_response() -> ReadyStatus {
         ReadyStatus {
