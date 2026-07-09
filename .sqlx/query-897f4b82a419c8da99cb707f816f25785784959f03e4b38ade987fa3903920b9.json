@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT * FROM blob_upload\n            WHERE uuid=$1\n            ",
+  "query": "\n            SELECT uuid, repo, offset, updated_at\n            FROM blob_upload\n            WHERE uuid=$1\n            ",
   "describe": {
     "columns": [
       {
@@ -9,17 +9,17 @@
         "type_info": "Text"
       },
       {
-        "name": "offset",
+        "name": "repo",
         "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "offset",
+        "ordinal": 2,
         "type_info": "Integer"
       },
       {
         "name": "updated_at",
-        "ordinal": 2,
-        "type_info": "Text"
-      },
-      {
-        "name": "repo",
         "ordinal": 3,
         "type_info": "Text"
       }
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "e623d75822399f662a068f7fcac6a1766802de1063f933cd42bf3c8f9b43ec73"
+  "hash": "897f4b82a419c8da99cb707f816f25785784959f03e4b38ade987fa3903920b9"
 }

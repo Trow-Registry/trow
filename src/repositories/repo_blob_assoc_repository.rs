@@ -22,8 +22,8 @@ impl RepoBlobAssocRepository {
         &self,
         repo_name: &str,
         manifest_digest: &str,
-    ) -> Result<Option<Option<String>>, sqlx::Error> {
-        sqlx::query_scalar!(
+    ) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query_scalar!(
             r#"
             SELECT rba.manifest_digest
             FROM repo_blob_assoc rba
@@ -33,7 +33,8 @@ impl RepoBlobAssocRepository {
             repo_name
         )
         .fetch_optional(&self.db_ro)
-        .await
+        .await?;
+        Ok(matches!(res, Some(Some(_digest))))
     }
 
     /// SELECT rba.blob_digest FROM repo_blob_assoc rba WHERE rba.blob_digest = $1 AND rba.repo_name = $2
@@ -41,15 +42,16 @@ impl RepoBlobAssocRepository {
         &self,
         blob_digest: &str,
         repo_name: &str,
-    ) -> Result<Option<Option<String>>, sqlx::Error> {
-        sqlx::query_scalar!(
+    ) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query_scalar!(
             r"SELECT rba.blob_digest FROM repo_blob_assoc rba
             WHERE rba.blob_digest = $1 AND rba.repo_name = $2",
             blob_digest,
             repo_name
         )
         .fetch_optional(&self.db_ro)
-        .await
+        .await?;
+        Ok(matches!(res, Some(Some(_digest))))
     }
 
     /// SELECT EXISTS(SELECT 1 FROM repo_blob_assoc WHERE manifest_digest = $1 AND repo_name = $2)
@@ -57,16 +59,18 @@ impl RepoBlobAssocRepository {
         &self,
         manifest_digest: &str,
         repo_name: &str,
-    ) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar!(
+    ) -> Result<bool, sqlx::Error> {
+        let has_manifest = sqlx::query_scalar!(
             r#"SELECT EXISTS(
                     SELECT 1 FROM repo_blob_assoc WHERE manifest_digest = $1 AND repo_name = $2
                 )"#,
             manifest_digest,
             repo_name
         )
-        .fetch_one(&self.db_rw)
-        .await
+        .fetch_one(&self.db_ro)
+        .await?;
+
+        Ok(has_manifest == 1)
     }
 
     /// INSERT INTO repo_blob_assoc VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING (blob assoc)

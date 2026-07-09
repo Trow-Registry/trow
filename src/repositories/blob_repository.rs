@@ -72,16 +72,17 @@ impl BlobRepository {
             "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = $1);",
             digest
         )
-        .fetch_one(&self.db_rw)
+        .fetch_one(&self.db_ro)
         .await?;
         Ok(res == 1)
     }
 
     /// SELECT SUM(b.size) FROM blob b
-    pub async fn sum_size(&self) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar!(r#"SELECT SUM(b.size) as "size!" FROM blob b"#)
+    pub async fn sum_size(&self) -> Result<usize, sqlx::Error> {
+        let res = sqlx::query_scalar!(r#"SELECT SUM(b.size) as "size!" FROM blob b"#)
             .fetch_one(&self.db_ro)
-            .await
+            .await?;
+        Ok(usize::try_from(res).unwrap_or(0))
     }
 
     /// SELECT digest, size FROM blob b WHERE b.last_accessed < ... AND NOT EXISTS (...)

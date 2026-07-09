@@ -34,9 +34,15 @@ impl HealthService {
     }
 
     pub async fn readiness(&self) -> ReadyStatus {
-        ReadyStatus {
-            message: String::new(),
-            is_ready: self.storage.is_ready().await.is_ok(),
+        match self.storage.is_ready().await {
+            Ok(()) => ReadyStatus {
+                message: String::new(),
+                is_ready: true,
+            },
+            Err(e) => ReadyStatus {
+                message: e.to_string(),
+                is_ready: false,
+            },
         }
     }
 }

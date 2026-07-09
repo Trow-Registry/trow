@@ -71,7 +71,7 @@ impl GcService {
         };
         let blobs = self.repos.blob.sum_size().await?;
         let uploads = self.repos.blob_upload.sum_offset().await?;
-        let space_taken = (blobs + uploads) as usize;
+        let space_taken = blobs + uploads;
         let space_available = (limit.bytes() as f64 * 0.8) as usize;
         let needed = space_taken.saturating_sub(space_available);
         Ok((needed > 0).then_some(needed))

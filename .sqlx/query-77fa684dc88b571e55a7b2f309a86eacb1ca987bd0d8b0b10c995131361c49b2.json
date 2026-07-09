@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO blob_upload (uuid, repo, offset)\n            VALUES ($1, $2, $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "77fa684dc88b571e55a7b2f309a86eacb1ca987bd0d8b0b10c995131361c49b2"
+}

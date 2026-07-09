@@ -110,9 +110,10 @@ impl BlobUploadRepository {
     }
 
     /// SELECT SUM(u.offset) FROM blob_upload u
-    pub async fn sum_offset(&self) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar!(r#"SELECT SUM(u.offset) as "size!" FROM blob_upload u"#)
+    pub async fn sum_offset(&self) -> Result<usize, sqlx::Error> {
+        let res = sqlx::query_scalar!(r#"SELECT SUM(u.offset) as "size!" FROM blob_upload u"#)
             .fetch_one(&self.db_ro)
-            .await
+            .await?;
+        Ok(usize::try_from(res).unwrap_or(0))
     }
 }

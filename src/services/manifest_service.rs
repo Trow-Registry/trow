@@ -72,18 +72,15 @@ impl ManifestService {
                 )));
             };
 
-            let maybe_digest = self
+            if !self
                 .repos
                 .repo_blob_assoc
                 .manifest_belongs_to_repo(&repo, &digest)
-                .await?;
-
-            match maybe_digest {
-                Some(Some(d)) => d,
-                _ => {
-                    return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
-                }
+                .await?
+            {
+                return Err(Error::ManifestUnknown(format!("Unknown digest {digest}")));
             }
+            digest
         };
 
         let res = self.repos.manifest.find(&digest).await?;
@@ -130,12 +127,12 @@ impl ManifestService {
                     .filter(|l| layer_is_distributable(l.media_type()))
                     .map(|m| m.digest().as_ref());
                 for digest in assets {
-                    let res = self
+                    if !self
                         .repos
                         .repo_blob_assoc
                         .manifest_belongs_to_repo(&repo_name, digest)
-                        .await?;
-                    if res.is_none() {
+                        .await?
+                    {
                         return Err(Error::ManifestInvalid(format!(
                             "Manifest asset not found: {digest}"
                         )));
@@ -149,12 +146,12 @@ impl ManifestService {
                     .filter(|l| layer_is_distributable(l.media_type()))
                     .map(|l| l.digest().as_ref());
                 for digest in assets {
-                    let res = self
+                    if !self
                         .repos
                         .repo_blob_assoc
                         .blob_belongs_to_repo(digest, &repo_name)
-                        .await?;
-                    if res.is_none() {
+                        .await?
+                    {
                         return Err(Error::ManifestInvalid(format!(
                             "Blob asset not found: {digest}"
                         )));

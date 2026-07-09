@@ -56,7 +56,7 @@ impl ProxyService {
                 .repo_blob_assoc
                 .manifest_exists_in_repo(&mani_digest, &repo_name)
                 .await?;
-            if has_manifest == 1 {
+            if has_manifest {
                 return Ok(mani_digest);
             }
             if let Some((cl, auth)) = &try_cl {

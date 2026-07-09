@@ -98,7 +98,9 @@ impl BlobUploadService {
         range: Option<RangeInclusive<u64>>,
     ) -> Result<AcceptedUpload, Error> {
         let upload_row = self.repos.blob_upload.find(uuid_str).await?;
-        assert_eq!(upload_row.repo, repo_name);
+        if upload_row.repo != repo_name {
+            return Err(Error::Invalid("Repository mismatch".to_string()));
+        }
         let upload_id_bin = Uuid::parse_str(uuid_str).unwrap();
 
         let size = self

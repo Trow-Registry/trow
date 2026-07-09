@@ -92,7 +92,7 @@ impl ManifestRepository {
             r#"SELECT DISTINCT manifest_digest FROM manifest_blob_assoc WHERE blob_digest = $1"#,
             blob_digest
         )
-        .fetch_all(&self.db_rw)
+        .fetch_all(&self.db_ro)
         .await
     }
 }
