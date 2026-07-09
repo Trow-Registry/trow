@@ -43,7 +43,7 @@ impl TagRepository {
             SELECT t.tag
             FROM tag t
             WHERE t.repo = $1
-                AND t.tag > $2
+                AND t.tag COLLATE NOCASE > $2
             ORDER BY t.tag COLLATE NOCASE ASC
             LIMIT $3
             "#,
