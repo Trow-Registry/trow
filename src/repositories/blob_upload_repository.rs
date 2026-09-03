@@ -102,7 +102,7 @@ impl BlobUploadRepository {
             r#"
             SELECT uuid, repo, offset, updated_at
             FROM blob_upload bu
-            WHERE bu.updated_at < strftime('%s', 'now', '-1 day')
+            WHERE bu.updated_at < unixepoch('now', '-1 day')
             "#
         )
         .fetch_all(&self.db_ro)

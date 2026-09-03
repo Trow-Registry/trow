@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT uuid, repo, offset, updated_at\n            FROM blob_upload bu\n            WHERE bu.updated_at < strftime('%s', 'now', '-1 day')\n            ",
+  "query": "\n            SELECT uuid, repo, offset, updated_at\n            FROM blob_upload bu\n            WHERE bu.updated_at < unixepoch('now', '-1 day')\n            ",
   "describe": {
     "columns": [
       {
@@ -21,7 +21,7 @@
       {
         "name": "updated_at",
         "ordinal": 3,
-        "type_info": "Text"
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "cc2eee2c57c61963207391adad6e7f1a0f29290843161e2176f157097f91b0b6"
+  "hash": "d3879cb497bd7b46705fe4e6325aaed5d77a8d3230ef5e2e532176c1b3a14ec4"
 }

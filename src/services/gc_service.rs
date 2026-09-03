@@ -270,24 +270,74 @@ mod tests {
         sqlx::query!(
             r#"
             INSERT INTO blob_upload (uuid, offset, updated_at, repo)
-            VALUES ('test-uuid-1', 100, strftime('%s', 'now', '-2 days'), 'testrepo'),
-                   ('test-uuid-2', 200, strftime('%s', 'now', '-5 hours'), 'testrepo'),
-                   ('test-uuid-3', 150, strftime('%s', 'now', '-9 days'), 'testrepo')
+            VALUES ('test-uuid-1', 100, unixepoch('now', '-2 days'), 'testrepo'),
+                   ('test-uuid-2', 200, unixepoch('now', '-5 hours'), 'testrepo'),
+                   ('test-uuid-3', 150, unixepoch('now', '-9 days'), 'testrepo')
             "#
         )
         .execute(state.services.repos().db_rw())
         .await
         .unwrap();
 
-        let result = state.services.gc.delete_stale_uploads().await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 250);
+        // Goes through the default, which must be the same epoch form the staleness
+        // comparison uses, not a CURRENT_TIMESTAMP datetime string.
+        state
+            .services
+            .repos()
+            .blob_upload
+            .create("test-uuid-4", "testrepo")
+            .await
+            .unwrap();
+
+        let updated_at_type = sqlx::query_scalar!(
+            r#"SELECT typeof(updated_at) AS "typeof!: String" FROM blob_upload WHERE uuid = 'test-uuid-4'"#
+        )
+        .fetch_one(state.services.repos().db_ro())
+        .await
+        .unwrap();
+        assert_eq!(updated_at_type, "integer");
+
+        let reclaimed = state.services.gc.delete_stale_uploads().await.unwrap();
+        assert_eq!(reclaimed, 250);
+
+        let mut uploads = sqlx::query_scalar!(r#"SELECT uuid FROM blob_upload"#)
+            .fetch_all(state.services.repos().db_ro())
+            .await
+            .unwrap();
+        uploads.sort();
+        assert_eq!(uploads, vec!["test-uuid-2", "test-uuid-4"]);
+    }
+
+    #[tracing_test::traced_test]
+    #[tokio::test]
+    async fn test_delete_stale_uploads_collects_untouched_uploads() {
+        let dir = test_temp_dir!();
+        let (state, _router) = test_utilities::trow_router(|_| {}, &dir).await;
+
+        state
+            .services
+            .repos()
+            .blob_upload
+            .create("never-touched", "testrepo")
+            .await
+            .unwrap();
+
+        sqlx::query!(
+            r#"UPDATE blob_upload SET updated_at = unixepoch('now', '-2 days') WHERE uuid = 'never-touched'"#
+        )
+        .execute(state.services.repos().db_rw())
+        .await
+        .unwrap();
+
+        state.services.gc.delete_stale_uploads().await.unwrap();
 
         let uploads = sqlx::query_scalar!(r#"SELECT uuid FROM blob_upload"#)
             .fetch_all(state.services.repos().db_ro())
             .await
             .unwrap();
-        assert_eq!(uploads.len(), 1);
-        assert_eq!(uploads[0], "test-uuid-2");
+        assert!(
+            uploads.is_empty(),
+            "upload created but never written to was not collected"
+        );
     }
 }
