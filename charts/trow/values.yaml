@@ -137,6 +137,8 @@ tolerations: []
 
 affinity: {}
 
+priorityClassName: ""
+
 volumeClaim:
   accessModes: ["ReadWriteOnce"]
   resources:
