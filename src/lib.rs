@@ -6,7 +6,6 @@ pub mod routes;
 pub mod services;
 #[cfg(test)]
 pub mod test_utilities;
-pub mod types;
 pub mod utils;
 
 use std::path::PathBuf;
@@ -59,9 +58,9 @@ impl TlsConfig {
 }
 
 #[derive(Clone, Debug)]
-struct UserConfig {
-    user: String,
-    hash_encoded: String, //Surprised not bytes
+pub struct UserConfig {
+    pub user: String,
+    pub hash_encoded: String, //Surprised not bytes
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +131,11 @@ impl TrowConfig {
         let usercfg = UserConfig { user, hash_encoded };
         self.user = Some(usercfg);
         self
+    }
+
+    /// The configured user, if authentication is enabled.
+    pub fn map_user(&self) -> Option<&UserConfig> {
+        self.user.as_ref()
     }
 
     /// Should only be used internally or for integration tests

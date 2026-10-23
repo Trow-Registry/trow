@@ -4,6 +4,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
+use bytes::Bytes;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
@@ -13,8 +14,20 @@ use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
-use crate::types::{ManifestDeleted, VerifiedManifest};
+use crate::services::manifest_results::{ManifestDeleted, VerifiedManifest};
+use crate::services::manifest_service::MANIFEST_BODY_SIZE_LIMIT;
 use crate::utils::manifest::OCIManifest;
+
+async fn read_manifest_body(body: Body) -> Result<Bytes, Error> {
+    axum::body::to_bytes(body, MANIFEST_BODY_SIZE_LIMIT)
+        .await
+        .map_err(|_| {
+            Error::ManifestInvalid(format!(
+                "Manifest is bigger than limit of {}MiB",
+                MANIFEST_BODY_SIZE_LIMIT / (1024 * 1024)
+            ))
+        })
+}
 
 async fn get_manifest(
     _auth_user: TrowToken,
@@ -51,7 +64,7 @@ async fn put_image_manifest(
     Ok(state
         .services
         .manifest
-        .put_manifest(repo_name, reference, host, body)
+        .put_manifest(repo_name, reference, host, read_manifest_body(body).await?)
         .await?)
 }
 endpoint_fn_7_levels!(
@@ -132,23 +145,9 @@ mod tests {
         .unwrap();
         let manifest_digest = Digest::digest_sha256_slice(&manifest);
         let manifest_digest_str = manifest_digest.as_str();
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
-            manifest_digest_str,
-            manifest,
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        test_utilities::seed_manifest_blob(&state, manifest_digest_str, &manifest).await;
         for repo in ["test1", "test2"] {
-            sqlx::query!(
-                r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($1, $2)"#,
-                repo,
-                manifest_digest_str
-            )
-            .execute(state.services.repos().db_rw())
-            .await
-            .unwrap();
+            test_utilities::seed_manifest_assoc(&state, repo, manifest_digest_str).await;
         }
 
         let resp = router
@@ -165,14 +164,8 @@ mod tests {
             StatusCode::ACCEPTED,
             "unexpected status code: {resp:?}"
         );
-        let res = sqlx::query!(
-            r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
-            manifest_digest_str
-        )
-        .fetch_one(state.services.repos().db_ro())
-        .await
-        .unwrap();
-        assert_eq!(res.count, 1, "manifest was deleted unexpectedly");
+        let count = test_utilities::manifest_repo_count(&state, manifest_digest_str).await;
+        assert_eq!(count, 1, "manifest was deleted unexpectedly");
 
         let resp = router
             .oneshot(
@@ -187,14 +180,8 @@ mod tests {
             StatusCode::ACCEPTED,
             "unexpected status code: {resp:?}"
         );
-        let res = sqlx::query!(
-            r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
-            manifest_digest_str
-        )
-        .fetch_one(state.services.repos().db_ro())
-        .await
-        .unwrap();
-        assert_eq!(res.count, 0, "manifest was not deleted");
+        let count = test_utilities::manifest_repo_count(&state, manifest_digest_str).await;
+        assert_eq!(count, 0, "manifest was not deleted");
     }
 
     #[tracing_test::traced_test]
@@ -208,24 +195,8 @@ mod tests {
         let manifest_digest = Digest::digest_sha256_slice(manifest_bytes);
         let manifest_digest_str = manifest_digest.as_str();
 
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
-            manifest_digest_str,
-            manifest_bytes,
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
-
         let repo_name = "test-repo";
-        sqlx::query!(
-            r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($1, $2)"#,
-            repo_name,
-            manifest_digest_str
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        test_utilities::seed_manifest(&state, repo_name, manifest_digest_str, manifest_bytes).await;
 
         let resp = router
             .oneshot(

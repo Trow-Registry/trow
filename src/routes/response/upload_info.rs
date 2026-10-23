@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
-pub use crate::types::UploadInfo;
+pub use crate::services::uploads::UploadInfo;
 
 impl IntoResponse for UploadInfo {
     fn into_response(self) -> Response {
