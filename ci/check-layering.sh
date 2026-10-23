@@ -30,10 +30,22 @@ prod_only() {
     ' "$@"
 }
 
-# 1. Routes must not touch persistence. Data access belongs to services.
+# 1. Routes must not touch persistence. Data access belongs to services, and
+#    test fixtures belong in src/test_utilities.rs.
 out=$(prod_only src/routes/*.rs src/routes/**/*.rs |
-    rg -n 'sqlx::query|crate::repositories|crate::file_storage' || true)
+    rg -n 'crate::repositories|crate::file_storage' || true)
 [ -z "$out" ] || fail "src/routes must not access repositories or file_storage" "$out"
+
+out=$(rg -n 'sqlx::query' src/routes/*.rs src/routes/**/*.rs || true)
+[ -z "$out" ] || fail "src/routes must not contain SQL, including in tests" "$out"
+
+# 1b. The raw repositories/storage accessors only exist for the GC's own
+#     internals and for the two fixture modules (src/test_utilities.rs for unit
+#     tests, tests/common/ for integration tests). Routes and integration test
+#     bodies must go through those fixtures.
+out=$(rg -n 'services\.(repos|storage)\(\)' src/routes/*.rs src/routes/**/*.rs \
+    tests/*.rs 2>/dev/null || true)
+[ -z "$out" ] || fail "use the test fixtures instead of reaching for repos()/storage()" "$out"
 
 # 2. Services are transport agnostic: no axum/hyper bodies, extractors, or
 #    response types.

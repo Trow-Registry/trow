@@ -74,6 +74,30 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
     serde_json::from_reader(reader).unwrap()
 }
 
+/// Every tag in the database, as `(repo, tag, manifest digest)`.
+pub async fn all_tags(state: &Arc<TrowServerState>) -> Vec<(String, String, String)> {
+    sqlx::query!("SELECT repo, tag, manifest_digest FROM tag")
+        .fetch_all(state.services.repos().db_ro())
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|t| (t.repo, t.tag, t.manifest_digest))
+        .collect()
+}
+
+/// Insert a tag pointing at an existing manifest.
+pub async fn seed_tag(state: &Arc<TrowServerState>, repo: &str, tag: &str, manifest_digest: &str) {
+    sqlx::query!(
+        "INSERT INTO tag (tag, repo, manifest_digest) VALUES ($1, $2, $3)",
+        tag,
+        repo,
+        manifest_digest
+    )
+    .execute(state.services.repos().db_rw())
+    .await
+    .unwrap();
+}
+
 /// Returns (blob-digest, manifest-digest)
 pub async fn upload_fake_image(cl: &Router, name: &str, tag: &str) -> (Digest, Digest) {
     let resp = cl

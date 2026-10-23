@@ -87,11 +87,15 @@ impl Services {
         }
     }
 
+    /// Aggregates over proxied repositories, used by the GC and by tests that
+    /// need to inspect or seed state directly.
     #[doc(hidden)]
     pub fn repos(&self) -> &Arc<Repositories> {
         &self.repos_shared
     }
 
+    /// Raw storage handle, used by tests that need to prepare in-progress
+    /// uploads without going through a service.
     #[doc(hidden)]
     pub fn storage(&self) -> &Arc<FileStorage> {
         &self.storage_shared
