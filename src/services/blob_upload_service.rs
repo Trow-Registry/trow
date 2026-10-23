@@ -4,10 +4,10 @@ use std::sync::Arc;
 use axum::body::Body;
 use uuid::Uuid;
 
-use crate::PROXY_DIR;
 use crate::file_storage::FileStorage;
 use crate::repositories::Repositories;
 use crate::services::Error;
+use crate::services::reference::ensure_writable;
 use crate::types::{AcceptedUpload, Upload, UploadInfo};
 use crate::utils::digest::Digest;
 
@@ -35,9 +35,7 @@ impl BlobUploadService {
         digest: Option<Digest>,
         data: Body,
     ) -> Result<Upload, Error> {
-        if repo_name.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        ensure_writable(&repo_name)?;
 
         let upload_uuid = Uuid::new_v4().to_string();
         self.repos
@@ -66,9 +64,7 @@ impl BlobUploadService {
         range: Option<RangeInclusive<u64>>,
         data: Body,
     ) -> Result<UploadInfo, Error> {
-        if repo_name.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        ensure_writable(&repo_name)?;
         let uuid_str = uuid.to_string();
         self.repos.blob_upload.exists(&uuid_str).await?;
 
@@ -139,9 +135,7 @@ impl BlobUploadService {
         repo_name: String,
         uuid: Uuid,
     ) -> Result<UploadStatus, Error> {
-        if repo_name.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        ensure_writable(&repo_name)?;
         let uuid_str = uuid.to_string();
         let offset = self
             .repos

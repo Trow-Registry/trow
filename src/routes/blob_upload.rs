@@ -8,13 +8,13 @@ use axum::routing::{post, put};
 use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
+use crate::TrowServerState;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::content_info::ContentInfo;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
 use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
-use crate::{PROXY_DIR, TrowServerState};
 
 /*
 ---
@@ -33,9 +33,6 @@ async fn put_blob_upload(
     Query(digest): Query<DigestQuery>,
     chunk: Body,
 ) -> Result<AcceptedUpload, Error> {
-    if repo.starts_with(PROXY_DIR) {
-        return Err(Error::UnsupportedForProxiedRepo);
-    }
     let uuid_str = uuid.to_string();
 
     Ok(state

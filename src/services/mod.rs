@@ -12,6 +12,7 @@ pub mod gc_service;
 pub mod health_service;
 pub mod manifest_service;
 pub mod proxy_service;
+pub mod reference;
 pub mod referrers_service;
 
 use std::sync::Arc;
