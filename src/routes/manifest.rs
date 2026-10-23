@@ -145,23 +145,9 @@ mod tests {
         .unwrap();
         let manifest_digest = Digest::digest_sha256_slice(&manifest);
         let manifest_digest_str = manifest_digest.as_str();
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
-            manifest_digest_str,
-            manifest,
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        test_utilities::seed_manifest_blob(&state, manifest_digest_str, &manifest).await;
         for repo in ["test1", "test2"] {
-            sqlx::query!(
-                r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($1, $2)"#,
-                repo,
-                manifest_digest_str
-            )
-            .execute(state.services.repos().db_rw())
-            .await
-            .unwrap();
+            test_utilities::seed_manifest_assoc(&state, repo, manifest_digest_str).await;
         }
 
         let resp = router
@@ -178,14 +164,8 @@ mod tests {
             StatusCode::ACCEPTED,
             "unexpected status code: {resp:?}"
         );
-        let res = sqlx::query!(
-            r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
-            manifest_digest_str
-        )
-        .fetch_one(state.services.repos().db_ro())
-        .await
-        .unwrap();
-        assert_eq!(res.count, 1, "manifest was deleted unexpectedly");
+        let count = test_utilities::manifest_repo_count(&state, manifest_digest_str).await;
+        assert_eq!(count, 1, "manifest was deleted unexpectedly");
 
         let resp = router
             .oneshot(
@@ -200,14 +180,8 @@ mod tests {
             StatusCode::ACCEPTED,
             "unexpected status code: {resp:?}"
         );
-        let res = sqlx::query!(
-            r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
-            manifest_digest_str
-        )
-        .fetch_one(state.services.repos().db_ro())
-        .await
-        .unwrap();
-        assert_eq!(res.count, 0, "manifest was not deleted");
+        let count = test_utilities::manifest_repo_count(&state, manifest_digest_str).await;
+        assert_eq!(count, 0, "manifest was not deleted");
     }
 
     #[tracing_test::traced_test]
@@ -221,24 +195,8 @@ mod tests {
         let manifest_digest = Digest::digest_sha256_slice(manifest_bytes);
         let manifest_digest_str = manifest_digest.as_str();
 
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
-            manifest_digest_str,
-            manifest_bytes,
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
-
         let repo_name = "test-repo";
-        sqlx::query!(
-            r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($1, $2)"#,
-            repo_name,
-            manifest_digest_str
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        test_utilities::seed_manifest(&state, repo_name, manifest_digest_str, manifest_bytes).await;
 
         let resp = router
             .oneshot(

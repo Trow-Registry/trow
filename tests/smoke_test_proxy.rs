@@ -152,14 +152,11 @@ mod proxy_registry {
         // check that it works and that manifests are written in the correct location
         get_manifest(&trow, "f/docker.io/alpine", "3.13.4").await;
 
-        let tags = sqlx::query!("SELECT * FROM tag")
-            .fetch_all(state.services.repos().db_ro())
-            .await
-            .unwrap();
+        let tags = crate::common::all_tags(&state).await;
 
         assert_eq!(tags.len(), 1);
-        assert_eq!(tags[0].repo, "f/docker.io/library/alpine");
-        assert_eq!(tags[0].tag, "3.13.4");
+        assert_eq!(tags[0].0, "f/docker.io/library/alpine");
+        assert_eq!(tags[0].1, "3.13.4");
     }
 
     #[tokio::test]
@@ -199,10 +196,7 @@ mod proxy_registry {
 
         // Check that tags get updated to point to latest digest
         let (man_3_13, digest_3_13) = get_manifest(&trow, "f/docker.io/alpine", "3.13.4").await;
-        sqlx::query!("INSERT INTO tag (repo, tag, manifest_digest) VALUES ('f/docker.io/library/alpine', 'latest', $1)", digest_3_13)
-            .execute(state.services.repos().db_rw())
-            .await
-            .expect("Failed to insert tag");
+        common::seed_tag(&state, "f/docker.io/library/alpine", "latest", &digest_3_13).await;
 
         let (man_latest, digest_latest) =
             get_manifest(&trow, "f/docker.io/library/alpine", "latest").await;
