@@ -189,6 +189,7 @@ impl From<crate::services::Error> for Error {
         use crate::services::ErrorKind as K;
         match err.kind() {
             K::NotFound => Error::NotFound,
+            K::Unauthorized => Error::Unauthorized,
             K::InvalidInput => Error::NameInvalid(err.detail()),
             K::UnsupportedForProxiedRepo => Error::UnsupportedForProxiedRepo,
             K::ManifestInvalid => Error::ManifestInvalid(err.detail()),
