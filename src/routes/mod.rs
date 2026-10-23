@@ -32,7 +32,7 @@ use tower_http::{cors, trace};
 use crate::TrowServerState;
 pub use crate::routes::response::errors::Error;
 use crate::routes::response::html::Html;
-use crate::routes::response::trow_token::{self, TrowToken, ValidBasicToken};
+use crate::routes::response::trow_token::{TrowToken, ValidBasicToken};
 
 fn add_router_layers<S: Send + Sync + Clone + 'static>(
     mut app: Router<S>,
@@ -169,9 +169,8 @@ async fn login(
     auth_user: ValidBasicToken,
     State(state): State<Arc<TrowServerState>>,
 ) -> Result<TrowToken, Error> {
-    let tok = trow_token::create_token(auth_user, &state.config);
-    match tok {
-        Ok(t) => Ok(t),
+    match state.services.auth.issue_token(auth_user.user()) {
+        Ok(token) => Ok(TrowToken::new(auth_user.user().to_string(), token)),
         Err(e) => {
             tracing::error!("Failed to create token: {:#}", e);
             Err(Error::Internal)

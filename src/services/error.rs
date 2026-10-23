@@ -6,6 +6,10 @@ use crate::utils::digest::DigestError;
 pub enum Error {
     #[error("not found")]
     NotFound,
+    #[error("unauthorized")]
+    Unauthorized,
+    #[error("internal error: {0}")]
+    Internal(String),
     #[error("invalid input: {0}")]
     Invalid(String),
     #[error("unsupported for proxied repo")]
@@ -32,12 +36,28 @@ impl Error {
         match self {
             Error::Invalid(s) | Error::ManifestInvalid(s) | Error::ManifestUnknown(s) => s.clone(),
             Error::NotFound => "not found".to_string(),
+            Error::Unauthorized => "unauthorized".to_string(),
+            Error::Internal(s) => s.clone(),
             Error::UnsupportedForProxiedRepo => "unsupported for proxied repo".to_string(),
             Error::BlobUploadUnknown => "blob upload unknown".to_string(),
             Error::Db(e) => e.to_string(),
             Error::Storage(e) => e.to_string(),
             Error::Digest(e) => e.to_string(),
             Error::Proxy(e) => e.to_string(),
+        }
+    }
+}
+
+impl Error {
+    /// Attaches detail to an error that carries none, keeping the variant so
+    /// classification is unaffected.
+    pub fn with_cause(self, cause: impl std::fmt::Display) -> Self {
+        match self {
+            Error::Unauthorized => {
+                tracing::warn!("{cause}");
+                Error::Unauthorized
+            }
+            other => other,
         }
     }
 }
@@ -56,6 +76,7 @@ impl From<DownloadRemoteImageError> for Error {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     NotFound,
+    Unauthorized,
     InvalidInput,
     UnsupportedForProxiedRepo,
     ManifestInvalid,
@@ -71,6 +92,8 @@ impl Error {
     pub fn kind(&self) -> ErrorKind {
         match self {
             Error::NotFound => ErrorKind::NotFound,
+            Error::Unauthorized => ErrorKind::Unauthorized,
+            Error::Internal(_) => ErrorKind::Internal,
             Error::Invalid(_) => ErrorKind::InvalidInput,
             Error::UnsupportedForProxiedRepo => ErrorKind::UnsupportedForProxiedRepo,
             Error::ManifestInvalid(_) => ErrorKind::ManifestInvalid,
