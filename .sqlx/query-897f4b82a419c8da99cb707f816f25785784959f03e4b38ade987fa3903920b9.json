@@ -21,7 +21,7 @@
       {
         "name": "updated_at",
         "ordinal": 3,
-        "type_info": "Text"
+        "type_info": "Integer"
       }
     ],
     "parameters": {

@@ -18,7 +18,7 @@ pub struct BlobUpload {
     pub uuid: String,
     pub repo: String,
     pub offset: i64,
-    pub updated_at: String,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, FromRow)]
