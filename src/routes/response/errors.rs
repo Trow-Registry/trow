@@ -186,31 +186,21 @@ impl From<crate::services::proxy_service::errors::DownloadRemoteImageError> for 
 
 impl From<crate::services::Error> for Error {
     fn from(err: crate::services::Error) -> Self {
-        use crate::file_storage::StorageBackendError;
-        use crate::services::Error as S;
-        use crate::utils::digest::DigestError;
-        match err {
-            S::NotFound => Error::NotFound,
-            S::Invalid(s) => Error::NameInvalid(s),
-            S::UnsupportedForProxiedRepo => Error::UnsupportedForProxiedRepo,
-            S::ManifestInvalid(s) => Error::ManifestInvalid(s),
-            S::ManifestUnknown(s) => Error::ManifestUnknown(s),
-            S::BlobUploadUnknown => Error::BlobUploadUnknown,
-            S::Db(sqlx::Error::RowNotFound) => Error::NotFound,
-            S::Db(e) => {
-                tracing::error!("Error(DbErr): {e}");
+        use crate::services::ErrorKind as K;
+        match err.kind() {
+            K::NotFound => Error::NotFound,
+            K::InvalidInput => Error::NameInvalid(err.detail()),
+            K::UnsupportedForProxiedRepo => Error::UnsupportedForProxiedRepo,
+            K::ManifestInvalid => Error::ManifestInvalid(err.detail()),
+            K::ManifestUnknown => Error::ManifestUnknown(err.detail()),
+            K::BlobUploadUnknown => Error::BlobUploadUnknown,
+            K::DigestInvalid => Error::DigestInvalid,
+            K::BlobNotFound => Error::BlobUnknown,
+            K::UnsatisfiableRange => Error::UnsatisfiableRange,
+            K::Internal => {
+                tracing::error!("Error(services): {err}");
                 Error::Internal
             }
-            S::Storage(e) => match e {
-                StorageBackendError::BlobNotFound(_) => Error::BlobUnknown,
-                StorageBackendError::InvalidContentRange => Error::UnsatisfiableRange,
-                _ => {
-                    tracing::error!("Error(StorageBackendError): {e}");
-                    Error::Internal
-                }
-            },
-            S::Digest(DigestError::InvalidDigest(_)) => Error::DigestInvalid,
-            S::Proxy(e) => Error::from(*e),
         }
     }
 }

@@ -1,7 +1,8 @@
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
-use axum::body::Body;
+use bytes::Bytes;
+use futures::stream::Stream;
 use uuid::Uuid;
 
 use crate::file_storage::FileStorage;
@@ -29,12 +30,16 @@ impl BlobUploadService {
         Self { repos, storage }
     }
 
-    pub async fn start_upload(
+    pub async fn start_upload<S, E>(
         &self,
         repo_name: String,
         digest: Option<Digest>,
-        data: Body,
-    ) -> Result<Upload, Error> {
+        data: S,
+    ) -> Result<Upload, Error>
+    where
+        S: Stream<Item = Result<Bytes, E>> + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
         ensure_writable(&repo_name)?;
 
         let upload_uuid = Uuid::new_v4().to_string();
@@ -57,20 +62,24 @@ impl BlobUploadService {
         )))
     }
 
-    pub async fn patch_upload(
+    pub async fn patch_upload<S, E>(
         &self,
         repo_name: String,
         uuid: Uuid,
         range: Option<RangeInclusive<u64>>,
-        data: Body,
-    ) -> Result<UploadInfo, Error> {
+        data: S,
+    ) -> Result<UploadInfo, Error>
+    where
+        S: Stream<Item = Result<Bytes, E>> + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
         ensure_writable(&repo_name)?;
         let uuid_str = uuid.to_string();
         self.repos.blob_upload.exists(&uuid_str).await?;
 
         let size = self
             .storage
-            .write_blob_part_stream(&uuid, data.into_data_stream(), range)
+            .write_blob_part_stream(&uuid, data, range)
             .await?;
         let total_stored = size.total_stored as i64;
         self.repos
@@ -85,14 +94,18 @@ impl BlobUploadService {
         ))
     }
 
-    pub async fn complete_upload(
+    pub async fn complete_upload<S, E>(
         &self,
         repo_name: &str,
         uuid_str: &str,
         digest: &Digest,
-        data: Body,
+        data: S,
         range: Option<RangeInclusive<u64>>,
-    ) -> Result<AcceptedUpload, Error> {
+    ) -> Result<AcceptedUpload, Error>
+    where
+        S: Stream<Item = Result<Bytes, E>> + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
         let upload_row = self.repos.blob_upload.find(uuid_str).await?;
         if upload_row.repo != repo_name {
             return Err(Error::Invalid("Repository mismatch".to_string()));
@@ -101,7 +114,7 @@ impl BlobUploadService {
 
         let size = self
             .storage
-            .write_blob_part_stream(&upload_id_bin, data.into_data_stream(), range)
+            .write_blob_part_stream(&upload_id_bin, data, range)
             .await?;
 
         self.storage
@@ -154,6 +167,7 @@ impl BlobUploadService {
 mod tests {
     use std::sync::Arc;
 
+    use bytes::Bytes;
     use uuid::Uuid;
 
     use crate::file_storage::FileStorage;
@@ -176,7 +190,7 @@ mod tests {
             .start_upload(
                 "f/docker.io/library/alpine".to_string(),
                 None,
-                axum::body::Body::empty(),
+                futures::stream::empty::<Result<Bytes, std::io::Error>>(),
             )
             .await;
         assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));
@@ -190,7 +204,11 @@ mod tests {
         let svc = BlobUploadService::new(repos.clone(), storage);
 
         let result = svc
-            .start_upload("myrepo".to_string(), None, axum::body::Body::empty())
+            .start_upload(
+                "myrepo".to_string(),
+                None,
+                futures::stream::empty::<Result<Bytes, std::io::Error>>(),
+            )
             .await
             .unwrap();
         // Returns Upload::Info when no digest provided
@@ -259,7 +277,7 @@ mod tests {
                 "f/docker.io/library/alpine".to_string(),
                 uuid,
                 None,
-                axum::body::Body::empty(),
+                futures::stream::empty::<Result<Bytes, std::io::Error>>(),
             )
             .await;
         assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));

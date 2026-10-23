@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use axum::body::Body;
-
 use crate::TrowConfig;
+use bytes::Bytes;
+
 use crate::repositories::Repositories;
 use crate::services::error::Error;
 use crate::services::proxy_service::ProxyService;
@@ -11,6 +11,9 @@ use crate::services::reference::parse_reference;
 use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::utils::digest::Digest;
 use crate::utils::manifest::{OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type};
+
+/// Upper bound on a manifest body, in bytes.
+pub const MANIFEST_BODY_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 
 pub struct ManifestPayload {
     pub bytes: bytes::Bytes,
@@ -102,19 +105,16 @@ impl ManifestService {
         repo_name: String,
         reference: String,
         host: String,
-        body: Body,
+        manifest_bytes: Bytes,
     ) -> Result<VerifiedManifest, Error> {
         ensure_writable(&repo_name)?;
+        if manifest_bytes.len() > MANIFEST_BODY_SIZE_LIMIT {
+            return Err(Error::ManifestInvalid(format!(
+                "Manifest is bigger than limit of {}MiB",
+                MANIFEST_BODY_SIZE_LIMIT / (1024 * 1024)
+            )));
+        }
         let is_tag = REGEX_TAG.is_match(&reference);
-        const MANIFEST_BODY_SIZE_LIMIT_MB: usize = 4;
-        let manifest_bytes = axum::body::to_bytes(body, MANIFEST_BODY_SIZE_LIMIT_MB * 1024 * 1024)
-            .await
-            .map_err(|_| {
-                Error::ManifestInvalid(format!(
-                    "Manifest is bigger than limit of {MANIFEST_BODY_SIZE_LIMIT_MB}MiB"
-                ))
-            })?
-            .to_vec();
         let manifest_parsed = serde_json::from_slice::<'_, OCIManifest>(&manifest_bytes)
             .map_err(|e| Error::ManifestInvalid(format!("{e}")))?;
 
@@ -238,6 +238,8 @@ pub(crate) fn determine_content_type(manifest_bytes: &[u8]) -> Result<String, Er
 mod tests {
     use std::sync::Arc;
 
+    use bytes::Bytes;
+
     use crate::TrowConfig;
     use crate::file_storage::FileStorage;
     use crate::services::error::Error;
@@ -278,7 +280,7 @@ mod tests {
                 "f/docker.io/library/alpine".to_string(),
                 "latest".to_string(),
                 "localhost".to_string(),
-                axum::body::Body::empty(),
+                Bytes::new(),
             )
             .await;
         assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));
@@ -294,7 +296,7 @@ mod tests {
                 "myrepo".to_string(),
                 "latest".to_string(),
                 "localhost".to_string(),
-                axum::body::Body::from("not-json"),
+                Bytes::from_static(b"not-json"),
             )
             .await;
         assert!(matches!(result, Err(Error::ManifestInvalid(_))));
@@ -311,7 +313,7 @@ mod tests {
                 "myrepo".to_string(),
                 "latest".to_string(),
                 "localhost".to_string(),
-                axum::body::Body::from(manifest_json),
+                Bytes::from(manifest_json),
             )
             .await
             .unwrap();
@@ -343,7 +345,7 @@ mod tests {
                 "sha256:0000000000000000000000000000000000000000000000000000000000000000"
                     .to_string(),
                 "localhost".to_string(),
-                axum::body::Body::from(manifest_json),
+                Bytes::from(manifest_json),
             )
             .await;
         assert!(matches!(result, Err(Error::ManifestInvalid(_))));
@@ -375,7 +377,7 @@ mod tests {
                 "myrepo".to_string(),
                 "latest".to_string(),
                 "localhost".to_string(),
-                axum::body::Body::from(manifest_with_layer),
+                Bytes::from(manifest_with_layer),
             )
             .await;
         assert!(matches!(result, Err(Error::ManifestInvalid(_))));
