@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 use axum::body::Body;
 
+use crate::TrowConfig;
 use crate::repositories::Repositories;
 use crate::services::error::Error;
 use crate::services::proxy_service::ProxyService;
+use crate::services::reference::ensure_writable;
+use crate::services::reference::parse_reference;
 use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::utils::digest::Digest;
 use crate::utils::manifest::{OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type};
-use crate::utils::resolve_reference::parse_reference;
-use crate::{PROXY_DIR, TrowConfig};
 
 pub struct ManifestPayload {
     pub bytes: bytes::Bytes,
@@ -103,9 +104,7 @@ impl ManifestService {
         host: String,
         body: Body,
     ) -> Result<VerifiedManifest, Error> {
-        if repo_name.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        ensure_writable(&repo_name)?;
         let is_tag = REGEX_TAG.is_match(&reference);
         const MANIFEST_BODY_SIZE_LIMIT_MB: usize = 4;
         let manifest_bytes = axum::body::to_bytes(body, MANIFEST_BODY_SIZE_LIMIT_MB * 1024 * 1024)
@@ -199,9 +198,7 @@ impl ManifestService {
         repo: String,
         reference: String,
     ) -> Result<ManifestDeleted, Error> {
-        if repo.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        ensure_writable(&repo)?;
         if REGEX_TAG.is_match(&reference) {
             self.repos.tag.delete(&repo, &reference).await?;
         } else {

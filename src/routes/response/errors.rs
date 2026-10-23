@@ -6,9 +6,6 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::file_storage::StorageBackendError;
-use crate::utils::digest::DigestError;
-
 #[derive(Debug)]
 pub enum Error {
     NameInvalid(String),
@@ -172,26 +169,6 @@ impl From<sqlx::Error> for Error {
     }
 }
 
-impl From<StorageBackendError> for Error {
-    fn from(err: StorageBackendError) -> Self {
-        tracing::error!("Error(StorageBackendError): {err}");
-        match err {
-            StorageBackendError::BlobNotFound(_) => Self::BlobUnknown,
-            StorageBackendError::InvalidContentRange => Self::UnsatisfiableRange,
-            _ => Self::Internal,
-        }
-    }
-}
-
-impl From<DigestError> for Error {
-    fn from(err: DigestError) -> Self {
-        tracing::warn!("Error(DigestError): {err}");
-        match err {
-            DigestError::InvalidDigest(_) => Self::DigestInvalid,
-        }
-    }
-}
-
 impl From<crate::services::proxy_service::errors::DownloadRemoteImageError> for Error {
     fn from(err: crate::services::proxy_service::errors::DownloadRemoteImageError) -> Self {
         use oci_client::errors::OciDistributionError;
@@ -209,7 +186,9 @@ impl From<crate::services::proxy_service::errors::DownloadRemoteImageError> for 
 
 impl From<crate::services::Error> for Error {
     fn from(err: crate::services::Error) -> Self {
+        use crate::file_storage::StorageBackendError;
         use crate::services::Error as S;
+        use crate::utils::digest::DigestError;
         match err {
             S::NotFound => Error::NotFound,
             S::Invalid(s) => Error::NameInvalid(s),
@@ -222,8 +201,15 @@ impl From<crate::services::Error> for Error {
                 tracing::error!("Error(DbErr): {e}");
                 Error::Internal
             }
-            S::Storage(e) => Error::from(e),
-            S::Digest(e) => Error::from(e),
+            S::Storage(e) => match e {
+                StorageBackendError::BlobNotFound(_) => Error::BlobUnknown,
+                StorageBackendError::InvalidContentRange => Error::UnsatisfiableRange,
+                _ => {
+                    tracing::error!("Error(StorageBackendError): {e}");
+                    Error::Internal
+                }
+            },
+            S::Digest(DigestError::InvalidDigest(_)) => Error::DigestInvalid,
             S::Proxy(e) => Error::from(*e),
         }
     }
