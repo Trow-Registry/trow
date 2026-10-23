@@ -9,15 +9,8 @@ use crate::file_storage::FileStorage;
 use crate::repositories::Repositories;
 use crate::services::Error;
 use crate::services::reference::ensure_writable;
-use crate::types::{AcceptedUpload, Upload, UploadInfo};
+use crate::services::uploads::{AcceptedUpload, Upload, UploadInfo, UploadStatus};
 use crate::utils::digest::Digest;
-
-#[derive(Debug)]
-pub struct UploadStatus {
-    pub uuid: Uuid,
-    pub repo: String,
-    pub offset: i64,
-}
 
 #[derive(Debug)]
 pub struct BlobUploadService {
@@ -212,7 +205,7 @@ mod tests {
             .await
             .unwrap();
         // Returns Upload::Info when no digest provided
-        assert!(matches!(result, crate::types::Upload::Info(_)));
+        assert!(matches!(result, crate::services::uploads::Upload::Info(_)));
 
         // Verify upload was created in DB
         let count: i64 = sqlx::query_scalar!("SELECT COUNT(*) FROM blob_upload")

@@ -14,8 +14,8 @@ use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
+use crate::services::manifest_results::{ManifestDeleted, VerifiedManifest};
 use crate::services::manifest_service::MANIFEST_BODY_SIZE_LIMIT;
-use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::utils::manifest::OCIManifest;
 
 async fn read_manifest_body(body: Body) -> Result<Bytes, Error> {

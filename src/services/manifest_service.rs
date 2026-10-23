@@ -5,10 +5,10 @@ use bytes::Bytes;
 
 use crate::repositories::Repositories;
 use crate::services::error::Error;
+use crate::services::manifest_results::{ManifestDeleted, VerifiedManifest};
 use crate::services::proxy_service::ProxyService;
 use crate::services::reference::ensure_writable;
 use crate::services::reference::parse_reference;
-use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::utils::digest::Digest;
 use crate::utils::manifest::{OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type};
 

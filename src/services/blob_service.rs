@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use tokio::io::AsyncRead;
 
+use crate::file_storage::BoundedStream;
 use crate::file_storage::FileStorage;
 use crate::repositories::Repositories;
 use crate::services::Error;
 use crate::services::reference::parse_reference;
-use crate::types::BoundedStream;
 use crate::utils::digest::Digest;
 
 pub struct BlobReader<S: AsyncRead + ?Sized + Send> {

@@ -59,7 +59,7 @@ out=$(prod_only src/repositories/*.rs |
 [ -z "$out" ] || fail "src/repositories must not depend on services or routes" "$out"
 
 # 4. Utils stay at the bottom of the stack.
-out=$(prod_only src/utils/*.rs src/file_storage.rs src/types.rs |
+out=$(prod_only src/utils/*.rs src/file_storage.rs |
     rg -n 'use crate::(services|routes|repositories)' || true)
 [ -z "$out" ] || fail "src/utils must not depend on a higher layer" "$out"
 
