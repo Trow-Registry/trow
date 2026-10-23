@@ -21,7 +21,7 @@ use self::admission_service::AdmissionService;
 use self::blob_service::BlobService;
 use self::blob_upload_service::BlobUploadService;
 use self::catalog_service::CatalogService;
-pub use self::error::Error;
+pub use self::error::{Error, ErrorKind};
 use self::gc_service::GcService;
 use self::health_service::HealthService;
 use self::manifest_service::ManifestService;

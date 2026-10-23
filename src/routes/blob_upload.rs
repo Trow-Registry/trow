@@ -38,7 +38,13 @@ async fn put_blob_upload(
     Ok(state
         .services
         .blob_upload
-        .complete_upload(&repo, &uuid_str, &digest.digest, chunk, None)
+        .complete_upload(
+            &repo,
+            &uuid_str,
+            &digest.digest,
+            chunk.into_data_stream(),
+            None,
+        )
         .await?)
 }
 
@@ -75,7 +81,7 @@ async fn patch_blob_upload(
     Ok(state
         .services
         .blob_upload
-        .patch_upload(repo, uuid, content_range, chunk)
+        .patch_upload(repo, uuid, content_range, chunk.into_data_stream())
         .await?)
 }
 
@@ -106,7 +112,7 @@ async fn post_blob_upload(
     Ok(state
         .services
         .blob_upload
-        .start_upload(repo_name, digest.digest, data)
+        .start_upload(repo_name, digest.digest, data.into_data_stream())
         .await?)
 }
 

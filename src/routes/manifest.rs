@@ -4,6 +4,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
+use bytes::Bytes;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
@@ -13,8 +14,20 @@ use crate::routes::extracts::ImageNamespace;
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
+use crate::services::manifest_service::MANIFEST_BODY_SIZE_LIMIT;
 use crate::types::{ManifestDeleted, VerifiedManifest};
 use crate::utils::manifest::OCIManifest;
+
+async fn read_manifest_body(body: Body) -> Result<Bytes, Error> {
+    axum::body::to_bytes(body, MANIFEST_BODY_SIZE_LIMIT)
+        .await
+        .map_err(|_| {
+            Error::ManifestInvalid(format!(
+                "Manifest is bigger than limit of {}MiB",
+                MANIFEST_BODY_SIZE_LIMIT / (1024 * 1024)
+            ))
+        })
+}
 
 async fn get_manifest(
     _auth_user: TrowToken,
@@ -51,7 +64,7 @@ async fn put_image_manifest(
     Ok(state
         .services
         .manifest
-        .put_manifest(repo_name, reference, host, body)
+        .put_manifest(repo_name, reference, host, read_manifest_body(body).await?)
         .await?)
 }
 endpoint_fn_7_levels!(

@@ -26,8 +26,65 @@ pub enum Error {
     Proxy(Box<DownloadRemoteImageError>),
 }
 
+impl Error {
+    /// The human readable part of an error, used to fill OCI error `detail`.
+    pub fn detail(&self) -> String {
+        match self {
+            Error::Invalid(s) | Error::ManifestInvalid(s) | Error::ManifestUnknown(s) => s.clone(),
+            Error::NotFound => "not found".to_string(),
+            Error::UnsupportedForProxiedRepo => "unsupported for proxied repo".to_string(),
+            Error::BlobUploadUnknown => "blob upload unknown".to_string(),
+            Error::Db(e) => e.to_string(),
+            Error::Storage(e) => e.to_string(),
+            Error::Digest(e) => e.to_string(),
+            Error::Proxy(e) => e.to_string(),
+        }
+    }
+}
+
 impl From<DownloadRemoteImageError> for Error {
     fn from(err: DownloadRemoteImageError) -> Self {
         Error::Proxy(Box::new(err))
+    }
+}
+
+/// Transport-independent classification of a service error.
+///
+/// The routes layer maps this onto OCI error codes; it lets that mapping stay
+/// in `src/routes/response/errors.rs` without importing storage or digest
+/// internals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorKind {
+    NotFound,
+    InvalidInput,
+    UnsupportedForProxiedRepo,
+    ManifestInvalid,
+    ManifestUnknown,
+    BlobUploadUnknown,
+    DigestInvalid,
+    BlobNotFound,
+    UnsatisfiableRange,
+    Internal,
+}
+
+impl Error {
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Error::NotFound => ErrorKind::NotFound,
+            Error::Invalid(_) => ErrorKind::InvalidInput,
+            Error::UnsupportedForProxiedRepo => ErrorKind::UnsupportedForProxiedRepo,
+            Error::ManifestInvalid(_) => ErrorKind::ManifestInvalid,
+            Error::ManifestUnknown(_) => ErrorKind::ManifestUnknown,
+            Error::BlobUploadUnknown => ErrorKind::BlobUploadUnknown,
+            Error::Db(sqlx::Error::RowNotFound) => ErrorKind::NotFound,
+            Error::Db(_) => ErrorKind::Internal,
+            Error::Storage(StorageBackendError::BlobNotFound(_)) => ErrorKind::BlobNotFound,
+            Error::Storage(StorageBackendError::InvalidContentRange) => {
+                ErrorKind::UnsatisfiableRange
+            }
+            Error::Storage(_) => ErrorKind::Internal,
+            Error::Digest(DigestError::InvalidDigest(_)) => ErrorKind::DigestInvalid,
+            Error::Proxy(_) => ErrorKind::Internal,
+        }
     }
 }
