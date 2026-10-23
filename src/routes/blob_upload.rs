@@ -9,12 +9,13 @@ use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::TrowServerState;
+use crate::routes::extracts::{DigestQuery, OptionalDigestQuery};
 use crate::routes::macros::route_7_levels;
 use crate::routes::response::content_info::ContentInfo;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
-use crate::types::{AcceptedUpload, DigestQuery, OptionalDigestQuery, Upload};
+use crate::services::uploads::{AcceptedUpload, Upload};
 
 /*
 ---

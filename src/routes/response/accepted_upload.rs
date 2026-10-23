@@ -2,7 +2,7 @@ use axum::body;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
-use crate::types::AcceptedUpload;
+use crate::services::uploads::AcceptedUpload;
 
 impl IntoResponse for AcceptedUpload {
     fn into_response(self) -> Response {
@@ -26,7 +26,7 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::types::AcceptedUpload;
+    use crate::services::uploads::AcceptedUpload;
     use crate::utils::digest::Digest;
 
     #[tokio::test]

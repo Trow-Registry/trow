@@ -2,7 +2,7 @@ use axum::body;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
-use crate::types::ManifestDeleted;
+use crate::services::manifest_results::ManifestDeleted;
 
 impl IntoResponse for ManifestDeleted {
     fn into_response(self) -> Response {

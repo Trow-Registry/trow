@@ -6,7 +6,6 @@ pub mod routes;
 pub mod services;
 #[cfg(test)]
 pub mod test_utilities;
-pub mod types;
 pub mod utils;
 
 use std::path::PathBuf;
