@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT typeof(updated_at) AS \"typeof!: String\" FROM blob_upload WHERE uuid = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "typeof!: String",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6e8b27fad8bb0e821e201b7689422b644c67dcd4a8a40e2002a5184d6e963b04"
+}

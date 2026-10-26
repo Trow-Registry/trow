@@ -208,10 +208,7 @@ mod tests {
         assert!(matches!(result, crate::services::uploads::Upload::Info(_)));
 
         // Verify upload was created in DB
-        let count: i64 = sqlx::query_scalar!("SELECT COUNT(*) FROM blob_upload")
-            .fetch_one(repos.db_ro())
-            .await
-            .unwrap();
+        let count = repos.blob_upload.count().await.unwrap();
         assert_eq!(count, 1);
     }
 
@@ -238,15 +235,11 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let uuid_str = uuid.to_string();
-        sqlx::query!(
-            "INSERT INTO blob_upload (uuid, offset, repo) VALUES (?, ?, ?)",
-            uuid_str,
-            42i64,
-            "myrepo"
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
+        repos
+            .blob_upload
+            .create_with_offset(&uuid_str, "myrepo", 42)
+            .await
+            .unwrap();
 
         let result = svc
             .get_upload_status("myrepo".to_string(), uuid)

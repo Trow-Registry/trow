@@ -122,23 +122,12 @@ mod tests {
         let (storage, blobs_dir) = setup_storage(&dir);
 
         let digest_str = "sha256:abc123def456789012345678901234567890123456789012345678901234567";
-        // Insert blob record
-        sqlx::query!(
-            "INSERT INTO blob (digest, size) VALUES (?, ?)",
-            digest_str,
-            4i64
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
-        // Insert blob association
-        sqlx::query!(
-            "INSERT INTO repo_blob_assoc (repo_name, blob_digest, manifest_digest) VALUES (?, ?, NULL)",
-            "myrepo", digest_str
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
+        repos.blob.insert_or_ignore(digest_str, 4i64).await.unwrap();
+        repos
+            .repo_blob_assoc
+            .insert_blob_assoc_safe("myrepo", digest_str)
+            .await
+            .unwrap();
         // Write blob file to storage
         let blob_path = blobs_dir.join(digest_str);
         tokio::fs::write(&blob_path, b"test").await.unwrap();

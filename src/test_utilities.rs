@@ -5,9 +5,7 @@ use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::Response;
 use serde::de::DeserializeOwned;
-use sqlx::sqlite::{
-    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
-};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use test_temp_dir::TestTempDir;
 
 use crate::repositories::Repositories;
@@ -50,25 +48,6 @@ pub async fn repos_in_memory() -> Arc<Repositories> {
     Arc::new(Repositories::from_pools(pool.clone(), pool))
 }
 
-/// Create an `Arc<SqlitePool>` backed by an in-memory SQLite database
-/// with migrations applied. Useful when tests need direct pool access.
-pub async fn pool_in_memory() -> SqlitePool {
-    let options = SqliteConnectOptions::new()
-        .filename(":memory:")
-        .synchronous(SqliteSynchronous::Normal)
-        .journal_mode(SqliteJournalMode::Wal)
-        .foreign_keys(true);
-
-    let pool = SqlitePoolOptions::new()
-        .max_connections(1)
-        .connect_with(options)
-        .await
-        .unwrap();
-
-    sqlx::migrate!().run(&pool).await.unwrap();
-    pool
-}
-
 // Persistence fixtures.
 //
 // Route and integration tests must not reach for repositories directly; these
@@ -84,81 +63,71 @@ pub async fn seed_manifest(state: &TrowServerState, repo_name: &str, digest: &st
 
 /// Insert only the manifest row, for manifests shared by several repositories.
 pub async fn seed_manifest_blob(state: &TrowServerState, digest: &str, bytes: &[u8]) {
-    sqlx::query!(
-        "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
-        digest,
-        bytes,
-    )
-    .execute(state.services.repos().db_rw())
-    .await
-    .unwrap();
+    state
+        .services
+        .repos()
+        .manifest
+        .insert_or_ignore(digest, bytes)
+        .await
+        .unwrap();
 }
 
 /// Associate an existing manifest with a repository.
 pub async fn seed_manifest_assoc(state: &TrowServerState, repo_name: &str, digest: &str) {
-    sqlx::query!(
-        "INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ($1, $2)",
-        repo_name,
-        digest
-    )
-    .execute(state.services.repos().db_rw())
-    .await
-    .unwrap();
+    state
+        .services
+        .repos()
+        .repo_blob_assoc
+        .insert_manifest_assoc_safe(repo_name, digest)
+        .await
+        .unwrap();
 }
 
 /// Number of repositories a manifest is still referenced by.
 pub async fn manifest_repo_count(state: &TrowServerState, digest: &str) -> i64 {
-    sqlx::query_scalar!(
-        r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
-        digest
-    )
-    .fetch_one(state.services.repos().db_ro())
-    .await
-    .unwrap()
+    state.services.repos().manifest.count(digest).await.unwrap()
 }
 
 /// Insert an in-progress blob upload row with a pre-filled offset.
 pub async fn seed_blob_upload(state: &TrowServerState, uuid: &str, repo: &str, offset: i64) {
-    sqlx::query!(
-        "INSERT INTO blob_upload (uuid, offset, repo) VALUES ($1, $2, $3)",
-        uuid,
-        offset,
-        repo
-    )
-    .execute(state.services.repos().db_rw())
-    .await
-    .unwrap();
+    state
+        .services
+        .repos()
+        .blob_upload
+        .create_with_offset(uuid, repo, offset)
+        .await
+        .unwrap();
 }
 
 /// Whether a blob upload row with this UUID exists.
 pub async fn blob_upload_exists(state: &TrowServerState, uuid: &str) -> bool {
-    let count: i64 = sqlx::query_scalar!(
-        r#"SELECT COUNT(*) as "count!" FROM blob_upload WHERE uuid = $1"#,
-        uuid
-    )
-    .fetch_one(state.services.repos().db_ro())
-    .await
-    .unwrap();
-    count > 0
+    state
+        .services
+        .repos()
+        .blob_upload
+        .exists(uuid)
+        .await
+        .is_ok()
 }
 
 /// Insert a tag pointing at an existing manifest.
 pub async fn seed_tag(state: &TrowServerState, repo: &str, tag: &str, manifest_digest: &str) {
-    sqlx::query!(
-        "INSERT INTO tag (tag, repo, manifest_digest) VALUES ($1, $2, $3)",
-        tag,
-        repo,
-        manifest_digest
-    )
-    .execute(state.services.repos().db_rw())
-    .await
-    .unwrap();
+    state
+        .services
+        .repos()
+        .tag
+        .upsert(tag, repo, manifest_digest)
+        .await
+        .unwrap();
 }
 
 /// Every tag in the database, as `(repo, tag, manifest digest)`.
 pub async fn all_tags(state: &TrowServerState) -> Vec<(String, String, String)> {
-    sqlx::query!("SELECT repo, tag, manifest_digest FROM tag")
-        .fetch_all(state.services.repos().db_ro())
+    state
+        .services
+        .repos()
+        .tag
+        .list_all()
         .await
         .unwrap()
         .into_iter()

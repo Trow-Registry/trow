@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO blob (digest, size, last_accessed)\n            VALUES ($1, $2, unixepoch() - $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b524db4825719060e5ff042a301b1af345c7095077f4dc83d7b2eaeae65a7735"
+}

@@ -95,7 +95,6 @@ impl Services {
     pub fn repos(&self) -> &Arc<Repositories> {
         &self.repos_shared
     }
-
     /// Raw storage handle, used by tests that need to prepare in-progress
     /// uploads without going through a service.
     #[doc(hidden)]

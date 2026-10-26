@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) as \"count!\" FROM tag WHERE repo = $1 AND tag = $2",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3b752f450f215bb17e48e10bcfebf282670d47d595917dca7a04e848ccf3d289"
+}
