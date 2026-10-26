@@ -18,16 +18,6 @@ impl BlobRepository {
         Self { db_ro, db_rw }
     }
 
-    #[doc(hidden)]
-    pub fn db_rw(&self) -> &SqlitePool {
-        &self.db_rw
-    }
-
-    #[doc(hidden)]
-    pub fn db_ro(&self) -> &SqlitePool {
-        &self.db_ro
-    }
-
     /// UPDATE blob SET last_accessed=unixepoch() WHERE digest=$1 AND EXISTS (SELECT 1 FROM repo_blob_assoc WHERE blob_digest=$1 AND repo_name=$2)
     pub async fn touch_last_accessed(
         &self,
@@ -124,6 +114,38 @@ impl BlobRepository {
         )
         .fetch_all(&self.db_ro)
         .await
+    }
+
+    /// INSERT INTO blob (digest, size, last_accessed) VALUES ($1, $2, unixepoch() - $3)
+    ///
+    /// Seeds a blob with a controlled age relative to the database clock, which
+    /// is the clock the GC's staleness cutoff compares against.
+    #[doc(hidden)]
+    pub async fn insert_aged(
+        &self,
+        digest: &str,
+        size: i64,
+        age_secs: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+            INSERT INTO blob (digest, size, last_accessed)
+            VALUES ($1, $2, unixepoch() - $3)
+            "#,
+            digest,
+            size,
+            age_secs
+        )
+        .execute(&self.db_rw)
+        .await?;
+        Ok(())
+    }
+
+    /// SELECT digest FROM blob
+    pub async fn list_all_digests(&self) -> Result<Vec<String>, sqlx::Error> {
+        sqlx::query_scalar!(r#"SELECT digest FROM blob"#)
+            .fetch_all(&self.db_ro)
+            .await
     }
 
     /// DELETE FROM blob WHERE digest = $1

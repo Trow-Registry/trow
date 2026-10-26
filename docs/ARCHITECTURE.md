@@ -39,9 +39,14 @@ spirit applies to tests as well.
 
 Other consequences of the rules:
 
- - **All SQL lives in `src/repositories/`.** It is the only module allowed to call `sqlx::query!`.
-   Anything a route or a test needs to read or seed goes through a repository method or a fixture in
-   `src/test_utilities.rs` (unit tests) / `tests/common/mod.rs` (integration tests).
+ - **All SQL lives in `src/repositories/`.** It is the only module allowed to call `sqlx::query!`,
+   and `ci/check-layering.sh` enforces that for tests as well as production code. Anything a route or
+   a test needs to read or seed goes through a repository method or a fixture in
+   `src/test_utilities.rs` (unit tests) / `tests/common/mod.rs` (integration tests). Those fixtures
+   are thin wrappers over repository methods, so a test never holds a database pool and the same
+   query cannot drift between production and test code. Seeding helpers that need a specific
+   timestamp (GC staleness, upload age) take an age in seconds and let SQLite compute the value
+   against its own clock, which is what the cutoff queries compare against.
  - **Services are transport agnostic.** They take `bytes::Bytes` or a byte stream, never
    `axum::body::Body`, and return plain structs. HTTP bodies, headers and status codes are decided in
    `src/routes/response/`.

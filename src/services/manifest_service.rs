@@ -322,15 +322,12 @@ mod tests {
         assert_eq!(result.repo_name(), "myrepo");
 
         // Verify tag was created
-        let tag_digest = sqlx::query_scalar!(
-            "SELECT manifest_digest FROM tag WHERE repo = ? AND tag = ?",
-            "myrepo",
-            "latest"
-        )
-        .fetch_one(repos.db_ro())
-        .await
-        .unwrap();
-        assert_eq!(tag_digest, result.digest());
+        let tag_digest = repos
+            .tag
+            .find_manifest_digest("myrepo", "latest")
+            .await
+            .unwrap();
+        assert_eq!(tag_digest.as_deref(), Some(result.digest()));
     }
 
     #[tokio::test]
@@ -404,39 +401,19 @@ mod tests {
 
         let digest = "sha256:abc123def456789012345678901234567890123456789012345678901234567";
         // tag has FK to manifest, so insert manifest first
-        let json_bytes: &[u8] = b"{}";
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES (?, ?, ?)",
-            digest,
-            json_bytes,
-            json_bytes
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
-        sqlx::query!(
-            "INSERT INTO tag (tag, repo, manifest_digest) VALUES (?, ?, ?)",
-            "latest",
-            "myrepo",
-            digest
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
+        repos
+            .manifest
+            .insert_or_ignore(digest, b"{}")
+            .await
+            .unwrap();
+        repos.tag.upsert("latest", "myrepo", digest).await.unwrap();
 
         svc.delete_manifest("myrepo".to_string(), "latest".to_string())
             .await
             .unwrap();
 
         // Verify tag was deleted
-        let count: i64 = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM tag WHERE repo = ? AND tag = ?",
-            "myrepo",
-            "latest"
-        )
-        .fetch_one(repos.db_ro())
-        .await
-        .unwrap();
+        let count = repos.tag.count("myrepo", "latest").await.unwrap();
         assert_eq!(count, 0);
     }
 
@@ -447,45 +424,31 @@ mod tests {
 
         let digest = "sha256:abc123def456789012345678901234567890123456789012345678901234567";
         // Setup: create manifest and association
-        let json_bytes: &[u8] = b"{}";
-        let blob_bytes: &[u8] = b"";
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES (?, ?, ?)",
-            digest,
-            json_bytes,
-            blob_bytes
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
-        sqlx::query!(
-            "INSERT INTO repo_blob_assoc (repo_name, blob_digest, manifest_digest) VALUES (?, NULL, ?)",
-            "myrepo", digest
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
+        repos
+            .manifest
+            .insert_or_ignore(digest, b"{}")
+            .await
+            .unwrap();
+        repos
+            .repo_blob_assoc
+            .insert_manifest_assoc_safe("myrepo", digest)
+            .await
+            .unwrap();
 
         svc.delete_manifest("myrepo".to_string(), digest.to_string())
             .await
             .unwrap();
 
         // Association deleted
-        let assoc_count: i64 = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM repo_blob_assoc WHERE manifest_digest = ?",
-            digest
-        )
-        .fetch_one(repos.db_ro())
-        .await
-        .unwrap();
+        let assoc_count = repos
+            .repo_blob_assoc
+            .count_manifest_assoc(digest)
+            .await
+            .unwrap();
         assert_eq!(assoc_count, 0);
 
         // Manifest deleted (no more associations)
-        let manifest_count: i64 =
-            sqlx::query_scalar!("SELECT COUNT(*) FROM manifest WHERE digest = ?", digest)
-                .fetch_one(repos.db_ro())
-                .await
-                .unwrap();
+        let manifest_count = repos.manifest.count(digest).await.unwrap();
         assert_eq!(manifest_count, 0);
     }
 
@@ -498,31 +461,17 @@ mod tests {
         let manifest_bytes = minimal_v2_manifest_json().as_bytes();
 
         // Setup: manifest first (FK target), then tag, then association
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES (?, ?, ?)",
-            digest,
-            manifest_bytes,
-            manifest_bytes
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
-        sqlx::query!(
-            "INSERT INTO tag (tag, repo, manifest_digest) VALUES (?, ?, ?)",
-            "latest",
-            "myrepo",
-            digest
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
-        sqlx::query!(
-            "INSERT INTO repo_blob_assoc (repo_name, blob_digest, manifest_digest) VALUES (?, NULL, ?)",
-            "myrepo", digest
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
+        repos
+            .manifest
+            .insert_or_ignore(digest, manifest_bytes)
+            .await
+            .unwrap();
+        repos.tag.upsert("latest", "myrepo", digest).await.unwrap();
+        repos
+            .repo_blob_assoc
+            .insert_manifest_assoc_safe("myrepo", digest)
+            .await
+            .unwrap();
 
         let result = svc
             .get_manifest("myrepo".to_string(), "latest".to_string(), None)

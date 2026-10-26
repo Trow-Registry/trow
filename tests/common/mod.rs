@@ -76,8 +76,11 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
 
 /// Every tag in the database, as `(repo, tag, manifest digest)`.
 pub async fn all_tags(state: &Arc<TrowServerState>) -> Vec<(String, String, String)> {
-    sqlx::query!("SELECT repo, tag, manifest_digest FROM tag")
-        .fetch_all(state.services.repos().db_ro())
+    state
+        .services
+        .repos()
+        .tag
+        .list_all()
         .await
         .unwrap()
         .into_iter()
@@ -87,15 +90,13 @@ pub async fn all_tags(state: &Arc<TrowServerState>) -> Vec<(String, String, Stri
 
 /// Insert a tag pointing at an existing manifest.
 pub async fn seed_tag(state: &Arc<TrowServerState>, repo: &str, tag: &str, manifest_digest: &str) {
-    sqlx::query!(
-        "INSERT INTO tag (tag, repo, manifest_digest) VALUES ($1, $2, $3)",
-        tag,
-        repo,
-        manifest_digest
-    )
-    .execute(state.services.repos().db_rw())
-    .await
-    .unwrap();
+    state
+        .services
+        .repos()
+        .tag
+        .upsert(tag, repo, manifest_digest)
+        .await
+        .unwrap();
 }
 
 /// Returns (blob-digest, manifest-digest)

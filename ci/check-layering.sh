@@ -63,4 +63,12 @@ out=$(prod_only src/utils/*.rs src/file_storage.rs |
     rg -n 'use crate::(services|routes|repositories)' || true)
 [ -z "$out" ] || fail "src/utils must not depend on a higher layer" "$out"
 
+# 5. The repository layer is the only place SQL lives, tests included. Migrations
+#    are exempt: running them is schema setup, not a query. Tests seed and assert
+#    through repository methods and the fixtures, so that every query stays in one
+#    auditable place and goes through the offline-prepared .sqlx cache.
+out=$(rg -n 'sqlx::(query|query_as|query_scalar)' src tests \
+    -g '!src/repositories/**' || true)
+[ -z "$out" ] || fail "SQL outside src/repositories (use a repository method or a fixture)" "$out"
+
 exit "$status"

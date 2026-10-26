@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO blob_upload (uuid, offset, updated_at, repo)\n            VALUES ($1, $2, unixepoch() - $3, $4)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "3c5d58aa12e55b2944ce95448442e06df76fc314536a8476e7a7356a58f54e33"
+}

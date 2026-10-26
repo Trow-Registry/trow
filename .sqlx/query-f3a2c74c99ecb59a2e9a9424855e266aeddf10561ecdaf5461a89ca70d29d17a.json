@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT digest FROM blob",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f3a2c74c99ecb59a2e9a9424855e266aeddf10561ecdaf5461a89ca70d29d17a"
+}
