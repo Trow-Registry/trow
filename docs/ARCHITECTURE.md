@@ -46,9 +46,10 @@ Other consequences of the rules:
    query cannot drift between production and test code. Seeding helpers that need a specific
    timestamp (GC staleness, upload age) take an age in seconds and let SQLite compute the value
    against its own clock, which is what the cutoff queries compare against.
- - **Services are transport agnostic.** They take `bytes::Bytes` or a byte stream, never
-   `axum::body::Body`, and return plain structs. HTTP bodies, headers and status codes are decided in
-   `src/routes/response/`.
+ - **Services are transport agnostic.** They take bytes or a byte stream and return plain structs.
+   HTTP bodies, headers and status codes are decided in `src/routes/response/`, which renders the
+   types services return, so handlers return those types instead of building responses themselves.
+   Router-wide middleware only adds headers every response carries and gives bodiless errors a body.
  - **Error mapping happens once.** Services return `services::Error`; `Error::kind()` classifies it as
    a transport-neutral `ErrorKind`, and `src/routes/response/errors.rs` turns that into an OCI error
    code. Routes never match on storage or database error variants.
@@ -91,15 +92,14 @@ how this is used, consider the process of uploading a new image:
    and recorded in the `blob` table, with a `repo_blob_assoc` row tying it to the repository. All
    digests are SHA256 hashes of the content at the moment.
  - Once the layers are uploaded, the manifest is uploaded in the same manner: validated against the
-   blobs already associated with the repository, then stored in `blobs/<digest>` and recorded in the
-   `manifest` table.
+   blobs already associated with the repository, then stored in the `manifest` table.
  - A tag is a row in the `tag` table mapping `(repo, tag)` to a manifest digest. Manifests are looked
-   up through `manifest_repository`/`tag_repository`; the bytes are read back from `blobs/`.
+   up through the repositories layer, which reads the bytes back from the database.
 
 So this means:
 
- - Files in the `blobs` directory represent not just image layers, but also manifests and config
-   data referred to from manifests. They are content addressed and shared between repositories.
+ - Files in the `blobs` directory represent image layers and the config data referred to from
+   manifests — not manifests themselves. They are content addressed and shared between repositories.
  - The files in `uploads` _are not_ digests. They are UUIDs used for temporary tracking of uploads,
    and are cleaned up by the garbage collector if abandoned.
  - Garbage collection is incremental rather than "pause-the-world": `services::gc_service` runs on a
