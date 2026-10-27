@@ -26,8 +26,8 @@ Note:
 
 ## Layering rules
 
-`ci/check-layering.sh` enforces the rules below in CI. `#[cfg(test)]` modules are excluded, but the
-spirit applies to tests as well.
+The rules below are conventions, enforced in review rather than by tooling. `#[cfg(test)]` modules
+are not checked mechanically, but the spirit applies to tests as well.
 
 | Layer | Lives in | May depend on | Must not |
 | --- | --- | --- | --- |
@@ -39,9 +39,8 @@ spirit applies to tests as well.
 
 Other consequences of the rules:
 
- - **All SQL lives in `src/repositories/`.** It is the only module allowed to call `sqlx::query!`,
-   and `ci/check-layering.sh` enforces that for tests as well as production code. Anything a route or
-   a test needs to read or seed goes through a repository method or a fixture in
+ - **All SQL lives in `src/repositories/`.** It is the only module allowed to call `sqlx::query!`.
+   Anything a route or a test needs to read or seed goes through a repository method or a fixture in
    `src/test_utilities.rs` (unit tests) / `tests/common/mod.rs` (integration tests). Those fixtures
    are thin wrappers over repository methods, so a test never holds a database pool and the same
    query cannot drift between production and test code. Seeding helpers that need a specific

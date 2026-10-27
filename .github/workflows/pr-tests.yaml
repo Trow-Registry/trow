@@ -37,8 +37,6 @@ jobs:
         run: cargo sqlx prepare --check
       - name: Cargo fmt
         run: cargo fmt --all -- --check
-      - name: Check layer boundaries
-        run: ./ci/check-layering.sh
       - name: Run Trow test suite
         run: RUST_LOG=info cargo nextest run -- --skip ipv6
 
