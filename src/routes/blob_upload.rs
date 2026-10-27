@@ -3,9 +3,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::response::Response;
 use axum::routing::{post, put};
-use hyper::StatusCode;
 
 use super::macros::endpoint_fn_7_levels;
 use crate::TrowServerState;
@@ -15,6 +13,7 @@ use crate::routes::response::content_info::ContentInfo;
 use crate::routes::response::errors::Error;
 use crate::routes::response::trow_token::TrowToken;
 use crate::routes::response::upload_info::UploadInfo;
+use crate::routes::response::upload_status::UploadStatus;
 use crate::services::uploads::{AcceptedUpload, Upload};
 
 /*
@@ -134,25 +133,12 @@ async fn get_blob_upload(
     _auth: TrowToken,
     State(state): State<Arc<TrowServerState>>,
     Path((repo_name, upload_id)): Path<(String, uuid::Uuid)>,
-) -> Result<Response, Error> {
-    let status = state
+) -> Result<UploadStatus, Error> {
+    Ok(state
         .services
         .blob_upload
         .get_upload_status(repo_name.clone(), upload_id)
-        .await?;
-    let location = format!("/v2/{}/blobs/uploads/{}", status.repo, status.uuid);
-
-    Ok(Response::builder()
-        .header("Docker-Upload-UUID", status.uuid.to_string())
-        .header(
-            "Range",
-            format!("0-{}", (status.offset as u64).saturating_sub(1)),
-        )
-        .header("Content-Length", "0")
-        .header("Location", location)
-        .status(StatusCode::NO_CONTENT)
-        .body(Body::empty())
-        .unwrap())
+        .await?)
 }
 
 endpoint_fn_7_levels!(
@@ -160,7 +146,7 @@ endpoint_fn_7_levels!(
         auth: TrowToken,
         state: State<Arc<TrowServerState>>;
         path: [image_name, upload_id: uuid::Uuid]
-    ) -> Result<Response, Error>
+    ) -> Result<UploadStatus, Error>
 );
 
 pub fn route(mut app: Router<Arc<TrowServerState>>) -> Router<Arc<TrowServerState>> {

@@ -10,6 +10,7 @@ pub mod readiness;
 pub mod trow_token;
 pub mod upload;
 pub mod upload_info;
+pub mod upload_status;
 pub mod verified_manifest;
 
 use std::marker::PhantomData;

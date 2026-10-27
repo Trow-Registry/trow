@@ -99,6 +99,7 @@ impl BlobUploadService {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
+        ensure_writable(repo_name)?;
         let upload_row = self.repos.blob_upload.find(uuid_str).await?;
         if upload_row.repo != repo_name {
             return Err(Error::Invalid("Repository mismatch".to_string()));
@@ -167,6 +168,7 @@ mod tests {
     use crate::services::blob_upload_service::BlobUploadService;
     use crate::services::error::Error;
     use crate::test_utilities::repos_in_memory;
+    use crate::utils::digest::Digest;
 
     fn setup_storage(dir: &test_temp_dir::TestTempDir) -> Arc<FileStorage> {
         Arc::new(FileStorage::new(dir.as_path_untracked().to_owned()).unwrap())
@@ -187,6 +189,49 @@ mod tests {
             )
             .await;
         assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));
+    }
+
+    #[tokio::test]
+    async fn complete_upload_rejects_proxied_repo() {
+        let repos = repos_in_memory().await;
+        let dir = test_temp_dir::test_temp_dir!();
+        let storage = setup_storage(&dir);
+        let svc = BlobUploadService::new(repos.clone(), storage.clone());
+        let repo = "f/docker.io/library/alpine";
+        let uuid = Uuid::new_v4().to_string();
+
+        for existing_upload in [false, true] {
+            if existing_upload {
+                repos.blob_upload.create(&uuid, repo).await.unwrap();
+            }
+            let blob = Bytes::from_static(b"blob data");
+            let digest = Digest::digest_sha256_slice(&blob);
+
+            let result = svc
+                .complete_upload(
+                    repo,
+                    &uuid,
+                    &digest,
+                    futures::stream::iter([Ok::<_, std::io::Error>(blob)]),
+                    None,
+                )
+                .await;
+
+            assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));
+            assert_eq!(
+                repos.blob_upload.count().await.unwrap(),
+                i64::from(existing_upload)
+            );
+            assert!(!repos.blob.exists(digest.as_str()).await.unwrap());
+            assert!(
+                !repos
+                    .repo_blob_assoc
+                    .blob_belongs_to_repo(digest.as_str(), repo)
+                    .await
+                    .unwrap()
+            );
+            assert!(storage.list_blobs().await.unwrap().is_empty());
+        }
     }
 
     #[tokio::test]
