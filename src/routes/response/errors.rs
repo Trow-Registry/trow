@@ -157,33 +157,6 @@ impl IntoResponse for Error {
     }
 }
 
-impl From<sqlx::Error> for Error {
-    fn from(err: sqlx::Error) -> Self {
-        match err {
-            sqlx::Error::RowNotFound => Self::NotFound,
-            _ => {
-                tracing::error!("Error(DbErr): {err}");
-                Self::Internal
-            }
-        }
-    }
-}
-
-impl From<crate::services::proxy_service::errors::DownloadRemoteImageError> for Error {
-    fn from(err: crate::services::proxy_service::errors::DownloadRemoteImageError) -> Self {
-        use oci_client::errors::OciDistributionError;
-        match &err {
-            crate::services::proxy_service::errors::DownloadRemoteImageError::OciClientError(
-                OciDistributionError::ImageManifestNotFoundError(_),
-            ) => Self::ManifestUnknown(err.to_string()),
-            _ => {
-                tracing::error!("Error(DownloadRemoteImageError): {err}");
-                Self::Internal
-            }
-        }
-    }
-}
-
 impl From<crate::services::Error> for Error {
     fn from(err: crate::services::Error) -> Self {
         use crate::services::ErrorKind as K;
@@ -203,5 +176,35 @@ impl From<crate::services::Error> for Error {
                 Error::Internal
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    use super::Error;
+    use crate::services::Error as ServiceError;
+
+    #[test]
+    fn db_row_not_found_maps_to_not_found() {
+        let err = Error::from(ServiceError::Db(sqlx::Error::RowNotFound));
+
+        assert!(matches!(err, Error::NotFound));
+        assert_eq!(err.into_response().status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn proxy_download_failure_maps_to_internal() {
+        let err = Error::from(ServiceError::Proxy(Box::new(
+            crate::services::proxy_service::errors::DownloadRemoteImageError::DownloadAttemptsFailed,
+        )));
+
+        assert!(matches!(err, Error::Internal));
+        assert_eq!(
+            err.into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }
