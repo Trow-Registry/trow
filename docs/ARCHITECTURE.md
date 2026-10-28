@@ -49,7 +49,8 @@ Other consequences of the rules:
  - **Services are transport agnostic.** They take bytes or a byte stream and return plain structs.
    HTTP bodies, headers and status codes are decided in `src/routes/response/`, which renders the
    types services return, so handlers return those types instead of building responses themselves.
-   Router-wide middleware only adds headers every response carries and gives bodiless errors a body.
+   Router-wide middleware only adds headers every response carries and fills in a JSON error body on
+   404 responses that lack one.
  - **Error mapping happens once.** Services return `services::Error`; `Error::kind()` classifies it as
    a transport-neutral `ErrorKind`, and `src/routes/response/errors.rs` turns that into an OCI error
    code. Routes never match on storage or database error variants.
