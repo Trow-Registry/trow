@@ -83,8 +83,8 @@ pub async fn seed_manifest_assoc(state: &TrowServerState, repo_name: &str, diges
         .unwrap();
 }
 
-/// Number of repositories a manifest is still referenced by.
-pub async fn manifest_repo_count(state: &TrowServerState, digest: &str) -> i64 {
+/// Number of `manifest` rows for a digest: 1 while the manifest exists, 0 once it is gone.
+pub async fn manifest_count(state: &TrowServerState, digest: &str) -> i64 {
     state.services.repos().manifest.count(digest).await.unwrap()
 }
 
