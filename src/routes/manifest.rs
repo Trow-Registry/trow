@@ -164,7 +164,7 @@ mod tests {
             StatusCode::ACCEPTED,
             "unexpected status code: {resp:?}"
         );
-        let count = test_utilities::manifest_repo_count(&state, manifest_digest_str).await;
+        let count = test_utilities::manifest_count(&state, manifest_digest_str).await;
         assert_eq!(count, 1, "manifest was deleted unexpectedly");
 
         let resp = router
@@ -180,7 +180,7 @@ mod tests {
             StatusCode::ACCEPTED,
             "unexpected status code: {resp:?}"
         );
-        let count = test_utilities::manifest_repo_count(&state, manifest_digest_str).await;
+        let count = test_utilities::manifest_count(&state, manifest_digest_str).await;
         assert_eq!(count, 0, "manifest was not deleted");
     }
 
