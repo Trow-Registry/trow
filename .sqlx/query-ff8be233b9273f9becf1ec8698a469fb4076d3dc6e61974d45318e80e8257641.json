@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT repo, tag, manifest_digest FROM tag",
+  "describe": {
+    "columns": [
+      {
+        "name": "repo",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "manifest_digest",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ff8be233b9273f9becf1ec8698a469fb4076d3dc6e61974d45318e80e8257641"
+}

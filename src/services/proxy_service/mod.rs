@@ -201,22 +201,16 @@ mod tests {
         let manifest_bytes: &[u8] = b"{}";
 
         // Insert manifest and association so proxy finds it locally
-        sqlx::query!(
-            "INSERT INTO manifest (digest, json, blob) VALUES (?, ?, ?)",
-            digest,
-            manifest_bytes,
-            manifest_bytes
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
-        sqlx::query!(
-            "INSERT INTO repo_blob_assoc (repo_name, blob_digest, manifest_digest) VALUES (?, NULL, ?)",
-            repo_name, digest
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
+        repos
+            .manifest
+            .insert_or_ignore(digest, manifest_bytes)
+            .await
+            .unwrap();
+        repos
+            .repo_blob_assoc
+            .insert_manifest_assoc_safe(repo_name, digest)
+            .await
+            .unwrap();
 
         // Use digest-based reference to skip network calls
         let image = Reference::with_digest(

@@ -5,9 +5,7 @@ use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::Response;
 use serde::de::DeserializeOwned;
-use sqlx::sqlite::{
-    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
-};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use test_temp_dir::TestTempDir;
 
 use crate::repositories::Repositories;
@@ -50,23 +48,109 @@ pub async fn repos_in_memory() -> Arc<Repositories> {
     Arc::new(Repositories::from_pools(pool.clone(), pool))
 }
 
-/// Create an `Arc<SqlitePool>` backed by an in-memory SQLite database
-/// with migrations applied. Useful when tests need direct pool access.
-pub async fn pool_in_memory() -> SqlitePool {
-    let options = SqliteConnectOptions::new()
-        .filename(":memory:")
-        .synchronous(SqliteSynchronous::Normal)
-        .journal_mode(SqliteJournalMode::Wal)
-        .foreign_keys(true);
+// Persistence fixtures.
+//
+// Route and integration tests must not reach for repositories directly; these
+// helpers are the single place that seeds the database and the storage backend
+// on their behalf.
 
-    let pool = SqlitePoolOptions::new()
-        .max_connections(1)
-        .connect_with(options)
+/// Insert a manifest row plus its repository association, as the registry
+/// would after a successful push.
+pub async fn seed_manifest(state: &TrowServerState, repo_name: &str, digest: &str, bytes: &[u8]) {
+    seed_manifest_blob(state, digest, bytes).await;
+    seed_manifest_assoc(state, repo_name, digest).await;
+}
+
+/// Insert only the manifest row, for manifests shared by several repositories.
+pub async fn seed_manifest_blob(state: &TrowServerState, digest: &str, bytes: &[u8]) {
+    state
+        .services
+        .repos()
+        .manifest
+        .insert_or_ignore(digest, bytes)
         .await
         .unwrap();
+}
 
-    sqlx::migrate!().run(&pool).await.unwrap();
-    pool
+/// Associate an existing manifest with a repository.
+pub async fn seed_manifest_assoc(state: &TrowServerState, repo_name: &str, digest: &str) {
+    state
+        .services
+        .repos()
+        .repo_blob_assoc
+        .insert_manifest_assoc_safe(repo_name, digest)
+        .await
+        .unwrap();
+}
+
+/// Number of `manifest` rows for a digest: 1 while the manifest exists, 0 once it is gone.
+pub async fn manifest_count(state: &TrowServerState, digest: &str) -> i64 {
+    state.services.repos().manifest.count(digest).await.unwrap()
+}
+
+/// Insert an in-progress blob upload row with a pre-filled offset.
+pub async fn seed_blob_upload(state: &TrowServerState, uuid: &str, repo: &str, offset: i64) {
+    state
+        .services
+        .repos()
+        .blob_upload
+        .create_with_offset(uuid, repo, offset)
+        .await
+        .unwrap();
+}
+
+/// Whether a blob upload row with this UUID exists.
+pub async fn blob_upload_exists(state: &TrowServerState, uuid: &str) -> bool {
+    state
+        .services
+        .repos()
+        .blob_upload
+        .exists(uuid)
+        .await
+        .is_ok()
+}
+
+/// Insert a tag pointing at an existing manifest.
+pub async fn seed_tag(state: &TrowServerState, repo: &str, tag: &str, manifest_digest: &str) {
+    state
+        .services
+        .repos()
+        .tag
+        .upsert(tag, repo, manifest_digest)
+        .await
+        .unwrap();
+}
+
+/// Every tag in the database, as `(repo, tag, manifest digest)`.
+pub async fn all_tags(state: &TrowServerState) -> Vec<(String, String, String)> {
+    state
+        .services
+        .repos()
+        .tag
+        .list_all()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|t| (t.repo, t.tag, t.manifest_digest))
+        .collect()
+}
+
+/// Write bytes into an in-progress upload, as a previous PATCH would.
+pub async fn seed_upload_content(
+    state: &TrowServerState,
+    uuid: &uuid::Uuid,
+    content: &'static [u8],
+) -> u64 {
+    let stream = futures::stream::iter(vec![Ok::<_, std::io::Error>(bytes::Bytes::from_static(
+        content,
+    ))]);
+    state
+        .services
+        .storage()
+        .write_blob_part_stream(uuid, stream, None)
+        .await
+        .unwrap()
+        .total_stored as u64
 }
 
 pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T {

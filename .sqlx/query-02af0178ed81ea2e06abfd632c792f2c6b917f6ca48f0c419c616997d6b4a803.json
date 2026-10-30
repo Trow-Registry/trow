@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT uuid FROM blob_upload",
+  "describe": {
+    "columns": [
+      {
+        "name": "uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "02af0178ed81ea2e06abfd632c792f2c6b917f6ca48f0c419c616997d6b4a803"
+}

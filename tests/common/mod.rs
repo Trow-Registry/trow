@@ -12,8 +12,8 @@ use http_body_util::BodyExt;
 use hyper::body::Buf;
 use hyper::{Request, Response};
 use reqwest::StatusCode;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 use trow::utils::digest::Digest;
 use trow::utils::manifest;
@@ -72,6 +72,31 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
         .aggregate()
         .reader();
     serde_json::from_reader(reader).unwrap()
+}
+
+/// Every tag in the database, as `(repo, tag, manifest digest)`.
+pub async fn all_tags(state: &Arc<TrowServerState>) -> Vec<(String, String, String)> {
+    state
+        .services
+        .repos()
+        .tag
+        .list_all()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|t| (t.repo, t.tag, t.manifest_digest))
+        .collect()
+}
+
+/// Insert a tag pointing at an existing manifest.
+pub async fn seed_tag(state: &Arc<TrowServerState>, repo: &str, tag: &str, manifest_digest: &str) {
+    state
+        .services
+        .repos()
+        .tag
+        .upsert(tag, repo, manifest_digest)
+        .await
+        .unwrap();
 }
 
 /// Returns (blob-digest, manifest-digest)
@@ -197,4 +222,64 @@ pub fn get_file<T: Serialize>(dir: &Path, contents: T) -> PathBuf {
     file.flush().unwrap();
 
     path
+}
+
+// Response bodies used by the registry interface tests.
+
+#[derive(Default, Debug, Deserialize, PartialEq)]
+pub struct RepoCatalog {
+    #[serde(rename = "repositories")]
+    catalog: Vec<String>,
+}
+
+impl RepoCatalog {
+    pub fn new() -> RepoCatalog {
+        RepoCatalog {
+            catalog: Vec::new(),
+        }
+    }
+
+    pub fn insert(&mut self, rn: String) {
+        self.catalog.push(rn);
+        self.catalog.sort();
+    }
+
+    pub fn catalog(&self) -> &Vec<String> {
+        &self.catalog
+    }
+
+    pub fn raw(self) -> Vec<String> {
+        self.catalog
+    }
+}
+
+impl From<Vec<String>> for RepoCatalog {
+    fn from(cat: Vec<String>) -> Self {
+        RepoCatalog { catalog: cat }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub struct TagList {
+    #[serde(rename = "name")]
+    repo: String,
+    #[serde(rename = "tags")]
+    list: Vec<String>,
+}
+
+impl TagList {
+    pub fn new(repo_name: String) -> TagList {
+        TagList {
+            repo: repo_name,
+            list: Vec::new(),
+        }
+    }
+
+    pub fn insert(&mut self, tag: String) {
+        self.list.push(tag);
+    }
+
+    pub fn repo_name(&self) -> &str {
+        &self.repo
+    }
 }

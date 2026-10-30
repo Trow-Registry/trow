@@ -6,9 +6,6 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::file_storage::StorageBackendError;
-use crate::utils::digest::DigestError;
-
 #[derive(Debug)]
 pub enum Error {
     NameInvalid(String),
@@ -160,71 +157,71 @@ impl IntoResponse for Error {
     }
 }
 
-impl From<sqlx::Error> for Error {
-    fn from(err: sqlx::Error) -> Self {
-        match err {
-            sqlx::Error::RowNotFound => Self::NotFound,
-            _ => {
-                tracing::error!("Error(DbErr): {err}");
-                Self::Internal
-            }
-        }
-    }
-}
-
-impl From<StorageBackendError> for Error {
-    fn from(err: StorageBackendError) -> Self {
-        tracing::error!("Error(StorageBackendError): {err}");
-        match err {
-            StorageBackendError::BlobNotFound(_) => Self::BlobUnknown,
-            StorageBackendError::InvalidContentRange => Self::UnsatisfiableRange,
-            _ => Self::Internal,
-        }
-    }
-}
-
-impl From<DigestError> for Error {
-    fn from(err: DigestError) -> Self {
-        tracing::warn!("Error(DigestError): {err}");
-        match err {
-            DigestError::InvalidDigest(_) => Self::DigestInvalid,
-        }
-    }
-}
-
-impl From<crate::services::proxy_service::errors::DownloadRemoteImageError> for Error {
-    fn from(err: crate::services::proxy_service::errors::DownloadRemoteImageError) -> Self {
-        use oci_client::errors::OciDistributionError;
-        match &err {
-            crate::services::proxy_service::errors::DownloadRemoteImageError::OciClientError(
-                OciDistributionError::ImageManifestNotFoundError(_),
-            ) => Self::ManifestUnknown(err.to_string()),
-            _ => {
-                tracing::error!("Error(DownloadRemoteImageError): {err}");
-                Self::Internal
-            }
-        }
-    }
-}
-
 impl From<crate::services::Error> for Error {
     fn from(err: crate::services::Error) -> Self {
-        use crate::services::Error as S;
-        match err {
-            S::NotFound => Error::NotFound,
-            S::Invalid(s) => Error::NameInvalid(s),
-            S::UnsupportedForProxiedRepo => Error::UnsupportedForProxiedRepo,
-            S::ManifestInvalid(s) => Error::ManifestInvalid(s),
-            S::ManifestUnknown(s) => Error::ManifestUnknown(s),
-            S::BlobUploadUnknown => Error::BlobUploadUnknown,
-            S::Db(sqlx::Error::RowNotFound) => Error::NotFound,
-            S::Db(e) => {
-                tracing::error!("Error(DbErr): {e}");
+        use crate::services::ErrorKind as K;
+        match err.kind() {
+            K::NotFound => Error::NotFound,
+            K::Unauthorized => Error::Unauthorized,
+            K::InvalidInput => Error::NameInvalid(err.detail()),
+            K::UnsupportedForProxiedRepo => Error::UnsupportedForProxiedRepo,
+            K::ManifestInvalid => Error::ManifestInvalid(err.detail()),
+            K::ManifestUnknown => Error::ManifestUnknown(err.detail()),
+            K::BlobUploadUnknown => Error::BlobUploadUnknown,
+            K::DigestInvalid => Error::DigestInvalid,
+            K::BlobNotFound => Error::BlobUnknown,
+            K::UnsatisfiableRange => Error::UnsatisfiableRange,
+            K::Internal => {
+                tracing::error!("Error(services): {err}");
                 Error::Internal
             }
-            S::Storage(e) => Error::from(e),
-            S::Digest(e) => Error::from(e),
-            S::Proxy(e) => Error::from(*e),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    use super::Error;
+    use crate::services::{Error as ServiceError, ErrorKind};
+
+    #[test]
+    fn db_row_not_found_maps_to_not_found() {
+        let err = Error::from(ServiceError::Db(sqlx::Error::RowNotFound));
+
+        assert!(matches!(err, Error::NotFound));
+        assert_eq!(err.into_response().status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn proxy_download_failure_maps_to_internal() {
+        let err = Error::from(ServiceError::Proxy(Box::new(
+            crate::services::proxy_service::errors::DownloadRemoteImageError::DownloadAttemptsFailed,
+        )));
+
+        assert!(matches!(err, Error::Internal));
+        assert_eq!(
+            err.into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn proxy_manifest_not_found_maps_to_manifest_unknown() {
+        let service_err = ServiceError::Proxy(Box::new(
+            crate::services::proxy_service::errors::DownloadRemoteImageError::OciClientError(
+                oci_client::errors::OciDistributionError::ImageManifestNotFoundError(
+                    "missing:latest".to_string(),
+                ),
+            ),
+        ));
+
+        assert_eq!(service_err.kind(), ErrorKind::ManifestUnknown);
+
+        let err = Error::from(service_err);
+        assert!(matches!(err, Error::ManifestUnknown(_)));
+        assert_eq!(err.into_response().status(), StatusCode::NOT_FOUND);
     }
 }

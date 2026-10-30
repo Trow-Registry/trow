@@ -1,22 +1,16 @@
 use std::ops::RangeInclusive;
 use std::sync::Arc;
 
-use axum::body::Body;
+use bytes::Bytes;
+use futures::stream::Stream;
 use uuid::Uuid;
 
-use crate::PROXY_DIR;
 use crate::file_storage::FileStorage;
 use crate::repositories::Repositories;
 use crate::services::Error;
-use crate::types::{AcceptedUpload, Upload, UploadInfo};
+use crate::services::reference::ensure_writable;
+use crate::services::uploads::{AcceptedUpload, Upload, UploadInfo, UploadStatus};
 use crate::utils::digest::Digest;
-
-#[derive(Debug)]
-pub struct UploadStatus {
-    pub uuid: Uuid,
-    pub repo: String,
-    pub offset: i64,
-}
 
 #[derive(Debug)]
 pub struct BlobUploadService {
@@ -29,15 +23,17 @@ impl BlobUploadService {
         Self { repos, storage }
     }
 
-    pub async fn start_upload(
+    pub async fn start_upload<S, E>(
         &self,
         repo_name: String,
         digest: Option<Digest>,
-        data: Body,
-    ) -> Result<Upload, Error> {
-        if repo_name.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        data: S,
+    ) -> Result<Upload, Error>
+    where
+        S: Stream<Item = Result<Bytes, E>> + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        ensure_writable(&repo_name)?;
 
         let upload_uuid = Uuid::new_v4().to_string();
         self.repos
@@ -59,22 +55,24 @@ impl BlobUploadService {
         )))
     }
 
-    pub async fn patch_upload(
+    pub async fn patch_upload<S, E>(
         &self,
         repo_name: String,
         uuid: Uuid,
         range: Option<RangeInclusive<u64>>,
-        data: Body,
-    ) -> Result<UploadInfo, Error> {
-        if repo_name.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        data: S,
+    ) -> Result<UploadInfo, Error>
+    where
+        S: Stream<Item = Result<Bytes, E>> + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        ensure_writable(&repo_name)?;
         let uuid_str = uuid.to_string();
         self.repos.blob_upload.exists(&uuid_str).await?;
 
         let size = self
             .storage
-            .write_blob_part_stream(&uuid, data.into_data_stream(), range)
+            .write_blob_part_stream(&uuid, data, range)
             .await?;
         let total_stored = size.total_stored as i64;
         self.repos
@@ -89,14 +87,19 @@ impl BlobUploadService {
         ))
     }
 
-    pub async fn complete_upload(
+    pub async fn complete_upload<S, E>(
         &self,
         repo_name: &str,
         uuid_str: &str,
         digest: &Digest,
-        data: Body,
+        data: S,
         range: Option<RangeInclusive<u64>>,
-    ) -> Result<AcceptedUpload, Error> {
+    ) -> Result<AcceptedUpload, Error>
+    where
+        S: Stream<Item = Result<Bytes, E>> + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        ensure_writable(repo_name)?;
         let upload_row = self.repos.blob_upload.find(uuid_str).await?;
         if upload_row.repo != repo_name {
             return Err(Error::Invalid("Repository mismatch".to_string()));
@@ -105,7 +108,7 @@ impl BlobUploadService {
 
         let size = self
             .storage
-            .write_blob_part_stream(&upload_id_bin, data.into_data_stream(), range)
+            .write_blob_part_stream(&upload_id_bin, data, range)
             .await?;
 
         self.storage
@@ -139,9 +142,7 @@ impl BlobUploadService {
         repo_name: String,
         uuid: Uuid,
     ) -> Result<UploadStatus, Error> {
-        if repo_name.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        ensure_writable(&repo_name)?;
         let uuid_str = uuid.to_string();
         let offset = self
             .repos
@@ -160,12 +161,14 @@ impl BlobUploadService {
 mod tests {
     use std::sync::Arc;
 
+    use bytes::Bytes;
     use uuid::Uuid;
 
     use crate::file_storage::FileStorage;
     use crate::services::blob_upload_service::BlobUploadService;
     use crate::services::error::Error;
     use crate::test_utilities::repos_in_memory;
+    use crate::utils::digest::Digest;
 
     fn setup_storage(dir: &test_temp_dir::TestTempDir) -> Arc<FileStorage> {
         Arc::new(FileStorage::new(dir.as_path_untracked().to_owned()).unwrap())
@@ -182,10 +185,53 @@ mod tests {
             .start_upload(
                 "f/docker.io/library/alpine".to_string(),
                 None,
-                axum::body::Body::empty(),
+                futures::stream::empty::<Result<Bytes, std::io::Error>>(),
             )
             .await;
         assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));
+    }
+
+    #[tokio::test]
+    async fn complete_upload_rejects_proxied_repo() {
+        let repos = repos_in_memory().await;
+        let dir = test_temp_dir::test_temp_dir!();
+        let storage = setup_storage(&dir);
+        let svc = BlobUploadService::new(repos.clone(), storage.clone());
+        let repo = "f/docker.io/library/alpine";
+        let uuid = Uuid::new_v4().to_string();
+
+        for existing_upload in [false, true] {
+            if existing_upload {
+                repos.blob_upload.create(&uuid, repo).await.unwrap();
+            }
+            let blob = Bytes::from_static(b"blob data");
+            let digest = Digest::digest_sha256_slice(&blob);
+
+            let result = svc
+                .complete_upload(
+                    repo,
+                    &uuid,
+                    &digest,
+                    futures::stream::iter([Ok::<_, std::io::Error>(blob)]),
+                    None,
+                )
+                .await;
+
+            assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));
+            assert_eq!(
+                repos.blob_upload.count().await.unwrap(),
+                i64::from(existing_upload)
+            );
+            assert!(!repos.blob.exists(digest.as_str()).await.unwrap());
+            assert!(
+                !repos
+                    .repo_blob_assoc
+                    .blob_belongs_to_repo(digest.as_str(), repo)
+                    .await
+                    .unwrap()
+            );
+            assert!(storage.list_blobs().await.unwrap().is_empty());
+        }
     }
 
     #[tokio::test]
@@ -196,17 +242,18 @@ mod tests {
         let svc = BlobUploadService::new(repos.clone(), storage);
 
         let result = svc
-            .start_upload("myrepo".to_string(), None, axum::body::Body::empty())
+            .start_upload(
+                "myrepo".to_string(),
+                None,
+                futures::stream::empty::<Result<Bytes, std::io::Error>>(),
+            )
             .await
             .unwrap();
         // Returns Upload::Info when no digest provided
-        assert!(matches!(result, crate::types::Upload::Info(_)));
+        assert!(matches!(result, crate::services::uploads::Upload::Info(_)));
 
         // Verify upload was created in DB
-        let count: i64 = sqlx::query_scalar!("SELECT COUNT(*) FROM blob_upload")
-            .fetch_one(repos.db_ro())
-            .await
-            .unwrap();
+        let count = repos.blob_upload.count().await.unwrap();
         assert_eq!(count, 1);
     }
 
@@ -233,15 +280,11 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let uuid_str = uuid.to_string();
-        sqlx::query!(
-            "INSERT INTO blob_upload (uuid, offset, repo) VALUES (?, ?, ?)",
-            uuid_str,
-            42i64,
-            "myrepo"
-        )
-        .execute(repos.db_rw())
-        .await
-        .unwrap();
+        repos
+            .blob_upload
+            .create_with_offset(&uuid_str, "myrepo", 42)
+            .await
+            .unwrap();
 
         let result = svc
             .get_upload_status("myrepo".to_string(), uuid)
@@ -265,7 +308,7 @@ mod tests {
                 "f/docker.io/library/alpine".to_string(),
                 uuid,
                 None,
-                axum::body::Body::empty(),
+                futures::stream::empty::<Result<Bytes, std::io::Error>>(),
             )
             .await;
         assert!(matches!(result, Err(Error::UnsupportedForProxiedRepo)));
