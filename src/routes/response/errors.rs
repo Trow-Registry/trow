@@ -185,7 +185,7 @@ mod tests {
     use axum::response::IntoResponse;
 
     use super::Error;
-    use crate::services::Error as ServiceError;
+    use crate::services::{Error as ServiceError, ErrorKind};
 
     #[test]
     fn db_row_not_found_maps_to_not_found() {
@@ -206,5 +206,22 @@ mod tests {
             err.into_response().status(),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    #[test]
+    fn proxy_manifest_not_found_maps_to_manifest_unknown() {
+        let service_err = ServiceError::Proxy(Box::new(
+            crate::services::proxy_service::errors::DownloadRemoteImageError::OciClientError(
+                oci_client::errors::OciDistributionError::ImageManifestNotFoundError(
+                    "missing:latest".to_string(),
+                ),
+            ),
+        ));
+
+        assert_eq!(service_err.kind(), ErrorKind::ManifestUnknown);
+
+        let err = Error::from(service_err);
+        assert!(matches!(err, Error::ManifestUnknown(_)));
+        assert_eq!(err.into_response().status(), StatusCode::NOT_FOUND);
     }
 }

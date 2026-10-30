@@ -1,3 +1,5 @@
+use oci_client::errors::OciDistributionError;
+
 use crate::file_storage::StorageBackendError;
 use crate::services::proxy_service::errors::DownloadRemoteImageError;
 use crate::utils::digest::DigestError;
@@ -107,7 +109,12 @@ impl Error {
             }
             Error::Storage(_) => ErrorKind::Internal,
             Error::Digest(DigestError::InvalidDigest(_)) => ErrorKind::DigestInvalid,
-            Error::Proxy(_) => ErrorKind::Internal,
+            Error::Proxy(e) => match e.as_ref() {
+                DownloadRemoteImageError::OciClientError(
+                    OciDistributionError::ImageManifestNotFoundError(_),
+                ) => ErrorKind::ManifestUnknown,
+                _ => ErrorKind::Internal,
+            },
         }
     }
 }
