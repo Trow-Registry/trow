@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
+      - uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
 
   tests:
     runs-on: ubuntu-latest
@@ -25,7 +25,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      - uses: wild-linker/action@v0.10.0
+      - uses: wild-linker/action@0.11.0
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.11
       - uses: taiki-e/install-action@v2
@@ -52,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@stable
-      - uses: wild-linker/action@v0.10.0
+      - uses: wild-linker/action@0.11.0
       - name: Cache compilation artefacts
         uses: mozilla-actions/sccache-action@v0.0.11
       - uses: taiki-e/install-action@v2
@@ -137,7 +137,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create kind cluster
-        uses: helm/kind-action@v1.15.0
+        uses: helm/kind-action@v1.15.1
         with:
           config: .github/workflows/config/kind.yaml
           cluster_name: kind
