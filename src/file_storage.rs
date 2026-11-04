@@ -5,7 +5,8 @@
 //! `FileStorage` methods.
 
 use std::borrow::Cow;
-use std::ops::RangeInclusive;
+
+use std::ops::{Deref, RangeInclusive};
 use std::path::{Path, PathBuf};
 use std::{io, str};
 
@@ -15,13 +16,39 @@ use tokio::fs;
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::time::Duration;
 
-use crate::types::BoundedStream;
+use crate::utils::temporary_file::FileWrapper;
 
 pub struct Stored {
     pub total_stored: u64,
     pub chunk: u64,
 }
-use crate::utils::temporary_file::FileWrapper;
+
+/// A reader that knows how many bytes it is allowed to yield.
+pub struct BoundedStream<S: AsyncRead> {
+    size: usize,
+    stream: S,
+}
+
+impl<S: AsyncRead> Deref for BoundedStream<S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        &self.stream
+    }
+}
+
+impl<S: AsyncRead> BoundedStream<S> {
+    pub fn new(size: usize, stream: S) -> Self {
+        BoundedStream { size, stream }
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+    pub fn reader(self) -> S {
+        self.stream
+    }
+}
 
 // Storage Driver Error
 #[derive(thiserror::Error, Debug)]

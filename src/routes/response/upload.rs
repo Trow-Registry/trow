@@ -1,6 +1,6 @@
 use axum::response::{IntoResponse, Response};
 
-pub use crate::types::Upload;
+pub use crate::services::uploads::Upload;
 
 impl IntoResponse for Upload {
     fn into_response(self) -> Response {

@@ -151,48 +151,49 @@ mod tests {
     use crate::test_utilities;
     use crate::test_utilities::test_temp_dir;
 
+    const HOUR: i64 = 3600;
+    const DAY: i64 = 24 * HOUR;
+
     #[tracing_test::traced_test]
     #[tokio::test]
     async fn test_delete_old_proxied_images() {
         let dir = test_temp_dir!();
         let (state, _router) = test_utilities::trow_router(|_| {}, &dir).await;
 
-        sqlx::query!(
-            r#"
-            INSERT INTO blob (digest, size, last_accessed)
-            VALUES ('sha256:test1', 100, strftime('%s', 'now', '-3 days')),
-                   ('sha256:test2', 175, strftime('%s', 'now', '-3 day')),
-                   ('sha256:test3', 300, strftime('%s', 'now', '-2 days'))
-            "#
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        let repos = state.services.repos();
+        // Ages are relative to the DB clock; the GC treats anything older than a
+        // day as stale.
+        for (digest, size, age_secs) in [
+            ("sha256:test1", 100, 3 * DAY),
+            ("sha256:test2", 175, 3 * DAY),
+            ("sha256:test3", 300, 2 * DAY),
+        ] {
+            repos
+                .blob
+                .insert_aged(digest, size, age_secs)
+                .await
+                .unwrap();
+        }
 
-        sqlx::query!(
-            r#"
-            INSERT INTO repo_blob_assoc (repo_name, blob_digest)
-            VALUES ('f/test_repo1', 'sha256:test1'),
-                   ('f/test_repo3', 'sha256:test3')
-            "#
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        for (repo_name, digest) in [
+            ("f/test_repo1", "sha256:test1"),
+            ("f/test_repo3", "sha256:test3"),
+        ] {
+            repos
+                .repo_blob_assoc
+                .insert_blob_assoc_safe(repo_name, digest)
+                .await
+                .unwrap();
+        }
 
         let dummy_manifest =
             r#"{"config":{"digest":"sha256:test2"},"layers":[{"digest":"sha256:test3"}]}"#
                 .as_bytes();
-        sqlx::query!(
-            r#"
-            INSERT INTO manifest (digest, blob, json)
-            VALUES ('sha256:test_manifest', $1, jsonb($1))
-            "#,
-            dummy_manifest
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        repos
+            .manifest
+            .insert_or_ignore("sha256:test_manifest", dummy_manifest)
+            .await
+            .unwrap();
 
         let space_needed = 250;
         let result = state
@@ -203,14 +204,20 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 275);
 
-        let repo_blob_assocs = sqlx::query_scalar!(r#"SELECT repo_name FROM repo_blob_assoc"#)
-            .fetch_all(state.services.repos().db_ro())
+        let repo_blob_assocs = state
+            .services
+            .repos()
+            .repo_blob_assoc
+            .list_all_repo_names()
             .await
             .unwrap();
         assert_eq!(&repo_blob_assocs, &["f/test_repo3"]);
 
-        let manifests = sqlx::query_scalar!(r#"SELECT digest FROM manifest"#)
-            .fetch_all(state.services.repos().db_ro())
+        let manifests = state
+            .services
+            .repos()
+            .manifest
+            .list_all_digests()
             .await
             .unwrap();
         assert!(manifests.is_empty());
@@ -222,40 +229,29 @@ mod tests {
         let dir = test_temp_dir!();
         let (state, _router) = test_utilities::trow_router(|_| {}, &dir).await;
 
-        sqlx::query!(
-            r#"
-            INSERT INTO blob (digest, size, last_accessed)
-            VALUES ('sha256:test1', 28, strftime('%s', 'now', '-3 days')),
-                   ('sha256:test2', 200, strftime('%s', 'now', '-3 days')),
-                   ('sha256:test3', 155, strftime('%s', 'now', '-3 days'))
-            "#
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        let repos = state.services.repos();
+        for (digest, size) in [
+            ("sha256:test1", 28),
+            ("sha256:test2", 200),
+            ("sha256:test3", 155),
+        ] {
+            repos.blob.insert_aged(digest, size, 3 * DAY).await.unwrap();
+        }
 
         let dummy_manifest =
             r#"{"config":{"digest":"sha256:test1"},"layers":[{"digest":"sha256:test3"}]}"#
                 .as_bytes();
-        sqlx::query!(
-            r#"
-            INSERT INTO manifest (digest, blob, json)
-            VALUES ('sha256:test_manifest1', $1, jsonb($1))
-            "#,
-            dummy_manifest
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        repos
+            .manifest
+            .insert_or_ignore("sha256:test_manifest1", dummy_manifest)
+            .await
+            .unwrap();
 
         let result = state.services.gc.delete_orphan_blobs().await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 200);
 
-        let blobs = sqlx::query_scalar!(r#"SELECT digest FROM blob"#)
-            .fetch_all(state.services.repos().db_ro())
-            .await
-            .unwrap();
+        let blobs = repos.blob.list_all_digests().await.unwrap();
         assert_eq!(blobs.len(), 2);
         assert!(blobs.contains(&"sha256:test1".to_string()));
         assert!(blobs.contains(&"sha256:test3".to_string()));
@@ -267,43 +263,38 @@ mod tests {
         let dir = test_temp_dir!();
         let (state, _router) = test_utilities::trow_router(|_| {}, &dir).await;
 
-        sqlx::query!(
-            r#"
-            INSERT INTO blob_upload (uuid, offset, updated_at, repo)
-            VALUES ('test-uuid-1', 100, unixepoch('now', '-2 days'), 'testrepo'),
-                   ('test-uuid-2', 200, unixepoch('now', '-5 hours'), 'testrepo'),
-                   ('test-uuid-3', 150, unixepoch('now', '-9 days'), 'testrepo')
-            "#
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        let repos = state.services.repos();
+        for (uuid, offset, age_secs) in [
+            ("test-uuid-1", 100, 2 * DAY),
+            ("test-uuid-2", 200, 5 * HOUR),
+            ("test-uuid-3", 150, 9 * DAY),
+        ] {
+            repos
+                .blob_upload
+                .create_aged(uuid, "testrepo", offset, age_secs)
+                .await
+                .unwrap();
+        }
 
         // Goes through the default, which must be the same epoch form the staleness
         // comparison uses, not a CURRENT_TIMESTAMP datetime string.
-        state
-            .services
-            .repos()
+        repos
             .blob_upload
             .create("test-uuid-4", "testrepo")
             .await
             .unwrap();
 
-        let updated_at_type = sqlx::query_scalar!(
-            r#"SELECT typeof(updated_at) AS "typeof!: String" FROM blob_upload WHERE uuid = 'test-uuid-4'"#
-        )
-        .fetch_one(state.services.repos().db_ro())
-        .await
-        .unwrap();
+        let updated_at_type = repos
+            .blob_upload
+            .updated_at_storage_class("test-uuid-4")
+            .await
+            .unwrap();
         assert_eq!(updated_at_type, "integer");
 
         let reclaimed = state.services.gc.delete_stale_uploads().await.unwrap();
         assert_eq!(reclaimed, 250);
 
-        let mut uploads = sqlx::query_scalar!(r#"SELECT uuid FROM blob_upload"#)
-            .fetch_all(state.services.repos().db_ro())
-            .await
-            .unwrap();
+        let mut uploads = repos.blob_upload.list_all_uuids().await.unwrap();
         uploads.sort();
         assert_eq!(uploads, vec!["test-uuid-2", "test-uuid-4"]);
     }
@@ -314,27 +305,22 @@ mod tests {
         let dir = test_temp_dir!();
         let (state, _router) = test_utilities::trow_router(|_| {}, &dir).await;
 
-        state
-            .services
-            .repos()
+        let repos = state.services.repos();
+        repos
             .blob_upload
             .create("never-touched", "testrepo")
             .await
             .unwrap();
 
-        sqlx::query!(
-            r#"UPDATE blob_upload SET updated_at = unixepoch('now', '-2 days') WHERE uuid = 'never-touched'"#
-        )
-        .execute(state.services.repos().db_rw())
-        .await
-        .unwrap();
+        repos
+            .blob_upload
+            .set_age_secs("never-touched", 2 * DAY)
+            .await
+            .unwrap();
 
         state.services.gc.delete_stale_uploads().await.unwrap();
 
-        let uploads = sqlx::query_scalar!(r#"SELECT uuid FROM blob_upload"#)
-            .fetch_all(state.services.repos().db_ro())
-            .await
-            .unwrap();
+        let uploads = repos.blob_upload.list_all_uuids().await.unwrap();
         assert!(
             uploads.is_empty(),
             "upload created but never written to was not collected"

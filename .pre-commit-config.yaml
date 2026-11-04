@@ -12,6 +12,7 @@ repos:
         exclude: charts/.+/templates/.+
       - id: check-toml
       - id: check-added-large-files
+      - id: check-executables-have-shebangs
 
   - repo: https://github.com/crate-ci/typos
     rev: 57b11c6b7e54c402ccd9cda953f1072ec4f78e33  # frozen: v1.43.5

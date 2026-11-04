@@ -4,23 +4,28 @@
 //! services; services never call controllers.
 
 pub mod admission_service;
+pub mod auth_service;
 pub mod blob_service;
 pub mod blob_upload_service;
 pub mod catalog_service;
 pub mod error;
 pub mod gc_service;
 pub mod health_service;
+pub mod manifest_results;
 pub mod manifest_service;
 pub mod proxy_service;
+pub mod reference;
 pub mod referrers_service;
+pub mod uploads;
 
 use std::sync::Arc;
 
 use self::admission_service::AdmissionService;
+use self::auth_service::AuthService;
 use self::blob_service::BlobService;
 use self::blob_upload_service::BlobUploadService;
 use self::catalog_service::CatalogService;
-pub use self::error::Error;
+pub use self::error::{Error, ErrorKind};
 use self::gc_service::GcService;
 use self::health_service::HealthService;
 use self::manifest_service::ManifestService;
@@ -45,6 +50,7 @@ pub struct Services {
     pub proxy: Arc<ProxyService>,
     pub gc: Arc<GcService>,
     pub admission: AdmissionService,
+    pub auth: AuthService,
     pub health: HealthService,
     #[doc(hidden)]
     repos_shared: Arc<Repositories>,
@@ -72,17 +78,25 @@ impl Services {
                 config.clone(),
             )),
             admission: AdmissionService::new(config.clone()),
+            auth: AuthService::new(
+                config.map_user().cloned(),
+                config.service_name.clone(),
+                config.token_secret.clone(),
+            ),
             health: HealthService::new(storage.clone()),
             repos_shared: repos.clone(),
             storage_shared: storage.clone(),
         }
     }
 
+    /// Aggregates over proxied repositories, used by the GC and by tests that
+    /// need to inspect or seed state directly.
     #[doc(hidden)]
     pub fn repos(&self) -> &Arc<Repositories> {
         &self.repos_shared
     }
-
+    /// Raw storage handle, used by tests that need to prepare in-progress
+    /// uploads without going through a service.
     #[doc(hidden)]
     pub fn storage(&self) -> &Arc<FileStorage> {
         &self.storage_shared

@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use oci_spec::image::{Descriptor, ImageIndex, MediaType};
 
-use crate::PROXY_DIR;
 use crate::repositories::Repositories;
 use crate::services::Error;
+use crate::services::reference::ensure_writable;
 use crate::utils::digest::Digest;
 
 #[derive(Debug)]
@@ -19,9 +19,7 @@ impl ReferrersService {
     }
 
     pub async fn list_referrers(&self, repo: String, digest: String) -> Result<ImageIndex, Error> {
-        if repo.starts_with(PROXY_DIR) {
-            return Err(Error::UnsupportedForProxiedRepo);
-        }
+        ensure_writable(&repo)?;
         let _ = Digest::try_from_raw(&digest)?;
         let rows = self.repos.manifest.list_referrers(&repo, &digest).await?;
 

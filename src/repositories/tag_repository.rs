@@ -1,5 +1,7 @@
 use sqlx::SqlitePool;
 
+use super::models::Tag;
+
 pub struct TagRepository {
     db_ro: SqlitePool,
     db_rw: SqlitePool,
@@ -85,5 +87,23 @@ impl TagRepository {
             .execute(&self.db_rw)
             .await?;
         Ok(())
+    }
+
+    /// SELECT COUNT(*) FROM tag WHERE repo = $1 AND tag = $2
+    pub async fn count(&self, repo: &str, tag: &str) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!" FROM tag WHERE repo = $1 AND tag = $2"#,
+            repo,
+            tag
+        )
+        .fetch_one(&self.db_ro)
+        .await
+    }
+
+    /// SELECT repo, tag, manifest_digest FROM tag
+    pub async fn list_all(&self) -> Result<Vec<Tag>, sqlx::Error> {
+        sqlx::query_as!(Tag, r#"SELECT repo, tag, manifest_digest FROM tag"#)
+            .fetch_all(&self.db_ro)
+            .await
     }
 }

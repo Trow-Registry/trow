@@ -114,21 +114,7 @@ mod tests {
 
         for man in [man_referred, subj, nosubj] {
             let digest = Digest::digest_sha256_slice(&man).to_string();
-            sqlx::query!(
-                "INSERT INTO manifest (digest, json, blob) VALUES ($1, jsonb($2), $2)",
-                digest,
-                man,
-            )
-            .execute(state.services.repos().db_rw())
-            .await
-            .unwrap();
-            sqlx::query!(
-                r#"INSERT INTO repo_blob_assoc (repo_name, manifest_digest) VALUES ("test", $1)"#,
-                digest
-            )
-            .execute(state.services.repos().db_rw())
-            .await
-            .unwrap();
+            test_utilities::seed_manifest(&state, "test", &digest, &man).await;
         }
 
         let resp = router

@@ -11,10 +11,11 @@ mod registry_interface {
     use reqwest::StatusCode;
     use test_temp_dir::{TestTempDir, test_temp_dir};
     use tower::ServiceExt;
-    use trow::types::{RepoCatalog, TagList};
     use trow::utils::digest;
 
-    use crate::common::{self, DIST_API_HEADER, response_body_string, trow_router};
+    use crate::common::{
+        self, DIST_API_HEADER, RepoCatalog, TagList, response_body_string, trow_router,
+    };
 
     async fn start_trow(data_dir: &TestTempDir) -> Router {
         trow_router(data_dir.as_path_untracked(), |_| {}).await.1

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT digest FROM manifest",
+  "describe": {
+    "columns": [
+      {
+        "name": "digest",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "907b4d90fa4540894296c089d07d541a0417a45ad0a82425f23f0e9d7bc671e6"
+}
