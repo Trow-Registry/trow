@@ -10,9 +10,10 @@ pub fn is_proxied(name: &str) -> bool {
     name.starts_with(PROXY_DIR)
 }
 
-/// Rejects writes to a proxied repository. Every mutating service entry point
+/// Rejects operations that proxied repositories do not support: pushes, blob
+/// uploads and the referrers API. Service entry points for those operations
 /// must call this before touching the database or the storage backend.
-pub fn ensure_writable(name: &str) -> Result<(), Error> {
+pub fn ensure_not_proxied(name: &str) -> Result<(), Error> {
     if is_proxied(name) {
         Err(Error::UnsupportedForProxiedRepo)
     } else {

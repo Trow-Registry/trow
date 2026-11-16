@@ -172,7 +172,7 @@ async fn login(
     match state.services.auth.issue_token(auth_user.user()) {
         Ok(token) => Ok(TrowToken::new(auth_user.user().to_string(), token)),
         Err(e) => {
-            tracing::error!("Failed to create token: {:#}", e);
+            tracing::error!("Failed to create token: {e}");
             Err(Error::Internal)
         }
     }

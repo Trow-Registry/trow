@@ -7,7 +7,7 @@ pub use crate::services::uploads::UploadStatus;
 impl IntoResponse for UploadStatus {
     fn into_response(self) -> Response {
         let location = format!("/v2/{}/blobs/uploads/{}", self.repo, self.uuid);
-        // An empty upload has no accepted bytes yet, so the range is empty.
+        // The subtraction saturates, so an empty upload reports `0-0`.
         let range = format!("0-{}", (self.offset as u64).saturating_sub(1));
 
         Response::builder()

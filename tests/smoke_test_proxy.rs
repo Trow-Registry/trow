@@ -155,8 +155,8 @@ mod proxy_registry {
         let tags = crate::common::all_tags(&state).await;
 
         assert_eq!(tags.len(), 1);
-        assert_eq!(tags[0].0, "f/docker.io/library/alpine");
-        assert_eq!(tags[0].1, "3.13.4");
+        assert_eq!(tags[0].repo, "f/docker.io/library/alpine");
+        assert_eq!(tags[0].tag, "3.13.4");
     }
 
     #[tokio::test]

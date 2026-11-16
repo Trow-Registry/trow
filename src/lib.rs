@@ -59,8 +59,8 @@ impl TlsConfig {
 
 #[derive(Clone, Debug)]
 pub struct UserConfig {
-    pub user: String,
-    pub hash_encoded: String, //Surprised not bytes
+    pub(crate) user: String,
+    pub(crate) hash_encoded: String,
 }
 
 #[derive(Debug, Clone)]
@@ -134,7 +134,7 @@ impl TrowConfig {
     }
 
     /// The configured user, if authentication is enabled.
-    pub fn map_user(&self) -> Option<&UserConfig> {
+    pub fn user(&self) -> Option<&UserConfig> {
         self.user.as_ref()
     }
 

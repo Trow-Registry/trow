@@ -117,32 +117,8 @@ impl BlobUploadRepository {
         Ok(usize::try_from(res).unwrap_or(0))
     }
 
-    /// INSERT INTO blob_upload (uuid, offset, repo) VALUES ($1, $2, $3)
-    ///
-    /// Creates an upload that already has bytes written, as a previous PATCH
-    /// would have left it.
-    #[doc(hidden)]
-    pub async fn create_with_offset(
-        &self,
-        uuid: &str,
-        repo: &str,
-        offset: i64,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"
-            INSERT INTO blob_upload (uuid, offset, repo)
-            VALUES ($1, $2, $3)
-            "#,
-            uuid,
-            offset,
-            repo
-        )
-        .execute(&self.db_rw)
-        .await?;
-        Ok(())
-    }
-
     /// SELECT COUNT(*) FROM blob_upload
+    #[cfg(test)]
     pub async fn count(&self) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!" FROM blob_upload"#)
             .fetch_one(&self.db_ro)
@@ -150,6 +126,7 @@ impl BlobUploadRepository {
     }
 
     /// SELECT uuid FROM blob_upload
+    #[cfg(test)]
     pub async fn list_all_uuids(&self) -> Result<Vec<String>, sqlx::Error> {
         sqlx::query_scalar!(r#"SELECT uuid FROM blob_upload"#)
             .fetch_all(&self.db_ro)
@@ -160,7 +137,7 @@ impl BlobUploadRepository {
     ///
     /// Backdates an upload relative to the database clock so staleness tests
     /// place rows deterministically on either side of the cutoff.
-    #[doc(hidden)]
+    #[cfg(test)]
     pub async fn set_age_secs(&self, uuid: &str, age_secs: i64) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"UPDATE blob_upload SET updated_at = unixepoch() - $2 WHERE uuid = $1"#,
@@ -174,8 +151,9 @@ impl BlobUploadRepository {
 
     /// INSERT INTO blob_upload (uuid, offset, updated_at, repo) VALUES ($1, $2, unixepoch() - $3, $4)
     ///
-    /// Seeds a stale upload in one statement, for GC tests that need several.
-    #[doc(hidden)]
+    /// Seeds an upload that already has bytes written, as a previous PATCH
+    /// would have left it, last updated `age_secs` ago by the database clock.
+    #[cfg(test)]
     pub async fn create_aged(
         &self,
         uuid: &str,
@@ -202,7 +180,7 @@ impl BlobUploadRepository {
     ///
     /// Guards that the column's default stays an epoch integer rather than a
     /// `CURRENT_TIMESTAMP` string, which would never compare as stale.
-    #[doc(hidden)]
+    #[cfg(test)]
     pub async fn updated_at_storage_class(&self, uuid: &str) -> Result<String, sqlx::Error> {
         sqlx::query_scalar!(
             r#"SELECT typeof(updated_at) AS "typeof!: String" FROM blob_upload WHERE uuid = $1"#,

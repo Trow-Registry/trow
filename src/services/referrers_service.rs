@@ -5,7 +5,7 @@ use oci_spec::image::{Descriptor, ImageIndex, MediaType};
 
 use crate::repositories::Repositories;
 use crate::services::Error;
-use crate::services::reference::ensure_writable;
+use crate::services::reference::ensure_not_proxied;
 use crate::utils::digest::Digest;
 
 #[derive(Debug)]
@@ -19,7 +19,7 @@ impl ReferrersService {
     }
 
     pub async fn list_referrers(&self, repo: String, digest: String) -> Result<ImageIndex, Error> {
-        ensure_writable(&repo)?;
+        ensure_not_proxied(&repo)?;
         let _ = Digest::try_from_raw(&digest)?;
         let rows = self.repos.manifest.list_referrers(&repo, &digest).await?;
 

@@ -79,7 +79,7 @@ impl Services {
             )),
             admission: AdmissionService::new(config.clone()),
             auth: AuthService::new(
-                config.map_user().cloned(),
+                config.user().cloned(),
                 config.service_name.clone(),
                 config.token_secret.clone(),
             ),
@@ -89,12 +89,13 @@ impl Services {
         }
     }
 
-    /// Aggregates over proxied repositories, used by the GC and by tests that
-    /// need to inspect or seed state directly.
+    /// Raw repositories handle, used by tests that need to inspect or seed
+    /// state directly.
     #[doc(hidden)]
     pub fn repos(&self) -> &Arc<Repositories> {
         &self.repos_shared
     }
+
     /// Raw storage handle, used by tests that need to prepare in-progress
     /// uploads without going through a service.
     #[doc(hidden)]

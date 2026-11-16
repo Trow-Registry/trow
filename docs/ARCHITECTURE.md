@@ -55,7 +55,7 @@ Other consequences of the rules:
    a transport-neutral `ErrorKind`, and `src/routes/response/errors.rs` turns that into an OCI error
    code. Routes never match on storage or database error variants.
  - **Business rules have one home.** For example the rule that repositories starting with `f/` are
-   read-only lives in `services::reference::ensure_writable`, not in each handler.
+   read-only lives in `services::reference::ensure_not_proxied`, not in each handler.
  - **Composition happens in one place.** `TrowConfig::build_server_state` builds `Repositories`,
    `FileStorage` and `Services`; `TrowServerState` then carries `config` plus the `Services` bundle.
    Services never construct each other outside `services::Services::new`.

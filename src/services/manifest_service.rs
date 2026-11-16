@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use crate::TrowConfig;
 use bytes::Bytes;
 
+use crate::TrowConfig;
 use crate::repositories::Repositories;
 use crate::services::error::Error;
 use crate::services::manifest_results::{ManifestDeleted, VerifiedManifest};
 use crate::services::proxy_service::ProxyService;
-use crate::services::reference::ensure_writable;
-use crate::services::reference::parse_reference;
+use crate::services::reference::{ensure_not_proxied, parse_reference};
 use crate::utils::digest::Digest;
 use crate::utils::manifest::{OCIManifest, REGEX_TAG, layer_is_distributable, manifest_media_type};
 
@@ -107,13 +106,7 @@ impl ManifestService {
         host: String,
         manifest_bytes: Bytes,
     ) -> Result<VerifiedManifest, Error> {
-        ensure_writable(&repo_name)?;
-        if manifest_bytes.len() > MANIFEST_BODY_SIZE_LIMIT {
-            return Err(Error::ManifestInvalid(format!(
-                "Manifest is bigger than limit of {}MiB",
-                MANIFEST_BODY_SIZE_LIMIT / (1024 * 1024)
-            )));
-        }
+        ensure_not_proxied(&repo_name)?;
         let is_tag = REGEX_TAG.is_match(&reference);
         let manifest_parsed = serde_json::from_slice::<'_, OCIManifest>(&manifest_bytes)
             .map_err(|e| Error::ManifestInvalid(format!("{e}")))?;
@@ -198,7 +191,7 @@ impl ManifestService {
         repo: String,
         reference: String,
     ) -> Result<ManifestDeleted, Error> {
-        ensure_writable(&repo)?;
+        ensure_not_proxied(&repo)?;
         if REGEX_TAG.is_match(&reference) {
             self.repos.tag.delete(&repo, &reference).await?;
         } else {

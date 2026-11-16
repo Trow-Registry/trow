@@ -120,7 +120,7 @@ impl BlobRepository {
     ///
     /// Seeds a blob with a controlled age relative to the database clock, which
     /// is the clock the GC's staleness cutoff compares against.
-    #[doc(hidden)]
+    #[cfg(test)]
     pub async fn insert_aged(
         &self,
         digest: &str,
@@ -142,6 +142,7 @@ impl BlobRepository {
     }
 
     /// SELECT digest FROM blob
+    #[cfg(test)]
     pub async fn list_all_digests(&self) -> Result<Vec<String>, sqlx::Error> {
         sqlx::query_scalar!(r#"SELECT digest FROM blob"#)
             .fetch_all(&self.db_ro)

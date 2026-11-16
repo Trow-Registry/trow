@@ -168,9 +168,18 @@ impl From<crate::services::Error> for Error {
             K::ManifestInvalid => Error::ManifestInvalid(err.detail()),
             K::ManifestUnknown => Error::ManifestUnknown(err.detail()),
             K::BlobUploadUnknown => Error::BlobUploadUnknown,
-            K::DigestInvalid => Error::DigestInvalid,
-            K::BlobNotFound => Error::BlobUnknown,
-            K::UnsatisfiableRange => Error::UnsatisfiableRange,
+            K::DigestInvalid => {
+                tracing::warn!("Error(services): {err}");
+                Error::DigestInvalid
+            }
+            K::BlobNotFound => {
+                tracing::warn!("Error(services): {err}");
+                Error::BlobUnknown
+            }
+            K::UnsatisfiableRange => {
+                tracing::warn!("Error(services): {err}");
+                Error::UnsatisfiableRange
+            }
             K::Internal => {
                 tracing::error!("Error(services): {err}");
                 Error::Internal

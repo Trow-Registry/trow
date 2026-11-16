@@ -5,6 +5,7 @@ use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
 use bytes::Bytes;
+use http_body_util::LengthLimitError;
 
 use super::extracts::AlwaysHost;
 use super::macros::endpoint_fn_7_levels;
@@ -21,11 +22,15 @@ use crate::utils::manifest::OCIManifest;
 async fn read_manifest_body(body: Body) -> Result<Bytes, Error> {
     axum::body::to_bytes(body, MANIFEST_BODY_SIZE_LIMIT)
         .await
-        .map_err(|_| {
-            Error::ManifestInvalid(format!(
-                "Manifest is bigger than limit of {}MiB",
-                MANIFEST_BODY_SIZE_LIMIT / (1024 * 1024)
-            ))
+        .map_err(|e| {
+            if e.into_inner().is::<LengthLimitError>() {
+                Error::ManifestInvalid(format!(
+                    "Manifest is bigger than limit of {}MiB",
+                    MANIFEST_BODY_SIZE_LIMIT / (1024 * 1024)
+                ))
+            } else {
+                Error::ManifestInvalid("Could not read manifest body".to_string())
+            }
         })
 }
 

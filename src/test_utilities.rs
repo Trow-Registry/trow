@@ -48,11 +48,8 @@ pub async fn repos_in_memory() -> Arc<Repositories> {
     Arc::new(Repositories::from_pools(pool.clone(), pool))
 }
 
-// Persistence fixtures.
-//
-// Route and integration tests must not reach for repositories directly; these
-// helpers are the single place that seeds the database and the storage backend
-// on their behalf.
+// Persistence fixtures for route tests, so they do not reach for repositories
+// directly.
 
 /// Insert a manifest row plus its repository association, as the registry
 /// would after a successful push.
@@ -94,7 +91,7 @@ pub async fn seed_blob_upload(state: &TrowServerState, uuid: &str, repo: &str, o
         .services
         .repos()
         .blob_upload
-        .create_with_offset(uuid, repo, offset)
+        .create_aged(uuid, repo, offset, 0)
         .await
         .unwrap();
 }
@@ -108,31 +105,6 @@ pub async fn blob_upload_exists(state: &TrowServerState, uuid: &str) -> bool {
         .exists(uuid)
         .await
         .is_ok()
-}
-
-/// Insert a tag pointing at an existing manifest.
-pub async fn seed_tag(state: &TrowServerState, repo: &str, tag: &str, manifest_digest: &str) {
-    state
-        .services
-        .repos()
-        .tag
-        .upsert(tag, repo, manifest_digest)
-        .await
-        .unwrap();
-}
-
-/// Every tag in the database, as `(repo, tag, manifest digest)`.
-pub async fn all_tags(state: &TrowServerState) -> Vec<(String, String, String)> {
-    state
-        .services
-        .repos()
-        .tag
-        .list_all()
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|t| (t.repo, t.tag, t.manifest_digest))
-        .collect()
 }
 
 /// Write bytes into an in-progress upload, as a previous PATCH would.

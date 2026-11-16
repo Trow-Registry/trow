@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::file_storage::FileStorage;
 use crate::repositories::Repositories;
 use crate::services::Error;
-use crate::services::reference::ensure_writable;
+use crate::services::reference::ensure_not_proxied;
 use crate::services::uploads::{AcceptedUpload, Upload, UploadInfo, UploadStatus};
 use crate::utils::digest::Digest;
 
@@ -33,7 +33,7 @@ impl BlobUploadService {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        ensure_writable(&repo_name)?;
+        ensure_not_proxied(&repo_name)?;
 
         let upload_uuid = Uuid::new_v4().to_string();
         self.repos
@@ -66,7 +66,7 @@ impl BlobUploadService {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        ensure_writable(&repo_name)?;
+        ensure_not_proxied(&repo_name)?;
         let uuid_str = uuid.to_string();
         self.repos.blob_upload.exists(&uuid_str).await?;
 
@@ -99,7 +99,7 @@ impl BlobUploadService {
         S: Stream<Item = Result<Bytes, E>> + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        ensure_writable(repo_name)?;
+        ensure_not_proxied(repo_name)?;
         let upload_row = self.repos.blob_upload.find(uuid_str).await?;
         if upload_row.repo != repo_name {
             return Err(Error::Invalid("Repository mismatch".to_string()));
@@ -142,7 +142,7 @@ impl BlobUploadService {
         repo_name: String,
         uuid: Uuid,
     ) -> Result<UploadStatus, Error> {
-        ensure_writable(&repo_name)?;
+        ensure_not_proxied(&repo_name)?;
         let uuid_str = uuid.to_string();
         let offset = self
             .repos
@@ -282,7 +282,7 @@ mod tests {
         let uuid_str = uuid.to_string();
         repos
             .blob_upload
-            .create_with_offset(&uuid_str, "myrepo", 42)
+            .create_aged(&uuid_str, "myrepo", 42, 0)
             .await
             .unwrap();
 

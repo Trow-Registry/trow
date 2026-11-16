@@ -15,6 +15,7 @@ use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
+use trow::repositories::models::Tag;
 use trow::utils::digest::Digest;
 use trow::utils::manifest;
 use trow::{TrowConfig, TrowServerState, routes};
@@ -74,18 +75,9 @@ pub async fn response_body_json<T: DeserializeOwned>(resp: Response<Body>) -> T 
     serde_json::from_reader(reader).unwrap()
 }
 
-/// Every tag in the database, as `(repo, tag, manifest digest)`.
-pub async fn all_tags(state: &Arc<TrowServerState>) -> Vec<(String, String, String)> {
-    state
-        .services
-        .repos()
-        .tag
-        .list_all()
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|t| (t.repo, t.tag, t.manifest_digest))
-        .collect()
+/// Every tag in the database.
+pub async fn all_tags(state: &Arc<TrowServerState>) -> Vec<Tag> {
+    state.services.repos().tag.list_all().await.unwrap()
 }
 
 /// Insert a tag pointing at an existing manifest.

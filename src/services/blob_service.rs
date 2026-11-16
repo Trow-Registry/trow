@@ -3,8 +3,7 @@ use std::sync::Arc;
 
 use tokio::io::AsyncRead;
 
-use crate::file_storage::BoundedStream;
-use crate::file_storage::FileStorage;
+use crate::file_storage::{BoundedStream, FileStorage};
 use crate::repositories::Repositories;
 use crate::services::Error;
 use crate::services::reference::parse_reference;

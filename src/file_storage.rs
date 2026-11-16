@@ -5,7 +5,6 @@
 //! `FileStorage` methods.
 
 use std::borrow::Cow;
-
 use std::ops::{Deref, RangeInclusive};
 use std::path::{Path, PathBuf};
 use std::{io, str};

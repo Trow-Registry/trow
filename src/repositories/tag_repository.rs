@@ -90,6 +90,7 @@ impl TagRepository {
     }
 
     /// SELECT COUNT(*) FROM tag WHERE repo = $1 AND tag = $2
+    #[cfg(test)]
     pub async fn count(&self, repo: &str, tag: &str) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar!(
             r#"SELECT COUNT(*) as "count!" FROM tag WHERE repo = $1 AND tag = $2"#,
@@ -101,6 +102,7 @@ impl TagRepository {
     }
 
     /// SELECT repo, tag, manifest_digest FROM tag
+    #[doc(hidden)]
     pub async fn list_all(&self) -> Result<Vec<Tag>, sqlx::Error> {
         sqlx::query_as!(Tag, r#"SELECT repo, tag, manifest_digest FROM tag"#)
             .fetch_all(&self.db_ro)

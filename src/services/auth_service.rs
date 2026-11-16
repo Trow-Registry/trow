@@ -4,7 +4,6 @@
 //! module owns the credential check (argon2) and the token lifecycle (sign and
 //! verify); the routes layer only extracts headers and renders responses.
 
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -54,7 +53,7 @@ pub struct AuthService {
     /// HMAC secret used to sign and verify session tokens.
     token_secret: Vec<u8>,
     /// The single configured user, if authentication is enabled.
-    user: Option<Arc<UserConfig>>,
+    user: Option<UserConfig>,
 }
 
 impl AuthService {
@@ -62,7 +61,7 @@ impl AuthService {
         Self {
             service_name,
             token_secret,
-            user: user.map(Arc::new),
+            user,
         }
     }
 
@@ -71,25 +70,26 @@ impl AuthService {
         self.user.is_some()
     }
 
-    /// Verifies a decoded `user:password` pair against the configured user.
-    ///
-    /// Any encoding problem at all fails verification rather than erroring:
-    /// the caller only needs to know whether the credentials are good.
-    pub fn verify_credentials(&self, user_pass: &[u8]) -> Result<AuthenticatedUser, Error> {
-        let user_cfg = self.user.as_ref().ok_or(Error::Unauthorized)?;
-        let mut split = user_pass.split(|b| b == &b':');
-        if let Some(user) = split.next()
-            && let Some(pass) = split.next()
-            && user_cfg.user.as_bytes() == user
-            && let Ok(valid) = argon2::verify_encoded(&user_cfg.hash_encoded, pass)
-            && valid
-        {
-            return Ok(AuthenticatedUser {
-                user: user_cfg.user.clone(),
-                token: String::new(),
-            });
+    /// Verifies a decoded `user:password` pair against the configured user and
+    /// returns the user name.
+    pub fn verify_credentials(&self, user_pass: &[u8]) -> Result<String, Error> {
+        let user_cfg = self
+            .user
+            .as_ref()
+            .ok_or_else(|| Error::Unauthorized("no user is configured".to_string()))?;
+        let sep = user_pass
+            .iter()
+            .position(|b| *b == b':')
+            .ok_or_else(|| Error::Unauthorized("malformed basic credentials".to_string()))?;
+        let (user, pass) = (&user_pass[..sep], &user_pass[sep + 1..]);
+        if user_cfg.user.as_bytes() != user {
+            return Err(Error::Unauthorized("unknown user".to_string()));
         }
-        Err(Error::Unauthorized)
+        match argon2::verify_encoded(&user_cfg.hash_encoded, pass) {
+            Ok(true) => Ok(user_cfg.user.clone()),
+            Ok(false) => Err(Error::Unauthorized("wrong password".to_string())),
+            Err(e) => Err(Error::Internal(format!("could not verify password: {e}"))),
+        }
     }
 
     /// Issues a session token for an authenticated user.
@@ -110,15 +110,13 @@ impl AuthService {
             iat: current_time.as_secs(),
             jti: Uuid::new_v4().to_string(),
         };
-        let payload = serde_json::to_value(claim)
-            .map_err(|e| Error::Internal(format!("could not encode token claim: {e}")))?;
 
         encode(
             &Header::default(),
-            &payload,
+            &claim,
             &EncodingKey::from_secret(&self.token_secret),
         )
-        .map_err(|e| Error::Unauthorized.with_cause(format!("could not sign token: {e}")))
+        .map_err(|e| Error::Internal(format!("could not sign token: {e}")))
     }
 
     /// Verifies a bearer token and returns the identity it describes.
@@ -130,21 +128,11 @@ impl AuthService {
             &DecodingKey::from_secret(&self.token_secret),
             &validation,
         )
-        .map_err(|e| Error::Unauthorized.with_cause(format!("could not decode token: {e}")))?;
+        .map_err(|e| Error::Unauthorized(format!("could not decode token: {e}")))?;
 
         Ok(AuthenticatedUser {
             user: decoded.claims.sub,
             token: token.to_string(),
-        })
-    }
-
-    /// Logs in with basic credentials and returns the issued session token.
-    pub fn login(&self, user_pass: &[u8]) -> Result<AuthenticatedUser, Error> {
-        let verified = self.verify_credentials(user_pass)?;
-        let token = self.issue_token(&verified.user)?;
-        Ok(AuthenticatedUser {
-            user: verified.user,
-            token,
         })
     }
 
@@ -187,7 +175,7 @@ mod tests {
     fn valid_credentials_are_accepted() {
         let auth = service(Some(("admin", "hunter2")));
         let user = auth.verify_credentials(b"admin:hunter2").unwrap();
-        assert_eq!(user.user, "admin");
+        assert_eq!(user, "admin");
     }
 
     #[test]
@@ -195,7 +183,7 @@ mod tests {
         let auth = service(Some(("admin", "hunter2")));
         assert!(matches!(
             auth.verify_credentials(b"admin:wrong"),
-            Err(Error::Unauthorized)
+            Err(Error::Unauthorized(_))
         ));
     }
 
@@ -204,7 +192,7 @@ mod tests {
         let auth = service(Some(("admin", "hunter2")));
         assert!(matches!(
             auth.verify_credentials(b"root:hunter2"),
-            Err(Error::Unauthorized)
+            Err(Error::Unauthorized(_))
         ));
     }
 
@@ -213,7 +201,7 @@ mod tests {
         let auth = service(Some(("admin", "hunter2")));
         assert!(matches!(
             auth.verify_credentials(b"adminhunter2"),
-            Err(Error::Unauthorized)
+            Err(Error::Unauthorized(_))
         ));
     }
 
@@ -221,7 +209,7 @@ mod tests {
     fn credentials_are_rejected_when_no_user_is_configured() {
         assert!(matches!(
             service(None).verify_credentials(b"admin:hunter2"),
-            Err(Error::Unauthorized)
+            Err(Error::Unauthorized(_))
         ));
     }
 
@@ -241,7 +229,7 @@ mod tests {
         let token = auth.issue_token("admin").unwrap();
         assert!(matches!(
             other.verify_token(&token),
-            Err(Error::Unauthorized)
+            Err(Error::Unauthorized(_))
         ));
     }
 
@@ -250,15 +238,13 @@ mod tests {
         let auth = service(Some(("admin", "hunter2")));
         assert!(matches!(
             auth.verify_token("not-a-jwt"),
-            Err(Error::Unauthorized)
+            Err(Error::Unauthorized(_))
         ));
     }
 
     #[test]
-    fn login_returns_a_usable_token() {
-        let auth = service(Some(("admin", "hunter2")));
-        let identity = auth.login(b"admin:hunter2").unwrap();
-        assert_eq!(identity.user, "admin");
-        assert_eq!(auth.verify_token(&identity.token).unwrap().user, "admin");
+    fn password_containing_colon_is_accepted() {
+        let auth = service(Some(("admin", "hun:ter2")));
+        assert_eq!(auth.verify_credentials(b"admin:hun:ter2").unwrap(), "admin");
     }
 }

@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 use super::authenticate::Authenticate;
 use crate::TrowServerState;
 use crate::routes::extracts::AlwaysHost;
-use crate::services::auth_service::AuthenticatedUser;
+use crate::services::ErrorKind;
+use crate::services::auth_service::{AuthService, AuthenticatedUser};
 
 const AUTHORIZATION: &str = "authorization";
 
@@ -68,11 +69,13 @@ where
             .map_err(|_| (StatusCode::UNAUTHORIZED, ()))?;
 
         match auth_service.verify_credentials(&user_pass) {
-            Ok(identity) => Ok(ValidBasicToken {
-                user: identity.user,
-            }),
+            Ok(user) => Ok(ValidBasicToken { user }),
             Err(e) => {
-                tracing::debug!("Rejected basic credentials: {e}");
+                if e.kind() == ErrorKind::Internal {
+                    tracing::error!("Could not verify basic credentials: {e}");
+                } else {
+                    tracing::debug!("Rejected basic credentials: {e}");
+                }
                 Err((StatusCode::UNAUTHORIZED, ()))
             }
         }
@@ -143,9 +146,7 @@ where
 
         if !auth_service.requires_auth() {
             //Authentication is not configured
-            let no_auth_token =
-                TrowToken::from(crate::services::auth_service::AuthService::anonymous());
-            return Ok(no_auth_token);
+            return Ok(TrowToken::from(AuthService::anonymous()));
         }
         let authorization = match parts
             .headers
