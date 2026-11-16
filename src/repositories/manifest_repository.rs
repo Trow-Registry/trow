@@ -95,4 +95,23 @@ impl ManifestRepository {
         .fetch_all(&self.db_ro)
         .await
     }
+
+    /// SELECT COUNT(*) FROM manifest WHERE digest = $1
+    #[cfg(test)]
+    pub async fn count(&self, digest: &str) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!" FROM manifest WHERE digest = $1"#,
+            digest
+        )
+        .fetch_one(&self.db_ro)
+        .await
+    }
+
+    /// SELECT digest FROM manifest
+    #[cfg(test)]
+    pub async fn list_all_digests(&self) -> Result<Vec<String>, sqlx::Error> {
+        sqlx::query_scalar!(r#"SELECT digest FROM manifest"#)
+            .fetch_all(&self.db_ro)
+            .await
+    }
 }

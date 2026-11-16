@@ -2,7 +2,7 @@ use axum::body;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
-use crate::types::VerifiedManifest;
+use crate::services::manifest_results::VerifiedManifest;
 
 impl IntoResponse for VerifiedManifest {
     fn into_response(self) -> Response {
@@ -29,7 +29,7 @@ mod test {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
 
-    use crate::types::VerifiedManifest;
+    use crate::services::manifest_results::VerifiedManifest;
     use crate::utils::digest::Digest;
 
     #[test]

@@ -4,6 +4,23 @@ use crate::PROXY_DIR;
 use crate::services::Error;
 use crate::utils::manifest::REGEX_TAG;
 
+/// Repositories whose name starts with `f/` are proxied to an upstream
+/// registry and are therefore read-only.
+pub fn is_proxied(name: &str) -> bool {
+    name.starts_with(PROXY_DIR)
+}
+
+/// Rejects operations that proxied repositories do not support: pushes, blob
+/// uploads and the referrers API. Service entry points for those operations
+/// must call this before touching the database or the storage backend.
+pub fn ensure_not_proxied(name: &str) -> Result<(), Error> {
+    if is_proxied(name) {
+        Err(Error::UnsupportedForProxiedRepo)
+    } else {
+        Ok(())
+    }
+}
+
 pub fn parse_reference(
     name: &str,
     version: &str,

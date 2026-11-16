@@ -1,6 +1,5 @@
 pub mod accepted_upload;
 pub mod authenticate;
-pub mod blob_deleted;
 pub mod blob_reader;
 pub mod content_info;
 pub mod errors;
@@ -8,10 +7,10 @@ pub mod health;
 pub mod html;
 pub mod manifest_deleted;
 pub mod readiness;
-pub mod tag_list;
 pub mod trow_token;
 pub mod upload;
 pub mod upload_info;
+pub mod upload_status;
 pub mod verified_manifest;
 
 use std::marker::PhantomData;

@@ -75,14 +75,4 @@ impl Repositories {
             repo_blob_assoc: RepoBlobAssocRepository::new(db_ro, db_rw),
         }
     }
-
-    #[doc(hidden)]
-    pub fn db_rw(&self) -> &SqlitePool {
-        self.blob.db_rw()
-    }
-
-    #[doc(hidden)]
-    pub fn db_ro(&self) -> &SqlitePool {
-        self.blob.db_ro()
-    }
 }

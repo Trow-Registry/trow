@@ -187,4 +187,12 @@ impl RepoBlobAssocRepository {
         .fetch_all(&self.db_ro)
         .await
     }
+
+    /// SELECT repo_name FROM repo_blob_assoc (every association, unfiltered)
+    #[cfg(test)]
+    pub async fn list_all_repo_names(&self) -> Result<Vec<String>, sqlx::Error> {
+        sqlx::query_scalar!(r#"SELECT repo_name FROM repo_blob_assoc ORDER BY repo_name ASC"#)
+            .fetch_all(&self.db_ro)
+            .await
+    }
 }

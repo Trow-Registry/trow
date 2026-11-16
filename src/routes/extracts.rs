@@ -9,6 +9,7 @@ use axum_extra::headers::Host;
 use serde::Deserialize;
 
 use crate::TrowServerState;
+use crate::utils::digest::Digest;
 
 #[derive(Deserialize)]
 pub struct ImageNamespace {
@@ -59,4 +60,14 @@ where
 
         Ok(AlwaysHost(String::new()))
     }
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct OptionalDigestQuery {
+    pub digest: Option<Digest>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct DigestQuery {
+    pub digest: Digest,
 }
